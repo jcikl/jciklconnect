@@ -27,6 +27,7 @@ import { isDevMode, withDevMode } from '../utils/devMode';
 import { MembersService } from './membersService';
 import { CommunicationService } from './communicationService';
 import { apiCache } from './cacheService';
+import { logError as logServiceError } from './errorLoggingService';
 
 const CACHE_PREFIX_BOARD_TERM = 'boardTermSettings:';
 const BOARD_TERM_TTL = 10 * 60 * 1000; // 10 minutes
@@ -74,7 +75,10 @@ export class BoardManagementService {
             ...doc.data(),
           })) as BoardMember[];
         } catch (error) {
-          console.error('Error getting current board members:', error);
+          logServiceError(
+            error instanceof Error ? error : new Error(String(error)),
+            { component: 'BoardManagementService', action: 'getCurrentBoardMembers' }
+          );
           throw error;
         }
       }
@@ -83,25 +87,21 @@ export class BoardManagementService {
 
   // Get board members for a specific year
   static async getBoardMembersByYear(year: string): Promise<BoardMember[]> {
+    if (isDevMode()) { return []; }
     try {
       const boardMembersRef = collection(db, 'boardMembers');
       const q = query(boardMembersRef, where('term', '==', year));
       const snapshot = await getDocs(q);
 
-      const docs = snapshot.docs.map(doc => ({
+      return snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
       })) as BoardMember[];
-
-      if (docs.length === 0 && isDevMode()) {
-        return [];
-      }
-      return docs;
     } catch (error) {
-      console.error('Error getting board members by year:', error);
-      if (isDevMode()) {
-        return [];
-      }
+      logServiceError(
+        error instanceof Error ? error : new Error(String(error)),
+        { component: 'BoardManagementService', action: 'getBoardMembersByYear', additionalData: { year } }
+      );
       throw error;
     }
   }
@@ -149,7 +149,10 @@ export class BoardManagementService {
             ...transitionData,
           };
         } catch (error) {
-          console.error('Error creating board transition:', error);
+          logServiceError(
+            error instanceof Error ? error : new Error(String(error)),
+            { component: 'BoardManagementService', action: 'createBoardTransition' }
+          );
           throw error;
         }
       }
@@ -172,34 +175,86 @@ export class BoardManagementService {
 
           const transition = { id: transitionDoc.id, ...transitionDoc.data() } as BoardTransition;
 
-          // Archive outgoing board members
+          // --- Phase 1: gather display fields for incoming members (reads only) ---
+          const incomingDisplayFields = await Promise.all(
+            transition.incomingBoard.map((m) => this.getMemberDisplayFields(m.memberId))
+          );
+
+          // --- Phase 2: build a single writeBatch for all boardMembers writes + transition status ---
+          const batch = writeBatch(db);
+          const now = new Date().toISOString();
+
+          // Archive outgoing boardMembers docs
           for (const outgoingMember of transition.outgoingBoard) {
-            await this.archiveBoardMember(outgoingMember);
+            const boardMemberRef = doc(db, 'boardMembers', outgoingMember.id);
+            batch.update(boardMemberRef, {
+              isActive: false,
+              endDate: now,
+              updatedAt: now,
+            });
           }
 
-          // Activate incoming board members
-          for (const incomingMember of transition.incomingBoard) {
-            await this.activateBoardMember(incomingMember);
-          }
+          // Activate incoming boardMembers docs (add new docs via batch.set)
+          const incomingNewRefs = transition.incomingBoard.map((incomingMember, i) => {
+            const display = incomingDisplayFields[i];
+            const termYear = parseInt(incomingMember.term, 10);
+            const isCurrentTerm = termYear === getCurrentBoardCalendarYear();
+            const boardMemberData = {
+              ...incomingMember,
+              ...display,
+              isActive: true,
+              startDate: now,
+              createdAt: now,
+              updatedAt: now,
+              ...(isCurrentTerm ? { isCurrentBoardMember: true } : {}),
+            };
+            const newRef = doc(collection(db, 'boardMembers'));
+            batch.set(newRef, boardMemberData);
+            return { ref: newRef, incomingMember };
+          });
+          void incomingNewRefs; // refs used only to register in batch
 
-          // Update transition status
-          await updateDoc(transitionRef, {
+          // Mark transition complete in the same batch
+          batch.update(transitionRef, {
             status: 'completed',
-            updatedAt: new Date().toISOString(),
+            updatedAt: now,
           });
 
-          // Send notifications
+          await batch.commit();
+
+          // --- Phase 3: propagate role changes to members collection (outside batch — reads required) ---
+          await Promise.all([
+            ...transition.outgoingBoard.map((m) =>
+              MembersService.updateMember(m.memberId, { role: UserRole.MEMBER })
+                .then(() => this.clearMemberCurrentBoardStatus(m.memberId))
+            ),
+            ...transition.incomingBoard.map((m) => {
+              const termYear = parseInt(m.term, 10);
+              const isCurrentTerm = termYear === getCurrentBoardCalendarYear();
+              return MembersService.updateMember(m.memberId, {
+                role: UserRole.BOARD,
+                currentBoardYear: termYear,
+                currentBoardPosition: m.position,
+                ...(isCurrentTerm ? { isCurrentBoardMember: true } : {}),
+              });
+            }),
+          ]);
+
+          // --- Phase 4: notifications (best-effort, non-atomic) ---
           await this.sendTransitionNotifications(transition);
 
         } catch (error) {
-          console.error('Error executing board transition:', error);
+          logServiceError(
+            error instanceof Error ? error : new Error(String(error)),
+            { component: 'BoardManagementService', action: 'executeBoardTransition', additionalData: { transitionId } }
+          );
           throw error;
         }
       }
     );
   }
 
-  // Archive a board member
+  // Archive a board member (kept for standalone use outside executeBoardTransition)
   private static async archiveBoardMember(boardMember: BoardMember): Promise<void> {
     try {
       const boardMemberRef = doc(db, 'boardMembers', boardMember.id);
@@ -214,12 +269,15 @@ export class BoardManagementService {
       });
       await this.clearMemberCurrentBoardStatus(boardMember.memberId);
     } catch (error) {
-      console.error('Error archiving board member:', error);
+      logServiceError(
+        error instanceof Error ? error : new Error(String(error)),
+        { component: 'BoardManagementService', action: 'archiveBoardMember', additionalData: { boardMemberId: boardMember.id } }
+      );
       throw error;
     }
   }
 
-  // Activate a board member
+  // Activate a board member (kept for standalone use outside executeBoardTransition)
   private static async activateBoardMember(boardMember: BoardMember): Promise<void> {
     try {
       const display = await this.getMemberDisplayFields(boardMember.memberId);
@@ -244,7 +302,10 @@ export class BoardManagementService {
         ...(isCurrentTerm ? { isCurrentBoardMember: true } : {}),
       });
     } catch (error) {
-      console.error('Error activating board member:', error);
+      logServiceError(
+        error instanceof Error ? error : new Error(String(error)),
+        { component: 'BoardManagementService', action: 'activateBoardMember', additionalData: { boardMemberId: boardMember.id } }
+      );
       throw error;
     }
   }
@@ -272,7 +333,10 @@ export class BoardManagementService {
         });
       }
     } catch (error) {
-      console.error('Error sending transition notifications:', error);
+      logServiceError(
+        error instanceof Error ? error : new Error(String(error)),
+        { component: 'BoardManagementService', action: 'sendTransitionNotifications' }
+      );
       throw error;
     }
   }
@@ -292,7 +356,10 @@ export class BoardManagementService {
             ...doc.data(),
           })) as BoardTransition[];
         } catch (error) {
-          console.error('Error getting board transition history:', error);
+          logServiceError(
+            error instanceof Error ? error : new Error(String(error)),
+            { component: 'BoardManagementService', action: 'getBoardTransitionHistory' }
+          );
           throw error;
         }
       }
@@ -397,7 +464,7 @@ export class BoardManagementService {
     updatedBy?: string
   ): Promise<void> {
     return withDevMode(
-      () => { console.log(`[Dev Mode] Would set board for term ${year}`, assignments); },
+      () => { if (isDevMode()) { console.log(`[Dev Mode] Would set board for term ${year}`, assignments); } },
       async () => {
         try {
           const boardMembersRef = collection(db, 'boardMembers');
@@ -448,7 +515,10 @@ export class BoardManagementService {
 
           await this.syncMemberDocumentsForTerm(year, assignments, existing);
         } catch (error) {
-          console.error('Error setting board for term:', error);
+          logServiceError(
+            error instanceof Error ? error : new Error(String(error)),
+            { component: 'BoardManagementService', action: 'setBoardForTerm', additionalData: { year } }
+          );
           throw error;
         }
       }
@@ -686,7 +756,10 @@ export class BoardManagementService {
           if (!snap.exists()) return null;
           return { year, ...snap.data() } as BoardTermSettings;
         } catch (error) {
-          console.error('Error getting board term settings:', error);
+          logServiceError(
+            error instanceof Error ? error : new Error(String(error)),
+            { component: 'BoardManagementService', action: 'getBoardTermSettings', additionalData: { year } }
+          );
           return null;
         }
       },
@@ -707,7 +780,10 @@ export class BoardManagementService {
       await setDoc(ref, clean, { merge: true });
       invalidateBoardTermCache(year);
     } catch (error) {
-      console.error('Error setting board term settings:', error);
+      logServiceError(
+        error instanceof Error ? error : new Error(String(error)),
+        { component: 'BoardManagementService', action: 'setBoardTermSettings', additionalData: { year } }
+      );
       throw error;
     }
   }
@@ -720,7 +796,7 @@ export class BoardManagementService {
   }> {
     return withDevMode(
       () => {
-        console.log(`[Dev Mode] Would transition board members for year ${newYear}`);
+        if (isDevMode()) { console.log(`[Dev Mode] Would transition board members for year ${newYear}`); }
         return { transitioned: 0, archived: 0, notificationsSent: 0 };
       },
       async () => {
@@ -771,11 +847,14 @@ export class BoardManagementService {
 
               notificationsSent++;
             } catch (error) {
-              console.error(`Error transitioning board member ${member.id}:`, error);
+              logServiceError(
+                error instanceof Error ? error : new Error(String(error)),
+                { component: 'BoardManagementService', action: 'transitionBoardMembers', additionalData: { memberId: member.id, newYear } }
+              );
             }
           }
 
-          console.log(`Board transition completed for year ${newYear}: ${transitioned} members transitioned, ${archived} positions archived`);
+          if (isDevMode()) { console.log(`Board transition completed for year ${newYear}: ${transitioned} members transitioned, ${archived} positions archived`); }
 
           return {
             transitioned,
@@ -783,7 +862,10 @@ export class BoardManagementService {
             notificationsSent,
           };
         } catch (error) {
-          console.error('Error transitioning board members:', error);
+          logServiceError(
+            error instanceof Error ? error : new Error(String(error)),
+            { component: 'BoardManagementService', action: 'transitionBoardMembers', additionalData: { newYear } }
+          );
           throw error;
         }
       }
@@ -796,13 +878,13 @@ export class BoardManagementService {
     assignments: Array<{ memberId: string; position: string }>
   ): Promise<void> {
     return withDevMode(
-      () => { console.log(`[Dev Mode] Would assign board members for year ${year}`); },
+      () => { if (isDevMode()) { console.log(`[Dev Mode] Would assign board members for year ${year}`); } },
       async () => {
         try {
           for (const assignment of assignments) {
             const member = await MembersService.getMemberById(assignment.memberId);
             if (!member) {
-              console.warn(`Member ${assignment.memberId} not found`);
+              if (isDevMode()) { console.warn(`Member ${assignment.memberId} not found`); }
               continue;
             }
 
@@ -831,7 +913,10 @@ export class BoardManagementService {
             });
           }
         } catch (error) {
-          console.error('Error assigning board members:', error);
+          logServiceError(
+            error instanceof Error ? error : new Error(String(error)),
+            { component: 'BoardManagementService', action: 'assignBoardMembers', additionalData: { year } }
+          );
           throw error;
         }
       }
@@ -853,7 +938,10 @@ export class BoardManagementService {
             (m.role === UserRole.BOARD || m.role === UserRole.ADMIN)
           );
         } catch (error) {
-          console.error('Error getting board composition:', error);
+          logServiceError(
+            error instanceof Error ? error : new Error(String(error)),
+            { component: 'BoardManagementService', action: 'getBoardComposition', additionalData: { year } }
+          );
           throw error;
         }
       }
@@ -875,7 +963,10 @@ export class BoardManagementService {
             ...doc.data(),
           })) as BoardMember[];
         } catch (error) {
-          console.error('Error getting board positions for member:', error);
+          logServiceError(
+            error instanceof Error ? error : new Error(String(error)),
+            { component: 'BoardManagementService', action: 'getMemberBoardPositions', additionalData: { memberId } }
+          );
           return [];
         }
       }
@@ -897,7 +988,10 @@ export class BoardManagementService {
             ...doc.data(),
           })) as BoardMember[];
         } catch (error) {
-          console.error('Error getting commission director positions for member:', error);
+          logServiceError(
+            error instanceof Error ? error : new Error(String(error)),
+            { component: 'BoardManagementService', action: 'getMemberCommissionDirectorPositions', additionalData: { memberId } }
+          );
           return [];
         }
       }
@@ -910,7 +1004,10 @@ export class BoardManagementService {
       const member = await MembersService.getMemberById(memberId);
       return member?.boardHistory || [];
     } catch (error) {
-      console.error('Error getting member board history:', error);
+      logServiceError(
+        error instanceof Error ? error : new Error(String(error)),
+        { component: 'BoardManagementService', action: 'getMemberBoardHistory', additionalData: { memberId } }
+      );
       throw error;
     }
   }

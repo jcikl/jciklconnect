@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useTransition } from 'react';
+import { useState, useEffect, useMemo, useCallback, useTransition, useRef } from 'react';
 import { useToast } from '../components/ui/Common';
 import { usePermissions } from './usePermissions';
 import { useAuth } from './useAuth';
@@ -21,6 +21,7 @@ import {
   buildCategoryFields,
   buildAdministrativePurpose,
 } from '../utils/transactionCategoryUtils';
+import { errorLoggingService } from '../services/errorLoggingService';
 import type { Transaction, BankAccount, ProjectFinancialAccount, TransactionSplit, InventoryItem } from '../types';
 import type { PaymentRequest, Project, MembershipType } from '../types';
 
@@ -133,6 +134,9 @@ export function useFinanceData(searchQuery?: string) {
   const { hasPermission, isDeveloper } = usePermissions();
   const { user } = useAuth();
 
+  // Tracks which projectIds have already been fetched for purpose autocomplete
+  const fetchedProjectPurposesRef = useRef<Set<string>>(new Set());
+
   // ── Helper wrappers (close over local state) ──────────────────────────────
 
   const isTransactionInCategory = (tx: Transaction, category: string): boolean =>
@@ -153,20 +157,181 @@ export function useFinanceData(searchQuery?: string) {
     return projects.find(p => p.id === selectedProjectFilter) || null;
   }, [selectedProjectFilter, projects]);
 
+  // ── Core data loaders (stable references via useCallback) ────────────────
+
+  const loadData = useCallback(async (targetYear: number = reportYear) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const [txs, accts, summ, inventory, projList, histFlows, allYears] = await Promise.all([
+        FinanceService.getAllTransactions(targetYear),
+        FinanceService.getAllBankAccounts(),
+        FinanceService.getFinancialSummary(targetYear),
+        InventoryService.getAllItems(),
+        ProjectsService.getAllProjects(),
+        targetYear !== 0 ? FinanceService.getHistoricalNetFlowBeforeYear(targetYear) : Promise.resolve({}),
+        FinanceService.getAllTransactionYears()
+      ]);
+      setTransactions(txs);
+      setAccounts(accts);
+      setSummary(summ);
+      setInventoryItems(inventory);
+      setProjects(projList);
+      setAdministrativeProjectIds(getAdministrativeProjectIds());
+      setHistoricalNetFlows(histFlows);
+      setAllTransactionYears(allYears);
+      try {
+        const projectAccountList = await projectFinancialService.getAllProjectAccounts(targetYear);
+        setProjectAccounts(projectAccountList);
+      } catch (projectAccountError) {
+        errorLoggingService.logError(
+          projectAccountError instanceof Error ? projectAccountError : new Error(String(projectAccountError)),
+          { component: 'useFinanceData', action: 'loadData.projectAccounts' }
+        );
+      }
+
+      const allSplits = await FinanceService.getAllTransactionSplits(targetYear);
+      const splitsMap: Record<string, TransactionSplit[]> = {};
+      const txIdsSet = new Set(txs.map(t => t.id));
+      allSplits.forEach(split => {
+        if (txIdsSet.has(split.parentTransactionId)) {
+          if (!splitsMap[split.parentTransactionId]) {
+            splitsMap[split.parentTransactionId] = [];
+          }
+          splitsMap[split.parentTransactionId].push(split);
+        }
+      });
+      setTransactionSplits(splitsMap);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load financial data';
+      setError(errorMessage);
+      showToast(errorMessage, 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [reportYear, showToast]);
+
+  const loadProjectAccounts = useCallback(async (year: number = projectAccountYearFilter) => {
+    setLoadingProjectAccounts(true);
+    try {
+      const [list, ptTrx] = await Promise.all([
+        projectFinancialService.getAllProjectAccounts(year),
+        projectFinancialService.getAllProjectTrackerTransactions()
+      ]);
+      setProjectAccounts(list);
+
+      const ptSummary: Record<string, { income: number; expenses: number }> = {};
+      ptTrx.forEach(tx => {
+        const pid = tx.projectId;
+        if (!pid) return;
+        if (!ptSummary[pid]) {
+          ptSummary[pid] = { income: 0, expenses: 0 };
+        }
+        const type = (tx.type || '').toLowerCase();
+        const amount = Math.abs(tx.amount || 0);
+        if (type === 'income') {
+          ptSummary[pid].income += amount;
+        } else {
+          ptSummary[pid].expenses += amount;
+        }
+      });
+      setProjectTrackerSummary(ptSummary);
+    } catch (err) {
+      errorLoggingService.logError(
+        err instanceof Error ? err : new Error(String(err)),
+        { component: 'useFinanceData', action: 'loadProjectAccounts' }
+      );
+      showToast('Failed to load project financial data', 'error');
+    } finally {
+      setLoadingProjectAccounts(false);
+    }
+  }, [projectAccountYearFilter, showToast]);
+
+  const loadProjects = useCallback(async () => {
+    // Projects are already fetched by loadData; return the current state value.
+    return projects;
+  }, [projects]);
+
+  const loadMembers = useCallback(async () => {
+    try {
+      const list = await MembersService.getAllMembers();
+      const mappedMembers = list.map(m => ({
+        id: m.id,
+        name: m.fullName && m.name
+          ? `${m.fullName} (${m.name})`
+          : (m.fullName || m.name || m.email || m.id),
+        fullName: m.fullName,
+        membershipType: m.membershipType,
+        tshirtSize: m.tshirtSize,
+        jacketSize: m.jacketSize,
+        introducer: m.introducer,
+        joinDate: m.joinDate,
+        membership: m.membership,
+      }));
+      setMembers(mappedMembers);
+      return mappedMembers;
+    } catch (err) {
+      errorLoggingService.logError(
+        err instanceof Error ? err : new Error(String(err)),
+        { component: 'useFinanceData', action: 'loadMembers' }
+      );
+      showToast('Failed to load members', 'error');
+      setMembers([]);
+      return [];
+    }
+  }, [showToast]);
+
+  const loadPrPendingReconciliation = useCallback(async () => {
+    setPrReconcileLoading(true);
+    try {
+      const { items } = await PaymentRequestService.list({ pageSize: 200 });
+      const approved = items.filter(pr => pr.status === 'approved');
+      const linkedPrIds = new Set(
+        transactions.filter(t => t.paymentRequestId && t.status === 'Reconciled').map(t => t.paymentRequestId!)
+      );
+      const pending = approved.filter(pr => !linkedPrIds.has(pr.id));
+      setPrPendingReconciliation(pending);
+      const bankExpenses = transactions.filter(t => t.source === 'bank_import' && t.type === 'Expense' && t.status !== 'Reconciled');
+      const suggestions: Record<string, Transaction[]> = {};
+      for (const pr of pending) {
+        const prDate = new Date(pr.date || pr.createdAt);
+        const prAmount = pr.totalAmount || pr.amount;
+        suggestions[pr.id] = bankExpenses
+          .filter(t => Math.abs(t.amount - prAmount) < 0.01 && Math.abs(new Date(t.date).getTime() - prDate.getTime()) <= 14 * 86400000)
+          .sort((a, b) => Math.abs(new Date(a.date).getTime() - prDate.getTime()) - Math.abs(new Date(b.date).getTime() - prDate.getTime()));
+      }
+      setPrBankSuggestions(suggestions);
+      const initial: Record<string, string> = {};
+      for (const pr of pending) { if (suggestions[pr.id]?.[0]) initial[pr.id] = suggestions[pr.id][0].id; }
+      setPrSelectedBankTx(initial);
+    } catch (e) {
+      errorLoggingService.logError(
+        e instanceof Error ? e : new Error(String(e)),
+        { component: 'useFinanceData', action: 'loadPrPendingReconciliation' }
+      );
+      showToast('Failed to load PR reconciliation data', 'error');
+    } finally {
+      setPrReconcileLoading(false);
+    }
+  }, [transactions, showToast]);
+
   // ── Project Trx handlers ──────────────────────────────────────────────────
 
-  const loadProjectTrxList = async (projectId: string) => {
+  const loadProjectTrxList = useCallback(async (projectId: string) => {
     setProjectTrxLoading(true);
     try {
       const txs = await FinanceService.getProjectTransactions(projectId);
       setProjectTrxList(txs);
     } catch (err) {
-      console.error('Failed to load project transactions', err);
+      errorLoggingService.logError(
+        err instanceof Error ? err : new Error(String(err)),
+        { component: 'useFinanceData', action: 'loadProjectTrxList' }
+      );
       showToast('Failed to load project tracker transactions', 'error');
     } finally {
       setProjectTrxLoading(false);
     }
-  };
+  }, [showToast]);
 
   const handleAddProjectTrx = useCallback(async () => {
     if (!selectedProjectFilter) return;
@@ -181,7 +346,7 @@ export function useFinanceData(searchQuery?: string) {
         projectId: selectedProjectFilter,
         category: 'Projects & Activities',
         status: 'Pending',
-      } as any);
+      } as Transaction);
       showToast('Transaction added successfully', 'success');
       setProjectTrxAddForm({});
       await loadProjectTrxList(selectedProjectFilter);
@@ -189,8 +354,7 @@ export function useFinanceData(searchQuery?: string) {
     } catch (err) {
       showToast('Failed to add transaction', 'error');
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedProjectFilter, projectTrxAddForm, showToast]);
+  }, [selectedProjectFilter, projectTrxAddForm, showToast, loadProjectTrxList, loadProjectAccounts]);
 
   const handleUpdateProjectTrx = useCallback(async (id: string) => {
     if (!selectedProjectFilter) return;
@@ -209,8 +373,7 @@ export function useFinanceData(searchQuery?: string) {
     } catch (err) {
       showToast('Failed to update transaction', 'error');
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedProjectFilter, projectTrxEditForm, showToast]);
+  }, [selectedProjectFilter, projectTrxEditForm, showToast, loadProjectTrxList, loadProjectAccounts]);
 
   const handleDeleteProjectTrx = useCallback(async (id: string) => {
     if (!selectedProjectFilter) return;
@@ -223,8 +386,7 @@ export function useFinanceData(searchQuery?: string) {
     } catch (err) {
       showToast('Failed to delete transaction', 'error');
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedProjectFilter, showToast]);
+  }, [selectedProjectFilter, showToast, loadProjectTrxList, loadProjectAccounts]);
 
   const handleProjectTrxPaste = useCallback(async (pastedText: string) => {
     if (!selectedProjectFilter) return;
@@ -296,7 +458,7 @@ export function useFinanceData(searchQuery?: string) {
           purpose: dynamicPurpose || undefined,
           category: 'Projects & Activities',
           status: 'Pending',
-        } as any);
+        } as Transaction);
         parsedCount++;
       }
 
@@ -308,13 +470,15 @@ export function useFinanceData(searchQuery?: string) {
         showToast('Could not parse any valid transactions from clipboard', 'warning');
       }
     } catch (err) {
-      console.error('Error pasting transactions:', err);
+      errorLoggingService.logError(
+        err instanceof Error ? err : new Error(String(err)),
+        { component: 'useFinanceData', action: 'handleProjectTrxPaste' }
+      );
       showToast('Error parsing or adding transactions', 'error');
     } finally {
       setProjectTrxLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedProjectFilter, showToast]);
+  }, [selectedProjectFilter, showToast, loadProjectTrxList, loadProjectAccounts]);
 
   // ── useMemos ──────────────────────────────────────────────────────────────
 
@@ -346,7 +510,10 @@ export function useFinanceData(searchQuery?: string) {
         const txs = await FinanceService.getBankTransactionsByProject(selectedProjectFilter);
         if (!ignore) setSelectedProjectTransactions(txs);
       } catch (err) {
-        console.error('Failed to load transactions for selected project:', err);
+        errorLoggingService.logError(
+          err instanceof Error ? err : new Error(String(err)),
+          { component: 'useFinanceData', action: 'loadSelectedProjectTransactions' }
+        );
         if (!ignore) setSelectedProjectTransactions([]);
       } finally {
         if (!ignore) setLoadingSelectedProjectTransactions(false);
@@ -360,8 +527,7 @@ export function useFinanceData(searchQuery?: string) {
     if (moduleTab === 'Reconciliation' && transactions.length > 0) {
       loadPrPendingReconciliation();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [moduleTab, transactions]);
+  }, [moduleTab, transactions, loadPrPendingReconciliation]);
 
   useEffect(() => {
     let ignore = false;
@@ -371,7 +537,10 @@ export function useFinanceData(searchQuery?: string) {
         const years = await FinanceService.getTransactionYearsForAccount(detailAccount.id);
         if (!ignore) setDetailAccountYears(years);
       } catch (err) {
-        console.error('Failed to load transaction years for account', err);
+        errorLoggingService.logError(
+          err instanceof Error ? err : new Error(String(err)),
+          { component: 'useFinanceData', action: 'loadTransactionYearsForAccount' }
+        );
         if (!ignore) setDetailAccountYears([new Date().getFullYear()]);
       }
     };
@@ -857,13 +1026,13 @@ export function useFinanceData(searchQuery?: string) {
 
   useEffect(() => {
     loadData(reportYear);
-  }, [reportYear]);
+  }, [reportYear, loadData]);
 
   useEffect(() => {
     if (moduleTab === 'Project Account') {
       loadProjectAccounts(projectAccountYearFilter);
     }
-  }, [moduleTab, projectAccountYearFilter]);
+  }, [moduleTab, projectAccountYearFilter, loadProjectAccounts]);
 
   useEffect(() => {
     setDetailYear(reportYear);
@@ -873,7 +1042,7 @@ export function useFinanceData(searchQuery?: string) {
     if (moduleTab === 'Membership' || (editingTransaction?.category === 'Membership' && isEditModalOpen) || (isModalOpen && recordFormCategory === 'Membership')) {
       loadMembers();
     }
-  }, [moduleTab, editingTransaction?.category, isEditModalOpen, isModalOpen, recordFormCategory]);
+  }, [moduleTab, editingTransaction?.category, isEditModalOpen, isModalOpen, recordFormCategory, loadMembers]);
 
   useEffect(() => {
     if (isModalOpen && addDefaultCategory) {
@@ -912,9 +1081,12 @@ export function useFinanceData(searchQuery?: string) {
         return;
       }
 
-      if (editingProjectPurposesByProject[projectId]) {
+      // Skip if already cached in state or in-flight ref
+      if (editingProjectPurposesByProject[projectId] || fetchedProjectPurposesRef.current.has(projectId)) {
         return;
       }
+
+      fetchedProjectPurposesRef.current.add(projectId);
 
       try {
         const purposes = new Set<string>();
@@ -924,22 +1096,28 @@ export function useFinanceData(searchQuery?: string) {
           ptTrx.forEach(t => {
             if (t.projectId === projectId && t.purpose) purposes.add(t.purpose);
           });
-        } catch (e) { console.error('Failed to load PT purposes', e); }
+        } catch (e) {
+          errorLoggingService.logError(
+            e instanceof Error ? e : new Error(String(e)),
+            { component: 'useFinanceData', action: 'loadPurposesForProject.pt' }
+          );
+        }
 
         const allTx = await FinanceService.getAllTransactions();
         allTx.forEach(t => {
           if (t.projectId === projectId && t.purpose) purposes.add(t.purpose);
         });
 
+        // Fetch all split sets in parallel instead of serially
         const splitTx = allTx.filter(t => t.isSplit && t.splitIds);
-        for (const t of splitTx) {
-          try {
-            const splits = await FinanceService.getTransactionSplits(t.id);
-            splits.forEach(s => {
-              if (s.projectId === projectId && s.purpose) purposes.add(s.purpose);
-            });
-          } catch (e) { }
-        }
+        const allSplitsArrays = await Promise.all(
+          splitTx.map(t =>
+            FinanceService.getTransactionSplits(t.id).catch(() => [] as TransactionSplit[])
+          )
+        );
+        allSplitsArrays.flat().forEach(s => {
+          if (s.projectId === projectId && s.purpose) purposes.add(s.purpose);
+        });
 
         if (!ignore) {
           setEditingProjectPurposesByProject(prev => ({
@@ -948,13 +1126,18 @@ export function useFinanceData(searchQuery?: string) {
           }));
         }
       } catch (e) {
-        console.error('Failed to load purposes for project', projectId, e);
+        if (!ignore) fetchedProjectPurposesRef.current.delete(projectId); // allow retry on next open
+        errorLoggingService.logError(
+          e instanceof Error ? e : new Error(String(e)),
+          { component: 'useFinanceData', action: 'loadPurposesForProject', additionalData: { projectId } }
+        );
+        showToast('Failed to load project purposes', 'error');
       }
     };
 
     loadPurposesForProject();
     return () => { ignore = true; };
-  }, [isEditModalOpen, editingTransaction?.projectId, editingTransaction?.category]);
+  }, [isEditModalOpen, editingTransaction?.projectId, editingTransaction?.category, editingProjectPurposesByProject, showToast]);
 
   useEffect(() => {
     let ignore = false;
@@ -990,7 +1173,10 @@ export function useFinanceData(searchQuery?: string) {
           setEditingAdminAccounts(Array.from(accts).sort());
         }
       } catch (e) {
-        console.error('Failed to load admin purposes', e);
+        errorLoggingService.logError(
+          e instanceof Error ? e : new Error(String(e)),
+          { component: 'useFinanceData', action: 'loadAdminPurposes' }
+        );
       }
     };
 
@@ -998,137 +1184,6 @@ export function useFinanceData(searchQuery?: string) {
     return () => { ignore = true; };
   }, [isEditModalOpen, editingTransaction?.category]);
 
-  // ── Core data loaders ─────────────────────────────────────────────────────
-
-  const loadData = async (targetYear: number = reportYear) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const [txs, accts, summ, inventory, projList, histFlows, allYears] = await Promise.all([
-        FinanceService.getAllTransactions(targetYear),
-        FinanceService.getAllBankAccounts(),
-        FinanceService.getFinancialSummary(targetYear),
-        InventoryService.getAllItems(),
-        ProjectsService.getAllProjects(),
-        targetYear !== 0 ? FinanceService.getHistoricalNetFlowBeforeYear(targetYear) : Promise.resolve({}),
-        FinanceService.getAllTransactionYears()
-      ]);
-      setTransactions(txs);
-      setAccounts(accts);
-      setSummary(summ);
-      setInventoryItems(inventory);
-      setProjects(projList);
-      setAdministrativeProjectIds(getAdministrativeProjectIds());
-      setHistoricalNetFlows(histFlows);
-      setAllTransactionYears(allYears);
-      try {
-        const projectAccountList = await projectFinancialService.getAllProjectAccounts(targetYear);
-        setProjectAccounts(projectAccountList);
-      } catch (projectAccountError) {
-        console.error('Failed to load project account labels', projectAccountError);
-      }
-
-      const allSplits = await FinanceService.getAllTransactionSplits(targetYear);
-      const splitsMap: Record<string, TransactionSplit[]> = {};
-      const txIdsSet = new Set(txs.map(t => t.id));
-      allSplits.forEach(split => {
-        if (txIdsSet.has(split.parentTransactionId)) {
-          if (!splitsMap[split.parentTransactionId]) {
-            splitsMap[split.parentTransactionId] = [];
-          }
-          splitsMap[split.parentTransactionId].push(split);
-        }
-      });
-      setTransactionSplits(splitsMap);
-
-      if (selectedProjectFilter && selectedProjectFilter !== UNASSIGNED_PROJECT_ID) {
-        try {
-          const selTxs = await FinanceService.getBankTransactionsByProject(selectedProjectFilter);
-          setSelectedProjectTransactions(selTxs);
-        } catch (selectedTxErr) {
-          console.error('Failed to reload selected project transactions in loadData', selectedTxErr);
-        }
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load financial data';
-      setError(errorMessage);
-      showToast(errorMessage, 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadProjectAccounts = async (year: number = projectAccountYearFilter) => {
-    setLoadingProjectAccounts(true);
-    try {
-      const [list, ptTrx] = await Promise.all([
-        projectFinancialService.getAllProjectAccounts(year),
-        projectFinancialService.getAllProjectTrackerTransactions()
-      ]);
-      setProjectAccounts(list);
-
-      const ptSummary: Record<string, { income: number; expenses: number }> = {};
-      ptTrx.forEach(tx => {
-        const pid = tx.projectId;
-        if (!pid) return;
-
-        if (!ptSummary[pid]) {
-          ptSummary[pid] = { income: 0, expenses: 0 };
-        }
-
-        const type = (tx.type || '').toLowerCase();
-        const amount = Math.abs(tx.amount || 0);
-
-        if (type === 'income') {
-          ptSummary[pid].income += amount;
-        } else {
-          ptSummary[pid].expenses += amount;
-        }
-      });
-      setProjectTrackerSummary(ptSummary);
-
-    } catch (err) {
-      console.error('Failed to load project accounts or PT data', err);
-      showToast('Failed to load project financial data', 'error');
-    } finally {
-      setLoadingProjectAccounts(false);
-    }
-  };
-
-  const loadProjects = async () => {
-    try {
-      const list = await ProjectsService.getAllProjects();
-      setProjects(list);
-      return list;
-    } catch {
-      setProjects([]);
-      return [];
-    }
-  };
-
-  const loadMembers = async () => {
-    try {
-      const list = await MembersService.getAllMembers();
-      const mappedMembers = list.map(m => ({
-        id: m.id,
-        name: m.fullName && m.name
-          ? `${m.fullName} (${m.name})`
-          : (m.fullName || m.name || m.email || m.id),
-        fullName: m.fullName,
-        membershipType: m.membershipType,
-        tshirtSize: m.tshirtSize,
-        jacketSize: m.jacketSize,
-        introducer: m.introducer,
-        joinDate: m.joinDate,
-        membership: m.membership,
-      }));
-      setMembers(mappedMembers);
-      return mappedMembers;
-    } catch {
-      setMembers([]);
-      return [];
-    }
-  };
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -1187,8 +1242,7 @@ export function useFinanceData(searchQuery?: string) {
     } finally {
       setLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showToast]);
+  }, [showToast, loadData]);
 
   const handleSendReminders = useCallback(() => {
     showToast('32 Payment reminders sent via Email & Push', 'success');
@@ -1227,8 +1281,7 @@ export function useFinanceData(searchQuery?: string) {
       setEditingAdministrativePurposeBase('');
     }
     setIsEditModalOpen(true);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [members.length]);
+  }, [members.length, loadMembers]);
 
   const handleDeleteTransaction = useCallback(async (transactionId: string) => {
     if (!confirm('Are you sure you want to delete this transaction? This action cannot be undone.')) {
@@ -1250,8 +1303,7 @@ export function useFinanceData(searchQuery?: string) {
     } catch (err) {
       showToast('Failed to delete transaction', 'error');
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transactions, showToast]);
+  }, [transactions, showToast, loadData]);
 
   const handleBatchDelete = useCallback(async () => {
     const totalCount = selectedTxIds.size + selectedSplitIds.size;
@@ -1279,7 +1331,10 @@ export function useFinanceData(searchQuery?: string) {
             setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
             return { success: true };
           } catch (err) {
-            console.error(`Failed to delete transaction ${id}:`, err);
+            errorLoggingService.logError(
+              err instanceof Error ? err : new Error(String(err)),
+              { component: 'useFinanceData', action: 'handleBatchDelete.tx', additionalData: { id } }
+            );
             setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
             return { success: false, id };
           }
@@ -1293,7 +1348,10 @@ export function useFinanceData(searchQuery?: string) {
             setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
             return { success: true };
           } catch (err) {
-            console.error(`Failed to delete split ${id}:`, err);
+            errorLoggingService.logError(
+              err instanceof Error ? err : new Error(String(err)),
+              { component: 'useFinanceData', action: 'handleBatchDelete.split', additionalData: { id } }
+            );
             setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
             return { success: false, id };
           }
@@ -1317,8 +1375,7 @@ export function useFinanceData(searchQuery?: string) {
       setLoading(false);
       setBatchOperationProgress(null);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedTxIds, selectedSplitIds, transactions, showToast]);
+  }, [selectedTxIds, selectedSplitIds, transactions, showToast, loadData]);
 
   const handleBatchApprove = useCallback(async () => {
     const totalCount = selectedTxIds.size + selectedSplitIds.size;
@@ -1344,7 +1401,10 @@ export function useFinanceData(searchQuery?: string) {
             setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
             return { success: true };
           } catch (err) {
-            console.error(`Failed to approve transaction ${id}:`, err);
+            errorLoggingService.logError(
+              err instanceof Error ? err : new Error(String(err)),
+              { component: 'useFinanceData', action: 'handleBatchApprove', additionalData: { id } }
+            );
             setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
             return { success: false };
           }
@@ -1372,38 +1432,8 @@ export function useFinanceData(searchQuery?: string) {
       setLoading(false);
       setBatchOperationProgress(null);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedTxIds, selectedSplitIds, transactions, showToast]);
+  }, [selectedTxIds, selectedSplitIds, transactions, showToast, loadData]);
 
-  const loadPrPendingReconciliation = async () => {
-    setPrReconcileLoading(true);
-    try {
-      const { items } = await PaymentRequestService.list({ pageSize: 200 });
-      const approved = items.filter(pr => pr.status === 'approved');
-      const linkedPrIds = new Set(
-        transactions.filter(t => t.paymentRequestId && t.status === 'Reconciled').map(t => t.paymentRequestId!)
-      );
-      const pending = approved.filter(pr => !linkedPrIds.has(pr.id));
-      setPrPendingReconciliation(pending);
-      const bankExpenses = transactions.filter(t => t.source === 'bank_import' && t.type === 'Expense' && t.status !== 'Reconciled');
-      const suggestions: Record<string, Transaction[]> = {};
-      for (const pr of pending) {
-        const prDate = new Date(pr.date || pr.createdAt);
-        const prAmount = pr.totalAmount || pr.amount;
-        suggestions[pr.id] = bankExpenses
-          .filter(t => Math.abs(t.amount - prAmount) < 0.01 && Math.abs(new Date(t.date).getTime() - prDate.getTime()) <= 14 * 86400000)
-          .sort((a, b) => Math.abs(new Date(a.date).getTime() - prDate.getTime()) - Math.abs(new Date(b.date).getTime() - prDate.getTime()));
-      }
-      setPrBankSuggestions(suggestions);
-      const initial: Record<string, string> = {};
-      for (const pr of pending) { if (suggestions[pr.id]?.[0]) initial[pr.id] = suggestions[pr.id][0].id; }
-      setPrSelectedBankTx(initial);
-    } catch (e) {
-      showToast('Failed to load PR reconciliation data', 'error');
-    } finally {
-      setPrReconcileLoading(false);
-    }
-  };
 
   const handleLinkPrToBankTx = useCallback(async (prId: string) => {
     const bankTxId = prSelectedBankTx[prId];
@@ -1451,8 +1481,7 @@ export function useFinanceData(searchQuery?: string) {
     } finally {
       setPrLinkingId(null);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prSelectedBankTx, user, transactions, showToast]);
+  }, [prSelectedBankTx, user, transactions, showToast, loadData, loadPrPendingReconciliation]);
 
   // Manual trigger for the event-registration income auto-matcher (情景 P1-14) —
   // this pipeline otherwise only runs right after a bank import, so finance needs
@@ -1469,8 +1498,7 @@ export function useFinanceData(searchQuery?: string) {
     } finally {
       setLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showToast]);
+  }, [showToast, loadData]);
 
   const handleReconciliationQuery = useCallback(async () => {
     const ref = refNumberQuery.trim();
@@ -1509,8 +1537,7 @@ export function useFinanceData(searchQuery?: string) {
     } finally {
       setReconcilingId(null);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, showToast]);
+  }, [user, showToast, loadData]);
 
   const handleVoidTransaction = useCallback(async (tx: Transaction) => {
     const reason = window.prompt(`Void reason for "${tx.description}"?\n(Required — this will be recorded on the transaction.)`);
@@ -1524,8 +1551,7 @@ export function useFinanceData(searchQuery?: string) {
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to void', 'error');
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, showToast]);
+  }, [user, showToast, loadData]);
 
   const handleUnmatchTransaction = useCallback(async (tx: Transaction) => {
     const partnerId = tx.matchedBankTxIds?.[0];
@@ -1538,8 +1564,7 @@ export function useFinanceData(searchQuery?: string) {
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to unmatch', 'error');
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showToast]);
+  }, [showToast, loadData]);
 
   const handleUpdateTransaction = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -1617,8 +1642,7 @@ export function useFinanceData(searchQuery?: string) {
     } catch (err) {
       showToast('Failed to update transaction', 'error');
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editingTransaction, editingMembershipYear, editingAdministrativeYear, editingAdministrativePurposeBase, showToast]);
+  }, [editingTransaction, editingMembershipYear, editingAdministrativeYear, editingAdministrativePurposeBase, showToast, loadData]);
 
   // ── Return all state + computed + handlers ────────────────────────────────
 

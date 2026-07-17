@@ -12,7 +12,7 @@ import { useHobbyClubs } from '../../hooks/useHobbyClubs';
 import { useBusinessDirectory } from '../../hooks/useBusinessDirectory';
 import { FinanceService } from '../../services/financeService';
 import { ReportService, ReportOptions } from '../../services/reportService';
-import { AIPredictionService } from '../../services/aiPredictionService';
+import { AIPredictionService, MemberChurnPrediction, PersonalizedRecommendation, EventDemandPrediction, ProjectSuccessPrediction } from '../../services/aiPredictionService';
 import { formatCurrency } from '../../utils/formatUtils';
 import { UserRole, Member } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
@@ -98,10 +98,10 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
   const [selectedBirthdayMonth, setSelectedBirthdayMonth] = useState<number>(new Date().getMonth());
   const [selectedHobbies, setSelectedHobbies] = useState<string[]>([]);
   const [aiInsights, setAiInsights] = useState<{
-    churnRisk: any[];
-    topRecommendations: any[];
-    eventPredictions: any[];
-    projectPredictions: any[];
+    churnRisk: MemberChurnPrediction[];
+    topRecommendations: PersonalizedRecommendation[];
+    eventPredictions: EventDemandPrediction[];
+    projectPredictions: ProjectSuccessPrediction[];
   }>({
     churnRisk: [],
     topRecommendations: [],

@@ -143,7 +143,7 @@ export class MentorshipService {
 
     // Industry alignment
     if (mentor.industry && (mentee.business?.interestedIndustries ?? mentee.interestedIndustries)) {
-      const industryMatch = (mentee.business?.interestedIndustries ?? mentee.interestedIndustries)!.some(industry =>
+      const industryMatch = (mentee.business?.interestedIndustries ?? mentee.interestedIndustries ?? []).some(industry =>
         industry.toLowerCase().includes(mentor.industry!.toLowerCase())
       );
       if (industryMatch) {

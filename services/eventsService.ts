@@ -216,14 +216,14 @@ export class EventsService {
       () => { this.mockEvents = this.mockEvents.filter(e => e.id !== eventId); },
       async () => {
         try {
-          await deleteDoc(doc(db, COLLECTIONS.PROJECTS, eventId));
-
+          const eventRef = doc(db, COLLECTIONS.PROJECTS, eventId);
           const regSnap = await getDocs(
             query(collection(db, COLLECTIONS.EVENT_REGISTRATIONS), where('eventId', '==', eventId))
           );
+
+          // FIX E4: clean up linked finance transactions (Pending/Cleared) before
+          // deleting registration docs, to avoid orphaned transaction records.
           if (!regSnap.empty) {
-            // FIX E4: clean up linked finance transactions (Pending/Cleared) before
-            // deleting registration docs, to avoid orphaned transaction records.
             const { FinanceService } = await import('./financeService');
             const txIds = regSnap.docs
               .map(d => d.data().financeTransactionId as string | undefined)
@@ -242,12 +242,23 @@ export class EventsService {
                 })
               );
             }
+          }
 
-            const BATCH_SIZE = 490;
-            const docs = regSnap.docs;
-            for (let i = 0; i < docs.length; i += BATCH_SIZE) {
+          // P0 FIX: include the event doc deletion in the same writeBatch as the
+          // registration cleanup so both succeed or fail together.
+          const BATCH_SIZE = 490;
+          const regDocs = regSnap.docs;
+          if (regDocs.length === 0) {
+            // No registrations — single batch containing only the event doc.
+            const batch = writeBatch(db);
+            batch.delete(eventRef);
+            await batch.commit();
+          } else {
+            for (let i = 0; i < regDocs.length; i += BATCH_SIZE) {
               const batch = writeBatch(db);
-              docs.slice(i, i + BATCH_SIZE).forEach(d => batch.delete(d.ref));
+              regDocs.slice(i, i + BATCH_SIZE).forEach(d => batch.delete(d.ref));
+              // Include the event doc delete in the first batch chunk.
+              if (i === 0) batch.delete(eventRef);
               await batch.commit();
             }
           }
@@ -292,39 +303,56 @@ export class EventsService {
             throw new Error('Event is full');
           }
 
-          let newRegistrationId: string | null = null;
-          let wasReactivated = false;
           if (existing && existing.status === 'cancelled') {
-            wasReactivated = true;
+            // Reactivation path: two separate ops with rollback guard.
             await EventRegistrationService.updateStatus(existing.id, 'registered', {
               registeredBy: extraFields?.registeredBy,
               registeredByName: extraFields?.registeredByName,
             });
-          } else {
-            newRegistrationId = await EventRegistrationService.create(eventId, memberId, DEFAULT_LO_ID, extraFields);
-          }
-          try {
-            await updateDoc(eventRef, {
-              attendees: event.attendees + 1,
-              registeredMembers: arrayUnion(memberId),
-            });
-            this.invalidateEventsCache(); // P1-C: invalidate after attendee count changes
-          } catch (counterError) {
-            if (newRegistrationId) {
-              try {
-                await deleteDoc(doc(db, COLLECTIONS.EVENT_REGISTRATIONS, newRegistrationId));
-              } catch (rollbackError) {
-                console.error('Error rolling back registration doc:', rollbackError);
-              }
-            } else if (wasReactivated && existing) {
+            try {
+              await updateDoc(eventRef, {
+                attendees: event.attendees + 1,
+                registeredMembers: arrayUnion(memberId),
+              });
+            } catch (counterError) {
               try {
                 await EventRegistrationService.updateStatus(existing.id, 'cancelled', {});
               } catch (rollbackError) {
                 console.error('Error rolling back reactivated registration:', rollbackError);
               }
+              throw counterError;
             }
-            throw counterError;
+          } else {
+            // P0 FIX: new registration — use setDoc + writeBatch so the registration
+            // doc and event counter update land atomically. addDoc cannot participate
+            // in a batch, so we create the doc ref manually first.
+            const newRegRef = doc(collection(db, COLLECTIONS.EVENT_REGISTRATIONS));
+            const payload: Record<string, unknown> = {
+              eventId,
+              memberId,
+              status: 'registered',
+              createdAt: Timestamp.now(),
+              updatedAt: Timestamp.now(),
+              loId: DEFAULT_LO_ID,
+            };
+            if (extraFields?.dietary) payload.dietary = extraFields.dietary;
+            if (extraFields?.isVegetarian != null) payload.isVegetarian = extraFields.isVegetarian;
+            if (extraFields?.emergencyContactName) payload.emergencyContactName = extraFields.emergencyContactName;
+            if (extraFields?.emergencyContactPhone) payload.emergencyContactPhone = extraFields.emergencyContactPhone;
+            if (extraFields?.tshirtSize) payload.tshirtSize = extraFields.tshirtSize;
+            if (extraFields?.memberName) payload.memberName = extraFields.memberName;
+            if (extraFields?.registeredBy) payload.registeredBy = extraFields.registeredBy;
+            if (extraFields?.registeredByName) payload.registeredByName = extraFields.registeredByName;
+
+            const batch = writeBatch(db);
+            batch.set(newRegRef, payload);
+            batch.update(eventRef, {
+              attendees: event.attendees + 1,
+              registeredMembers: arrayUnion(memberId),
+            });
+            await batch.commit();
           }
+          this.invalidateEventsCache(); // P1-C: invalidate after attendee count changes
         } catch (error) {
           console.error('Error registering for event:', error);
           throw error;
@@ -349,16 +377,14 @@ export class EventsService {
           const event = await this.getEventById(eventId);
           if (!event) throw new Error('Event not found');
 
-          // N-1: cancel reg doc first, then decrement event counter — consistent with registerForEvent.
-          // FIX E5: capture financeTransactionId BEFORE cancelling, update registration status FIRST,
-          // then delete the finance transaction. This ensures the registration is never left in an
-          // active state while its transaction is already gone (which made it look paid but uncancelled).
+          // P0 FIX: use a single writeBatch so the registration status update and
+          // the event counter decrement are committed atomically.
+          // Finance-tx cleanup is async and must happen BEFORE the batch commit
+          // (we need the tx data while it still exists), so it runs first.
           const reg = await EventRegistrationService.getByEventAndMember(eventId, memberId);
           const financeTransactionId: string | undefined = reg?.financeTransactionId ?? undefined;
-          if (reg) {
-            await EventRegistrationService.cancel(reg.id, cancelledBy, cancelledByName, cancelledByRole);
-          }
-          // Delete linked finance transaction only AFTER status is safely 'cancelled'
+
+          // Delete linked finance transaction BEFORE flipping status to 'cancelled'.
           if (financeTransactionId) {
             try {
               const { FinanceService } = await import('./financeService');
@@ -370,10 +396,25 @@ export class EventsService {
               console.warn('[EventsService.cancelRegistration] Could not delete tx', financeTransactionId, txErr);
             }
           }
-          await updateDoc(eventRef, {
-            attendees: Math.max(0, event.attendees - 1),
-            registeredMembers: arrayRemove(memberId),
-          });
+
+          if (reg) {
+            const regRef = doc(db, COLLECTIONS.EVENT_REGISTRATIONS, reg.id);
+            const batch = writeBatch(db);
+            batch.update(regRef, {
+              status: 'cancelled',
+              cancelledAt: Timestamp.now(),
+              cancelledBy,
+              cancelledByName,
+              cancelledByRole,
+              financeTransactionId: null,
+              updatedAt: Timestamp.now(),
+            });
+            batch.update(eventRef, {
+              attendees: Math.max(0, event.attendees - 1),
+              registeredMembers: arrayRemove(memberId),
+            });
+            await batch.commit();
+          }
           this.invalidateEventsCache();
         } catch (error) {
           console.error('Error canceling registration:', error);

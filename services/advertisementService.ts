@@ -12,6 +12,8 @@ import {
   orderBy,
   Timestamp,
   increment,
+  QueryDocumentSnapshot,
+  DocumentData,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
@@ -107,7 +109,7 @@ const CACHE_TTL = 3 * 60 * 1000; // 3 minutes
 const CACHE_KEY_ALL = 'ads:all';
 const CACHE_KEY_ACTIVE_PREFIX = 'ads:active:';
 
-function mapDoc(docSnap: any): Advertisement {
+function mapDoc(docSnap: QueryDocumentSnapshot<DocumentData>): Advertisement {
   const d = docSnap.data();
   return {
     id: docSnap.id,

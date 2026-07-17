@@ -26,7 +26,7 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
     const [categories, setCategories] = useState<string[]>([]);
     const { trainingModules, documents, loading, error } = useKnowledge();
     // Note: documents from useKnowledge may not have version info, we'll handle that in the component
-    const { paths, loading: pathsLoading, createPath, updatePath, deletePath } = useLearningPaths();
+    const { paths, loading: pathsLoading, error: pathsError, createPath, updatePath, deletePath } = useLearningPaths();
     const { member } = useAuth();
     const { isBoard, isAdmin } = usePermissions();
     const { showToast } = useToast();
@@ -149,6 +149,7 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                             paths={filteredPaths}
                             myProgress={myProgress}
                             loading={pathsLoading}
+                            error={pathsError}
                             onStartPath={handleStartPath}
                             onSelectPath={setSelectedPath}
                             canManage={isBoard || isAdmin}
@@ -159,6 +160,7 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                         <DocumentsTab
                             documents={filteredDocuments}
                             loading={loading}
+                            error={error}
                             onSelectDocument={setSelectedDocument}
                             canManage={isBoard || isAdmin}
                             searchTerm={searchQuery || searchTerm}
@@ -201,6 +203,7 @@ interface LearningPathsTabProps {
     paths: LearningPath[];
     myProgress: LearningProgress[];
     loading: boolean;
+    error?: string | null;
     onStartPath: (pathId: string) => void;
     onSelectPath: (path: LearningPath) => void;
     canManage: boolean;
@@ -211,6 +214,7 @@ const LearningPathsTab: React.FC<LearningPathsTabProps> = ({
     paths,
     myProgress,
     loading,
+    error,
     onStartPath,
     onSelectPath,
     canManage,
@@ -223,7 +227,7 @@ const LearningPathsTab: React.FC<LearningPathsTabProps> = ({
 
     return (
         <>
-        <LoadingState loading={loading} error={null} empty={paths.length === 0} emptyMessage="No learning paths available">
+        <LoadingState loading={loading} error={error ?? null} empty={paths.length === 0} emptyMessage="No learning paths available">
             <div className="grid md:grid-cols-2 gap-6">
                 {paths.map(path => {
                     const progress = getProgress(path.id!);
@@ -324,6 +328,7 @@ const LearningPathsTab: React.FC<LearningPathsTabProps> = ({
 interface DocumentsTabProps {
     documents: any[];
     loading: boolean;
+    error?: string | null;
     onSelectDocument: (doc: DocumentWithVersions) => void;
     canManage: boolean;
     searchTerm?: string;
@@ -336,6 +341,7 @@ interface DocumentsTabProps {
 const DocumentsTab: React.FC<DocumentsTabProps> = ({
     documents,
     loading,
+    error,
     onSelectDocument,
     canManage,
     searchTerm = '',
@@ -387,7 +393,7 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({
                 )}
             </div>
 
-            <LoadingState loading={loading} error={null} empty={documents.length === 0} emptyMessage="No documents found">
+            <LoadingState loading={loading} error={error ?? null} empty={documents.length === 0} emptyMessage="No documents found">
                 <div className="space-y-2">
                     {documents.map(doc => (
                         <div

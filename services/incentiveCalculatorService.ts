@@ -10,6 +10,7 @@ import { COLLECTIONS } from '../config/constants';
 import {
     IncentiveLogicId,
     IncentiveStandard,
+    IncentiveMilestone,
     Member
 } from '../types';
 import { PointsService } from './pointsService';
@@ -42,7 +43,7 @@ export class IncentiveCalculatorService {
      * Execute specific logic for a standard
      */
     private static async executeLogic(loId: string, standard: IncentiveStandard): Promise<void> {
-        let result: { quantity: number; score: number; milestones?: any[] } = { quantity: 0, score: 0 };
+        let result: { quantity: number; score: number; milestones?: IncentiveMilestone[] } = { quantity: 0, score: 0 };
 
         switch (standard.autoLogicId) {
             case IncentiveLogicId.EFFICIENT_MEMBERSHIP_CONVERSION:
@@ -90,7 +91,7 @@ export class IncentiveCalculatorService {
     /**
      * Logic: 30% / 50% / 60% conversion of Friends to Members
      */
-    private static async calcMembershipConversion(loId: string, standard: IncentiveStandard): Promise<{ quantity: number, score: number, milestones?: any[] }> {
+    private static async calcMembershipConversion(loId: string, standard: IncentiveStandard): Promise<{ quantity: number, score: number, milestones?: IncentiveMilestone[] }> {
         const q = query(collection(db, COLLECTIONS.MEMBERS), where('loId', '==', loId));
         const snapshot = await getDocs(q);
         const members = snapshot.docs.map(d => d.data() as Member);
@@ -159,7 +160,7 @@ export class IncentiveCalculatorService {
     /**
      * Logic: BOD Meeting frequency
      */
-    private static async calcBODMeetings(loId: string, standard: IncentiveStandard): Promise<{ quantity: number, score: number, milestones?: any[] }> {
+    private static async calcBODMeetings(loId: string, standard: IncentiveStandard): Promise<{ quantity: number, score: number, milestones?: IncentiveMilestone[] }> {
         const q = query(
             collection(db, COLLECTIONS.EVENTS),
             where('loId', '==', loId),
@@ -208,7 +209,7 @@ export class IncentiveCalculatorService {
     /**
      * Logic: Membership Growth vs Baseline
      */
-    private static async calcMembershipGrowth(loId: string, standard: IncentiveStandard): Promise<{ quantity: number, score: number, milestones?: any[] }> {
+    private static async calcMembershipGrowth(loId: string, standard: IncentiveStandard): Promise<{ quantity: number, score: number, milestones?: IncentiveMilestone[] }> {
         const q = query(collection(db, COLLECTIONS.MEMBERS), where('loId', '==', loId));
         const snapshot = await getDocs(q);
         const currentCount = snapshot.docs.length;
@@ -237,10 +238,10 @@ export class IncentiveCalculatorService {
     /**
      * Logic: Generic Event-based milestones (based on activityType and minParticipants)
      */
-    private static async calcEventBasedMilestones(loId: string, standard: IncentiveStandard): Promise<{ quantity: number, score: number, milestones?: any[] }> {
+    private static async calcEventBasedMilestones(loId: string, standard: IncentiveStandard): Promise<{ quantity: number, score: number, milestones?: IncentiveMilestone[] }> {
         if (!standard.milestones) return { quantity: 0, score: 0 };
 
-        const achieved: any[] = [];
+        const achieved: IncentiveMilestone[] = [];
 
         const q = query(
             collection(db, COLLECTIONS.EVENTS),

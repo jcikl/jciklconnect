@@ -9,7 +9,8 @@ import {
   orderBy,
   serverTimestamp,
   writeBatch,
-  increment
+  increment,
+  Timestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS, CONTRACT_STATUS } from '../config/constants';
@@ -23,7 +24,7 @@ export interface CommitmentContract {
   goalDescription: string;
   stakedPoints: number;
   multiplier: number; // Potential reward multiplier if fulfilled
-  deadline: any;
+  deadline: Timestamp | Date | null;
   status: 'Active' | 'Verifying' | 'Fulfilled' | 'Failed' | 'Expired';
   proofUrl?: string;
   escrowId?: string;
@@ -32,9 +33,9 @@ export interface CommitmentContract {
   failurePenalty?: number;
   remainingSlots?: number;
   verifiedBy?: string;
-  verifiedAt?: any;
-  createdAt: any;
-  updatedAt: any;
+  verifiedAt?: Timestamp | Date | null;
+  createdAt: Timestamp | Date | null;
+  updatedAt: Timestamp | Date | null;
 }
 
 export class ContractService {
@@ -205,17 +206,12 @@ export class ContractService {
     if (!contractDoc.exists()) return;
     const data = contractDoc.data() as CommitmentContract;
 
-    // 1. Release original stake back to member
-    await PointsService.releaseEscrow(data.escrowId!, data.memberId);
-
-    // P1-E: Stamp releasedBy on the escrow record now that the release succeeded
-    if (data.escrowId) {
-      const escrowRef = doc(db, COLLECTIONS.POINT_ESCROW, data.escrowId);
-      await updateDoc(escrowRef, {
-        releasedBy: currentUserId || 'system',
-        releasedAt: serverTimestamp()
-      });
-    }
+    // 1. Release original stake back to member.
+    //    Pass releasedBy via metadata so the escrow update and the release happen
+    //    atomically inside releaseEscrow's runTransaction — no separate updateDoc needed.
+    await PointsService.releaseEscrow(data.escrowId!, data.memberId, {
+      releasedBy: currentUserId || 'system'
+    });
 
     // 2. Award bonus points (The 20% "Greed" reward)
     const bonus = Math.floor(data.stakedPoints * (data.multiplier - 1));

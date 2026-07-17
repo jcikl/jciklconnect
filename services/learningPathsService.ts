@@ -489,7 +489,7 @@ export class LearningPathsService {
       } satisfies Omit<Certificate, 'id'>);
 
       // Mark progress record as cert-issued (if not already)
-      if (progressSnap.docs[0] && !progressRecord!.certificateIssued) {
+      if (progressSnap.docs[0] && progressRecord?.certificateIssued === false) {
         batch.update(progressSnap.docs[0].ref, {
           certificateIssued: true,
           certificateId: certRef.id,

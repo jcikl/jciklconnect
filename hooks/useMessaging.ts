@@ -1,5 +1,5 @@
 // Messaging Hook - Manages messaging state and operations
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { MessagingService, Conversation, Message } from '../services/messagingService';
 import { useToast } from '../components/ui/Common';
 import { useAuth } from './useAuth';
@@ -13,6 +13,7 @@ export const useMessaging = () => {
   const [error, setError] = useState<string | null>(null);
   const { member } = useAuth();
   const { showToast } = useToast();
+  const isSendingRef = useRef(false);
 
   // Load conversations
   const loadConversations = useCallback(async () => {
@@ -43,18 +44,25 @@ export const useMessaging = () => {
     }
 
     try {
+      setLoading(true);
       setError(null);
       const data = await MessagingService.getMessages(conversationId);
       setMessages(data);
-
-      // Mark messages as read
-      if (member) {
-        await MessagingService.markAsRead(conversationId, member.id);
-      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load messages';
       setError(errorMessage);
       showToast(errorMessage, 'error');
+    } finally {
+      setLoading(false);
+    }
+
+    // Mark messages as read silently — permission errors must not surface as load failures
+    try {
+      if (member) {
+        await MessagingService.markAsRead(conversationId, member.id);
+      }
+    } catch {
+      // Intentionally ignored — read receipts are best-effort
     }
   }, [member, showToast]);
 
@@ -70,6 +78,9 @@ export const useMessaging = () => {
       return;
     }
 
+    if (isSendingRef.current) return;
+    isSendingRef.current = true;
+
     try {
       setError(null);
       await MessagingService.sendMessage(
@@ -81,7 +92,7 @@ export const useMessaging = () => {
         type,
         attachments
       );
-      
+
       // Reload messages
       await loadMessages(conversationId);
       await loadConversations();
@@ -90,6 +101,8 @@ export const useMessaging = () => {
       setError(errorMessage);
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSendingRef.current = false;
     }
   }, [member, showToast, loadMessages, loadConversations]);
 

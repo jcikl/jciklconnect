@@ -273,6 +273,7 @@ export class FinanceService {
       },
       async () => {
         try {
+          /* TODO: replace with aggregation doc read — see CLAUDE.md fix roadmap */
           // TODO: replace with a dedicated 'transactionYears' summary document for O(1) lookup
           const q = query(collection(db, COLLECTIONS.TRANSACTIONS), limit(1000));
           const snapshot = await getDocs(q);
@@ -537,7 +538,7 @@ export class FinanceService {
       },
       async () => {
         try {
-          const newTransaction: any = {
+          const newTransaction: Record<string, unknown> = {
             ...transactionData,
             createdAt: Timestamp.now(),
             updatedAt: Timestamp.now(),
@@ -586,16 +587,16 @@ export class FinanceService {
         try {
           const transactionRef = doc(db, COLLECTIONS.PROJECT_TRANSACTIONS, transactionId);
 
-          const updateData: any = {
+          const updateData = {
             ...removeUndefined(updates),
             updatedAt: Timestamp.now(),
-          };
+          } as Partial<Transaction>;
 
           if (updates.date !== undefined) {
-            updateData.date = updates.date ? Timestamp.fromDate(new Date(updates.date)) : '';
+            (updateData as Record<string, unknown>).date = updates.date ? Timestamp.fromDate(new Date(updates.date)) : '';
           }
 
-          await updateDoc(transactionRef, updateData);
+          await updateDoc(transactionRef, updateData as Record<string, unknown>);
           invalidateFinanceCache();
         } catch (error) {
           console.error('Error updating project transaction:', error);
@@ -765,7 +766,7 @@ export class FinanceService {
       for (const split of splits) {
         if (split.id && existingSplitIds.has(split.id)) {
           // Update existing split
-          const updateData: any = {
+          const updateData: Partial<TransactionSplit> = {
             category: split.category,
             type: parentTransaction.type,
             projectId: split.projectId,
@@ -781,7 +782,7 @@ export class FinanceService {
         } else {
           // Create new split — pre-allocate a doc ID so it can go into the batch
           const newRef = doc(collection(db, COLLECTIONS.TRANSACTION_SPLITS));
-          const splitData: any = removeUndefined({
+          const splitData = removeUndefined({
             parentTransactionId,
             loId: parentTransaction.loId ?? null,
             category: split.category,
@@ -1043,16 +1044,16 @@ export class FinanceService {
           const parentTx = parentDoc.exists() ? parentDoc.data() as Transaction : null;
           const originalCategory = (parentTx as any)?.originalCategory || parentTx?.category || '';
 
-          const updateData: any = {
+          const updateData = {
             splitIds: remainingIds,
             isSplit: remainingIds.length > 0,
             category: remainingIds.length === 0 ? originalCategory : '',
             updatedAt: Timestamp.now(),
-          };
+          } as unknown as Partial<Transaction>;
 
           if (remainingIds.length === 0) {
-            updateData.projectTransactionIds = [];
-            updateData.projectTransactionId = null;
+            (updateData as Record<string, unknown>).projectTransactionIds = [];
+            (updateData as Record<string, unknown>).projectTransactionId = null;
             updateData.status = parentTx?.prevStatus ?? 'Pending';
             updateData.purpose = '';
           }
@@ -1156,13 +1157,13 @@ export class FinanceService {
         throw new Error(`Cannot edit a ${currentTransaction.status} transaction. Unmatch it first before making changes.`);
       }
 
-      const updateData: any = {
+      const updateData = {
         ...removeUndefined(updates),
         updatedAt: Timestamp.now(),
-      };
+      } as Partial<Transaction>;
 
       if (updates.date) {
-        updateData.date = Timestamp.fromDate(new Date(updates.date));
+        (updateData as Record<string, unknown>).date = Timestamp.fromDate(new Date(updates.date));
       }
 
       // If transaction type is updated, propagate to all splits in the same batch
@@ -1336,11 +1337,11 @@ export class FinanceService {
           const finalCategory = categoryUpdates.category ?? currentTransaction?.category;
           const explicitKeys = new Set(Object.keys(categoryUpdates).filter(k => (categoryUpdates as any)[k] !== undefined));
 
-          const updateData: any = {
+          const updateData = {
             ...removeUndefined(categoryUpdates),
             ...buildCategoryCleanupUpdates({ finalCategory, previousCategory: currentTransaction?.category, explicitKeys }),
             updatedAt: new Date().toISOString(),
-          };
+          } as Partial<Transaction>;
 
           if (finalCategory === 'Membership') {
             const yearVal = categoryUpdates.year || currentTransaction?.year ||
@@ -1372,7 +1373,7 @@ export class FinanceService {
     type TxPlan = {
       txId: string;
       currentTransaction: Transaction;
-      updateData: any;
+      updateData: Partial<Transaction>;
       nextTransaction: Transaction;
     };
     const plans: TxPlan[] = [];
@@ -1393,15 +1394,16 @@ export class FinanceService {
           const finalCategory = categoryUpdates.category ?? currentTransaction?.category;
           const explicitKeys = new Set(Object.keys(categoryUpdates).filter(k => (categoryUpdates as any)[k] !== undefined));
 
-          const updateData: any = {
+          const updateData = {
             ...removeUndefined(categoryUpdates),
             ...buildCategoryCleanupUpdates({ finalCategory, previousCategory: currentTransaction?.category, explicitKeys }),
             updatedAt: Timestamp.now(),
-          };
+          } as Partial<Transaction>;
 
           if (finalCategory === 'Membership') {
+            const rawDate = currentTransaction?.date as (Timestamp & { toDate(): Date }) | string | undefined;
             const yearVal = categoryUpdates.year || currentTransaction?.year ||
-              (currentTransaction?.date ? new Date((currentTransaction.date as any)?.toDate?.() ?? currentTransaction.date).getFullYear() : new Date().getFullYear());
+              (rawDate ? new Date(typeof rawDate === 'string' ? rawDate : rawDate.toDate()).getFullYear() : new Date().getFullYear());
             if (!categoryUpdates.projectId) {
               updateData.projectId = buildMembershipProjectId(yearVal);
             }
@@ -1497,13 +1499,13 @@ export class FinanceService {
           const explicitKeys = new Set(Object.keys(categoryUpdates).filter(k => (categoryUpdates as any)[k] !== undefined));
 
           const catForCleanup = (finalCategory as string) === '' ? undefined : finalCategory as import('../utils/transactionCategoryUtils').TransactionCategory;
-          const updateData: any = {
+          const updateData = {
             ...removeUndefined(categoryUpdates),
             ...(catForCleanup
               ? buildCategoryCleanupUpdates({ finalCategory: catForCleanup, previousCategory: currentSplit?.category || undefined, explicitKeys })
               : {}),
             updatedAt: new Date().toISOString(),
-          };
+          } as Partial<TransactionSplit>;
 
           if (finalCategory === 'Membership' && !categoryUpdates.projectId) {
             const yearVal = categoryUpdates.year || currentSplit?.year || new Date().getFullYear();
@@ -1526,7 +1528,7 @@ export class FinanceService {
     type SplitPlan = {
       splitId: string;
       currentSplit: TransactionSplit;
-      updateData: any;
+      updateData: Partial<TransactionSplit>;
       nextSplit: TransactionSplit;
     };
     const plans: SplitPlan[] = [];
@@ -1559,13 +1561,13 @@ export class FinanceService {
           const explicitKeys = new Set(Object.keys(categoryUpdates).filter(k => (categoryUpdates as any)[k] !== undefined));
 
           const catForCleanup2 = (finalCategory as string) === '' ? undefined : finalCategory as import('../utils/transactionCategoryUtils').TransactionCategory;
-          const updateData: any = {
+          const updateData = {
             ...removeUndefined(categoryUpdates),
             ...(catForCleanup2
               ? buildCategoryCleanupUpdates({ finalCategory: catForCleanup2, previousCategory: currentSplit?.category || undefined, explicitKeys })
               : {}),
             updatedAt: Timestamp.now(),
-          };
+          } as Partial<TransactionSplit>;
 
           if (finalCategory === 'Membership' && !categoryUpdates.projectId) {
             const yearVal = categoryUpdates.year || currentSplit?.year || new Date().getFullYear();
@@ -2139,7 +2141,7 @@ export class FinanceService {
           transactionId: [],
         };
 
-        const zeroTxUpdates: any = {
+        const zeroTxUpdates: Record<string, unknown> = {
           membership: currentMembership,
           updatedAt: Timestamp.now(),
         };
@@ -2190,7 +2192,7 @@ export class FinanceService {
         paymentDate: paymentDate ?? null,
       };
 
-      const updates: any = {
+      const updates: Record<string, unknown> = {
         membership: currentMembership,
         updatedAt: Timestamp.now()
       };
@@ -2365,16 +2367,16 @@ export class FinanceService {
       async () => {
         try {
           const accountRef = doc(db, COLLECTIONS.BANK_ACCOUNTS, accountId);
-          const updateData: any = {
+          const updateData = {
             ...updates,
             updatedAt: Timestamp.now(),
-          };
+          } as Partial<BankAccount>;
 
           if (updates.lastReconciled) {
-            updateData.lastReconciled = Timestamp.fromDate(new Date(updates.lastReconciled));
+            (updateData as Record<string, unknown>).lastReconciled = Timestamp.fromDate(new Date(updates.lastReconciled));
           }
 
-          await updateDoc(accountRef, updateData);
+          await updateDoc(accountRef, updateData as Record<string, unknown>);
           invalidateFinanceCache();
         } catch (error) {
           console.error('Error updating bank account:', error);

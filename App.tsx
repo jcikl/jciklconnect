@@ -203,7 +203,7 @@ export const JCIKLApp: React.FC = () => {
       const enriched = all.map(m => {
         const isBoard = boardPositionMap.has(m.id);
         const isCommDir = !isBoard && commissionDirectorSet.has(m.id);
-        const isProbation = !isBoard && !isCommDir && !!(m as any).probationTasks;
+        const isProbation = !isBoard && !isCommDir && !!(m.probationTasks);
         // sortOrder: Board=0, CommDir=1, Member=2, Probation=3
         const sortOrder = isBoard ? 0 : isCommDir ? 1 : isProbation ? 3 : 2;
         return {
@@ -265,7 +265,7 @@ export const JCIKLApp: React.FC = () => {
     const currentYear = new Date().getFullYear();
     const totalMembers = members.length;
     const activeMembers = members.filter(m => {
-      const record = (m.membership as any)?.[currentYear];
+      const record = m.membership?.[currentYear];
       const isPaid = record?.status === 'paid' || record?.status === 'over paid';
       return m.role !== UserRole.GUEST && isPaid;
     }).length;
@@ -677,8 +677,8 @@ export const JCIKLApp: React.FC = () => {
   // Note: Cannot use hooks inside this function - use values from component scope
   const renderCurrentView = (scrollRef?: React.RefObject<HTMLDivElement>) => {
     switch (view) {
-      case 'MEMBERS': return <MembersView searchQuery={searchQuery} initialSelectedMemberId={initialSelectedMemberId} onClearSelection={() => setInitialSelectedMemberId(null)} />;
-      case 'ACTIVITIES': return <ActivityPlansView searchQuery={searchQuery} />;
+      case 'MEMBERS': if (!canAccessWorkspaceModules) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <MembersView searchQuery={searchQuery} initialSelectedMemberId={initialSelectedMemberId} onClearSelection={() => setInitialSelectedMemberId(null)} />;
+      case 'ACTIVITIES': if (!canAccessWorkspaceModules && !isBoard && !isAdmin) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <ActivityPlansView searchQuery={searchQuery} />;
       case 'PROJECTS':
         if (!canViewEventsManagement) {
           return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
@@ -689,15 +689,15 @@ export const JCIKLApp: React.FC = () => {
           return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
         }
         return <FlagshipProjectsManagementView searchQuery={searchQuery} />;
-      case 'EVENTS': return <EventsView searchQuery={searchQuery} initialSelectedEventId={initialSelectedEventId} onClearSelection={() => setInitialSelectedEventId(null)} />;
+      case 'EVENTS': if (!canAccessWorkspaceModules) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <EventsView searchQuery={searchQuery} initialSelectedEventId={initialSelectedEventId} onClearSelection={() => setInitialSelectedEventId(null)} />;
       case 'FINANCE': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return hasPermission('canViewFinance') ? <FinanceView searchQuery={searchQuery} /> : <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
-      case 'PAYMENT_REQUESTS': return <PaymentRequestsView searchQuery={searchQuery} />;
+      case 'PAYMENT_REQUESTS': if (!hasPermission('canViewFinance') && !canAccessEventsAndPayments) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <PaymentRequestsView searchQuery={searchQuery} />;
       case 'GAMIFICATION': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <GamificationView />;
       case 'INVENTORY': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return hasPermission('canViewFinance') ? <InventoryView searchQuery={searchQuery} /> : <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
       case 'DIRECTORY': return <BusinessDirectoryView searchQuery={searchQuery} initialSelectedBusinessId={initialSelectedBusinessId} onClearSelection={() => setInitialSelectedBusinessId(null)} />;
       case 'AUTOMATION': if (!isAdmin && !isBoard) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <AutomationStudio />;
       case 'KNOWLEDGE': return <KnowledgeView searchQuery={searchQuery} />;
-      case 'COMMUNICATION': return <CommunicationView searchQuery={searchQuery} />;
+      case 'COMMUNICATION': if (!canAccessWorkspaceModules) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <CommunicationView searchQuery={searchQuery} />;
       case 'CLUBS': return <HobbyClubsView searchQuery={searchQuery} />;
       case 'SURVEYS': return <SurveysView searchQuery={searchQuery} />;
       case 'BENEFITS': return <MemberBenefitsView searchQuery={searchQuery} />;
@@ -706,7 +706,7 @@ export const JCIKLApp: React.FC = () => {
       case 'ADVERTISEMENTS': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <AdvertisementsView searchQuery={searchQuery} />;
       case 'AI_INSIGHTS': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <AIInsightsView onNavigate={handleViewChange} searchQuery={searchQuery} />;
       case 'TEMPLATES': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <TemplatesView searchQuery={searchQuery} />;
-      case 'ACTIVITY_PLANS': return <ActivityPlansView searchQuery={searchQuery} />;
+      case 'ACTIVITY_PLANS': if (!canAccessWorkspaceModules && !isBoard && !isAdmin) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <ActivityPlansView searchQuery={searchQuery} />;
       case 'REPORTS': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <ReportsView />;
       case 'DEVELOPER': if (!isDeveloper && !isAdmin) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <DeveloperInterface />;
       case 'TOYYIB': if (!isAdmin && !isBoard && !isDeveloper) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <ToyyibView />;
@@ -716,7 +716,7 @@ export const JCIKLApp: React.FC = () => {
       case 'ACCESS_CONFIG': if (!isAdmin && !isBoard) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <SystemConfigView initialTab="access" />;
       case 'SYSTEM_CONFIG': if (!isAdmin && !isBoard) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <SystemConfigView />;
       case 'PUBLICATIONS': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <PublicationsView />;
-      case 'SPONSORSHIPS': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <SponsorshipView searchQuery={searchQuery} />;
+      case 'SPONSORSHIPS': if (!isBoard && !isAdmin) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <SponsorshipView searchQuery={searchQuery} />;
       default:
         if ((isBoard || isAdmin) && showBoardDashboard) {
           return <BoardDashboard

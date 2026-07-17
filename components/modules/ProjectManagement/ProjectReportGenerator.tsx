@@ -25,7 +25,7 @@ import {
 } from '../../../services/projectReportService';
 import { Project } from '../../../types';
 import * as Forms from '../../ui/Form';
-import { Badge } from '../../ui/Common';
+import { Badge, useToast } from '../../ui/Common';
 
 interface ProjectReportGeneratorProps {
   project: Project;
@@ -42,6 +42,7 @@ export const ProjectReportGenerator: React.FC<ProjectReportGeneratorProps> = ({
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
   const [generatedReport, setGeneratedReport] = useState<ProjectReport | null>(null);
   const [loading, setLoading] = useState(false);
+  const { showToast } = useToast();
   const [exportFormat, setExportFormat] = useState<'pdf' | 'excel' | 'json' | 'text'>('pdf');
 
   // Template creation state
@@ -67,6 +68,7 @@ export const ProjectReportGenerator: React.FC<ProjectReportGeneratorProps> = ({
       setTemplates(templateList);
     } catch (error) {
       console.error('Error loading templates:', error);
+      showToast('Failed to load report templates', 'error');
     }
   };
 
@@ -77,6 +79,7 @@ export const ProjectReportGenerator: React.FC<ProjectReportGeneratorProps> = ({
       setGeneratedReport(report);
     } catch (error) {
       console.error('Error generating report:', error);
+      showToast('Failed to generate report', 'error');
     } finally {
       setLoading(false);
     }
@@ -110,6 +113,7 @@ export const ProjectReportGenerator: React.FC<ProjectReportGeneratorProps> = ({
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error exporting report:', error);
+      showToast('Failed to export report', 'error');
     } finally {
       setLoading(false);
     }
@@ -150,6 +154,7 @@ export const ProjectReportGenerator: React.FC<ProjectReportGeneratorProps> = ({
       });
     } catch (error) {
       console.error('Error creating template:', error);
+      showToast('Failed to create template', 'error');
     }
   };
 
@@ -159,6 +164,7 @@ export const ProjectReportGenerator: React.FC<ProjectReportGeneratorProps> = ({
       await loadTemplates();
     } catch (error) {
       console.error('Error deleting template:', error);
+      showToast('Failed to delete template', 'error');
     }
   };
 

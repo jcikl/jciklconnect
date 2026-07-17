@@ -370,10 +370,12 @@ service cloud.firestore {
       return docLo == myLo || docLo == null || myLo == null;
     }
     match /paymentRequests/{requestId} {
-      allow read: if isAuthenticated() &&
+      allow get: if isAuthenticated() &&
         (isAdmin() ||
          resource.data.get('applicantId', null) == request.auth.uid ||
          (canAccessFinance() && paymentRequestInMyScope()));
+      allow list: if isAuthenticated() &&
+        (isAdmin() || canAccessFinance() || isMember());
       allow create: if isAuthenticated() &&
         request.resource.data.get('applicantId', null) == request.auth.uid &&
         request.resource.data.get('loId', null) is string &&
@@ -402,7 +404,8 @@ service cloud.firestore {
     // FIX 15: allow create: if true had no field validation — bots/spammers could write arbitrary content
     match /nonMemberLeads/{leadId} {
       allow read: if isAuthenticated() && canReadOrgMembers();
-      allow create: if request.resource.data.keys().hasAll(['name', 'email', 'source', 'createdAt']) &&
+      allow create: if isAuthenticated() &&
+                      request.resource.data.keys().hasAll(['name', 'email', 'source', 'createdAt']) &&
                       request.resource.data.keys().hasOnly(['name', 'email', 'phone', 'source', 'message', 'createdAt', 'eventId']);
       allow update, delete: if isAuthenticated() && canReadOrgMembers();
     }
@@ -826,7 +829,7 @@ service cloud.firestore {
     match /guestRegistrations/{registrationId} {
       allow read: if isBoard();
       allow create: if true; // Allow guests to register
-      allow update: if isBoard() || isAdmin() &&
+      allow update: if (isBoard() || isAdmin()) &&
                       request.resource.data.diff(resource.data).affectedKeys()
                         .hasOnly(['status', 'checkedIn', 'checkedInAt', 'notes', 'updatedAt']);
       allow delete: if isBoard();
@@ -992,7 +995,7 @@ service cloud.firestore {
     // System configuration (e.g., birthday_processor)
     match /system_config/{configId} {
       allow read: if isAuthenticated();
-      allow write: if isBoard() || isAuthenticated(); // Allow members to update (e.g. birthday processing)
+      allow write: if isBoard() || isAdmin();
     }
 
     // System config collection (e.g. radar_mappings)
@@ -1077,8 +1080,9 @@ service cloud.firestore {
     // - Members can read and create their own bills only (for dues/event payments)
     // - Webhook writes go through Admin SDK and bypass these rules
     match /toyyibBills/{billId} {
-      allow read: if isBoard() ||
-                     (isAuthenticated() && resource.data.memberId == request.auth.uid);
+      allow get: if isBoard() ||
+                    (isAuthenticated() && resource.data.memberId == request.auth.uid);
+      allow list: if isAuthenticated();
       allow create: if isBoard() ||
                        (isAuthenticated() && request.resource.data.memberId == request.auth.uid);
       allow update, delete: if isBoard();

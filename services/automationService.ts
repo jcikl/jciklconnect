@@ -48,6 +48,12 @@ export interface WorkflowStep {
   conditions?: Record<string, any>;
 }
 
+export interface WorkflowCondition {
+  field: string;
+  operator: '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains';
+  value: unknown;
+}
+
 export class AutomationService {
   // Get all workflows
   static async getAllWorkflows(): Promise<Workflow[]> {
@@ -86,7 +92,7 @@ export class AutomationService {
             lastExecuted: doc.data().lastExecuted?.toDate(),
           } as Workflow));
         } catch (error) {
-          console.error('Error fetching workflows:', error);
+          errorLoggingService.logError(error as Error, { action: 'AutomationService.getAllWorkflows' });
           throw error;
         }
       }
@@ -117,7 +123,7 @@ export class AutomationService {
           }
           return null;
         } catch (error) {
-          console.error('Error fetching workflow:', error);
+          errorLoggingService.logError(error as Error, { action: 'AutomationService.getWorkflow' });
           throw error;
         }
       }
@@ -129,7 +135,9 @@ export class AutomationService {
     return withDevMode(
       () => {
         const newId = `mock-workflow-${Date.now()}`;
-        console.log(`[DEV MODE] Simulating creation of workflow with ID: ${newId}`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[DEV MODE] Simulating creation of workflow with ID: ${newId}`);
+        }
         return newId;
       },
       async () => {
@@ -150,7 +158,7 @@ export class AutomationService {
           const docRef = await addDoc(collection(db, COLLECTIONS.WORKFLOWS), newWorkflow);
           return docRef.id;
         } catch (error) {
-          console.error('Error creating workflow:', error);
+          errorLoggingService.logError(error as Error, { action: 'AutomationService.createWorkflow' });
           throw error;
         }
       }
@@ -169,7 +177,7 @@ export class AutomationService {
             updatedAt: Timestamp.now(),
           });
         } catch (error) {
-          console.error('Error updating workflow:', error);
+          errorLoggingService.logError(error as Error, { action: 'AutomationService.updateWorkflow' });
           throw error;
         }
       }
@@ -184,7 +192,7 @@ export class AutomationService {
         try {
           await deleteDoc(doc(db, COLLECTIONS.WORKFLOWS, workflowId));
         } catch (error) {
-          console.error('Error deleting workflow:', error);
+          errorLoggingService.logError(error as Error, { action: 'AutomationService.deleteWorkflow' });
           throw error;
         }
       }
@@ -374,7 +382,7 @@ export class AutomationService {
         throw error;
       }
         } catch (error) {
-          console.error('Error executing workflow:', error);
+          errorLoggingService.logError(error as Error, { action: 'AutomationService.executeWorkflow' });
           throw error;
         }
       }
@@ -410,7 +418,7 @@ export class AutomationService {
             );
             recipientEmail = members
               .filter(m => m?.email)
-              .map(m => m!.email);
+              .flatMap(m => m?.email ? [m.email] : []);
           }
 
           if (!recipientEmail) {
@@ -434,9 +442,11 @@ export class AutomationService {
             },
           });
 
-          console.log(`Email sent successfully to ${Array.isArray(recipientEmail) ? recipientEmail.join(', ') : recipientEmail}`);
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`Email sent successfully to ${Array.isArray(recipientEmail) ? recipientEmail.join(', ') : recipientEmail}`);
+          }
         } catch (error) {
-          console.error('Error sending email in workflow:', error);
+          errorLoggingService.logError(error as Error, { action: 'AutomationService.executeStep.send_email' });
           // Fallback to notification if email fails
           if (step.config.recipientId) {
             await CommunicationService.createNotification({
@@ -452,7 +462,9 @@ export class AutomationService {
 
       case 'update_data':
         // Generic data update - would need to know the collection and document
-        console.log('Data update step:', step.config, context);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Data update step:', step.config, context);
+        }
         // This would require more context about what data to update
         // Could be implemented based on step.config.collection, step.config.docId, etc.
         break;
@@ -476,12 +488,14 @@ export class AutomationService {
               relatedEntityId,
               relatedEntityType
             );
-            console.log(`Awarded ${amount} points to member ${memberId}`);
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`Awarded ${amount} points to member ${memberId}`);
+            }
           } else {
-            console.warn('No memberId provided for award_points step');
+            errorLoggingService.logWarning('No memberId provided for award_points step', { action: 'AutomationService.executeStep' });
           }
         } catch (error) {
-          console.error('Error awarding points in workflow:', error);
+          errorLoggingService.logError(error as Error, { action: 'AutomationService.executeStep.award_points' });
           throw error;
         }
         break;
@@ -501,12 +515,14 @@ export class AutomationService {
               message,
               type: type as 'info' | 'success' | 'warning' | 'error',
             });
-            console.log(`Created notification for member ${memberId}`);
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`Created notification for member ${memberId}`);
+            }
           } else {
-            console.warn('No memberId provided for create_notification step');
+            errorLoggingService.logWarning('No memberId provided for create_notification step', { action: 'AutomationService.executeStep' });
           }
         } catch (error) {
-          console.error('Error creating notification in workflow:', error);
+          errorLoggingService.logError(error as Error, { action: 'AutomationService.executeStep.create_notification' });
           throw error;
         }
         break;
@@ -530,33 +546,37 @@ export class AutomationService {
               throw new Error(`Webhook call failed: ${response.statusText}`);
             }
 
-            console.log(`Webhook called successfully: ${url}`);
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`Webhook called successfully: ${url}`);
+            }
           } else {
-            console.warn('No URL provided for call_webhook step');
+            errorLoggingService.logWarning('No URL provided for call_webhook step', { action: 'AutomationService.executeStep' });
           }
         } catch (error) {
-          console.error('Error calling webhook in workflow:', error);
+          errorLoggingService.logError(error as Error, { action: 'AutomationService.executeStep.call_webhook' });
           // Don't throw - webhook failures shouldn't stop the workflow
-          console.warn('Continuing workflow despite webhook error');
         }
         break;
 
-      case 'conditional':
+      case 'conditional': {
         // Conditional logic - evaluate condition and potentially skip steps
-        const condition = step.config.condition;
+        const condition = step.config.condition as WorkflowCondition | null | undefined;
         const conditionMet = this.evaluateCondition(condition, context);
-        console.log(`Condition evaluated: ${conditionMet}`, condition);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`Condition evaluated: ${conditionMet}`, condition);
+        }
         // This would affect which steps execute next
         context._conditionResult = conditionMet;
         break;
+      }
 
       default:
-        console.warn('Unknown step type:', step.type);
+        errorLoggingService.logWarning(`Unknown step type: ${step.type}`, { action: 'AutomationService.executeStep' });
     }
   }
 
   // Helper method to evaluate conditions
-  private static evaluateCondition(condition: any, context: Record<string, any>): boolean {
+  private static evaluateCondition(condition: WorkflowCondition | null | undefined, context: Record<string, unknown>): boolean {
     if (!condition) return true;
 
     // Simple condition evaluation
@@ -570,13 +590,13 @@ export class AutomationService {
         case '!=':
           return fieldValue !== condition.value;
         case '>':
-          return fieldValue > condition.value;
+          return (fieldValue as number) > (condition.value as number);
         case '<':
-          return fieldValue < condition.value;
+          return (fieldValue as number) < (condition.value as number);
         case '>=':
-          return fieldValue >= condition.value;
+          return (fieldValue as number) >= (condition.value as number);
         case '<=':
-          return fieldValue <= condition.value;
+          return (fieldValue as number) <= (condition.value as number);
         case 'contains':
           return String(fieldValue).includes(String(condition.value));
         default:
@@ -588,8 +608,8 @@ export class AutomationService {
   }
 
   // Helper method to get nested object values
-  private static getNestedValue(obj: any, path: string): any {
-    return path.split('.').reduce((current, prop) => current?.[prop], obj);
+  private static getNestedValue(obj: Record<string, unknown>, path: string): unknown {
+    return path.split('.').reduce((current: unknown, prop) => (current as Record<string, unknown>)?.[prop], obj);
   }
 
   // Get automation rules
@@ -606,7 +626,7 @@ export class AutomationService {
             ...doc.data(),
           } as AutomationRule));
         } catch (error) {
-          console.error('Error fetching automation rules:', error);
+          errorLoggingService.logError(error as Error, { action: 'AutomationService.getAutomationRules' });
           throw error;
         }
       }
@@ -616,7 +636,7 @@ export class AutomationService {
   // Create automation rule
   static async createRule(ruleData: Omit<AutomationRule, 'id' | 'executions'>): Promise<string> {
     return withDevMode(
-      () => { console.log('[Dev Mode] Mocking automation rule creation'); return `mock-rule-${Date.now()}`; },
+      () => { if (process.env.NODE_ENV === 'development') { console.log('[Dev Mode] Mocking automation rule creation'); } return `mock-rule-${Date.now()}`; },
       async () => {
         try {
           const newRule = {
@@ -627,7 +647,7 @@ export class AutomationService {
           const docRef = await addDoc(collection(db, COLLECTIONS.AUTOMATION_RULES), newRule);
           return docRef.id;
         } catch (error) {
-          console.error('Error creating automation rule:', error);
+          errorLoggingService.logError(error as Error, { action: 'AutomationService.createAutomationRule' });
           throw error;
         }
       }
@@ -637,12 +657,12 @@ export class AutomationService {
   // Update automation rule
   static async updateRule(ruleId: string, updates: Partial<AutomationRule>): Promise<void> {
     return withDevMode(
-      () => { console.log(`[DEV MODE] Simulating update of automation rule ${ruleId} with updates:`, updates); },
+      () => { if (process.env.NODE_ENV === 'development') { console.log(`[DEV MODE] Simulating update of automation rule ${ruleId} with updates:`, updates); } },
       async () => {
         try {
           await updateDoc(doc(db, COLLECTIONS.AUTOMATION_RULES, ruleId), updates);
         } catch (error) {
-          console.error('Error updating automation rule:', error);
+          errorLoggingService.logError(error as Error, { action: 'AutomationService.updateAutomationRule' });
           throw error;
         }
       }
@@ -711,7 +731,7 @@ export class AutomationService {
             completedAt: doc.data().completedAt?.toDate?.()?.toISOString() || doc.data().completedAt,
           } as WorkflowExecution));
         } catch (error) {
-          console.error('Error fetching execution logs:', error);
+          errorLoggingService.logError(error as Error, { action: 'AutomationService.getExecutionLogs' });
           throw error;
         }
       }
@@ -738,7 +758,7 @@ export class AutomationService {
             completedAt: docSnap.data().completedAt?.toDate?.()?.toISOString() || docSnap.data().completedAt,
           } as WorkflowExecution;
         } catch (error) {
-          console.error('Error fetching execution:', error);
+          errorLoggingService.logError(error as Error, { action: 'AutomationService.getExecution' });
           throw error;
         }
       }

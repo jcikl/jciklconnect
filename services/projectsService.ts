@@ -8,6 +8,7 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
+  writeBatch,
   query,
   where,
   orderBy,
@@ -17,7 +18,8 @@ import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { Project, Task } from '../types';
 import { PointsService } from './pointsService';
-import { withDevMode } from '../utils/devMode';
+import { withDevMode, isDevMode } from '../utils/devMode';
+import { invalidateFinanceCache } from './financeService';
 import { apiCache } from './cacheService';
 import { MOCK_PROJECTS, MOCK_TASKS } from './mockData';
 
@@ -54,6 +56,7 @@ export class ProjectsService {
 
   // Get project by ID
   static async getProjectById(projectId: string): Promise<Project | null> {
+    if (isDevMode()) { return MOCK_PROJECTS?.find(p => p.id === projectId) ?? null; }
     try {
       const docRef = doc(db, COLLECTIONS.PROJECTS, projectId);
       const docSnap = await getDoc(docRef);
@@ -71,6 +74,7 @@ export class ProjectsService {
   // Create new project
   // P1-B: accept optional currentUserId so organizerId is reliably written
   static async createProject(projectData: Omit<Project, 'id'>, currentUserId?: string): Promise<string> {
+    if (isDevMode()) { return 'mock-project-' + Math.floor(Math.random() * 10000); }
     try {
       // P1-A: write both name and title for backward-compat callers that use either field
       const resolvedName = projectData.name || projectData.title || '';
@@ -242,18 +246,24 @@ export class ProjectsService {
             }
           }
 
-          await deleteDoc(projectRef);
-          this.invalidateProjectsCache();
-
           // Clear projectId from bank transactions that reference this project (情景 M)
           const txQuery = query(
             collection(db, COLLECTIONS.TRANSACTIONS),
             where('projectId', '==', projectId)
           );
           const txSnap = await getDocs(txQuery);
-          await Promise.all(txSnap.docs.map(d =>
-            updateDoc(d.ref, { projectId: null, updatedAt: Timestamp.now() })
-          ));
+
+          // Atomically delete the project and unlink all associated transactions
+          const batch = writeBatch(db);
+          batch.delete(projectRef);
+          const now = Timestamp.now();
+          txSnap.docs.forEach(d => {
+            batch.update(d.ref, { projectId: null, updatedAt: now });
+          });
+          await batch.commit();
+
+          this.invalidateProjectsCache();
+          invalidateFinanceCache();
 
           // Recalculate radar stats for affected members (revocation)
           if (memberIdsToRecalculate.size > 0) {
@@ -409,7 +419,7 @@ export class ProjectsService {
           if (taskId && taskData.dependencies?.includes(taskId)) {
             throw new Error('A task cannot depend on itself.');
           }
-          // TODO: Implement full circular dependency detection for task chains.
+          // TODO: Implement DFS cycle detection with visited set to prevent infinite loops in task chains
 
           const now = Timestamp.now();
           const rawTask = {
@@ -481,7 +491,7 @@ export class ProjectsService {
           if (updates.dependencies?.includes(taskId)) {
             throw new Error('A task cannot depend on itself.');
           }
-          // TODO: Implement full circular dependency detection for task chains.
+          // TODO: Implement DFS cycle detection with visited set to prevent infinite loops in task chains
 
           const taskRef = doc(db, 'tasks', taskId);
 

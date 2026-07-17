@@ -483,6 +483,7 @@ export class MembersService {
 
   /** Update member. Sets updatedAt and optionally updatedBy (audit). */
   static async updateMember(memberId: string, updates: Partial<Member>, updatedBy?: string): Promise<void> {
+    if (isDevMode()) { return; }
     try {
       const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
       const currentSnap = await getDoc(memberRef);
@@ -734,20 +735,20 @@ export class MembersService {
         query(collection(db, 'boardMembers'), where('memberId', '==', memberId))
       );
 
-      await Promise.all(
-        boardSnapshot.docs.map((boardDoc) =>
-          updateDoc(doc(db, 'boardMembers', boardDoc.id), {
-            ...cleanDisplay,
-            updatedAt: new Date().toISOString(),
-          })
-        )
-      );
+      const batch = writeBatch(db);
+      boardSnapshot.docs.forEach((boardDoc) => {
+        batch.update(doc(db, 'boardMembers', boardDoc.id), {
+          ...cleanDisplay,
+          updatedAt: new Date().toISOString(),
+        });
+      });
+      await batch.commit();
     } catch (err) {
-      console.warn('Board member display sync skipped:', err);
       logServiceError(
         err instanceof Error ? err : new Error(String(err)),
         { component: 'MembersService', action: 'syncBoardMemberDisplayFields', additionalData: { memberId } }
       );
+      throw err;
     }
   }
 

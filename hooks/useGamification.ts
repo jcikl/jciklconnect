@@ -118,20 +118,12 @@ export const useGamification = (memberId?: string) => {
     return {
         awards,
         memberAwards,
-        // UI expects achievements/badges separately for now, so we expose them unified
-        achievements: awards, // Compatibility alias
-        badges: awards,      // Compatibility alias
-        memberBadges: memberAwards,
-        memberAchievements: memberAwards,
         loading,
         error,
         awardAward,
         createAward,
         updateAward,
         deleteAward,
-        // Compatibility aliases for the UI
-        awardBadge: awardAward,
-        awardAchievement: (memberId: string, awardId: string) => awardAward(awardId, memberId),
         refresh: loadAllAwards
     };
 };

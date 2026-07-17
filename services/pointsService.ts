@@ -14,6 +14,7 @@ import {
   Timestamp,
   writeBatch,
   runTransaction,
+  increment,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS, POINT_CATEGORIES, MEMBER_TIERS } from '../config/constants';
@@ -117,18 +118,36 @@ export class PointsService {
             createdAt: Timestamp.now(),
           };
 
-          const transactionRef = await addDoc(
-            collection(db, COLLECTIONS.POINTS),
-            transaction
-          );
+          // Generate a new document ID so we can use writeBatch (setDoc requires an ID)
+          const pointsDocRef = doc(collection(db, COLLECTIONS.POINTS));
+          const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
 
-          // Update member's total points
-          await this.updateMemberPoints(memberId, points);
+          // Verify member exists before committing
+          const memberSnap = await getDoc(memberRef);
+          if (!memberSnap.exists()) {
+            throw new Error('Member not found');
+          }
+
+          // Derive new tier from the current points + delta
+          const currentPoints = memberSnap.data().points || 0;
+          const newPoints = currentPoints + points;
+          const tier = PointsService.calculateTier(newPoints);
+
+          // Atomic batch: create points record + update member totals in one commit
+          const batch = writeBatch(db);
+          batch.set(pointsDocRef, transaction);
+          batch.update(memberRef, {
+            points: newPoints,
+            tier,
+            updatedAt: Timestamp.now(),
+          });
+          await batch.commit();
 
           // Invalidate caches after write
           PointsService.invalidatePointsCache();
+          MembersService.invalidateMembersCache();
 
-          return transactionRef.id;
+          return pointsDocRef.id;
         } catch (error) {
           console.error('Error awarding points:', error);
           throw error;
@@ -450,8 +469,10 @@ export class PointsService {
             updatedAt: Timestamp.now(),
           });
 
-          // Invalidate members cache after write
+          // Invalidate members cache after write (both flat and role-grouped cache keys)
           MembersService.invalidateMembersCache();
+          apiCache.deleteByPrefix('members:byRole:');
+          PointsService.invalidatePointsCache();
         } catch (error) {
           console.error('Error updating member points:', error);
           throw error;
@@ -893,11 +914,12 @@ export class PointsService {
               updatedAt: Timestamp.now()
             });
 
-            // Close Escrow
+            // Close Escrow — include releasedBy if caller supplied it via metadata
             transaction.update(escrowRef, {
               status: 'Released',
               releasedTo: targetMemberId,
-              releasedAt: Timestamp.now()
+              releasedAt: Timestamp.now(),
+              ...(metadata?.releasedBy ? { releasedBy: metadata.releasedBy } : {})
             });
 
             // Record receiving transaction
