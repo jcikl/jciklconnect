@@ -25,6 +25,7 @@ const ALLOWED_ORIGINS = ['https://app.jcikl.cc', 'http://localhost:3000', 'http:
 const CREATE_BILL_ALLOWED_PARAMS = [
   'billName', 'billDescription', 'billAmount', 'billTo',
   'billEmail', 'billPhone', 'billSplitPayment', 'billSplitPaymentArgs',
+  'categoryCode', // required by ToyyibPay to assign the bill to a category
 ];
 
 const SECRET_KEY = process.env.TOYYIBPAY_SECRET_KEY;
@@ -81,19 +82,18 @@ exports.handler = async (event) => {
     return { statusCode: 405, headers: cors, body: 'Method Not Allowed' };
   }
 
-  // FIX 1: Require Firebase ID token with BOARD/ADMIN role
+  // Require Firebase ID token for all requests
   const authHeader = event.headers.authorization || event.headers.Authorization;
   if (!authHeader?.startsWith('Bearer ')) {
     return { statusCode: 401, headers: cors, body: JSON.stringify({ error: 'Unauthorized' }) };
   }
   const idToken = authHeader.split('Bearer ')[1];
+  let decodedUid, callerRole;
   try {
     const decoded = await getAuth().verifyIdToken(idToken);
+    decodedUid = decoded.uid;
     const callerDoc = await getFirestore().collection('members').doc(decoded.uid).get();
-    const role = callerDoc.data()?.role;
-    if (!['BOARD', 'ADMIN', 'SUPER_ADMIN'].includes(role)) {
-      return { statusCode: 403, headers: cors, body: JSON.stringify({ error: 'Forbidden' }) };
-    }
+    callerRole = callerDoc.data()?.role;
   } catch {
     return { statusCode: 401, headers: cors, body: JSON.stringify({ error: 'Unauthorized' }) };
   }
@@ -106,6 +106,11 @@ exports.handler = async (event) => {
   }
 
   const { action, ...params } = body;
+
+  // createCategory is admin-only; all other actions require only authentication
+  if (action === 'createCategory' && !['BOARD', 'ADMIN', 'SUPER_ADMIN'].includes(callerRole)) {
+    return { statusCode: 403, headers: cors, body: JSON.stringify({ error: 'Forbidden' }) };
+  }
 
   try {
     let result;
