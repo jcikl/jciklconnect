@@ -177,6 +177,7 @@
   },
   "active": "e1773e6f96bc2d51",
   "lastOpenFiles": [
+    "hooks/usePermissions.ts.tmp.4224.06c27393b781",
     "node_modules/@rollup/plugin-node-resolve/README.md",
     "components/modules/Members/config/memberImportConfig.ts.tmp.14128.817680bf2b66",
     "services/dataImportExportService.ts.tmp.14128.303d9a67f925",

@@ -16,8 +16,32 @@ To curate exclusive lifestyle experiences that build high-trust relationships an
 - 1 Bring 3 booth
 - 1 bring 1 for free
 
+## Upcoming Events
+### 19 Aug 2026
+Venue: APC
+Time: 7pm - 10pm
+Fee: RM150
+
+### 9 Sep 2026
+Venue: APC
+Time: 7pm - 10pm
+Fee: RM150
+
+## Package
+### RM 400
+X Selected Cigars
+X Selected Wine
+### RM 800
+Y Selected Cigars 
+Y Selected Wine
+
+RM 1500
+Z Selected Cigar
+Z Selected Wine
+
+
 ### Membership Size
-#### 0 - 50 Members
+#### 0 - 100 Members
 - Membership Fee: FOC
 - Events Type (w topic sharing): 
 	- Cigar Lounge Gathering, Monthly
@@ -27,52 +51,3 @@ To curate exclusive lifestyle experiences that build high-trust relationships an
 	- JDM Club
 	- Watches 
 	- Founder Dinner, Quarterly
-- Half year active rate target: 24 / 50
-- Active Member: 3 events/ Half
-#### 51 - 100 Members
-- Membership Fee: FOC
-- Events Type: 
-	- Cigar Lounge Gathering, Monthly
-	- Golf Swing Gathering, Monthly
-	- Wine Taste Gathering, Monthly
-	- Founder Dinner, Quarterly
-- Half year active rate target: 24 / 50
-- Active Member: 3 events/ Half
-#### 101 - 150 Members
-- Membership Fee: 1500
-- Events Type: 
-	- Cigar Lounge Gathering
-	- Golf Swing Gathering
-	- Wine Taste Gathering
-	- Founder Dinner, Quarterly
-- Quarterly active rate target: 24 / 50
-- Active Member: 3 events/ Half
-- 7 Events Pass except founder dinner
-#### 151 - 250 Members
-- Membership Fee: 1500
-- Events Type: 
-	- Cigar Lounge Gathering
-	- Golf Swing Gathering
-	- Wine Taste Gathering
-	- Founder Dinner, Quarterly
-- Quarterly active rate target: 24 / 50
-- Active Member: 3 events/ Half
-- 7 Events Pass except founder dinner
-#### 251 - 500 Members
-- Membership Fee: 2000
-- Events Type: 
-	- Cigar Lounge Gathering, Bi-Weekly
-	- Golf Swing Gathering, Bi-Weekly
-	- Wine Taste Gathering, Bi-Weekly
-	- Founder Dinner, Quarterly
-- Quarterly active rate target: 24 / 50
-- Active Member: 3 events/ Half
-- 10 Events Pass except founder dinner
-
-#### 501 - 1000 Members
-
-
-#### 1001 - 1500 Members
-
-
-## 1501 - 2000 Members

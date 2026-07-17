@@ -7,6 +7,13 @@
       "runtimeArgs": ["run", "dev", "--", "--port", "3002"],
       "port": 3002,
       "autoPort": true
+    },
+    {
+      "name": "JCI KL Netlify Dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:netlify"],
+      "port": 8888,
+      "autoPort": true
     }
   ]
 }
