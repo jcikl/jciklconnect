@@ -593,8 +593,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (err: any) {
       const code: string = err?.code ?? '';
       if (code === 'auth/user-not-found' || code === 'auth/invalid-email' || err?.status === 400) {
-        // Firebase returns 400 for unregistered emails (or when Email Enumeration
-        // Protection is on). Don't leak whether the account exists — show neutral message.
+        // Firebase Auth account doesn't exist. Silently try auto-invite: if this email
+        // belongs to a Firestore member, the function creates the Auth account and sends
+        // a password-setup email. Always show the same neutral message either way.
+        try {
+          await fetch('/.netlify/functions/auto-invite', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+          });
+        } catch {
+          // Network failure — swallow silently, neutral message shown below
+        }
         throw new Error('If an account exists for this email, a reset link has been sent. Please check your inbox (and spam folder).');
       }
       if (code === 'auth/too-many-requests') {
