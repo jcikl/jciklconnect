@@ -504,7 +504,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
 
           {/* TAB NAVIGATION */}
           <Tabs
-            variant="underline"
+            variant="button"
             tabs={memberTabItems}
             activeTab={activeTab}
             onTabChange={(id) => setActiveTab(id as typeof activeTab)}

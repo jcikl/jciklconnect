@@ -248,7 +248,7 @@ export const BoardTransitionTools: React.FC<BoardTransitionToolsProps> = ({
       <div className="bg-white rounded-lg shadow">
         <div className="px-2 pt-2">
           <Tabs
-            variant="underline"
+            variant="button"
             tabs={[
               { id: 'current', label: 'Current Board', icon: <Users size={16} /> },
               { id: 'transition', label: 'Transition', icon: <ArrowRight size={16} /> },
