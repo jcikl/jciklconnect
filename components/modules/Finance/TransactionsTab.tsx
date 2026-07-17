@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { Search, ChevronDown, Edit, Trash2, Link2Off, Ban } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Button, Badge, ConfirmDialog, CONFIRM_CLOSED } from '../../ui/Common';
+import { Button, Badge, ConfirmDialog, CONFIRM_CLOSED, useToast } from '../../ui/Common';
 import type { ConfirmState } from '../../ui/Common';
 import { LoadingState } from '../../ui/Loading';
 import { Input } from '../../ui/Form';
@@ -115,6 +115,7 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
   hasMoreTransactions,
   setTransactionLimit,
 }) => {
+  const { showToast } = useToast();
   const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
 
   const requestDeleteTransaction = (id: string, description?: string) => {
@@ -215,14 +216,14 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
         ptTrx.forEach(t => {
           if (t.projectId === targetProjectId && t.description) purposes.add(t.description);
         });
-      } catch (e) { console.error('Failed to load PT purposes', e); }
+      } catch (e) { console.error('Failed to load PT purposes', e); showToast('Failed to load transaction types', 'warning'); }
       let allTx: Transaction[] = [];
       try {
         allTx = await FinanceService.getAllTransactions();
         allTx.forEach(t => {
           if (t.projectId === targetProjectId && t.purpose) purposes.add(t.purpose);
         });
-      } catch (e) { console.error('Failed to load tx purposes', e); }
+      } catch (e) { console.error('Failed to load tx purposes', e); showToast('Failed to load purposes', 'warning'); }
       try {
         const splitTx = allTx.filter(t => t.isSplit && t.splitIds);
         for (const t of splitTx) {
@@ -233,7 +234,7 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
             });
           } catch (e) { /* ignore */ }
         }
-      } catch (e) { console.error('Failed to load split purposes', e); }
+      } catch (e) { console.error('Failed to load split purposes', e); showToast('Failed to load split data', 'warning'); }
       setProjectPurposes(Array.from(purposes).sort());
     };
     loadPurposes();

@@ -3,6 +3,8 @@ import { auth } from '../config/firebase';
 
 function sanitizeContext(obj: unknown, depth = 0): unknown {
   if (depth > 3 || obj === null || typeof obj !== 'object') return obj;
+  // Fix 12 (P2): preserve arrays instead of converting them to numeric-keyed objects.
+  if (Array.isArray(obj)) return obj.map(item => sanitizeContext(item, depth + 1));
   const SENSITIVE_RE = /password|token|secret|key|credential|apikey|api_key/i;
   return Object.fromEntries(
     Object.entries(obj as Record<string, unknown>)

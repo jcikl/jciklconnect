@@ -183,6 +183,9 @@ export const uploadToCloudinary = (
     const resourceType = options?.resourceType ?? 'image';
     const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${resourceType}/upload`;
     xhr.open('POST', url, true);
+    // Fix 13 (P2): abort upload if Cloudinary doesn't respond within 2 minutes.
+    xhr.timeout = 120000;
+    xhr.ontimeout = () => reject(new Error('Cloudinary upload timed out after 2 minutes'));
 
     if (onProgress) {
       xhr.upload.onprogress = (event) => {

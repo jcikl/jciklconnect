@@ -24,6 +24,7 @@ import { MOCK_AUTOMATION_RULES } from './mockData';
 import { PointsService } from './pointsService';
 import { CommunicationService } from './communicationService';
 import { errorLoggingService } from './errorLoggingService';
+import { apiCache as cacheService } from './cacheService';
 
 export interface Workflow {
   id?: string;
@@ -533,6 +534,8 @@ export class AutomationService {
         const { collection: col, docId, fields } = step.config || {};
         if (!col || !docId || !fields) throw new Error('update_data requires config.collection, config.docId, and config.fields');
         await updateDoc(doc(db, col, docId), fields);
+        // Fix 10 (P2): invalidate cache for the updated collection so stale reads don't persist
+        cacheService.deleteByPrefix(col + ':');
         break;
       }
 

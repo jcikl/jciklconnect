@@ -1,4 +1,4 @@
-import { collection, doc, setDoc, getDocs, deleteDoc, serverTimestamp, addDoc, updateDoc, query, where, orderBy, limit, increment, writeBatch } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, deleteDoc, serverTimestamp, addDoc, updateDoc, query, where, orderBy, limit, increment, writeBatch, runTransaction } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { db } from '../config/firebase';
 import { COLLECTIONS, TOYYIB_CONFIG } from '../config/constants';
@@ -185,10 +185,11 @@ export class ToyyibService {
       const billRef = doc(collection(db, COLLECTIONS.TOYYIB_BILLS));
       billBatch.set(billRef, billRecord);
       if (usedCategoryCode) {
-        billBatch.update(doc(db, COLLECTIONS.TOYYIB_CATEGORIES, usedCategoryCode), {
+        // Fix 4 (P1): use set+merge so this succeeds whether or not the category doc exists yet.
+        billBatch.set(doc(db, COLLECTIONS.TOYYIB_CATEGORIES, usedCategoryCode), {
           billCount: increment(1),
           updatedAt: serverTimestamp(),
-        });
+        }, { merge: true });
       }
       await billBatch.commit();
       return {
@@ -414,18 +415,24 @@ export class ToyyibService {
     const billpaymentStatus: string = String(txn.billpaymentStatus ?? '2');
     const billPaymentDate: string = txn.billPaymentDate ?? '';
 
-    // P1-fix: only overwrite status when the incoming status is at least as final as the stored one.
+    // Fix 5 (P2): wrap priority comparison + updateDoc in a runTransaction so concurrent
+    // webhook callbacks can't both downgrade the status.
     // Priority: 1 (paid) > 4 (settling) > 2 (pending) > 3 (failed)
     const STATUS_PRIORITY: Record<string, number> = { '1': 4, '4': 3, '2': 2, '3': 1 };
     const snap = await getDocs(query(collection(db, COLLECTIONS.TOYYIB_BILLS), where('billCode', '==', billCode), limit(1)));
     const match = snap.docs[0];
     if (match) {
-      const existingStatus = String(match.data().billpaymentStatus ?? '2');
-      const existingPriority = STATUS_PRIORITY[existingStatus] ?? 0;
-      const incomingPriority = STATUS_PRIORITY[billpaymentStatus] ?? 0;
-      if (incomingPriority >= existingPriority) {
-        await updateDoc(doc(db, COLLECTIONS.TOYYIB_BILLS, match.id), { billpaymentStatus, billPaymentDate });
-      }
+      const billRef = doc(db, COLLECTIONS.TOYYIB_BILLS, match.id);
+      await runTransaction(db, async (txn) => {
+        const freshSnap = await txn.get(billRef);
+        if (!freshSnap.exists()) return;
+        const existingStatus = String(freshSnap.data().billpaymentStatus ?? '2');
+        const existingPriority = STATUS_PRIORITY[existingStatus] ?? 0;
+        const incomingPriority = STATUS_PRIORITY[billpaymentStatus] ?? 0;
+        if (incomingPriority >= existingPriority) {
+          txn.update(billRef, { billpaymentStatus, billPaymentDate });
+        }
+      });
     }
     return { billpaymentStatus, billPaymentDate };
   }

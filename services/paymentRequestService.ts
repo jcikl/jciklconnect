@@ -14,6 +14,7 @@ import {
   orderBy,
   limit,
   startAfter,
+  increment,
   DocumentSnapshot,
   Timestamp,
 } from 'firebase/firestore';
@@ -352,6 +353,11 @@ export class PaymentRequestService {
             }
             txn.set(txRef, transactionPayload);
             txn.update(ref, prUpdatePayload);
+            // Fix 1 (P0): decrement bankAccount.currentBalance atomically with the expense tx creation
+            if (pr.claimFromBankAccountId) {
+              const bankAccountRef = doc(db, COLLECTIONS.BANK_ACCOUNTS, pr.claimFromBankAccountId);
+              txn.update(bankAccountRef, { currentBalance: increment(-(pr.totalAmount || pr.amount)) });
+            }
           });
           invalidateFinanceCache();
 
@@ -659,7 +665,14 @@ export class PaymentRequestService {
                 const batch = writeBatch(db);
                 batch.update(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id), payload);
                 for (const txDoc of linkedSnap.docs) {
+                  const oldTxAmount = (txDoc.data() as Transaction).amount ?? 0;
+                  const delta = newAmount - oldTxAmount;
                   batch.update(txDoc.ref, { amount: newAmount, updatedAt: Timestamp.now() });
+                  // Fix 3 (P1): adjust bankAccount.currentBalance by -delta atomically
+                  const bankAccountId = (txDoc.data() as Transaction).bankAccountId ?? pr.claimFromBankAccountId;
+                  if (bankAccountId && delta !== 0) {
+                    batch.update(doc(db, COLLECTIONS.BANK_ACCOUNTS, bankAccountId), { currentBalance: increment(-delta) });
+                  }
                 }
                 await batch.commit();
                 invalidateFinanceCache();
@@ -692,7 +705,28 @@ export class PaymentRequestService {
         if (pr) await this._notifyApplicant(pr, 'cancelled');
       },
       async () => {
-        // Fix 3: validate status before cancelling — only submitted/approved PRs can be cancelled.
+        // Fix 2 (P1): fetch expense tx refs BEFORE the transaction, then delete them inside
+        // the runTransaction so both the status update and expense deletion are atomic.
+        const expenseQ = query(
+          collection(db, COLLECTIONS.TRANSACTIONS),
+          where('paymentRequestId', '==', id),
+          where('type', '==', 'Expense')
+        );
+        const expenseSnap = await getDocs(expenseQ);
+
+        // Surface reconciled txs as a user-friendly error before attempting cancellation.
+        const reconciledTxs = expenseSnap.docs.filter(d => {
+          const tx = d.data() as Transaction;
+          return tx.status === 'Reconciled' || tx.status === 'Partially Reconciled';
+        });
+        if (reconciledTxs.length > 0) {
+          throw new Error(
+            `Cannot cancel: ${reconciledTxs.length} linked expense transaction(s) have already been reconciled. ` +
+            'Please manually reverse the reconciliation first.'
+          );
+        }
+        const nonReconciledRefs = expenseSnap.docs.map(d => d.ref);
+
         const prRef = doc(db, COLLECTIONS.PAYMENT_REQUESTS, id);
         await runTransaction(db, async (txn) => {
           const prSnap = await txn.get(prRef);
@@ -706,26 +740,11 @@ export class PaymentRequestService {
             updatedAt: Timestamp.now(),
             updatedBy: userId,
           });
-        });
-
-        // After status update succeeds, delete linked expense transactions atomically.
-        const expenseQ = query(
-          collection(db, COLLECTIONS.TRANSACTIONS),
-          where('paymentRequestId', '==', id),
-          where('type', '==', 'Expense')
-        );
-        const expenseSnap = await getDocs(expenseQ);
-
-        const batch = writeBatch(db);
-        for (const txDoc of expenseSnap.docs) {
-          const tx = txDoc.data() as Transaction;
-          if (tx.status !== 'Reconciled' && tx.status !== 'Partially Reconciled') {
-            batch.delete(txDoc.ref);
-          } else {
-            console.warn('[PaymentRequestService.cancel] Skipping delete of reconciled expense tx', txDoc.id, '— must be voided manually');
+          // Delete all non-reconciled expense txs atomically with the status update.
+          for (const expenseRef of nonReconciledRefs) {
+            txn.delete(expenseRef);
           }
-        }
-        await batch.commit();
+        });
         invalidateFinanceCache();
 
         // Notify applicant (AA)

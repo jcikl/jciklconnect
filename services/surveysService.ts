@@ -373,16 +373,18 @@ export class SurveysService {
         );
       }
 
+      // Fix 12 (P2): throw early if 'link' channel is requested but base URL is not configured,
+      // preventing undefined from being stored as the shareableLink in Firestore.
+      const baseUrl = import.meta.env.VITE_APP_BASE_URL;
+      if (channels.includes('link') && !baseUrl) {
+        throw new Error('Cannot generate shareable link: VITE_APP_BASE_URL environment variable is not configured.');
+      }
+      const shareableLink = baseUrl ? `${baseUrl}/survey/${surveyId}` : undefined;
+
       // Update survey record with distribution channels and optional shareable link
       await this.updateSurvey(surveyId, {
         distributionChannels: channels,
-        shareableLink: channels.includes('link') ? (() => {
-          const baseUrl = import.meta.env.VITE_APP_BASE_URL;
-          if (!baseUrl) {
-            console.warn('[SurveysService] VITE_APP_BASE_URL is not set. Shareable links will be broken.');
-          }
-          return baseUrl ? `${baseUrl}/survey/${surveyId}` : undefined;
-        })() : undefined,
+        shareableLink: channels.includes('link') ? shareableLink : undefined,
       });
 
       return { emailsSent: 0, notificationsSent };

@@ -12,3 +12,4 @@ export { PageHeader } from './PageHeader';
 export { ConfirmDialog } from './ConfirmDialog';
 export type { ConfirmState } from './ConfirmDialog';
 export { CONFIRM_CLOSED } from './ConfirmDialog';
+export { LoadingSpinner as Spinner } from './Loading';

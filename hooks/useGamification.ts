@@ -70,7 +70,7 @@ export const useGamification = (memberId?: string) => {
 
     const loading = awardsLoading || (!!memberId && memberAwardsLoading);
 
-    const loadAllAwards = () => queryClient.invalidateQueries({ queryKey: ['awards'] });
+    const loadAllAwards = useCallback(() => queryClient.invalidateQueries({ queryKey: ['awards'] }), [queryClient]);
 
     const awardAward = useCallback(async (awardId: string, targetMemberId: string, reason?: string) => {
         try {

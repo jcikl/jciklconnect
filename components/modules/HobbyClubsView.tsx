@@ -1,4 +1,11 @@
 import React, { useState, useEffect } from 'react';
+
+// Generate an inline SVG data URI with initials — avoids external ui-avatars.com requests blocked by CSP
+const getInitialsSvg = (name: string, size = 200): string => {
+  const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><rect width="${size}" height="${size}" fill="#0097D7" rx="${size / 2}"/><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" fill="white" font-family="sans-serif" font-size="${Math.round(size * 0.4)}px">${initials}</text></svg>`;
+  return `data:image/svg+xml;base64,${btoa(svg)}`;
+};
 import { Users, Calendar, Plus, Heart, Edit, Trash2 } from 'lucide-react';
 import { Card, Button, AvatarGroup, Badge, Modal, useToast, PageHeader, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
 import type { ConfirmState } from '../ui/Common';
@@ -44,7 +51,7 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
                 name: formData.get('name') as string,
                 category: (formData.get('category') as HobbyClub['category']) || 'Social',
                 lead: member?.name || '',
-                image: formData.get('image') as string || `https://ui-avatars.com/api/?name=${encodeURIComponent(formData.get('name') as string)}&background=0097D7&color=fff&size=200`,
+                image: formData.get('image') as string || getInitialsSvg(formData.get('name') as string, 200),
             };
 
             await createClub(newClub);

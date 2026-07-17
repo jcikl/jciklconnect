@@ -604,6 +604,8 @@ export class PromotionService {
     };
 
     const savedId = await this.saveManualPromotionRequest(request);
+    // Fix 3 (P1): overwrite synthetic id with the real Firestore doc id returned by saveManualPromotionRequest.
+    request.id = savedId;
 
     // P1 fix: if override is true, pass savedId so the request status is stamped
     // approved inside the same writeBatch as the member promotion — atomically.
@@ -998,6 +1000,7 @@ export class PromotionService {
     if (isDevMode()) return defaults;
 
     try {
+      // TODO: Move 'system' to COLLECTIONS.SYSTEM in constants.ts
       const snap = await getDoc(doc(db, 'system', 'promotionSettings'));
       if (snap.exists()) return snap.data() as PromotionSettings;
     } catch (e) {

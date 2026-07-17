@@ -1,5 +1,12 @@
 // Messaging View - 1-to-1, group, and project-specific messaging
 import React, { useState, useRef, useEffect } from 'react';
+
+// Generate an inline SVG data URI with initials — avoids external ui-avatars.com requests blocked by CSP
+const getInitialsSvg = (name: string, size = 48): string => {
+  const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><rect width="${size}" height="${size}" fill="#0097D7" rx="${size / 2}"/><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" fill="white" font-family="sans-serif" font-size="${Math.round(size * 0.4)}px">${initials}</text></svg>`;
+  return `data:image/svg+xml;base64,${btoa(svg)}`;
+};
 import {
   MessageSquare, Send, Plus, Users, Search, MoreVertical,
   UserPlus, Hash, Briefcase, Paperclip, Image as ImageIcon, X
@@ -187,7 +194,7 @@ export const MessagingView: React.FC = () => {
                       <div className="flex items-start gap-3">
                         {conv.type === 'direct' ? (
                           <img
-                            src={getConversationAvatar(conv) || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(getConversationDisplayName(conv))}
+                            src={getConversationAvatar(conv) || getInitialsSvg(getConversationDisplayName(conv), 48)}
                             alt={getConversationDisplayName(conv)}
                             className="w-12 h-12 rounded-full bg-slate-200 flex-shrink-0"
                           />
@@ -245,7 +252,7 @@ export const MessagingView: React.FC = () => {
                 <div className="flex items-center gap-3">
                   {selectedConversation.type === 'direct' ? (
                     <img
-                      src={getConversationAvatar(selectedConversation) || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(getConversationDisplayName(selectedConversation))}
+                      src={getConversationAvatar(selectedConversation) || getInitialsSvg(getConversationDisplayName(selectedConversation), 40)}
                       alt={getConversationDisplayName(selectedConversation)}
                       className="w-10 h-10 rounded-full bg-slate-200"
                     />
@@ -286,7 +293,7 @@ export const MessagingView: React.FC = () => {
                       >
                         {showAvatar && !isOwnMessage && (
                           <img
-                            src={message.senderAvatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(message.senderName)}
+                            src={message.senderAvatar || getInitialsSvg(message.senderName, 32)}
                             alt={message.senderName}
                             className="w-8 h-8 rounded-full bg-slate-200 flex-shrink-0"
                           />

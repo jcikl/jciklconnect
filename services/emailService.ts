@@ -170,20 +170,34 @@ export class EmailService {
       throw new Error('User is not authenticated — cannot send email');
     }
 
-    const response = await fetch('/.netlify/functions/send-email', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        to: message.to,
-        subject: message.subject,
-        html: message.html || message.text || '',
-        provider,
-        from: this.config ? `${this.config.fromName} <${this.config.fromEmail}>` : undefined,
-      }),
-    });
+    // Fix 11 (P1): add a 30-second timeout so a hung proxy function never blocks the caller indefinitely.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    let response: Response;
+    try {
+      response = await fetch('/.netlify/functions/send-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          to: message.to,
+          subject: message.subject,
+          html: message.html || message.text || '',
+          provider,
+          from: this.config ? `${this.config.fromName} <${this.config.fromEmail}>` : undefined,
+        }),
+        signal: controller.signal,
+      });
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        throw new Error('Email send timed out after 30 seconds');
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     const data = await response.json() as { success: boolean; messageId?: string; error?: string };
     if (!data.success) {

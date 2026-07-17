@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Save, Shield } from 'lucide-react';
 import { Button, useToast, Tabs } from '../ui/Common';
 import { usePermissions } from '../../hooks/usePermissions';
 import { UserRole } from '../../types';
 import { db } from '../../config/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 
 // Reuse same Toggle as MembershipConfigView
 const Toggle: React.FC<{ checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }> = ({ checked, onChange, disabled }) => (
@@ -80,6 +80,22 @@ export const AccessConfigView: React.FC = () => {
     [UserRole.SUPER_ADMIN]: { ...ALL_ON },
     [UserRole.INACTIVE]:    { ...ALL_OFF },
   });
+
+  useEffect(() => {
+    const loadSavedConfig = async () => {
+      try {
+        const snap = await getDoc(doc(db, 'system', 'accessConfig'));
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.boardPerms) setBoardPerms(data.boardPerms);
+          if (data.rolePerms) setRolePerms(data.rolePerms);
+        }
+      } catch (err) {
+        console.error('[AccessConfigView] Failed to load saved config:', err);
+      }
+    };
+    loadSavedConfig();
+  }, []);
 
   const handleSave = async () => {
     if (!isAdmin) {

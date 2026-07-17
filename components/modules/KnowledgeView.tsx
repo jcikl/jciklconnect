@@ -502,6 +502,7 @@ const LearningPathDetailModal: React.FC<LearningPathDetailModalProps> = ({
     onStart,
     member,
 }) => {
+    const { showToast } = useToast();
     return (
         <Modal isOpen={true} onClose={onClose} title={path.name} size="lg" drawerOnMobile>
             <div className="space-y-6">
@@ -590,6 +591,7 @@ const LearningPathDetailModal: React.FC<LearningPathDetailModalProps> = ({
                                                         window.location.reload(); // Refresh to show updated progress
                                                     } catch (err) {
                                                         console.error('Failed to complete module:', err);
+                                                        showToast('Failed to mark module complete', 'error');
                                                     }
                                                 }}
                                             >

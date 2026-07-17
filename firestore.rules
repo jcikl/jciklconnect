@@ -546,6 +546,21 @@ service cloud.firestore {
       allow update, delete: if isBoard() || isAdmin();
     }
     
+    // Elections collection (board elections with sub-collection ballots)
+    // FIX 1: collection had no match block — all access silently denied by catch-all
+    match /elections/{electionId} {
+      allow read: if isMember() || isBoard() || isAdmin();
+      allow create, update: if isBoard() || isAdmin();
+      allow delete: if isAdmin();
+
+      // Ballots sub-collection — deterministic docId (uid_electionId) prevents double voting
+      match /ballots/{ballotId} {
+        allow read: if isBoard() || isAdmin() || request.auth.uid == resource.data.voterId;
+        allow create: if isMember() && ballotId == request.auth.uid + '_' + electionId;
+        allow update, delete: if isAdmin();
+      }
+    }
+
     // Votes collection (standalone voting records across all elections)
     match /votes/{voteId} {
       // FIX 4: split read — resource.data is null in list queries; protect ballot privacy
@@ -651,12 +666,13 @@ service cloud.firestore {
     }
     
     // Inquiries collection (Business Directory)
+    // FIX 3: allow read used resource.data in list queries (always null) — members could never list their inquiries
     match /inquiries/{inquiryId} {
-      allow read: if isAuthenticated() &&
-                     (resource.data.senderId == request.auth.uid ||
-                      resource.data.recipientId == request.auth.uid ||
-                      (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN']));
+      allow get: if isAuthenticated() &&
+                    (resource.data.senderId == request.auth.uid ||
+                     resource.data.recipientId == request.auth.uid ||
+                     isBoard() || isAdmin());
+      allow list: if isBoard() || isAdmin();
       allow create: if isAuthenticated() &&
                        request.resource.data.senderId == request.auth.uid;
       allow update: if isAuthenticated() &&
@@ -721,7 +737,9 @@ service cloud.firestore {
 
     match /promotionHistory/{historyId} {
       // FIX: allow the subject member to read their own promotion history
-      allow read: if isBoard() || isAdmin() || isDeveloper() || resource.data.memberId == request.auth.uid;
+      // FIX 4: split read — resource.data is null in list queries so memberId check always failed for lists
+      allow get: if isBoard() || isAdmin() || isDeveloper() || resource.data.memberId == request.auth.uid;
+      allow list: if isBoard() || isAdmin() || isDeveloper();
       allow create, update, delete: if isBoard() || isAdmin() || isDeveloper();
     }
     
@@ -846,7 +864,10 @@ service cloud.firestore {
     // FIX 22: allow update had no hasOnly whitelist — Board could overwrite any field including immutable registration data
     match /guestRegistrations/{registrationId} {
       allow read: if isBoard();
-      allow create: if true; // Allow guests to register
+      // FIX 5: allow create: if true had no field validation — bots could write arbitrary content
+      // Fields from eventsService.ts: eventId, name, email, phone, registeredAt, status, organization, notes
+      allow create: if request.resource.data.keys().hasAll(['name', 'email', 'eventId', 'registeredAt'])
+                    && request.resource.data.keys().hasOnly(['name', 'email', 'phone', 'eventId', 'organization', 'notes', 'registeredAt', 'status']);
       allow update: if (isBoard() || isAdmin()) &&
                       request.resource.data.diff(resource.data).affectedKeys()
                         .hasOnly(['status', 'checkedIn', 'checkedInAt', 'notes', 'updatedAt']);
@@ -1122,7 +1143,7 @@ service cloud.firestore {
     match /toyyibBills/{billId} {
       allow get: if isBoard() ||
                     (isAuthenticated() && resource.data.memberId == request.auth.uid);
-      allow list: if isAuthenticated();
+      allow list: if isBoard() || isAdmin();
       allow create: if isBoard() ||
                        (isAuthenticated() && request.resource.data.memberId == request.auth.uid);
       allow update, delete: if isBoard();
@@ -1193,8 +1214,9 @@ service cloud.firestore {
 
     // Achievement Progress collection (tracks per-member progress toward achievements)
     // FIX 14: collection had ZERO rules — unauthenticated users could read all achievement progress
+    // FIX 6: tighten read — exclude GUEST and INACTIVE roles, consistent with other gamification collections
     match /achievementProgress/{id} {
-      allow read: if isAuthenticated();
+      allow read: if isMember() || isBoard() || isAdmin();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }

@@ -548,7 +548,13 @@ export class ActivityPlansService {
             const childIds = snap.docs.map(d => d.id);
             toDelete.push(...childIds);
             currentIds = childIds;
-            if (toDelete.length >= 490) break; // safety cap
+            if (toDelete.length >= 490) {
+              await errorLoggingService.logError(
+                new Error('deleteActivityPlan: version chain exceeds 490 documents, deletion incomplete'),
+                { component: 'ActivityPlansService', action: 'deleteActivityPlan', additionalData: { planId, deletedCount: toDelete.length } }
+              );
+              throw new Error('Activity plan version chain is too large to delete in one operation. Please contact an administrator.');
+            }
           }
 
           const batch = writeBatch(db);

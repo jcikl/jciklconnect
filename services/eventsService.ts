@@ -121,16 +121,21 @@ export class EventsService {
           const docRef = doc(db, COLLECTIONS.PROJECTS, eventId);
           const docSnap = await getDoc(docRef);
 
-          let eventData: Event | null = null;
-          if (docSnap.exists()) {
-            const d = docSnap.data();
-            const hasDate = d?.eventStartDate != null || d?.date != null;
-            const isBannedStatus = ['Planning', 'Draft', 'Submitted', 'Under Review', 'Rejected', 'Cancelled'].includes(d?.status);
-            if (hasDate && !isBannedStatus) {
-              eventData = this.projectDocToEvent({ id: docSnap.id, data: () => d });
-            }
+          if (!docSnap.exists()) {
+            // Fix 2 (P2): don't cache null — not-found events are rare and caching them
+            // with the old pattern caused cache misses on legitimately cached null values.
+            return null;
           }
-          apiCache.set(`events:id:${eventId}`, eventData, 180);
+          const d = docSnap.data();
+          const hasDate = d?.eventStartDate != null || d?.date != null;
+          const isBannedStatus = ['Planning', 'Draft', 'Submitted', 'Under Review', 'Rejected', 'Cancelled'].includes(d?.status);
+          let eventData: Event | null = null;
+          if (hasDate && !isBannedStatus) {
+            eventData = this.projectDocToEvent({ id: docSnap.id, data: () => d });
+          }
+          if (eventData) {
+            apiCache.set(`events:id:${eventId}`, eventData, 180);
+          }
           return eventData;
         } catch (error) {
           console.error('Error fetching event:', error);
@@ -406,6 +411,10 @@ export class EventsService {
           // the member still showing as 'registered' if the batch then failed.
           const reg = await EventRegistrationService.getByEventAndMember(eventId, memberId);
           const financeTransactionId: string | undefined = reg?.financeTransactionId ?? undefined;
+
+          if (!reg || reg.status === 'cancelled') {
+            return; // already cancelled, idempotent — prevents driving attendees counter negative
+          }
 
           if (reg) {
             const regRef = doc(db, COLLECTIONS.EVENT_REGISTRATIONS, reg.id);

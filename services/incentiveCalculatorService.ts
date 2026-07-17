@@ -314,34 +314,42 @@ export class IncentiveCalculatorService {
             const sub = snapshot.docs[0];
             const subData = sub.data();
             if (subData.status === 'APPROVED' && subData.evidenceText?.includes('Auto-calculated')) {
-                const { doc, updateDoc } = await import('firebase/firestore');
-                await updateDoc(doc(db, COLLECTIONS.INCENTIVE_SUBMISSIONS, sub.id), {
+                const { doc: firestoreDoc, updateDoc } = await import('firebase/firestore');
+                const submissionRef = firestoreDoc(db, COLLECTIONS.INCENTIVE_SUBMISSIONS, sub.id);
+                await updateDoc(submissionRef, {
                     quantity,
                     scoreAwarded: score,
                     updatedAt: Timestamp.now()
                 });
+                // Fix 7 (P2): invalidate incentive cache after updating submission score.
+                PointsService.invalidateIncentiveCache();
 
-                // Fix 12: re-award the score delta when an existing APPROVED auto-calculated
-                // submission is updated so member points stay in sync with the recalculation.
+                // Fix 6 (P1): handle both positive and negative deltas — score reductions
+                // (negative delta) must also deduct points to prevent phantom accumulation.
+                // Fix 5 (P1): wrap awardPoints in try/catch that rethrows with context so
+                // callers know the submission was updated but points are inconsistent.
                 const delta = score - (subData.scoreAwarded || 0);
-                if (delta > 0 && subData.loId) {
+                if (delta !== 0 && subData.memberId) {
                     try {
-                        // Award delta points to the LO's members — loId is stored on the submission.
-                        // If a specific memberId is not set on the submission, we award to the LO
-                        // via incentiveCalculator context; use PointsService.awardPoints per member
-                        // when memberId is available.
-                        if (subData.memberId) {
-                            await PointsService.awardPoints(
-                                subData.memberId,
-                                delta,
-                                'INCENTIVE_ADJUSTMENT',
-                                'Score recalculation',
-                                sub.id,
-                                'incentive'
-                            );
-                        }
+                        await PointsService.awardPoints(
+                            subData.memberId,
+                            delta,
+                            'INCENTIVE_ADJUSTMENT',
+                            `Score ${delta > 0 ? 'increase' : 'reduction'}: ${subData.achievementTitle || sub.id}`,
+                            sub.id,
+                            'incentive'
+                        );
                     } catch (deltaErr) {
-                        console.warn('[syncSubmission] Failed to award delta points (non-fatal):', deltaErr);
+                        // IMPORTANT: submissionRef was already updated but points were not awarded/deducted.
+                        // Log for manual reconciliation.
+                        const { errorLoggingService } = await import('./errorLoggingService');
+                        errorLoggingService.logError(
+                            deltaErr instanceof Error ? deltaErr : new Error(String(deltaErr)),
+                            { component: 'IncentiveCalculatorService', action: 'syncSubmission.awardPoints', additionalData: { memberId: subData.memberId, delta, submissionId: sub.id } }
+                        );
+                        throw new Error(
+                            `Score updated but points adjustment failed. Manual reconciliation needed. ${deltaErr instanceof Error ? deltaErr.message : String(deltaErr)}`
+                        );
                     }
                 }
             }

@@ -1674,7 +1674,8 @@ export function useFinanceData(searchQuery?: string) {
   const handleUpdateTransaction = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (isUpdatingTransactionRef.current) return; // RC-004: double-click guard
-    if (!editingTransaction) return;
+    isUpdatingTransactionRef.current = true; // Set BEFORE first await to prevent race
+    if (!editingTransaction) { isUpdatingTransactionRef.current = false; return; }
 
     const formData = new FormData(e.currentTarget);
     const category = editingTransaction.category;
@@ -1737,7 +1738,6 @@ export function useFinanceData(searchQuery?: string) {
     };
 
     try {
-      isUpdatingTransactionRef.current = true;
       await FinanceService.updateTransaction(editingTransaction.id, updatedTransaction);
       showToast('Transaction updated successfully', 'success');
       setIsEditModalOpen(false);

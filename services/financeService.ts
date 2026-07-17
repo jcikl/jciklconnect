@@ -998,34 +998,32 @@ export class FinanceService {
         try {
           const splitRef = doc(db, COLLECTIONS.TRANSACTION_SPLITS, splitId);
 
-          // TX-W2: read current split, validate amount totals, then write atomically.
-          // Firestore v9 transactions don't support collection queries (only doc reads),
-          // so sibling validation is done outside; the runTransaction ensures the write
-          // is atomic with a fresh read of the split document.
-          const currentDoc = await getDoc(splitRef);
-          if (!currentDoc.exists()) throw new Error('Split not found');
-          let currentSplit = currentDoc.data() as TransactionSplit;
-
-          if (updates.amount !== undefined) {
-            const allSplits = await this.getTransactionSplits(currentSplit.parentTransactionId);
-            const totalSplitAmount = allSplits.reduce((sum, s) => {
-              return sum + (s.id === splitId ? updates.amount! : s.amount);
-            }, 0);
-            const parentDoc = await getDoc(doc(db, COLLECTIONS.TRANSACTIONS, currentSplit.parentTransactionId));
-            if (parentDoc.exists()) {
-              const parentAmount = parentDoc.data().amount;
-              if (Math.abs(totalSplitAmount - parentAmount) > 0.01) {
-                throw new Error(
-                  `Split amounts (${totalSplitAmount}) must equal parent transaction amount (${parentAmount})`
-                );
-              }
-            }
-          }
-
+          // TX-W2 / Fix 7 (P1): validate amount totals and write atomically inside a single
+          // runTransaction. Sibling splits are fetched via getDocs (which is allowed inside
+          // the transaction callback, though not part of Firestore's atomic read set); the
+          // parent document is read via tx.get() which IS part of the atomic read set.
+          let currentSplit: TransactionSplit;
           await runTransaction(db, async (tx) => {
             const freshSnap = await tx.get(splitRef);
             if (!freshSnap.exists()) throw new Error('Split not found');
             currentSplit = freshSnap.data() as TransactionSplit;
+
+            if (updates.amount !== undefined) {
+              const allSplits = await this.getTransactionSplits(currentSplit.parentTransactionId);
+              const totalSplitAmount = allSplits.reduce((sum, s) => {
+                return sum + (s.id === splitId ? updates.amount! : s.amount);
+              }, 0);
+              const parentDoc = await tx.get(doc(db, COLLECTIONS.TRANSACTIONS, currentSplit.parentTransactionId));
+              if (parentDoc.exists()) {
+                const parentAmount = parentDoc.data().amount;
+                if (Math.abs(totalSplitAmount - parentAmount) > 0.01) {
+                  throw new Error(
+                    `Split amounts (${totalSplitAmount}) must equal parent transaction amount (${parentAmount})`
+                  );
+                }
+              }
+            }
+
             tx.update(splitRef, {
               ...removeUndefined(updates),
               updatedAt: Timestamp.now(),

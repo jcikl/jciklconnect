@@ -170,7 +170,6 @@ exports.handler = async (event) => {
       messageId = data.id || `mg-${Date.now()}`;
     }
 
-    const toArr = Array.isArray(toAddress) ? toAddress : [toAddress];
     console.log('[send-email] Sent via', provider, '| recipients:', toArr.length, '| messageId:', messageId);
     return {
       statusCode: 200,

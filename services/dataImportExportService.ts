@@ -761,7 +761,12 @@ export class DataImportExportService {
     // If the current authenticated user is not recognised or is exporting someone else's data,
     // apply the sensitive field restriction as a conservative default.
     // TODO: Make this method async to read ID token claims and perform full ADMIN role check.
-    const isAdminContext = Boolean(currentUid && currentUid === userId);
+    // Fix 11 (P2): isAdminContext was incorrectly set to true when exporting one's own data,
+    // allowing self-export to bypass sensitive field restrictions. Admin context must be based
+    // on role (not self-export match). Defaulting to false (most restrictive) here;
+    // full role enforcement must happen server-side.
+    // TODO: Pass caller role from service layer for proper client-side enforcement.
+    const isAdminContext = false;
     const allRestricted = isAdminContext
       ? restrictedFields
       : [...restrictedFields, ...sensitiveMemberFields];

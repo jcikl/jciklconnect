@@ -22,6 +22,7 @@ import {
   increment,
   serverTimestamp,
   Timestamp,
+  runTransaction,
 } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
 import { COLLECTIONS, POINT_CATEGORIES } from '../config/constants';
@@ -35,6 +36,7 @@ import { MOCK_AUTOMATION_RULES } from './mockData';
 import { PointsService } from './pointsService';
 import { CommunicationService } from './communicationService';
 import { errorLoggingService } from './errorLoggingService';
+import { apiCache as cacheService } from './cacheService';
 
 // ─── Local step-shape used inside this service ────────────────────────────────
 export interface WorkflowStep {
@@ -270,6 +272,11 @@ export class WorkflowService {
       },
       async () => {
         try {
+          // Fix 7 (P1): execution-depth guard prevents infinite workflow loops
+          if ((context._executionDepth ?? 0) >= 5) {
+            throw new Error('Workflow execution depth limit exceeded (max 5). Possible infinite loop detected.');
+          }
+
           const workflow = await this.getWorkflowById(workflowId);
           if (!workflow || workflow.status !== 'active') {
             throw new Error('Workflow not found or not active');
@@ -289,34 +296,12 @@ export class WorkflowService {
           })();
           const idempotencyKey = `${workflowId}_${triggerId}`;
 
-          // Check whether this trigger was already processed.
-          const dupQuery = query(
-            collection(db, EXEC_COL()),
-            where('workflowId', '==', workflowId),
-            where('idempotencyKey', '==', idempotencyKey),
-            where('status', 'in', ['running', 'success']),
-            limit(1)
-          );
-          const dupSnap = await getDocs(dupQuery);
-          if (!dupSnap.empty) {
-            const existing = dupSnap.docs[0];
-            console.log(
-              `WorkflowService: workflow already executed for this trigger, skipping. executionId=${existing.id}`
-            );
-            return {
-              id: existing.id,
-              ...existing.data(),
-              startedAt:
-                existing.data().startedAt?.toDate?.()?.toISOString() ??
-                existing.data().startedAt,
-              completedAt:
-                existing.data().completedAt?.toDate?.()?.toISOString() ??
-                existing.data().completedAt,
-            } as WorkflowExecution;
-          }
-          // ─────────────────────────────────────────────────────────────────────
+          // Fix 8 (P1): atomic dedup via runTransaction prevents TOCTOU race condition.
+          // Using a deterministic document ID ensures only one execution record is
+          // ever created for a given idempotencyKey, even under concurrent calls.
+          const executionDocId = `${workflowId}_${triggerId}`;
+          const executionRef = doc(db, EXEC_COL(), executionDocId);
 
-          // Create the execution record (includes idempotencyKey).
           const executionPayload: Omit<WorkflowExecution, 'id'> & {
             idempotencyKey: string;
             currentStepIndex: number;
@@ -333,10 +318,30 @@ export class WorkflowService {
             currentStepIndex: 0,
           };
 
-          const executionRef = await addDoc(collection(db, EXEC_COL()), {
-            ...executionPayload,
-            startedAt: serverTimestamp(),
+          let isDuplicate = false;
+          let duplicateExecution: WorkflowExecution | undefined;
+          await runTransaction(db, async (txn) => {
+            const existing = await txn.get(executionRef);
+            if (existing.exists()) {
+              isDuplicate = true;
+              duplicateExecution = {
+                id: existing.id,
+                ...existing.data(),
+                startedAt: existing.data().startedAt?.toDate?.()?.toISOString() ?? existing.data().startedAt,
+                completedAt: existing.data().completedAt?.toDate?.()?.toISOString() ?? existing.data().completedAt,
+              } as WorkflowExecution;
+              return; // do not write — transaction will commit as a no-op read
+            }
+            txn.set(executionRef, { ...executionPayload, startedAt: serverTimestamp() });
           });
+
+          if (isDuplicate && duplicateExecution) {
+            console.log(
+              `WorkflowService: workflow already executed for this trigger, skipping. executionId=${executionDocId}`
+            );
+            return duplicateExecution;
+          }
+          // ─────────────────────────────────────────────────────────────────────
 
           const executedSteps: WorkflowExecutionStep[] = [];
           let executionError: WorkflowExecution['error'] | undefined;
@@ -530,6 +535,8 @@ export class WorkflowService {
           );
         }
         await updateDoc(doc(db, config.collection as string, config.docId as string), config.fields as Record<string, unknown>);
+        // Fix 9 (P2): invalidate cache for the updated collection so stale reads don't persist
+        cacheService.deleteByPrefix((config.collection as string) + ':');
         break;
       }
 

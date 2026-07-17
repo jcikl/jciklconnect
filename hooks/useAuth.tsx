@@ -241,6 +241,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           if (isMounted && !checkDevMode()) {
             setUser(null);
             setMember(null);
+            // Clean up simulated role state regardless of how sign-out was triggered (e.g., idle timeout)
+            setSimulatedRole(null);
+            setSimulatedMemberId(null);
+            setOriginalRole(null);
           }
         }
 

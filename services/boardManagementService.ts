@@ -285,17 +285,28 @@ export class BoardManagementService {
   // Archive a board member (kept for standalone use outside executeBoardTransition)
   private static async archiveBoardMember(boardMember: BoardMember): Promise<void> {
     try {
+      const now = new Date().toISOString();
       const boardMemberRef = doc(db, 'boardMembers', boardMember.id);
-      await updateDoc(boardMemberRef, {
-        isActive: false,
-        endDate: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
+      const memberRef = doc(db, COLLECTIONS.MEMBERS, boardMember.memberId);
 
-      await MembersService.updateMember(boardMember.memberId, {
-        role: UserRole.MEMBER,
+      // Fix 10 (P1): consolidate three sequential writes into one atomic writeBatch so
+      // partial failure cannot leave boardMembers and member role in an inconsistent state.
+      const archiveBatch = writeBatch(db);
+      archiveBatch.update(boardMemberRef, {
+        isActive: false,
+        endDate: now,
+        updatedAt: now,
       });
-      await this.clearMemberCurrentBoardStatus(boardMember.memberId);
+      archiveBatch.update(memberRef, {
+        role: UserRole.MEMBER,
+        currentBoardYear: deleteField(),
+        currentBoardPosition: deleteField(),
+        isCurrentBoardMember: false,
+        isCurrentCommissionDirector: false,
+        updatedAt: now,
+      });
+      await archiveBatch.commit();
+      MembersService.invalidateMembersCache();
 
       // Best-effort notification — must not roll back the already-committed updates
       try {
@@ -391,11 +402,12 @@ export class BoardManagementService {
         });
       }
     } catch (error) {
+      // Fix 8 (P1): intentionally do not rethrow — notification failure must not roll back
+      // a board transition that has already committed to Firestore.
       logServiceError(
         error instanceof Error ? error : new Error(String(error)),
         { component: 'BoardManagementService', action: 'sendTransitionNotifications' }
       );
-      throw error;
     }
   }
 
@@ -582,7 +594,19 @@ export class BoardManagementService {
       }
       await boardBatch.commit();
 
-          await this.syncMemberDocumentsForTerm(year, assignments, existing);
+          // Fix 9 (P1): boardBatch is already committed. If syncMemberDocumentsForTerm fails,
+          // boardMembers are set but member role fields may be stale. Log with enough context
+          // for manual remediation rather than letting the error surface silently.
+          try {
+            await this.syncMemberDocumentsForTerm(year, assignments, existing);
+          } catch (syncErr) {
+            logServiceError(
+              syncErr instanceof Error ? syncErr : new Error(String(syncErr)),
+              { component: 'BoardManagementService', action: 'setBoardForTerm.syncMemberDocumentsForTerm', additionalData: { year } }
+            );
+            // Re-throw so the caller knows the secondary sync failed and can retry or alert.
+            throw syncErr;
+          }
         } catch (error) {
           logServiceError(
             error instanceof Error ? error : new Error(String(error)),

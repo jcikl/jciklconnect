@@ -10,7 +10,7 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, Target, Edit3, CreditCard, Image as ImageIcon, MapPin, Tag, Shield, RotateCcw, ArrowLeft,
   Download, Printer, Share2, Copy, ExternalLink, Eye, Upload, Info, Zap, Activity, DollarSign, Lock, Unlock, SlidersHorizontal, Handshake
 } from 'lucide-react';
-import { Button, Card, Badge, StatCard, Modal, Drawer, ToastProvider, useToast, ProgressBar } from './components/ui/Common';
+import { Button, Card, Badge, StatCard, Modal, Drawer, ToastProvider, useToast, ProgressBar, Spinner } from './components/ui/Common';
 import { PerfMonitor } from './components/ui/PerfMonitor';
 import * as Forms from './components/ui/Form';
 import { LoginModal } from './components/auth/LoginModal';
@@ -652,7 +652,7 @@ export const JCIKLApp: React.FC = () => {
     return (
       <>
         <GuestAnalyticsTracker />
-        <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-jci-blue" aria-hidden /></div>}>
+        <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><Spinner size="lg" /></div>}>
           <Routes>
             <Route path="/" element={<GuestLandingPage {...guestPageProps} />} />
             <Route path="/events" element={<GuestEventsPage {...guestPageProps} />} />

@@ -1,5 +1,7 @@
 // Reconciliation Service - Auto-matching & splitting bank transactions with project transactions
-import { increment } from 'firebase/firestore';
+import { increment, doc, runTransaction, Timestamp } from 'firebase/firestore';
+import { db } from '../config/firebase';
+import { COLLECTIONS } from '../config/constants';
 import { Transaction, TransactionSplit } from '../types';
 import { FinanceService } from './financeService';
 import { errorLoggingService } from './errorLoggingService';
@@ -732,37 +734,38 @@ export class ReconciliationService {
     bankTransactions: Transaction[],
     projectTransactions: Transaction[]
   ): Promise<void> {
-    const pTx = projectTransactions.find(p => p.id === projectTxId);
-    if (!pTx) return;
-
-    const currentMatchedIds = pTx.matchedBankTxIds || [];
-    const currentMatchedAmount = pTx.matchedBankAmount || 0;
-
-    const newMatchedIds = currentMatchedIds.includes(bankTxId)
-      ? currentMatchedIds
-      : [...currentMatchedIds, bankTxId];
-    // Fix 8: use client-side value only for status computation; the actual write uses
-    // server-side increment(allocatedAmount) to avoid stale client-side accumulation.
-    const newMatchedAmount = currentMatchedAmount + allocatedAmount;
-    const total = Math.abs(pTx.amount);
-    const status = computeMatchStatus(total - newMatchedAmount, total);
-
+    // Fix 8 (P1): read the project tx fresh inside a runTransaction so matchedBankAmount is
+    // computed from the live server value, not a stale client-side snapshot.
+    const projectTxRef = doc(db, COLLECTIONS.TRANSACTIONS, projectTxId);
     const bankTx = bankTransactions.find(b => b.id === bankTxId);
     const bankDate = bankTx?.date || '';
 
-    const updates: any = {
-      matchedBankAmount: increment(allocatedAmount),
-      matchedBankTxIds: newMatchedIds,
-      matchStatus: status,
-    };
-
-    if (bankDate) {
-      updates.date = bankDate;
-    }
-
     // E3: let the error propagate — the caller (executeAutoMatch) catches it per-allocation
     // and records it in summary.errors so the caller knows which updates failed.
-    await FinanceService.updateProjectTransaction(projectTxId, updates);
+    await runTransaction(db, async (txn) => {
+      const freshSnap = await txn.get(projectTxRef);
+      if (!freshSnap.exists()) return;
+      const freshData = freshSnap.data() as Transaction;
+
+      const currentMatchedIds: string[] = freshData.matchedBankTxIds || [];
+      const newMatchedIds = currentMatchedIds.includes(bankTxId)
+        ? currentMatchedIds
+        : [...currentMatchedIds, bankTxId];
+
+      const newMatchedAmount = (freshData.matchedBankAmount || 0) + allocatedAmount;
+      const total = Math.abs(freshData.amount);
+      const status = computeMatchStatus(total - newMatchedAmount, total);
+
+      const writePayload: any = {
+        matchedBankAmount: newMatchedAmount,
+        matchedBankTxIds: newMatchedIds,
+        matchStatus: status,
+        updatedAt: Timestamp.now(),
+      };
+      if (bankDate) writePayload.date = bankDate;
+
+      txn.update(projectTxRef, writePayload);
+    });
   }
 
   /**

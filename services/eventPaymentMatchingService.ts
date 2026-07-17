@@ -159,6 +159,10 @@ export class EventPaymentMatchingService {
       const bankData = bankSnap.exists() ? (bankSnap.data() as Transaction) : null;
       const incomeData = incomeSnap.exists() ? (incomeSnap.data() as Transaction) : null;
 
+      // Fix 6 (P1): idempotency guard — if bankTxId is already in matchedBankTxIds, skip
+      const existingIds: string[] = incomeData?.matchedBankTxIds ?? [];
+      if (existingIds.includes(bankTxId)) return;
+
       const newAllocated = (bankData?.matchedBankAmount ?? 0) + Math.abs(incomeData?.amount ?? 0);
       const bankTotal = Math.abs(bankData?.amount ?? 0);
       const bankMatchStatus: Transaction['matchStatus'] =
@@ -167,7 +171,7 @@ export class EventPaymentMatchingService {
       // Update income tx → Cleared; record prevStatus so removeMatch can restore exactly
       transaction.update(incomeRef, {
         matchStatus: 'full',
-        matchedBankTxIds: [...(incomeData?.matchedBankTxIds ?? []), bankTxId],
+        matchedBankTxIds: [...existingIds, bankTxId],
         status: 'Cleared',
         prevStatus: incomeData?.status ?? 'Pending',
         updatedAt: Timestamp.now(),

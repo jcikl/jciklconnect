@@ -179,32 +179,37 @@ export class GamificationService {
                     const badgeAwardRef = doc(collection(db, COLLECTIONS.BADGE_AWARDS));
                     batch.set(badgeAwardRef, awardData);
 
-                    // Fix 6 & 7: inline points award, tier recalculation, and badge arrayUnion
-                    // in a single batch.update call to avoid two separate updates on the same doc.
-                    if (award.pointsReward > 0 && member) {
+                    // Fix 1 (P0): badges arrayUnion always runs when !alreadyAwarded, regardless of pointsReward.
+                    // Points and tier increment are gated on pointsReward > 0 separately.
+                    if (!alreadyAwarded) {
                         const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
-                        const currentPoints: number = (member as any).points || 0;
-                        const newPoints = currentPoints + award.pointsReward;
-                        const newTier = PointsService.calculateTier(newPoints);
-
-                        // Merge badges arrayUnion + points increment + tier into ONE update call
-                        const memberUpdate: Record<string, any> = {
-                            points: increment(award.pointsReward),
-                            tier: newTier,
-                            updatedAt: Timestamp.now(),
+                        const userBadge: UserBadge = {
+                            id: awardId,
+                            name: award.name,
+                            icon: award.icon,
+                            description: award.description,
+                            earnedDate: new Date().toISOString()
                         };
-                        if (member && !alreadyAwarded) {
-                            const userBadge: UserBadge = {
-                                id: awardId,
-                                name: award.name,
-                                icon: award.icon,
-                                description: award.description,
-                                earnedDate: new Date().toISOString()
-                            };
-                            memberUpdate.badges = arrayUnion(userBadge);
-                        }
-                        batch.update(memberRef, memberUpdate);
+                        // Always append badge
+                        batch.update(memberRef, { badges: arrayUnion(userBadge), updatedAt: Timestamp.now() });
 
+                        if (award.pointsReward > 0 && member) {
+                            const currentPoints: number = (member as any).points || 0;
+                            const newPoints = currentPoints + award.pointsReward;
+                            // TODO: Tier computed from pre-batch member snapshot may be stale if concurrent
+                            // awardPoints commits between this read and batch.commit(). Refactor to runTransaction
+                            // for fully atomic tier computation (see approveClaim TODO for the pattern).
+                            const newTier = PointsService.calculateTier(newPoints);
+
+                            // Merge points increment + tier into a second update on the same doc (Firestore merges within batch)
+                            batch.update(memberRef, {
+                                points: increment(award.pointsReward),
+                                tier: newTier,
+                            });
+                        }
+                    }
+
+                    if (award.pointsReward > 0 && member) {
                         // Also create a points transaction record in the same batch
                         const pointsTxRef = doc(collection(db, COLLECTIONS.POINTS));
                         batch.set(pointsTxRef, {

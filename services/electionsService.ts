@@ -53,7 +53,7 @@ export class ElectionsService {
         : query(collection(db, col), orderBy('createdAt', 'desc'), limit(100));
       const snap = await getDocs(q);
       const result = snap.docs.map(d => ({ id: d.id, ...d.data() }) as Election);
-      cacheService.set(cacheKey, result, 180);
+      cacheService.set(cacheKey, result, 180 * 1000);
       return result;
     } catch (e) {
       errorLoggingService.logError(e as Error, { component: 'ElectionsService', action: 'getElections' });
@@ -120,6 +120,12 @@ export class ElectionsService {
 
   static async openElection(electionId: string): Promise<void> {
     if (isDevMode()) return;
+    const snap = await getDoc(doc(db, COLLECTIONS.ELECTIONS, electionId));
+    if (!snap.exists()) throw new Error('Election not found');
+    const data = snap.data() as Election;
+    if (data.status !== 'draft') {
+      throw new Error(`Cannot open election in status '${data.status}'. Election must be in 'draft' status first.`);
+    }
     await updateDoc(doc(db, COLLECTIONS.ELECTIONS, electionId), {
       status: 'open',
       updatedAt: Timestamp.now(),
@@ -129,6 +135,12 @@ export class ElectionsService {
 
   static async closeElection(electionId: string): Promise<void> {
     if (isDevMode()) return;
+    const snap = await getDoc(doc(db, COLLECTIONS.ELECTIONS, electionId));
+    if (!snap.exists()) throw new Error('Election not found');
+    const data = snap.data() as Election;
+    if (data.status !== 'open') {
+      throw new Error(`Cannot close election in status '${data.status}'. Election must be 'open' first.`);
+    }
     await updateDoc(doc(db, COLLECTIONS.ELECTIONS, electionId), {
       status: 'closed',
       closedAt: Timestamp.now(),
@@ -144,6 +156,13 @@ export class ElectionsService {
   static async tallyElection(electionId: string): Promise<Record<string, Record<string, number>>> {
     if (isDevMode()) return {};
     const col = COLLECTIONS.ELECTIONS;
+    const electionRef = doc(db, col, electionId);
+    const electionSnap = await getDoc(electionRef);
+    if (!electionSnap.exists()) throw new Error('Election not found');
+    const electionData = electionSnap.data() as Election;
+    if (electionData.status !== 'closed') {
+      throw new Error(`Cannot tally election in status '${electionData.status}'. Election must be 'closed' first.`);
+    }
     const snap = await getDocs(collection(db, `${col}/${electionId}/ballots`));
     const tally: Record<string, Record<string, number>> = {};
 

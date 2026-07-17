@@ -132,15 +132,21 @@ export class EventBudgetService {
         try {
           // Fix 11: use setDoc with deterministic doc ID (eventId) + merge:true so the
           // operation is idempotent and avoids the read-then-create/update race condition.
+          // Fix 9 (P2): only set createdAt when the document doesn't exist yet, so updates
+          // don't overwrite the original creation timestamp.
           const budgetRef = doc(db, COLLECTIONS.EVENT_BUDGETS, budgetData.eventId);
+          const snap = await getDoc(budgetRef);
           const payload: any = {
             ...budgetData,
             updatedAt: Timestamp.now(),
           };
+          if (!snap.exists()) {
+            payload.createdAt = Timestamp.now();
+          }
           if (budgetData.approvedAt) {
             payload.approvedAt = Timestamp.fromDate(budgetData.approvedAt as Date);
           }
-          await setDoc(budgetRef, { ...payload, createdAt: Timestamp.now() }, { merge: true });
+          await setDoc(budgetRef, payload, { merge: true });
           EventsService.invalidateEventsCache();
           return budgetData.eventId;
         } catch (error) {

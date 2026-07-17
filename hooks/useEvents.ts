@@ -154,6 +154,7 @@ export const useEvents = (options?: { publicMode?: boolean }) => {
     isSubmittingRef.current = true;
     try {
       await EventsService.cancelRegistration(eventId, memberId, cancelledBy, cancelledByName, cancelledByRole);
+      showToast('Registration cancelled successfully', 'success');
       await loadEvents();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Cancellation failed';
