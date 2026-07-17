@@ -96,21 +96,36 @@ exports.handler = async (event) => {
       }
     }
 
-    const link = await auth.generatePasswordResetLink(email);
+    // Use Firebase's built-in password-reset email infrastructure (same template
+    // configured in Firebase Console → Authentication → Templates).
+    // The REST endpoint triggers the actual email delivery without a third-party
+    // email service; the only requirement is the project's Web API key.
+    const apiKey = process.env.VITE_FIREBASE_API_KEY;
+    if (!apiKey) {
+      throw new Error('VITE_FIREBASE_API_KEY env var missing — cannot send reset email');
+    }
+    const resetRes = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestType: 'PASSWORD_RESET', email }),
+      }
+    );
+    if (!resetRes.ok) {
+      const errBody = await resetRes.text();
+      console.error('[send-invite] sendOobCode failed:', resetRes.status, errBody);
+      throw new Error('Failed to send password reset email');
+    }
 
-    // TODO (TEMPORARY — must replace before production): Deliver this link via a
-    // transactional email provider (Resend / SendGrid / Nodemailer) instead of
-    // logging it server-side. The link is a one-time account-access token; logging
-    // it is acceptable for internal admin use only. Remove the console.log and add
-    // proper email delivery once an email integration is in place.
-    console.log('[send-invite] Invite link for', email, ':', link);
+    console.log('[send-invite] Password reset email sent to', email);
 
     return {
       statusCode: 200,
       headers: cors,
       body: JSON.stringify({
         success: true,
-        message: 'User account created. Password reset link logged server-side. Check Netlify function logs or Firebase Console for the link. Email delivery integration pending.',
+        message: 'Invite sent. The member will receive a password-setup email shortly.',
       }),
     };
   } catch (err) {
