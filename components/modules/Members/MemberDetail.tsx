@@ -1,4 +1,4 @@
-﻿import * as React from 'react';
+import * as React from 'react';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Settings, X, Sparkles, Phone, Mail,
@@ -1431,7 +1431,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
                           <p className="text-[10px] text-slate-400 font-medium">
                             Target: RM {record.dues || 0}
                           </p>
-                          {Number(record.dues) > 0 && record.amount >= Number(record.dues) && (
+                          {Number(record.dues) > 0 && Number(record.amount || 0) >= Number(record.dues) && (
                             <p className="text-[10px] text-green-600 font-bold">{'✓'} Fulfilled</p>
                           )}
                         </div>
