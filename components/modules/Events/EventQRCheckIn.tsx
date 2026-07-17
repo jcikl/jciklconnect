@@ -18,6 +18,7 @@ export const EventQRCheckIn: React.FC<Props> = ({ eventId, eventName, checkedInC
   const [generating, setGenerating] = useState(true);
   const [copied, setCopied] = useState(false);
   const isMounted = useRef(true);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const checkInUrl = `${window.location.origin}/checkin/${eventId}`;
 
@@ -40,11 +41,13 @@ export const EventQRCheckIn: React.FC<Props> = ({ eventId, eventName, checkedInC
     return () => { isMounted.current = false; };
   }, [checkInUrl]);
 
+  useEffect(() => () => { if (copyTimerRef.current) clearTimeout(copyTimerRef.current); }, []);
+
   const handleCopy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(checkInUrl);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
     } catch {
       // clipboard not available
     }

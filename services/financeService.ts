@@ -39,6 +39,24 @@ import {
 import { apiCache } from './cacheService';
 import { SponsorshipsService } from './sponsorshipService';
 
+/** Typed shape for raw Firestore transaction/split documents (avoids `as any` escapes). */
+interface RawTransactionDoc {
+  amount?: number;
+  type?: string;
+  status?: string;
+  category?: string;
+  bankAccountId?: string;
+  loId?: string | null;
+  date?: unknown;
+  description?: string;
+  memberId?: string;
+  projectId?: string;
+  paymentRequestId?: string | null;
+  year?: number;
+  createdAt?: unknown;
+  [key: string]: unknown;
+}
+
 const FINANCE_CACHE_PREFIX = 'finance:';
 const TX_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
 
@@ -131,11 +149,11 @@ export class FinanceService {
 
             const snapshot = await getDocs(q);
             let transactions = snapshot.docs.map(doc => {
-              const data = doc.data() as any;
+              const data = doc.data() as RawTransactionDoc;
               return {
                 id: doc.id,
                 ...data,
-                date: data.date?.toDate?.()?.toISOString() || data.date,
+                date: (data.date as any)?.toDate?.()?.toISOString() || data.date,
               } as Transaction;
             });
 
@@ -184,7 +202,7 @@ export class FinanceService {
           const netFlows: Record<string, number> = {};
 
           snapshot.docs.forEach(doc => {
-            const data = doc.data() as any;
+            const data = doc.data() as RawTransactionDoc;
             const type = data.type;
             const amount = data.amount || 0;
             const bankAccountId = data.bankAccountId;
@@ -223,9 +241,9 @@ export class FinanceService {
           const snapshot = await getDocs(q);
           const years = new Set<number>();
           snapshot.docs.forEach(doc => {
-            const data = doc.data() as any;
+            const data = doc.data() as RawTransactionDoc;
             if (data.date) {
-              const dateVal = data.date.toDate?.() || new Date(data.date);
+              const dateVal = (data.date as any)?.toDate?.() || new Date(data.date as string);
               const y = new Date(dateVal).getFullYear();
               if (!isNaN(y)) {
                 years.add(y);
@@ -256,9 +274,9 @@ export class FinanceService {
           const snapshot = await getDocs(q);
           const years = new Set<number>();
           snapshot.docs.forEach(doc => {
-            const data = doc.data() as any;
+            const data = doc.data() as RawTransactionDoc;
             if (data.date) {
-              const dateVal = data.date.toDate?.() || new Date(data.date);
+              const dateVal = (data.date as any)?.toDate?.() || new Date(data.date as string);
               const y = new Date(dateVal).getFullYear();
               if (!isNaN(y)) {
                 years.add(y);
@@ -857,11 +875,11 @@ export class FinanceService {
           }
           const snapshot = await getDocs(q);
           return snapshot.docs.map(doc => {
-            const data = doc.data() as any;
+            const data = doc.data() as RawTransactionDoc;
             return {
               id: doc.id,
               ...data,
-              createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt,
+              createdAt: (data.createdAt as any)?.toDate?.()?.toISOString() || data.createdAt,
             } as TransactionSplit;
           });
         } catch (error) {

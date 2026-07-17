@@ -335,23 +335,25 @@ export function useFinanceData(searchQuery?: string) {
   }, [selectedTxIds.size, selectedSplitIds.size, setIsBatchMode]);
 
   useEffect(() => {
+    let ignore = false;
     const loadSelectedProjectTransactions = async () => {
       if (!selectedProjectFilter || selectedProjectFilter === UNASSIGNED_PROJECT_ID) {
-        setSelectedProjectTransactions([]);
+        if (!ignore) setSelectedProjectTransactions([]);
         return;
       }
-      setLoadingSelectedProjectTransactions(true);
+      if (!ignore) setLoadingSelectedProjectTransactions(true);
       try {
         const txs = await FinanceService.getBankTransactionsByProject(selectedProjectFilter);
-        setSelectedProjectTransactions(txs);
+        if (!ignore) setSelectedProjectTransactions(txs);
       } catch (err) {
         console.error('Failed to load transactions for selected project:', err);
-        setSelectedProjectTransactions([]);
+        if (!ignore) setSelectedProjectTransactions([]);
       } finally {
-        setLoadingSelectedProjectTransactions(false);
+        if (!ignore) setLoadingSelectedProjectTransactions(false);
       }
     };
     loadSelectedProjectTransactions();
+    return () => { ignore = true; };
   }, [selectedProjectFilter]);
 
   useEffect(() => {
@@ -362,17 +364,19 @@ export function useFinanceData(searchQuery?: string) {
   }, [moduleTab, transactions]);
 
   useEffect(() => {
+    let ignore = false;
     const loadYears = async () => {
       if (!detailAccount) return;
       try {
         const years = await FinanceService.getTransactionYearsForAccount(detailAccount.id);
-        setDetailAccountYears(years);
+        if (!ignore) setDetailAccountYears(years);
       } catch (err) {
         console.error('Failed to load transaction years for account', err);
-        setDetailAccountYears([new Date().getFullYear()]);
+        if (!ignore) setDetailAccountYears([new Date().getFullYear()]);
       }
     };
     loadYears();
+    return () => { ignore = true; };
   }, [detailAccount]);
 
   const availableYears = useMemo(() => {
@@ -878,23 +882,26 @@ export function useFinanceData(searchQuery?: string) {
   }, [isModalOpen, addDefaultCategory]);
 
   useEffect(() => {
+    let ignore = false;
     const loadUncompletedPRs = async () => {
       try {
         const { items } = await PaymentRequestService.list({ pageSize: 100 });
-        setUncompletedPRs(items.filter(pr => pr.status === 'submitted' || pr.status === 'draft'));
+        if (!ignore) setUncompletedPRs(items.filter(pr => pr.status === 'submitted' || pr.status === 'draft'));
       } catch {
-        setUncompletedPRs([]);
+        if (!ignore) setUncompletedPRs([]);
       }
     };
 
     if (isEditModalOpen || isModalOpen) {
       loadUncompletedPRs();
     } else {
-      setUncompletedPRs([]);
+      if (!ignore) setUncompletedPRs([]);
     }
+    return () => { ignore = true; };
   }, [isEditModalOpen, isModalOpen]);
 
   useEffect(() => {
+    let ignore = false;
     const loadPurposesForProject = async () => {
       if (!isEditModalOpen || !editingTransaction || editingTransaction.category !== 'Projects & Activities') {
         return;
@@ -934,19 +941,23 @@ export function useFinanceData(searchQuery?: string) {
           } catch (e) { }
         }
 
-        setEditingProjectPurposesByProject(prev => ({
-          ...prev,
-          [projectId]: Array.from(purposes).sort()
-        }));
+        if (!ignore) {
+          setEditingProjectPurposesByProject(prev => ({
+            ...prev,
+            [projectId]: Array.from(purposes).sort()
+          }));
+        }
       } catch (e) {
         console.error('Failed to load purposes for project', projectId, e);
       }
     };
 
     loadPurposesForProject();
+    return () => { ignore = true; };
   }, [isEditModalOpen, editingTransaction?.projectId, editingTransaction?.category]);
 
   useEffect(() => {
+    let ignore = false;
     const loadAdminPurposes = async () => {
       if (!isEditModalOpen || !editingTransaction || editingTransaction.category !== 'Administrative') {
         return;
@@ -974,14 +985,17 @@ export function useFinanceData(searchQuery?: string) {
 
         administrativeProjectIds.forEach(id => accts.add(id));
 
-        setEditingAdminPurposes(Array.from(purposes).sort());
-        setEditingAdminAccounts(Array.from(accts).sort());
+        if (!ignore) {
+          setEditingAdminPurposes(Array.from(purposes).sort());
+          setEditingAdminAccounts(Array.from(accts).sort());
+        }
       } catch (e) {
         console.error('Failed to load admin purposes', e);
       }
     };
 
     loadAdminPurposes();
+    return () => { ignore = true; };
   }, [isEditModalOpen, editingTransaction?.category]);
 
   // ── Core data loaders ─────────────────────────────────────────────────────

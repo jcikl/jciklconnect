@@ -54,8 +54,33 @@ export function useFirestoreCollection<T>({
   }, [enabled, ...deps]);
 
   useEffect(() => {
-    reload();
-  }, [reload]);
+    let ignore = false;
+    const run = async () => {
+      if (!enabled) {
+        if (!ignore) { setData([]); setLoading(false); setError(null); }
+        return;
+      }
+      try {
+        if (!ignore) setLoading(true);
+        if (!ignore) setError(null);
+        const result = await loader();
+        if (!ignore) {
+          setData(result);
+          setLoading(false);
+        }
+      } catch (err) {
+        if (!ignore) {
+          const msg = err instanceof Error ? err.message : 'Failed to load data';
+          setError(msg);
+          showToast(msg, 'error');
+          setLoading(false);
+        }
+      }
+    };
+    run();
+    return () => { ignore = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, ...deps]);
 
   return { data, loading, error, reload };
 }

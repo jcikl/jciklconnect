@@ -14,7 +14,7 @@
  *     existingBillStatus={record.toyyibPaymentStatus} />
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ExternalLink, Copy, CheckCircle, AlertCircle, CreditCard } from 'lucide-react';
 import { useToyyibPayment } from '../../../hooks/useToyyibPayment';
 import type { Member } from '../../../types';
@@ -62,6 +62,8 @@ export const PaymentButton: React.FC<PaymentButtonProps> = ({
   const [paymentUrl, setPaymentUrl] = useState<string | null>(isFailed ? null : (existingPaymentUrl ?? null));
   const [isExisting, setIsExisting] = useState(!isFailed && !!existingPaymentUrl);
   const [copied, setCopied] = useState(false);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (copyTimerRef.current) clearTimeout(copyTimerRef.current); }, []);
 
   const isPaid = existingBillStatus === '1';
 
@@ -87,7 +89,7 @@ export const PaymentButton: React.FC<PaymentButtonProps> = ({
     if (!paymentUrl) return;
     navigator.clipboard.writeText(paymentUrl);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
   };
 
   if (isPaid) {

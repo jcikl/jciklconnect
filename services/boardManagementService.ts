@@ -590,7 +590,17 @@ export class BoardManagementService {
         );
         const ghostRecords: BoardMember[] = ghostSnap.docs
           .filter((d) => !activeMemberIds.has(d.id))
-          .map((d) => ({ id: d.id, memberId: d.id, position: '', term: year } as unknown as BoardMember));
+          .map((d): BoardMember => ({
+            id: d.id,
+            memberId: d.id,
+            position: 'Member',
+            term: year,
+            startDate: '',
+            isActive: false,
+            permissions: [],
+            createdAt: '',
+            updatedAt: '',
+          }));
 
         // Also clear ghost commission directors
         const commDirGhostSnap = await getDocs(

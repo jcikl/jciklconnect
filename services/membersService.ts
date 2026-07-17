@@ -13,6 +13,7 @@ import {
   limit,
   startAfter,
   Timestamp,
+  DocumentData,
   writeBatch,
   deleteField,
   arrayRemove,
@@ -51,6 +52,18 @@ import {
 } from './membershipConfigService';
 
 const FIRST_MEMBERSHIP_DUES_TARGET = 350;
+
+// Type-safe helpers for reading Firestore member document fields
+function getMemberRole(data: DocumentData | undefined): string | null {
+  if (!data) return null;
+  const role = data['role'];
+  return typeof role === 'string' ? role : null;
+}
+function getMemberLoId(data: DocumentData | undefined): string | null {
+  if (!data) return null;
+  const loId = data['loId'];
+  return typeof loId === 'string' ? loId : null;
+}
 
 export class MembersService {
   /**
@@ -749,8 +762,8 @@ export class MembersService {
 
       // Read current user's member doc to verify ADMIN role
       const currentMemberDoc = await getDoc(doc(db, COLLECTIONS.MEMBERS, currentUid));
-      const currentRole = currentMemberDoc.exists() ? (currentMemberDoc.data() as any).role : null;
-      const myLoId = currentMemberDoc.exists() ? (currentMemberDoc.data() as any).loId ?? null : null;
+      const currentRole = currentMemberDoc.exists() ? getMemberRole(currentMemberDoc.data()) : null;
+      const myLoId = currentMemberDoc.exists() ? getMemberLoId(currentMemberDoc.data()) ?? null : null;
       if (!['ADMIN', 'SUPER_ADMIN'].includes(currentRole)) {
         const e: any = new Error('User lacks ADMIN / SUPER_ADMIN role for deletion');
         e.code = 'permission-denied';
@@ -971,7 +984,7 @@ export class MembersService {
           const e: any = new Error('User not authenticated'); e.code = 'permission-denied'; throw e;
         }
         const callerDoc = await getDoc(doc(db, COLLECTIONS.MEMBERS, currentUid));
-        const callerRole = callerDoc.exists() ? (callerDoc.data() as any).role : null;
+        const callerRole = callerDoc.exists() ? getMemberRole(callerDoc.data()) : null;
         if (!adminOnlyRoles.includes(callerRole as UserRole)) {
           const e: any = new Error(`Only ADMIN / SUPER_ADMIN may assign the ${newRole} role`);
           e.code = 'permission-denied'; throw e;
@@ -1115,7 +1128,7 @@ export class MembersService {
         const e: any = new Error('User not authenticated'); e.code = 'permission-denied'; throw e;
       }
       const callerDoc = await getDoc(doc(db, COLLECTIONS.MEMBERS, currentUid));
-      if (!callerDoc.exists() || !['ADMIN', 'SUPER_ADMIN'].includes((callerDoc.data() as any).role)) {
+      if (!callerDoc.exists() || !['ADMIN', 'SUPER_ADMIN'].includes(getMemberRole(callerDoc.data()) ?? '')) {
         const e: any = new Error('User lacks ADMIN / SUPER_ADMIN role for deletion'); e.code = 'permission-denied'; throw e;
       }
 

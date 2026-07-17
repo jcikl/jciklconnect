@@ -1,5 +1,5 @@
 ﻿// Payment Requests “ submit, my applications, finance list and review
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Plus, RefreshCw, CheckCircle, XCircle, Search, X, FileText, Download, Eye, Clock, Copy, Check, Landmark, DollarSign, Paperclip, Sparkles, Building2, User, Trash2 } from 'lucide-react';
 import { Button, Card, Modal, useToast, Tabs, Badge } from '../ui/Common';
 import { SubmitPaymentRequestModal } from './PaymentRequests/SubmitPaymentRequestModal';
@@ -31,12 +31,14 @@ const STATUS_LABEL: Record<PaymentRequestStatus, string> = {
 
 const CopyButton: React.FC<{ text: string; label?: string }> = ({ text, label }) => {
   const [copied, setCopied] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      timerRef.current = setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error('Failed to copy', err);
     }

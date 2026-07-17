@@ -60,8 +60,7 @@ export default defineConfig(({ mode }) => {
             'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage', 'firebase/messaging'],
             'vendor-charts':   ['recharts'],
             'vendor-icons':    ['lucide-react'],
-            'vendor-calendar': ['react-big-calendar'],
-            'vendor-motion':   ['framer-motion'],
+'vendor-motion':   ['framer-motion'],
             // pdf libs: dynamically imported in PaymentRequestsView, named here for readability
             'vendor-pdf':      ['jspdf', 'pdf-lib'],
             // xlsx removed: now dynamically imported, will be split automatically
