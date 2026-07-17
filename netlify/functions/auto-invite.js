@@ -1,6 +1,6 @@
 const { initializeApp, getApps, cert } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
-const { getFirestore } = require('firebase-admin/firestore');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 
 const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID;
 const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
@@ -109,9 +109,37 @@ exports.handler = async (event) => {
     if (!resetRes.ok) {
       const errBody = await resetRes.text();
       console.error('[auto-invite] sendOobCode failed:', resetRes.status, errBody);
+      // Log failed send
+      try {
+        await db.collection('emailLogs').add({
+          recipientEmail: emailKey,
+          emailType: 'auto_invitation',
+          sentAt: FieldValue.serverTimestamp(),
+          success: false,
+          errorMessage: `sendOobCode HTTP ${resetRes.status}: ${errBody}`,
+          triggeredBy: 'netlify-function',
+          subject: 'JCI KL — Set up your password',
+        });
+      } catch (logError) {
+        console.error('[auto-invite] Failed to write email log (failure):', logError);
+      }
       // Still return neutral — don't expose internal errors
     } else {
       console.log('[auto-invite] password setup email sent to', emailKey);
+      // Log successful send
+      try {
+        await db.collection('emailLogs').add({
+          recipientEmail: emailKey,
+          emailType: 'auto_invitation',
+          sentAt: FieldValue.serverTimestamp(),
+          success: true,
+          triggeredBy: 'netlify-function',
+          subject: 'JCI KL — Set up your password',
+        });
+      } catch (logError) {
+        console.error('[auto-invite] Failed to write email log (success):', logError);
+        // Don't throw — logging failure should not break email delivery
+      }
     }
 
     return { statusCode: 200, headers: cors, body: JSON.stringify(NEUTRAL_RESPONSE) };

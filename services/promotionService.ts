@@ -1,4 +1,4 @@
-// Probation to Official Member Promotion Service
+﻿// Probation to Official Member Promotion Service
 import {
   PromotionProgress,
   PromotionRequirement,
@@ -18,9 +18,40 @@ import {
   MembershipConfigService,
   computeMembershipTypeFromMember,
 } from './membershipConfigService';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import {
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  where,
+  Timestamp,
+  doc,
+  setDoc,
+  updateDoc,
+  writeBatch,
+  serverTimestamp
+} from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
+import { isDevMode } from '../utils/devMode';
+import { errorLoggingService } from './errorLoggingService';
+
+// Local interface for ManualPromotionRequest if not yet in types.ts
+interface LocalManualPromotionRequest {
+  id: string;
+  memberId: string;
+  memberName?: string;
+  requestedBy: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: Date;
+  approvedBy?: string;
+  approvedAt?: Date;
+  rejectionReason?: string;
+  reason?: string;
+  overrideRequirements?: boolean;
+  missingRequirements?: string[];
+  requestedAt?: Date;
+}
 
 export type EngagementYear = 'firstYear' | 'secondYear';
 
@@ -212,7 +243,7 @@ export class PromotionService {
         id: 'jci_inspire',
         type: 'jci_inspire_completion',
         name: 'Course Completion',
-        description: 'Complete the JCIM Inspire course OR JCI KL New Members™ Orientation',
+        description: 'Complete the JCIM Inspire course OR JCI KL New Membersâ„¢ Orientation',
         isCompleted: false
       }
     ];
@@ -322,7 +353,7 @@ export class PromotionService {
 
     const requirements = this.ENGAGEMENT_REQUIREMENTS[year].map((definition) => {
       const progress = storedProgress[definition.key] || {};
-      // Pending verification items are NOT yet completed — BOD must approve first
+      // Pending verification items are NOT yet completed â€” BOD must approve first
       const isCompleted = !progress.pendingVerification &&
         (progress.completed === true || Boolean(progress.detail?.trim() && progress.date?.trim()));
 
@@ -419,7 +450,7 @@ export class PromotionService {
         id: 'jci_inspire',
         type: 'jci_inspire_completion',
         name: 'Course Completion',
-        description: 'Complete the JCIM Inspire course OR JCI KL New Members’ Orientation',
+        description: 'Complete the JCIM Inspire course OR JCI KL New Membersâ€™ Orientation',
         isCompleted: false
       }
     ];
@@ -483,13 +514,19 @@ export class PromotionService {
     const probationMembers = await this.getProbationMembers();
     const promotions: PromotionHistory[] = [];
 
+    // FIX 4 (P1): isolate each member so one failure does not abort remaining promotions
     for (const member of probationMembers) {
-      const progress = await this.getPromotionProgress(member.id);
-      if (progress?.isEligibleForPromotion) {
-        const promotion = await this.promoteToOfficialMember(member.id, 'system', 'automatic');
-        if (promotion) {
-          promotions.push(promotion);
+      try {
+        const progress = await this.getPromotionProgress(member.id);
+        if (progress?.isEligibleForPromotion) {
+          const promotion = await this.promoteToOfficialMember(member.id, 'system', 'automatic');
+          if (promotion) {
+            promotions.push(promotion);
+          }
         }
+      } catch (error) {
+        errorLoggingService.logError(error as Error, { component: 'processAutomaticPromotions', additionalData: { memberId: member.id } });
+        // continue to next member
       }
     }
 
@@ -524,16 +561,27 @@ export class PromotionService {
       throw new Error('Member is not eligible for automatic promotion');
     }
 
-    // Update member status
-    await MembersService.updateMember(memberId, {
-      membershipType: 'Official',
-      role: UserRole.MEMBER
-    });
-    await this.updateMemberDues(memberId, this.FULL_MEMBER_DUES);
+    // FIX 1 (P0): atomic writeBatch for member update + dues + promotion history
+    const batch = writeBatch(db);
 
-    // Create promotion history record
+    // batch: member role + membershipType
+    const memberRef = doc(db, COLLECTIONS.MEMBERS ?? 'members', memberId);
+    batch.update(memberRef, { membershipType: 'Official', role: UserRole.MEMBER });
+
+    // batch: dues update
+    const currentYear = new Date().getFullYear().toString();
+    if (member.membership?.[currentYear]) {
+      const updatedMembership = {
+        ...member.membership,
+        [currentYear]: { ...member.membership[currentYear], dues: this.FULL_MEMBER_DUES }
+      };
+      batch.update(memberRef, { membership: updatedMembership });
+    }
+
+    // FIX 5 (P2): pre-generate docRef so id field matches document ID
+    const promotionRef = doc(collection(db, COLLECTIONS.PROMOTION_HISTORY));
     const promotion: PromotionHistory = {
-      id: `promotion_${memberId}_${Date.now()}`,
+      id: promotionRef.id,
       memberId,
       memberName: member.name,
       fromMembershipType: 'Probation',
@@ -547,10 +595,13 @@ export class PromotionService {
       notificationSent: false,
       notes: reason
     };
+    if (!isDevMode()) {
+      batch.set(promotionRef, { ...promotion, promotionDate: serverTimestamp() });
+    }
 
-    await this.savePromotionHistory(promotion);
+    await batch.commit();
 
-    // Send notification
+    // Send notification AFTER batch succeeds
     await this.sendPromotionNotification(promotion);
 
     return promotion;
@@ -897,10 +948,15 @@ export class PromotionService {
   }
 
   private static async savePromotionHistory(promotion: PromotionHistory): Promise<void> {
-    await addDoc(collection(db, COLLECTIONS.PROMOTION_HISTORY), {
-      ...promotion,
-      promotionDate: serverTimestamp()
-    });
+    // FIX 2 (P1): isDevMode guard
+    if (isDevMode()) {
+      console.log('Dev: savePromotionHistory skipped');
+      return;
+    }
+    // FIX 5 (P2): use setDoc with pre-generated ID so id field matches docRef.id
+    const docRef = doc(collection(db, COLLECTIONS.PROMOTION_HISTORY));
+    const promotionWithId = { ...promotion, id: docRef.id, promotionDate: serverTimestamp() };
+    await setDoc(docRef, promotionWithId);
     console.log(`Saved promotion history for member ${promotion.memberId}`);
   }
 
@@ -910,6 +966,79 @@ export class PromotionService {
       requestedAt: serverTimestamp()
     });
     console.log(`Saved manual promotion request for member ${request.memberId}`);
+  }
+
+  // FIX 6 (P1): read/list/approve/reject methods for manualPromotionRequests
+
+  /**
+   * List manual promotion requests, optionally filtered by status.
+   */
+  static async getManualPromotionRequests(status?: string): Promise<ManualPromotionRequest[]> {
+    if (isDevMode()) {
+      return [];
+    }
+    try {
+      const col = collection(db, COLLECTIONS.MANUAL_PROMOTION_REQUESTS);
+      const q = status ? query(col, where('status', '==', status)) : query(col);
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ ...d.data(), id: d.id } as ManualPromotionRequest));
+    } catch (error) {
+      errorLoggingService.logError(error as Error, { component: 'getManualPromotionRequests', additionalData: { status } });
+      return [];
+    }
+  }
+
+  /**
+   * Approve a manual promotion request and trigger the actual promotion.
+   */
+  static async approveManualPromotionRequest(requestId: string, approvedBy: string): Promise<void> {
+    if (isDevMode()) {
+      console.log('Dev: approveManualPromotionRequest skipped');
+      return;
+    }
+    try {
+      const requestRef = doc(db, COLLECTIONS.MANUAL_PROMOTION_REQUESTS, requestId);
+      // Fetch the request to get memberId
+      const snap = await getDocs(query(
+        collection(db, COLLECTIONS.MANUAL_PROMOTION_REQUESTS),
+        where('__name__', '==', requestId)
+      ));
+      if (snap.empty) throw new Error(`Manual promotion request ${requestId} not found`);
+      const requestData = { ...snap.docs[0].data(), id: requestId } as ManualPromotionRequest;
+
+      // Mark approved
+      await updateDoc(requestRef, {
+        status: 'approved',
+        approvedBy,
+        approvedAt: serverTimestamp()
+      });
+
+      // Trigger promotion
+      await this.promoteToOfficialMember(requestData.memberId, approvedBy, 'manual');
+    } catch (error) {
+      errorLoggingService.logError(error as Error, { component: 'approveManualPromotionRequest', additionalData: { requestId, approvedBy } });
+      throw error;
+    }
+  }
+
+  /**
+   * Reject a manual promotion request with a reason.
+   */
+  static async rejectManualPromotionRequest(requestId: string, reason: string): Promise<void> {
+    if (isDevMode()) {
+      console.log('Dev: rejectManualPromotionRequest skipped');
+      return;
+    }
+    try {
+      const requestRef = doc(db, COLLECTIONS.MANUAL_PROMOTION_REQUESTS, requestId);
+      await updateDoc(requestRef, {
+        status: 'rejected',
+        rejectionReason: reason,
+      });
+    } catch (error) {
+      errorLoggingService.logError(error as Error, { component: 'rejectManualPromotionRequest', additionalData: { requestId } });
+      throw error;
+    }
   }
 
   private static async sendPromotionNotification(promotion: PromotionHistory): Promise<void> {
@@ -947,9 +1076,25 @@ export class PromotionService {
     };
   }
 
+  // FIX 3 (P1): real Firestore query instead of stub
   private static async getPromotionsInYear(year: number): Promise<PromotionHistory[]> {
-    // Simulate getting promotions for a specific year
-    return [];
+    if (isDevMode()) {
+      return [];
+    }
+    try {
+      const yearStart = Timestamp.fromDate(new Date(year, 0, 1));
+      const yearEnd = Timestamp.fromDate(new Date(year, 11, 31, 23, 59, 59));
+      const q = query(
+        collection(db, COLLECTIONS.PROMOTION_HISTORY),
+        where('promotionDate', '>=', yearStart),
+        where('promotionDate', '<=', yearEnd)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ ...d.data(), id: d.id } as PromotionHistory));
+    } catch (error) {
+      errorLoggingService.logError(error as Error, { component: 'getPromotionsInYear', additionalData: { year } });
+      return [];
+    }
   }
 
   private static async calculateAveragePromotionTime(): Promise<number> {
@@ -957,3 +1102,4 @@ export class PromotionService {
     return 180; // 180 days average
   }
 }
+

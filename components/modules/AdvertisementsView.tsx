@@ -393,7 +393,7 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
                         </div>
                       ))}
                     </div>
-                    <Button className="w-full">Select Package</Button>
+                    <Button className="w-full" onClick={() => showToast('Please contact admin to purchase this package', 'info')}>Select Package</Button>
                   </Card>
                 ))}
               </div>

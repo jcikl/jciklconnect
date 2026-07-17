@@ -179,17 +179,17 @@ service cloud.firestore {
       // Allow create: authenticated users (simplified - don't require member doc)
       allow create: if isAuthenticated();
       
-      // Allow update: post author or board/admin (if member doc exists)
-      allow update: if isAuthenticated() && 
-                       (request.resource.data.author.id == request.auth.uid || 
+      // Allow update: post author or board/admin/super_admin (if member doc exists)
+      allow update: if isAuthenticated() &&
+                       (request.resource.data.author.id == request.auth.uid ||
                         (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                         get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN']));
-      
-      // Allow delete: post author or board/admin (if member doc exists)
-      allow delete: if isAuthenticated() && 
-                       (resource.data.author.id == request.auth.uid || 
+                         get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN', 'SUPER_ADMIN']));
+
+      // Allow delete: post author or board/admin/super_admin (if member doc exists)
+      allow delete: if isAuthenticated() &&
+                       (resource.data.author.id == request.auth.uid ||
                         (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                         get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN']));
+                         get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN', 'SUPER_ADMIN']));
     }
     
     // Events collection
@@ -226,7 +226,7 @@ service cloud.firestore {
     // Flagship Projects collection
     match /flagship_projects/{projectId} {
       allow read: if true;
-      allow create, update, delete: if isBoard();
+      allow create, update, delete: if isBoard() || isAdmin();
     }
 
     // Project tasks collection (Kanban, Gantt)
@@ -714,11 +714,15 @@ service cloud.firestore {
 
     // Probation to Full Member promotion workflow
     match /manualPromotionRequests/{requestId} {
-      allow read, create, update, delete: if isBoard() || isAdmin() || isDeveloper();
+      // FIX: allow the applicant to read their own promotion request
+      allow read: if isBoard() || isAdmin() || request.auth.uid == resource.data.memberId;
+      allow create, update, delete: if isBoard() || isAdmin() || isDeveloper();
     }
 
     match /promotionHistory/{historyId} {
-      allow read, create, update, delete: if isBoard() || isAdmin() || isDeveloper();
+      // FIX: allow the subject member to read their own promotion history
+      allow read: if isBoard() || isAdmin() || isDeveloper() || resource.data.memberId == request.auth.uid;
+      allow create, update, delete: if isBoard() || isAdmin() || isDeveloper();
     }
     
     // Activity Plans collection
@@ -919,21 +923,36 @@ service cloud.firestore {
     
     // Inventory: maintenance schedules, inventory alerts (InventoryView)
     match /maintenance_schedules/{docId} {
-      allow read: if isAuthenticated() && 
-                     exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                     getUserRole() in ['MEMBER', 'BOARD', 'ADMIN'];
-      allow create, update, delete: if isBoard();
+      // FIX: removed getUserRole()-in-list resource.data check that blocked list queries; simplified to isMember()
+      allow read: if isAuthenticated() && isMember();
+      // FIX: added hasOnly whitelist on create to prevent arbitrary field injection
+      allow create: if isBoard() &&
+        request.resource.data.keys().hasOnly([
+          'itemId','scheduledDate','nextMaintenanceDate','frequency','assignedTo','status','notes','createdAt','loId'
+        ]);
+      // FIX: added hasOnly on update to lock immutable fields (itemId)
+      allow update: if isBoard() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'scheduledDate','nextMaintenanceDate','frequency','assignedTo','status','notes','updatedAt','completedAt','completedBy'
+        ]);
+      allow delete: if isBoard();
     }
     match /inventory_alerts/{docId} {
       allow read: if isAuthenticated() && isMember();
       // E9 fix: split create from update/delete to add field whitelist on create
+      // FIX: added 'acknowledged' to hasOnly list
       allow create: if isBoard() &&
         request.resource.data.keys().hasAll(['itemId', 'type', 'severity', 'message']) &&
         request.resource.data.keys().hasOnly([
           'itemId', 'type', 'severity', 'message', 'threshold', 'currentValue',
-          'createdAt', 'loId', 'resolved'
+          'createdAt', 'loId', 'resolved', 'acknowledged'
         ]);
-      allow update, delete: if isBoard();
+      // FIX: added hasOnly whitelist to update — only acknowledgement fields writable by Board
+      allow update: if isBoard() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'acknowledged','acknowledgedBy','acknowledgedAt'
+        ]);
+      allow delete: if isBoard();
     }
     
     // Behavioral nudging: nudge rules (Gamification — Behavioral Nudging config)
@@ -1066,15 +1085,21 @@ service cloud.firestore {
 
     // Guest page analytics — unauthenticated visitors increment counters; Board reads
     // FIX 16: allow update had no auth check — unauthenticated bots could inflate page view counters
+    // FIX 16b: added docId format validation on create to prevent bots writing arbitrary keys
+    // FIX 16c: added 10-second time throttle on update to limit bot flood writes
     match /guestPageStats/{docId} {
       allow read: if isBoard();
       // setDoc({merge:true}) triggers create on new docs, update on existing ones.
       // Both must allow unauthenticated writes (analytics only, field-locked).
-      allow create: if request.resource.data.keys().hasOnly(
-        ['page', 'date', 'views', 'dwellSeconds', 'signupClicks', 'updatedAt']
-      );
-      allow update: if request.resource.data.diff(resource.data).affectedKeys()
-                        .hasOnly(['views', 'dwellSeconds', 'signupClicks', 'updatedAt']);
+      // docId must be YYYY-MM-DD_<page> format to block arbitrary key injection
+      allow create: if request.resource.id.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}_(home|events|projects|about|enewsletters|directory|partnerships)$')
+        && request.resource.data.keys().hasOnly(
+          ['date', 'views', 'dwellSeconds', 'signupClicks', 'updatedAt']
+        );
+      // Time throttle: at least 10 seconds between updates to limit bot write bursts
+      allow update: if request.time > resource.data.updatedAt + duration.value(10, 's')
+                        && request.resource.data.diff(resource.data).affectedKeys()
+                            .hasOnly(['views', 'dwellSeconds', 'signupClicks', 'updatedAt']);
       allow delete: if isAdmin();
     }
 
@@ -1122,6 +1147,15 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && isAdmin();
     }
 
+    // Audit log collection — immutable write-once records; Board can create, Admin reads
+    // FIX: new block added; without this, auditLog had zero rules (default deny — all writes silently failed)
+    match /auditLog/{logId} {
+      allow read: if isAdmin();
+      allow create: if isBoard() || isAdmin();
+      allow update: if false;
+      allow delete: if false;
+    }
+
     // Firestore audit log — written by firestoreLogger, read by admins only
     // FIX 17: allow create was open to any authenticated user — members could inject fake audit log entries
     match /systemLogs/{logId} {
@@ -1146,9 +1180,13 @@ service cloud.firestore {
 
     // Points Rule Executions collection (execution log for automated point rule triggers)
     // FIX 1: collection had ZERO rules — execution logging always silently failed
+    // FIX 2: restrict create to Admin only — any authenticated user could inject fake execution records
     match /pointsRuleExecutions/{id} {
       allow read: if isBoard() || isAdmin();
-      allow create: if isAuthenticated();
+      allow create: if isAdmin() &&
+        request.resource.data.keys().hasOnly([
+          'ruleId','memberId','pointsAwarded','executedAt','triggerId','triggerData','loId'
+        ]);
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }

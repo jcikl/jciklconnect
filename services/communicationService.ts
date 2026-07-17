@@ -12,6 +12,9 @@ import {
   orderBy,
   Timestamp,
   writeBatch,
+  increment,
+  arrayUnion,
+  arrayRemove,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
@@ -19,6 +22,7 @@ import { NewsPost, Notification, UserRole } from '../types';
 import { isDevMode, withDevMode } from '../utils/devMode';
 import { MOCK_POSTS, MOCK_NOTIFICATIONS } from './mockData';
 import { EmailService, EmailMessage } from './emailService';
+import { errorLoggingService } from './errorLoggingService';
 
 export class CommunicationService {
   // Get all posts
@@ -73,16 +77,22 @@ export class CommunicationService {
 
   // Update post
   static async updatePost(postId: string, updates: Partial<NewsPost>): Promise<void> {
-    try {
-      const postRef = doc(db, COLLECTIONS.COMMUNICATION, postId);
-      await updateDoc(postRef, {
-        ...updates,
-        updatedAt: Timestamp.now(),
-      });
-    } catch (error) {
-      console.error('Error updating post:', error);
-      throw error;
-    }
+    // FIX 4: add devMode guard consistent with all other service methods
+    return withDevMode(
+      () => { console.log(`[DEV MODE] updatePost: Simulating update for post ${postId}`, updates); },
+      async () => {
+        try {
+          const postRef = doc(db, COLLECTIONS.COMMUNICATION, postId);
+          await updateDoc(postRef, {
+            ...updates,
+            updatedAt: Timestamp.now(),
+          });
+        } catch (error) {
+          console.error('Error updating post:', error);
+          throw error;
+        }
+      }
+    );
   }
 
   // Delete post
@@ -101,16 +111,12 @@ export class CommunicationService {
       () => { console.log(`[DEV MODE] Simulating like on post ${postId} by member ${memberId}`); },
       async () => {
         try {
+          // FIX 2: use atomic increment + arrayUnion to avoid race condition on concurrent likes
           const postRef = doc(db, COLLECTIONS.COMMUNICATION, postId);
-          const postSnap = await getDoc(postRef);
-
-          if (postSnap.exists()) {
-            const currentLikes = postSnap.data().likes || 0;
-            await updateDoc(postRef, {
-              likes: currentLikes + 1,
-              likedBy: [...(postSnap.data().likedBy || []), memberId],
-            });
-          }
+          await updateDoc(postRef, {
+            likes: increment(1),
+            likedBy: arrayUnion(memberId),
+          });
         } catch (error) {
           console.error('Error liking post:', error);
           throw error;
@@ -349,13 +355,14 @@ export class CommunicationService {
       sendNotification?: boolean;
     },
     authorId: string
-  ): Promise<{ postId: string; emailsSent: number; notificationsSent: number; failedNotifications?: Array<{ memberId: string; reason: string }> }> {
+  ): Promise<{ postId: string; emailsSent: number; emailsFailed: number; notificationsSent: number; failedNotifications?: Array<{ memberId: string; reason: string }> }> {
     return withDevMode(
       () => {
         console.log('[DEV MODE] Would create announcement:', announcementData);
         return {
           postId: `mock-announcement-${Date.now()}`,
           emailsSent: 0,
+          emailsFailed: 0,
           notificationsSent: 0,
         };
       },
@@ -384,6 +391,7 @@ export class CommunicationService {
       const author = await MembersService.getMemberById(authorId);
       const postData: Omit<NewsPost, 'id' | 'timestamp'> = {
         author: {
+          id: authorId,  // FIX 1: persist author ID so posts can be attributed and edited
           name: author?.name || 'System',
           avatar: author?.avatar || '',
           role: author?.role || 'Admin',
@@ -397,6 +405,7 @@ export class CommunicationService {
       const postId = await this.createPost(postData);
 
       let emailsSent = 0;
+      let emailsFailed = 0;
       let notificationsSent = 0;
 
       // Send email notifications if requested
@@ -406,32 +415,42 @@ export class CommunicationService {
           .map(m => m.email);
 
         if (emailAddresses.length > 0) {
-          try {
-            const emailMessages: EmailMessage[] = emailAddresses.map(email => ({
-              to: email,
-              subject: `[${announcementData.priority}] ${announcementData.title}`,
-              html: `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                  <h2 style="color: #0066CC;">${announcementData.title}</h2>
-                  <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                    ${announcementData.content.replace(/\n/g, '<br>')}
+          // FIX 3: send each email individually so partial failures are counted, not swallowed
+          const emailResults = await Promise.allSettled(
+            emailAddresses.map(email => {
+              const msg: EmailMessage = {
+                to: email,
+                subject: `[${announcementData.priority}] ${announcementData.title}`,
+                html: `
+                  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #0066CC;">${announcementData.title}</h2>
+                    <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                      ${announcementData.content.replace(/\n/g, '<br>')}
+                    </div>
+                    ${announcementData.expiresDate ? `
+                      <p style="color: #666; font-size: 12px;">
+                        This announcement expires on ${new Date(announcementData.expiresDate).toLocaleDateString()}
+                      </p>
+                    ` : ''}
                   </div>
-                  ${announcementData.expiresDate && `
-                    <p style="color: #666; font-size: 12px;">
-                      This announcement expires on ${new Date(announcementData.expiresDate).toLocaleDateString()}
-                    </p>
-                  `}
-                </div>
-              `,
-              text: `${announcementData.title}\n\n${announcementData.content}`,
-              tags: ['announcement', announcementData.priority.toLowerCase()],
-            }));
-
-            await EmailService.sendBulkEmails(emailMessages);
-            emailsSent = emailAddresses.length;
-          } catch (error) {
-            console.error('Error sending announcement emails:', error);
-          }
+                `,
+                text: `${announcementData.title}\n\n${announcementData.content}`,
+                tags: ['announcement', announcementData.priority.toLowerCase()],
+              };
+              return EmailService.sendEmail(msg);
+            })
+          );
+          emailResults.forEach((result, i) => {
+            if (result.status === 'fulfilled') {
+              emailsSent++;
+            } else {
+              emailsFailed++;
+              errorLoggingService.logError(
+                result.reason instanceof Error ? result.reason : new Error(String(result.reason)),
+                { component: 'CommunicationService.createAnnouncement', additionalData: { email: emailAddresses[i] } }
+              );
+            }
+          });
         }
       }
 
@@ -467,6 +486,7 @@ export class CommunicationService {
       return {
         postId,
         emailsSent,
+        emailsFailed,
         notificationsSent,
       };
       } catch (error) {

@@ -437,6 +437,22 @@ Use this prompt to perform a full systematic analysis of any single Firestore co
 | `pointRules` | 2026-07-17 | 5（0/3/2）| 1 | 部分 | — |
 | `businessProfiles` | 2026-07-17 | 6（0/3/3）| 1 | 缺失 | allow update检查new data.memberId而非existing owner→任意用户可冒充覆写 |
 
+**第四批扫描（2026-07-17，system-scan-round2）— P0×14 P1×42 P2×23 Total×79**
+
+| 集合 | 分析日期 | 逻辑错误数（P0/P1/P2）| 变体不对称数 | 退回完整度 | 关键P0摘要 |
+|------|----------|-----------------------|------------|-----------|-----------|
+| `flagship_projects` | 2026-07-17 | 7（1/4/2）| 0 | 缺失 | getAllProjects catch 回退 mock 数据→公开页显示假项目 |
+| `promotionPackages` | 2026-07-17 | 5（0/3/2）| 1 | 缺失 | — |
+| `maintenance_schedules` | 2026-07-17 | 7（1/4/2）| 1 | 部分 | createMaintenanceSchedule 单步 addDoc 不同步 inventoryItems.nextMaintenanceDate→两表日期永久不一致 |
+| `inventory_alerts` | 2026-07-17 | 6（1/3/2）| 1 | 部分 | createAlert 写入 acknowledged 字段被 Firestore hasOnly 白名单拒绝→手动创建告警全部静默失败 |
+| `pointsRuleExecutions` | 2026-07-17 | 7（3/2/2）| 1 | 部分 | 执行记录写入与积分发放非原子无回滚；allow create if isAuthenticated→任意用户污染统计；getDoc→setDoc 竞态→双倍积分 |
+| `emailLogs` | 2026-07-17 | 7（1/4/2）| 0 | 缺失 | 无实际写入者（空壳）→集合永远为空，邮件发送无审计记录 |
+| `guestPageStats` | 2026-07-17 | 7（0/4/3）| 0 | 缺失 | — |
+| `promotionHistory` | 2026-07-17 | 7（2/4/1）| 0 | 缺失 | promoteToOfficialMember 三步非批次→会员角色已变但无历史记录；Firestore 规则不允许 MEMBER 读自己晋级记录 |
+| `manualPromotionRequests` | 2026-07-17 | 9（2/5/2）| 1 | 缺失 | overrideRequirements 硬编码 true→提交即晋升绕过审批；两步写入非批次→申请记录与成员晋升状态永久不一致 |
+| `auditLog` | 2026-07-17 | 8（2/4/2）| 1 | 缺失 | AuditLogService 从未调用（死代码）；无 Firestore 规则→所有审计写入全部静默失败 |
+| `communication` | 2026-07-17 | 9（1/5/3）| 2 | 部分 | author.id 从未写入文档→会员永远无法自删自己的帖子 |
+
 ### 已分析集合（collection-deps）
 
 | 集合 | 分析日期 | 联动集合数 | 强耦合 | 中耦合 | 弱耦合 | P0风险数 | P0风险摘要 |

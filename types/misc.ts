@@ -73,7 +73,11 @@ export interface InventoryAlert {
   createdAt: string;
   acknowledged?: boolean;
   acknowledgedBy?: string;
-  acknowledgedAt?: string;
+  acknowledgedAt?: string | Date;
+  resolved?: boolean;
+  loId?: string;
+  threshold?: number;
+  currentValue?: number;
 }
 
 export interface Notification {
@@ -130,7 +134,7 @@ export interface Document {
 
 export interface NewsPost {
   id: string;
-  author: { name: string; avatar: string; role: string };
+  author: { id?: string; name: string; avatar: string; role: string };
   content: string;
   timestamp: string;
   likes: number;
@@ -255,4 +259,29 @@ export interface Partnership {
   status: 'active' | 'inactive';
   createdAt?: any;
   updatedAt?: any;
+}
+
+export interface EmailLog {
+  id: string;
+  recipientEmail: string;
+  recipientMemberId?: string;
+  emailType: 'invitation' | 'birthday' | 'promotion' | 'announcement' | 'payment' | 'other';
+  sentAt: Date | string;
+  success: boolean;
+  errorMessage?: string;
+  triggeredBy?: string;
+  subject?: string;
+}
+
+export interface AuditEntry {
+  id?: string;
+  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'APPROVE' | 'REJECT' | 'RESTORE';
+  performedBy: string;
+  targetCollection: string;
+  targetId: string;
+  before?: Record<string, unknown>;
+  after?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+  timestamp: Date | string;
+  loId?: string;
 }

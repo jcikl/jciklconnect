@@ -1,6 +1,6 @@
 const { initializeApp, getApps, cert } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
-const { getFirestore } = require('firebase-admin/firestore');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 
 const rateLimitMap = new Map() // callerUid -> { count, resetAt }
 const RATE_LIMIT = 10 // max invites per window
@@ -115,10 +115,42 @@ exports.handler = async (event) => {
     if (!resetRes.ok) {
       const errBody = await resetRes.text();
       console.error('[send-invite] sendOobCode failed:', resetRes.status, errBody);
-      throw new Error('Failed to send password reset email');
+      const sendError = new Error('Failed to send password reset email');
+      // Log failed send
+      try {
+        const db = getFirestore();
+        await db.collection('emailLogs').add({
+          recipientEmail: email,
+          emailType: 'invitation',
+          sentAt: FieldValue.serverTimestamp(),
+          success: false,
+          errorMessage: `sendOobCode HTTP ${resetRes.status}: ${errBody}`,
+          triggeredBy: 'netlify-function',
+          subject: 'JCI KL — Set up your password',
+        });
+      } catch (logError) {
+        console.error('[send-invite] Failed to write email log (failure):', logError);
+      }
+      throw sendError;
     }
 
     console.log('[send-invite] Password reset email sent to', email);
+
+    // Log successful send
+    try {
+      const db = getFirestore();
+      await db.collection('emailLogs').add({
+        recipientEmail: email,
+        emailType: 'invitation',
+        sentAt: FieldValue.serverTimestamp(),
+        success: true,
+        triggeredBy: 'netlify-function',
+        subject: 'JCI KL — Set up your password',
+      });
+    } catch (logError) {
+      console.error('[send-invite] Failed to write email log (success):', logError);
+      // Don't throw — logging failure should not break email delivery
+    }
 
     return {
       statusCode: 200,

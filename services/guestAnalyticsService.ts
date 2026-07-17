@@ -1,7 +1,9 @@
-import { doc, setDoc, increment, collection, getDocs, query, where } from 'firebase/firestore';
+﻿import { doc, setDoc, increment, collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { withDevMode } from '../utils/devMode';
 import { COLLECTIONS } from '../config/constants';
+import { apiCache } from './cacheService';
+import { errorLoggingService } from './errorLoggingService';
 
 export type GuestPage = 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'directory' | 'partnerships';
 
@@ -62,6 +64,7 @@ const bump = async (page: GuestPage, fields: Record<string, ReturnType<typeof in
     } catch (err) {
       // Analytics must never break the guest experience
       console.warn('guestAnalytics write failed:', err);
+      errorLoggingService.logError(err as Error, { component: 'guestAnalytics.bump', additionalData: { page: Object.keys(fields).join(',') } });
     }
   });
 };
@@ -86,6 +89,7 @@ export class GuestAnalyticsService {
 
   /** Aggregate stats over the last `days` days, one row per guest page. */
   static async getSummary(days: number): Promise<GuestPageSummary[]> {
+    const cacheKey = `guest-summary-${days}`;
     return withDevMode(
       () => GUEST_PAGES.map((page, i) => ({
         page,
@@ -95,12 +99,20 @@ export class GuestAnalyticsService {
         signupClicks: Math.max(0, 14 - i * 2),
       })),
       async () => {
+        const cached = apiCache.get<GuestPageSummary[]>(cacheKey);
+        if (cached) return cached;
+
         const cutoff = new Date();
         cutoff.setDate(cutoff.getDate() - days);
         const cutoffStr = cutoff.toISOString().slice(0, 10);
+        const todayStr_ = todayStr();
 
         const snap = await getDocs(
-          query(collection(db, COLLECTIONS.GUEST_PAGE_STATS), where('date', '>=', cutoffStr))
+          query(
+            collection(db, COLLECTIONS.GUEST_PAGE_STATS),
+            where('date', '>=', cutoffStr),
+            where('date', '<=', todayStr_)
+          )
         );
 
         const byPage = new Map<GuestPage, GuestPageSummary>();
@@ -118,10 +130,13 @@ export class GuestAnalyticsService {
         for (const row of byPage.values()) {
           row.avgDwellSeconds = row.views > 0 ? Math.round(row.dwellSeconds / row.views) : 0;
         }
-        return Array.from(byPage.values());
+        const result = Array.from(byPage.values());
+        apiCache.set(cacheKey, result, 5 * 60 * 1000);
+        return result;
       }
     );
   }
 }
 
 export const guestAnalyticsService = GuestAnalyticsService;
+

@@ -108,6 +108,7 @@ const COLL = COLLECTIONS.ADVERTISEMENTS || 'advertisements';
 const CACHE_TTL = 3 * 60 * 1000; // 3 minutes
 const CACHE_KEY_ALL = 'ads:all';
 const CACHE_KEY_ACTIVE_PREFIX = 'ads:active:';
+const CACHE_KEY_PACKAGES = 'pkgs:promotionPackages';
 
 function mapDoc(docSnap: QueryDocumentSnapshot<DocumentData>): Advertisement {
   const d = docSnap.data();
@@ -125,6 +126,10 @@ export class AdvertisementService {
   // ── Cache helpers ──────────────────────────────────────────────────────────
   static invalidateAdsCache(): void {
     apiCache.deleteByPrefix('ads:');
+  }
+
+  static invalidatePackagesCache(): void {
+    apiCache.deleteByPrefix('pkgs:');
   }
 
   // ── Get all advertisements ─────────────────────────────────────────────────
@@ -346,12 +351,12 @@ export class AdvertisementService {
       () => [],
       () =>
         apiCache.getOrSet<PromotionPackage[]>(
-          'ads:promotionPackages',
+          CACHE_KEY_PACKAGES,
           async () => {
             try {
               const snapshot = await getDocs(
                 query(
-                  collection(db, COLLECTIONS.PROMOTION_PACKAGES || 'promotionPackages'),
+                  collection(db, COLLECTIONS.PROMOTION_PACKAGES),
                   orderBy('price', 'asc')
                 )
               );

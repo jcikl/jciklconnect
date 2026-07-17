@@ -15,6 +15,7 @@ import {
   writeBatch,
   deleteField,
   increment,
+  serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
@@ -352,11 +353,14 @@ export class InventoryService {
     return withDevMode(
       () => { console.log('[DEV MODE] Generating inventory alerts'); },
       async () => {
+    type NewAlert = { itemId: string; type: string; severity: string; message: string };
+    const newAlerts: NewAlert[] = [];
+
+    // ── Block 1: low-stock / overdue-return alerts ─────────────────────────
+    // Failure here does NOT prevent maintenance alerts from running.
     try {
-      // Fetch all data and existing unacknowledged alerts in parallel (3 queries total, not 3×N)
-      const [items, maintenanceSchedules, existingAlertsSnap] = await Promise.all([
+      const [items, existingAlertsSnap] = await Promise.all([
         this.getAllItems(),
-        this.getMaintenanceSchedules(),
         getDocs(query(
           collection(db, COLLECTIONS.INVENTORY_ALERTS),
           where('acknowledged', '==', false)
@@ -370,13 +374,11 @@ export class InventoryService {
         activeAlertKeys.add(`${data.itemId}::${data.type}`);
       });
 
-      type NewAlert = { itemId: string; type: string; severity: string; message: string };
-      const newAlerts: NewAlert[] = [];
-
       // Check for low stock / out-of-stock items
       for (const item of items) {
         if (item.quantity <= (item.minQuantity || 0)) {
-          const alertType = 'Low Stock';
+          // FIX 5: distinguish Out of Stock (quantity === 0) from Low Stock (quantity > 0)
+          const alertType = item.quantity === 0 ? 'Out of Stock' : 'Low Stock';
           if (!activeAlertKeys.has(`${item.id}::${alertType}`)) {
             newAlerts.push({
               itemId: item.id,
@@ -403,10 +405,29 @@ export class InventoryService {
           }
         }
       }
+    } catch (stockError) {
+      errorLoggingService.logError(stockError as Error, { component: 'InventoryService', action: 'generateAlerts:lowStock' });
+      // Continue — maintenance alerts should still run
+    }
 
-      // Check for upcoming / overdue maintenance
+    // ── Block 2: maintenance alerts ─────────────────────────────────────────
+    // Failure here does NOT discard any low-stock alerts already collected.
+    try {
+      const [maintenanceSchedules, existingAlertsSnap] = await Promise.all([
+        this.getMaintenanceSchedules(),
+        getDocs(query(
+          collection(db, COLLECTIONS.INVENTORY_ALERTS),
+          where('acknowledged', '==', false)
+        )),
+      ]);
+
+      const activeAlertKeys = new Set<string>();
+      existingAlertsSnap.docs.forEach(d => {
+        const data = d.data();
+        activeAlertKeys.add(`${data.itemId}::${data.type}`);
+      });
+
       const now = new Date();
-      const itemMap = new Map(items.map(i => [i.id, i]));
       for (const schedule of maintenanceSchedules) {
         if (!schedule.scheduledDate) continue;
         const scheduledDate = new Date(schedule.scheduledDate);
@@ -415,33 +436,32 @@ export class InventoryService {
         if (daysUntil <= 7 && daysUntil >= -7) {
           const alertType = 'Maintenance Due';
           if (!activeAlertKeys.has(`${schedule.itemId}::${alertType}`)) {
-            const item = itemMap.get(schedule.itemId);
             newAlerts.push({
               itemId: schedule.itemId,
               type: alertType,
               severity: daysUntil < 0 ? 'High' : 'Medium',
-              message: `${item?.name || 'Item'} requires ${schedule.type.toLowerCase()} maintenance (${schedule.type})`,
+              message: `Item requires ${schedule.type.toLowerCase()} maintenance (${schedule.type})`,
             });
           }
         }
       }
+    } catch (maintError) {
+      errorLoggingService.logError(maintError as Error, { component: 'InventoryService', action: 'generateAlerts:maintenance' });
+      // Continue — write whatever alerts were already collected
+    }
 
-      // Write all new alerts atomically in a single batch
-      if (newAlerts.length > 0) {
-        const batch = writeBatch(db);
-        newAlerts.forEach(alert => {
-          batch.set(doc(collection(db, COLLECTIONS.INVENTORY_ALERTS)), {
-            ...alert,
-            acknowledged: false,
-            createdAt: Timestamp.now(),
-          });
+    // Write all new alerts atomically in a single batch
+    if (newAlerts.length > 0) {
+      const batch = writeBatch(db);
+      newAlerts.forEach(alert => {
+        batch.set(doc(collection(db, COLLECTIONS.INVENTORY_ALERTS)), {
+          ...alert,
+          acknowledged: false,
+          createdAt: Timestamp.now(),
         });
-        await batch.commit();
-        InventoryService.invalidateAlertsCache();
-      }
-    } catch (error) {
-      errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'generateAlerts' });
-      throw error;
+      });
+      await batch.commit();
+      InventoryService.invalidateAlertsCache();
     }
 });
   }
@@ -913,13 +933,27 @@ export class InventoryService {
       () => { console.log('[DEV MODE] Creating maintenance schedule:', schedule); return `schedule_${Date.now()}`; },
       async () => {
     try {
-      const docRef = await addDoc(collection(db, COLLECTIONS.MAINTENANCE_SCHEDULES), {
+      const batch = writeBatch(db);
+      const scheduleRef = doc(collection(db, COLLECTIONS.MAINTENANCE_SCHEDULES));
+      batch.set(scheduleRef, {
         ...schedule,
         createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now()
+        updatedAt: Timestamp.now(),
       });
+      // Sync nextMaintenanceDate on the inventory item so it stays current
+      if (schedule.itemId && schedule.scheduledDate) {
+        const inventoryItemRef = doc(db, COLLECTIONS.INVENTORY, schedule.itemId);
+        batch.update(inventoryItemRef, {
+          nextMaintenanceDate: schedule.scheduledDate,
+          updatedAt: serverTimestamp(),
+        });
+      }
+      await batch.commit();
       InventoryService.invalidateMaintenanceCache();
-      return docRef.id;
+      if (schedule.itemId) {
+        InventoryService.invalidateInventoryCache(schedule.itemId);
+      }
+      return scheduleRef.id;
     } catch (error) {
       errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'createMaintenanceSchedule' });
       throw error;
@@ -934,11 +968,19 @@ export class InventoryService {
       async () => {
     try {
       const docRef = doc(db, COLLECTIONS.MAINTENANCE_SCHEDULES, scheduleId);
+      // Read the schedule first so we can invalidate the linked item's cache
+      const scheduleSnap = await getDoc(docRef);
+      const existingItemId = scheduleSnap.exists()
+        ? (scheduleSnap.data() as MaintenanceSchedule).itemId
+        : updates.itemId;
       await updateDoc(docRef, {
         ...updates,
         updatedAt: Timestamp.now()
       });
       InventoryService.invalidateMaintenanceCache();
+      if (existingItemId) {
+        InventoryService.invalidateInventoryCache(existingItemId);
+      }
     } catch (error) {
       errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'updateMaintenanceSchedule' });
       throw error;
@@ -961,6 +1003,22 @@ export class InventoryService {
       const now = Timestamp.now();
       const completedDate = new Date().toISOString();
 
+      // Query open maintenance alerts for this item before starting the batch
+      const openAlertsSnap = await getDocs(query(
+        collection(db, COLLECTIONS.INVENTORY_ALERTS),
+        where('itemId', '==', schedule.itemId),
+        where('type', '==', 'Maintenance Due'),
+        where('resolved', '==', false),
+      )).catch(() =>
+        // If the resolved field doesn't exist on old docs, fall back to unacknowledged alerts
+        getDocs(query(
+          collection(db, COLLECTIONS.INVENTORY_ALERTS),
+          where('itemId', '==', schedule.itemId),
+          where('type', '==', 'Maintenance Due'),
+          where('acknowledged', '==', false),
+        ))
+      );
+
       const batch = writeBatch(db);
       batch.update(scheduleRef, {
         status: 'Completed',
@@ -974,9 +1032,19 @@ export class InventoryService {
         lastCheckedAt: completedDate,
         updatedAt: now,
       });
+      // Resolve related maintenance alerts atomically in the same batch
+      openAlertsSnap.docs.forEach(alertDoc => {
+        batch.update(alertDoc.ref, {
+          resolved: true,
+          resolvedAt: serverTimestamp(),
+        });
+      });
       await batch.commit();
       InventoryService.invalidateMaintenanceCache();
       InventoryService.invalidateInventoryCache(schedule.itemId);
+      if (openAlertsSnap.docs.length > 0) {
+        InventoryService.invalidateAlertsCache();
+      }
     } catch (error) {
       errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'completeMaintenance' });
       throw error;

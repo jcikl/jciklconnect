@@ -1,4 +1,4 @@
-// Flagship Projects Service - CRUD Operations
+﻿// Flagship Projects Service - CRUD Operations
 import {
   collection,
   doc,
@@ -16,6 +16,7 @@ import { COLLECTIONS } from '../config/constants';
 import { FlagshipProject } from '../types';
 import { withDevMode } from '../utils/devMode';
 import { MOCK_FLAGSHIP_PROJECTS } from './mockData';
+import { errorLoggingService } from './errorLoggingService';
 
 // Local in-memory store for Dev Mode simulation
 let devFlagshipProjects: FlagshipProject[] = [...MOCK_FLAGSHIP_PROJECTS];
@@ -38,8 +39,8 @@ export class FlagshipProjectsService {
           } as FlagshipProject));
         } catch (error) {
           console.error('Error fetching flagship projects:', error);
-          // Fallback
-          return devFlagshipProjects;
+          await errorLoggingService.logError(error, { component: 'FlagshipProjectsService' });
+          throw error;
         }
       }
     );
@@ -59,6 +60,7 @@ export class FlagshipProjectsService {
           return null;
         } catch (error) {
           console.error('Error fetching flagship project:', error);
+          await errorLoggingService.logError(error, { component: 'FlagshipProjectsService' });
           throw error;
         }
       }
@@ -90,6 +92,7 @@ export class FlagshipProjectsService {
           return docRef.id;
         } catch (error) {
           console.error('Error creating flagship project:', error);
+          await errorLoggingService.logError(error, { component: 'FlagshipProjectsService' });
           throw error;
         }
       }
@@ -113,6 +116,7 @@ export class FlagshipProjectsService {
           });
         } catch (error) {
           console.error('Error updating flagship project:', error);
+          await errorLoggingService.logError(error, { component: 'FlagshipProjectsService' });
           throw error;
         }
       }
@@ -130,9 +134,11 @@ export class FlagshipProjectsService {
           await deleteDoc(doc(db, COLLECTIONS.FLAGSHIP_PROJECTS, id));
         } catch (error) {
           console.error('Error deleting flagship project:', error);
+          await errorLoggingService.logError(error, { component: 'FlagshipProjectsService' });
           throw error;
         }
       }
     );
   }
 }
+

@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   TrendingUp, CheckCircle, Clock, Award, AlertCircle,
   Calendar, FileText, User, Users, RefreshCw, Check, X, Save, Edit3, ChevronDown, ChevronUp, Sparkles, Filter
 } from 'lucide-react';
 import { Card, Button, Badge, ProgressBar, Modal, useToast } from '../../ui/Common';
+import { useAuth } from '../../../hooks/useAuth';
 import { Input } from '../../ui/Form';
 import {
   EngagementRequirementStatus,
@@ -50,7 +51,7 @@ const formatDatedDetail = (date?: string, detail?: string): string => {
 
 const parseDatedDetail = (value?: string): { date: string; detail: string } => {
   const text = (value || '').trim();
-  const match = text.match(/^(\d{4}-\d{2}-\d{2})\s*[-–]\s*(.*)$/);
+  const match = text.match(/^(\d{4}-\d{2}-\d{2})\s*[-â€“]\s*(.*)$/);
   if (match) {
     return { date: match[1], detail: match[2]?.trim() || '' };
   }
@@ -179,6 +180,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
   const [pendingOnly, setPendingOnly] = useState(false);
   const [promotingConfirmId, setPromotingConfirmId] = useState<string | null>(null);
   const [quickPromotingId, setQuickPromotingId] = useState<string | null>(null);
+  const { member: currentUser } = useAuth();
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -372,7 +374,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
         }
         return next;
       });
-      showToast(`Auto-suggest: ${filled} field${filled !== 1 ? 's' : ''} pre-filled — review and save`, 'success');
+      showToast(`Auto-suggest: ${filled} field${filled !== 1 ? 's' : ''} pre-filled â€” review and save`, 'success');
     } catch (err: any) {
       showToast(err.message || 'Auto-suggest failed', 'error');
     } finally {
@@ -387,7 +389,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
       const results = await EngagementAutoSuggestService.runAutoSuggest(
         selectedMemberId,
         selectedEngagementYear,
-        'bod' // placeholder — replace with actual user ID from auth context
+        'bod' // placeholder â€” replace with actual user ID from auth context
       );
       const suggested = results.filter(r => !r.skipped).length;
       const skipped = results.filter(r => r.skipped).length;
@@ -574,7 +576,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
     try {
       const promotion = await PromotionService.promoteToOfficialMember(
         memberId,
-        'current_user_id', // Would come from auth context
+        currentUser?.id || '',
         method,
         method === 'manual' ? manualPromotionReason : undefined
       );
@@ -600,9 +602,9 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
     try {
       await PromotionService.createManualPromotionRequest(
         selectedMemberId,
-        'current_user_id', // Would come from auth context
+        currentUser?.id || '',
         manualPromotionReason,
-        true // Override requirements
+        false // Do not override requirements by default
       );
 
       showToast('Manual promotion request submitted', 'success');
@@ -735,7 +737,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
 
       {activeView === 'promotion' && (
         <>
-          {/* Stats + completion rates — collapsible */}
+          {/* Stats + completion rates â€” collapsible */}
           {statistics && (
             <Card>
               {/* Always-visible: 4 stat chips + expand toggle */}
@@ -785,14 +787,14 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
           {/* Probation Members List */}
           <Card>
             <div className="flex items-center justify-between mb-4">
-              <span className="font-bold text-slate-900">Probation Members{filteredProbationMembers.length ? ` · ${filteredProbationMembers.length}` : ''}</span>
+              <span className="font-bold text-slate-900">Probation Members{filteredProbationMembers.length ? ` Â· ${filteredProbationMembers.length}` : ''}</span>
               <button
                 onClick={handleBulkPromoAutoSuggest}
                 disabled={bulkAutoSuggesting}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-50 transition-colors shadow-sm"
               >
                 {bulkAutoSuggesting ? <RefreshCw size={12} className="animate-spin" /> : <Sparkles size={12} className="text-amber-500" />}
-                {bulkAutoSuggesting && bulkProgress ? `${bulkProgress.current}/${bulkProgress.total}…` : 'Auto-Suggest All'}
+                {bulkAutoSuggesting && bulkProgress ? `${bulkProgress.current}/${bulkProgress.total}â€¦` : 'Auto-Suggest All'}
               </button>
             </div>
             <div className="space-y-2">
@@ -853,7 +855,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                               onClick={() => setPromotingConfirmId(member.id)}
                               className="inline-flex items-center gap-1 text-[10px] font-bold text-green-700 bg-green-100 border border-green-200 hover:bg-green-200 px-2 py-0.5 rounded-full transition-colors"
                             >
-                              <CheckCircle size={10} /> Eligible · Promote →
+                              <CheckCircle size={10} /> Eligible Â· Promote â†’
                             </button>
                           )
                         ) : (
@@ -908,7 +910,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
           <div className="flex items-center justify-between mb-3">
             <span className="font-bold text-slate-900">
               {ENGAGEMENT_VIEW_LABELS[activeView]}
-              {displayedEngagementMembers.length ? ` · ${displayedEngagementMembers.length}` : ''}
+              {displayedEngagementMembers.length ? ` Â· ${displayedEngagementMembers.length}` : ''}
             </span>
             <div className="flex items-center gap-1.5">
               {/* Pending Only toggle */}
@@ -932,7 +934,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-50 transition-colors shadow-sm"
               >
                 {bulkAutoSuggesting ? <RefreshCw size={12} className="animate-spin" /> : <Sparkles size={12} className="text-amber-500" />}
-                {bulkAutoSuggesting && bulkProgress ? `${bulkProgress.current}/${bulkProgress.total}…` : 'Auto-Suggest All'}
+                {bulkAutoSuggesting && bulkProgress ? `${bulkProgress.current}/${bulkProgress.total}â€¦` : 'Auto-Suggest All'}
               </button>
             </div>
           </div>
@@ -1113,7 +1115,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
               </div>
               {promotionProgress.isEligibleForPromotion && (
                 <div className="flex items-center gap-1.5 text-xs font-medium text-green-700">
-                  <CheckCircle size={12} /> All requirements met — eligible for promotion
+                  <CheckCircle size={12} /> All requirements met â€” eligible for promotion
                 </div>
               )}
             </div>
@@ -1126,7 +1128,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                 className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-50 transition-colors shadow-sm"
               >
                 {promoAutoSuggesting ? <RefreshCw size={13} className="animate-spin" /> : <Sparkles size={13} className="text-amber-500" />}
-                <span>{promoAutoSuggesting ? 'Scanning…' : 'Auto-Suggest from Activity'}</span>
+                <span>{promoAutoSuggesting ? 'Scanningâ€¦' : 'Auto-Suggest from Activity'}</span>
               </button>
             </div>
 
@@ -1149,7 +1151,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                       {req.isCompleted && <Badge variant="success">Done</Badge>}
                     </div>
                     <p className="text-xs text-slate-500 mb-3 pl-5">{req.description}</p>
-                  {/* Inputs — stacked mobile, side-by-side sm+ */}
+                  {/* Inputs â€” stacked mobile, side-by-side sm+ */}
                   {req.type === 'event_participation' ? (
                     <div className="space-y-2">
                       <div className="flex flex-col sm:flex-row gap-2">
@@ -1199,7 +1201,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                   ) : (
                     <div className="flex flex-col sm:flex-row gap-2">
                       <input type="text" className={`${inputClassName} flex-1`}
-                        placeholder={REQUIREMENT_PLACEHOLDER[req.type] || 'Enter details…'}
+                        placeholder={REQUIREMENT_PLACEHOLDER[req.type] || 'Enter detailsâ€¦'}
                         value={editValues[`${req.type}_detail`] || ''}
                         onChange={(e) => setEditValues(prev => ({ ...prev, [`${req.type}_detail`]: e.target.value }))} />
                       <div className="flex gap-2">
@@ -1238,7 +1240,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
             {/* Dues info */}
             <div className="flex items-start gap-2 p-3 rounded-xl bg-blue-50 border border-blue-100 text-xs text-blue-800">
               <AlertCircle size={14} className="text-blue-500 mt-0.5 shrink-0" />
-              <span>Upon promotion: dues change from <strong>RM350</strong> (Probation) → <strong>RM300</strong> (Full Member).</span>
+              <span>Upon promotion: dues change from <strong>RM350</strong> (Probation) â†’ <strong>RM300</strong> (Full Member).</span>
             </div>
           </div>
         )}
@@ -1273,7 +1275,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                   <div className="flex justify-between items-center">
                     <span className="text-xs font-medium text-slate-500">
                       {engagementProgress.completedCount}/{engagementProgress.totalCount} completed
-                      {pendingTotal > 0 && <span className="ml-2 text-amber-500">· {pendingTotal} pending</span>}
+                      {pendingTotal > 0 && <span className="ml-2 text-amber-500">Â· {pendingTotal} pending</span>}
                     </span>
                     <span className="text-xs font-bold text-slate-700">{engagementProgress.overallProgress.toFixed(0)}%</span>
                   </div>
@@ -1291,7 +1293,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                   className="shrink-0 flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-50 transition-colors shadow-sm"
                 >
                   {autoSuggesting ? <RefreshCw size={13} className="animate-spin" /> : <Sparkles size={13} className="text-amber-500" />}
-                  <span className="hidden sm:inline">{autoSuggesting ? 'Scanning…' : 'Auto-Suggest'}</span>
+                  <span className="hidden sm:inline">{autoSuggesting ? 'Scanningâ€¦' : 'Auto-Suggest'}</span>
                 </button>
               </div>
 
@@ -1387,7 +1389,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                           </div>
                         )}
 
-                        {/* Input row — stacked on mobile, side-by-side on sm+ */}
+                        {/* Input row â€” stacked on mobile, side-by-side on sm+ */}
                         <div className="flex flex-col sm:flex-row gap-2">
                           <input
                             type="text"
@@ -1495,3 +1497,4 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
     </div>
   );
 };
+

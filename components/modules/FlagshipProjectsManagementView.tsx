@@ -203,14 +203,15 @@ export const FlagshipProjectsManagementView: React.FC<{ searchQuery?: string }> 
         unsdg: selectedSdgs,
       });
 
-      // Trigger deletion of removed photos from Cloudinary
+      // Delete removed photos from Cloudinary (awaited so failures surface to the user)
       if (pendingDeletePhotos.length > 0) {
-        Promise.all(pendingDeletePhotos.map(url => deleteFromCloudinary(url)))
-          .then(results => {
-            const successCount = results.filter(Boolean).length;
-            console.log(`Deleted ${successCount}/${pendingDeletePhotos.length} images from Cloudinary.`);
-          })
-          .catch(err => console.error('Error deleting from Cloudinary:', err));
+        try {
+          await Promise.all(pendingDeletePhotos.map(url => deleteFromCloudinary(url)));
+          console.log(`Deleted ${pendingDeletePhotos.length} image(s) from Cloudinary.`);
+        } catch (err) {
+          console.error('Error deleting from Cloudinary:', err);
+          showToast('Changes saved, but some removed images could not be deleted from storage', 'warning');
+        }
         setPendingDeletePhotos([]);
       }
 
@@ -235,14 +236,24 @@ export const FlagshipProjectsManagementView: React.FC<{ searchQuery?: string }> 
           const projectToDelete = projects.find(p => p.id === projectId);
           await FlagshipProjectsService.deleteProject(projectId);
 
-          // Also delete all of its images from Cloudinary!
-          if (projectToDelete && projectToDelete.galleryUrls && projectToDelete.galleryUrls.length > 0) {
-            Promise.all(projectToDelete.galleryUrls.map(url => deleteFromCloudinary(url)))
-              .then(results => {
-                const successCount = results.filter(Boolean).length;
-                console.log(`Deleted all ${successCount}/${projectToDelete.galleryUrls!.length} project images from Cloudinary.`);
-              })
-              .catch(err => console.error('Failed to clean up Cloudinary assets on project deletion:', err));
+          // Also delete all of its images from Cloudinary (logo + gallery)
+          if (projectToDelete) {
+            const urlsToDelete: string[] = [];
+            if (projectToDelete.logoUrl) {
+              urlsToDelete.push(projectToDelete.logoUrl);
+            }
+            if (projectToDelete.galleryUrls && projectToDelete.galleryUrls.length > 0) {
+              urlsToDelete.push(...projectToDelete.galleryUrls);
+            }
+            if (urlsToDelete.length > 0) {
+              try {
+                await Promise.all(urlsToDelete.map(url => deleteFromCloudinary(url)));
+                console.log(`Deleted ${urlsToDelete.length} asset(s) from Cloudinary.`);
+              } catch (err) {
+                console.error('Failed to clean up Cloudinary assets on project deletion:', err);
+                showToast('Project deleted, but some images could not be removed from storage', 'warning');
+              }
+            }
           }
 
           showToast('Flagship project deleted successfully', 'success');

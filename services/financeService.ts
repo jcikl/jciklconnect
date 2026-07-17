@@ -49,6 +49,7 @@ import { apiCache } from './cacheService';
 
 // PERF6: chunkArray above is also used by reconcileBankAccount to batch-fetch splits
 import { SponsorshipsService } from './sponsorshipService';
+import { AuditLogService } from './auditLogService';
 
 /** Typed shape for raw Firestore transaction/split documents (avoids `as any` escapes). */
 interface RawTransactionDoc {
@@ -1887,13 +1888,19 @@ export class FinanceService {
 
           // Write an immutable tombstone so the deletion is auditable
           const operatorId = deletedBy || auth?.currentUser?.uid || 'unknown';
-          addDoc(collection(db, 'auditLog'), {
-            action: 'deleteTransaction',
-            documentId: transactionId,
-            deletedBy: operatorId,
-            deletedAt: new Date().toISOString(),
-            snapshotAmount: transaction?.amount ?? null,
-            snapshotDescription: transaction?.description ?? null,
+          AuditLogService.writeAuditEntry({
+            action: 'DELETE',
+            performedBy: operatorId,
+            targetCollection: COLLECTIONS.TRANSACTIONS,
+            targetId: transactionId,
+            before: {
+              amount: transaction?.amount ?? null,
+              description: transaction?.description ?? null,
+            },
+            after: null,
+            metadata: {
+              deletedAt: new Date().toISOString(),
+            },
           }).catch(err => console.error('[deleteTransaction] Failed to write audit tombstone:', err));
 
           // Sync with Member Membership if category is Membership
