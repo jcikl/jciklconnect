@@ -588,7 +588,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       throw new Error(`请等待 ${remaining} 秒后再重新发送重置邮件。`);
     }
     lastResetRequestRef.current = now;
-    await sendPasswordResetEmail(auth, email);
+    try {
+      await sendPasswordResetEmail(auth, email);
+    } catch (err: any) {
+      const code: string = err?.code ?? '';
+      if (code === 'auth/user-not-found' || code === 'auth/invalid-email' || err?.status === 400) {
+        // Firebase returns 400 for unregistered emails (or when Email Enumeration
+        // Protection is on). Don't leak whether the account exists — show neutral message.
+        throw new Error('If an account exists for this email, a reset link has been sent. Please check your inbox (and spam folder).');
+      }
+      if (code === 'auth/too-many-requests') {
+        throw new Error('Too many requests. Please wait a few minutes and try again.');
+      }
+      throw new Error('Failed to send reset email. Please try again or contact your administrator.');
+    }
   }, []);
 
   const updateMemberProfile = useCallback(async (updates: Partial<Member>) => {
