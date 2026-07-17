@@ -1355,7 +1355,7 @@ export const JCIKLApp: React.FC = () => {
             >
               <X size={18} />
             </button>
-            <picture><source type="image/webp" srcSet="/mascot/logout.webp" /><img src="/mascot/logout.png" alt="" className="w-auto h-auto max-h-32 object-contain" loading="lazy" /></picture>
+            <img src="/mascot/logout.png" alt="" className="w-auto h-auto max-h-32 object-contain" loading="lazy" />
             <div className="space-y-1.5">
               <p className="font-semibold text-slate-800 text-base">Sign out?</p>
               <p className="text-sm text-slate-400">You'll need to log in again to access your account.</p>
