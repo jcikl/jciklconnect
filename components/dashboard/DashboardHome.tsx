@@ -386,7 +386,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
           onClick={() => setShowBirthdayDrawer(true)}
           className="relative overflow-hidden rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group"
         >
-          <div className="absolute inset-0" style={{ backgroundImage: 'url(/background/birthday-background.jpg)', backgroundSize: 'cover', backgroundPosition: 'center' }} />
+          <div className="absolute inset-0" style={{ backgroundImage: 'url(/background/birthday-background.webp)', backgroundSize: 'cover', backgroundPosition: 'center' }} />
           <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(190,18,60,0.82) 0%, rgba(134,25,143,0.78) 50%, rgba(79,70,229,0.75) 100%)' }} />
           <div className="relative z-10 p-4">
             <div className="flex items-center justify-between mb-3">
@@ -505,7 +505,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
           className="relative overflow-hidden rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group"
           onClick={(isProbationMember || isFullMember) ? openJourneyModal : () => setShowUpgradeModal(true)}
         >
-          <div className="absolute inset-0" style={{ backgroundImage: 'url(/background/birthday-background.jpg)', backgroundSize: 'cover', backgroundPosition: 'center' }} />
+          <div className="absolute inset-0" style={{ backgroundImage: 'url(/background/birthday-background.webp)', backgroundSize: 'cover', backgroundPosition: 'center' }} />
           <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(217,119,6,0.88) 0%, rgba(180,83,9,0.84) 50%, rgba(120,53,15,0.82) 100%)' }} />
           <div className="relative z-10 p-4">
             <div className="flex items-center justify-between mb-3">
@@ -730,7 +730,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
             {/* Header — matches journey card background (drag handle integrated) */}
             <div className="px-5 pt-3 pb-4 flex-shrink-0" style={{
-              backgroundImage: 'linear-gradient(135deg, rgba(217,119,6,0.88) 0%, rgba(180,83,9,0.84) 50%, rgba(120,53,15,0.82) 100%), url(/background/birthday-background.jpg)',
+              backgroundImage: 'linear-gradient(135deg, rgba(217,119,6,0.88) 0%, rgba(180,83,9,0.84) 50%, rgba(120,53,15,0.82) 100%), url(/background/birthday-background.webp)',
               backgroundSize: 'cover',
               backgroundPosition: 'center',
             }}>
@@ -1169,7 +1169,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
           </div>
         }
         headerStyle={{
-          backgroundImage: 'linear-gradient(135deg, rgba(190,18,60,0.82) 0%, rgba(134,25,143,0.78) 50%, rgba(79,70,229,0.75) 100%), url(/background/birthday-background.jpg)',
+          backgroundImage: 'linear-gradient(135deg, rgba(190,18,60,0.82) 0%, rgba(134,25,143,0.78) 50%, rgba(79,70,229,0.75) 100%), url(/background/birthday-background.webp)',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
         }}

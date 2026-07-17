@@ -1148,12 +1148,12 @@ export const JCIKLApp: React.FC = () => {
                       title="Toggle Board Dashboard"
                       className="h-9 flex items-center justify-center shrink-0 transition-all duration-200 hover:opacity-80"
                     >
-                      <img src="/mascot/JCIKL-Mascot.png" alt="JCI KL" className="h-7 w-auto" />
+                      <picture><source type="image/webp" srcSet="/mascot/JCIKL-Mascot.webp" /><img src="/mascot/JCIKL-Mascot.png" alt="JCI KL" className="h-7 w-auto" /></picture>
                       <span className={`ml-1.5 h-7 flex items-center text-[20px] leading-7 font-black tracking-tight whitespace-nowrap ${showBoardDashboard ? 'text-amber-300' : 'text-white'}`}>JCI KL Connect</span>
                     </button>
                   ) : (
                     <div className="h-9 flex items-center justify-center shrink-0">
-                      <img src="/mascot/JCIKL-Mascot.png" alt="JCI KL" className="h-7 w-auto" />
+                      <picture><source type="image/webp" srcSet="/mascot/JCIKL-Mascot.webp" /><img src="/mascot/JCIKL-Mascot.png" alt="JCI KL" className="h-7 w-auto" /></picture>
                       <span className="ml-1.5 h-7 flex items-center text-[20px] leading-7 font-black tracking-tight whitespace-nowrap text-white">JCI KL Connect</span>
                     </div>
                   )}
@@ -1355,7 +1355,7 @@ export const JCIKLApp: React.FC = () => {
             >
               <X size={18} />
             </button>
-            <img src="/mascot/logout.png" alt="" className="w-auto h-auto max-h-32 object-contain" loading="lazy" />
+            <picture><source type="image/webp" srcSet="/mascot/logout.webp" /><img src="/mascot/logout.png" alt="" className="w-auto h-auto max-h-32 object-contain" loading="lazy" /></picture>
             <div className="space-y-1.5">
               <p className="font-semibold text-slate-800 text-base">Sign out?</p>
               <p className="text-sm text-slate-400">You'll need to log in again to access your account.</p>
