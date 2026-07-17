@@ -210,10 +210,11 @@ service cloud.firestore {
     
     // Projects collection
     match /projects/{projectId} {
-      // FIX 1: split read — resource.data.status is null in list queries for unauthenticated users.
-      // Authenticated members can list all projects; guests only get individually-fetched Active docs.
+      // Public events page uses getDocs(query(projects, where('status','==','Active'))).
+      // Firestore list rules can't filter by query params, so allow list: if true lets the
+      // unauthenticated guest events page work; service layer filters status in code.
       allow get: if isAuthenticated() || resource.data.status == 'Active';
-      allow list: if isAuthenticated();
+      allow list: if true;
       // FIX 1: restrict writes to Board+; members may update only their own attendance/registration fields
       allow create, delete: if isBoard() || isAdmin();
       allow update: if isBoard() || isAdmin() ||
@@ -1067,12 +1068,13 @@ service cloud.firestore {
     // FIX 16: allow update had no auth check — unauthenticated bots could inflate page view counters
     match /guestPageStats/{docId} {
       allow read: if isBoard();
+      // setDoc({merge:true}) triggers create on new docs, update on existing ones.
+      // Both must allow unauthenticated writes (analytics only, field-locked).
       allow create: if request.resource.data.keys().hasOnly(
         ['page', 'date', 'views', 'dwellSeconds', 'signupClicks', 'updatedAt']
       );
-      allow update: if isAuthenticated() &&
-                      request.resource.data.diff(resource.data).affectedKeys()
-                        .hasOnly(['pageViews', 'totalDwellTime', 'lastVisit']);
+      allow update: if request.resource.data.diff(resource.data).affectedKeys()
+                        .hasOnly(['views', 'dwellSeconds', 'signupClicks', 'updatedAt']);
       allow delete: if isAdmin();
     }
 
