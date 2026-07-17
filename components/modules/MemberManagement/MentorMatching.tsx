@@ -262,7 +262,7 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
       <div className="bg-white rounded-lg shadow">
         <div className="px-2 pt-2">
           <Tabs
-            variant="button"
+           
             tabs={[
               { id: 'overview', label: 'Overview', icon: <BarChart3 size={16} /> },
               { id: 'matching', label: 'Smart Matching', icon: <Zap size={16} /> },

@@ -8,7 +8,6 @@ const BUSINESS_CATEGORIES = [
   'Distributor / Exporter / Importer',
 ];
 import { Card, Button, Badge, Modal, useToast, Tabs } from '../ui/Common';
-import { Input } from '../ui/Form';
 import { MembersOnlyOverlay } from '../ui/MembersOnlyOverlay';
 import { LoadingState } from '../ui/Loading';
 import { useBusinessDirectory } from '../../hooks/useBusinessDirectory';

@@ -1140,7 +1140,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
           ]}
           activeTab={activeDetailTab}
           onTabChange={(tabId) => setActiveDetailTab(tabId as any)}
-          variant="button"
+         
         />
       </div>
 

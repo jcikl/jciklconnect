@@ -113,7 +113,7 @@ export const EventsView: React.FC<{ searchQuery?: string; initialSelectedEventId
           {/* Mobile: segmented control in white bordered container */}
           <div className="md:hidden p-1.5 bg-white rounded-xl border border-slate-200 shadow-sm">
             <Tabs
-              variant="button"
+             
               fullWidth
               tabs={['Upcoming', 'Completed']}
               activeTab={activeTab}

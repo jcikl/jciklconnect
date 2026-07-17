@@ -151,7 +151,7 @@ const ProjectAccountTabBase: React.FC<ProjectAccountTabProps> = ({
       {/* Mobile tab switcher */}
       <div className="md:hidden">
         <Tabs
-          variant="button"
+         
           fullWidth
           tabs={[
             { id: 'projects', label: 'Projects' },

@@ -673,7 +673,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
           {/* Mobile: segmented control + filter on same row */}
           <div className="md:hidden flex items-center gap-2 w-full p-1.5 bg-white rounded-xl border border-slate-200 shadow-sm">
             <Tabs
-              variant="button"
+             
               fullWidth
               tabs={[
                 { id: 'my', label: 'My Requests' },

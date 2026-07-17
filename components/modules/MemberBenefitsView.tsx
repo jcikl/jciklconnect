@@ -176,7 +176,7 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
 
       {/* Filter chips */}
       <Tabs
-        variant="button"
+       
         tabs={FILTER_TABS.map(t => ({ id: t.key, label: t.label }))}
         activeTab={activeFilter}
         onTabChange={(id) => setActiveFilter(id as FilterTab)}

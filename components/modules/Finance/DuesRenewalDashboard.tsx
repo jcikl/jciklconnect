@@ -654,7 +654,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
       {summary && (
         <div className="md:hidden">
           <Tabs
-            variant="button"
+           
             fullWidth
             tabs={[
               { id: 'stats', label: '指标概览' },
@@ -891,7 +891,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
       {/* Mobile tab switcher */}
       <div className="md:hidden">
         <Tabs
-          variant="button"
+         
           fullWidth
           tabs={[
             { id: 'members', label: 'Renewal Members' },
