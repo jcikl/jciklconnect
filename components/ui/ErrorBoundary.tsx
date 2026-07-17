@@ -251,19 +251,9 @@ export function withErrorBoundary<P extends object>(
 export function useErrorHandler() {
   return React.useCallback((error: Error, errorInfo?: any) => {
     console.error('Manual error report:', error, errorInfo);
-    
-    // Log to error service
-    const errorData = {
-      message: error.message,
-      stack: error.stack,
-      timestamp: new Date().toISOString(),
-      userAgent: navigator.userAgent,
-      url: window.location.href,
-      userId: localStorage.getItem('userId') || 'anonymous',
-      additionalInfo: errorInfo
-    };
-
-    // TODO: Send to error tracking service
-    console.error('Error data:', errorData);
+    errorLoggingService.logError(error, {
+      component: 'useErrorHandler',
+      additionalData: errorInfo ? { errorInfo } : undefined,
+    });
   }, []);
 }

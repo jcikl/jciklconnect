@@ -123,9 +123,10 @@ async function executeNode(node: any, data: any): Promise<any> {
       return await executeAction(node.config, data);
       
     case 'delay':
-      const delayMs = node.config.delayMs || 1000;
-      await new Promise(resolve => setTimeout(resolve, delayMs));
-      return { delayed: delayMs };
+      // F10 FIX: blocking setTimeout ties up the Cloud Function and risks timeout.
+      // TODO: implement delay via Cloud Tasks for reliable deferred execution.
+      console.warn('Delay node skipped in Cloud Function context — use Cloud Tasks for deferred actions.');
+      return { delayed: 0, skipped: true };
       
     default:
       throw new Error(`Unknown node type: ${node.type}`);
@@ -246,7 +247,10 @@ const AUTOMATION_SIDE_EFFECT_COLLECTIONS = [
 // schedule field are currently ignored by this Firestore-triggered function.
 
 // Function to evaluate automation rules
-export const evaluateAutomationRules = functions.firestore
+// F10 FIX: extend timeout to 300 s and raise memory to prevent OOM on large rule sets.
+export const evaluateAutomationRules = functions
+  .runWith({ timeoutSeconds: 300, memory: '512MB' })
+  .firestore
   .document('{collection}/{documentId}')
   .onWrite(async (change, context) => {
     // P0-A: Bail out early when the write came from an automation side-effect

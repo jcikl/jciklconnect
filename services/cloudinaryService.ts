@@ -243,29 +243,10 @@ export const getPublicIdFromUrl = (url: string): string | null => {
 };
 
 /**
- * Generates an SHA-1 signature for Cloudinary requests using native browser Web Crypto API.
- */
-const generateSignature = async (
-  params: Record<string, string>,
-  apiSecret: string
-): Promise<string> => {
-  const sortedKeys = Object.keys(params).sort();
-  const sortedString = sortedKeys
-    .map((key) => `${key}=${params[key]}`)
-    .join('&') + apiSecret;
-
-  const encoder = new TextEncoder();
-  const data = encoder.encode(sortedString);
-  const hashBuffer = await crypto.subtle.digest('SHA-1', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-  return hashHex;
-};
-
-/**
- * Deletes an image from Cloudinary using the secure destroy endpoint.
+ * Deletes an image from Cloudinary via the server-side proxy function.
+ * SEC-001: The API secret is no longer used in the browser. The signed
+ * deletion is performed by netlify/functions/cloudinary-delete.js using
+ * the server-only CLOUDINARY_API_SECRET env var.
  * @param url - The secure URL of the image to delete
  * @returns A promise resolving to true if successful, false otherwise
  */
@@ -273,41 +254,33 @@ export const deleteFromCloudinary = async (url: string): Promise<boolean> => {
   const publicId = getPublicIdFromUrl(url);
   if (!publicId) return false;
 
-  const apiKey = import.meta.env.VITE_CLOUDINARY_API_KEY;
-  const apiSecret = import.meta.env.VITE_CLOUDINARY_API_SECRET;
-
-  if (!apiKey || !apiSecret) {
-    console.warn(
-      'Cloudinary API Key or API Secret is missing. Skipping Cloudinary asset deletion.'
-    );
-    return false;
-  }
-
   try {
-    const timestamp = Math.round(new Date().getTime() / 1000).toString();
-    const params: Record<string, string> = {
-      public_id: publicId,
-      timestamp: timestamp,
-    };
+    const { getAuth } = await import('firebase/auth');
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) {
+      console.warn('[cloudinaryService] No authenticated user — skipping deletion.');
+      return false;
+    }
+    const idToken = await user.getIdToken();
 
-    const signature = await generateSignature(params, apiSecret);
+    const response = await fetch('/.netlify/functions/cloudinary-delete', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({ publicId }),
+    });
 
-    const formData = new FormData();
-    formData.append('public_id', publicId);
-    formData.append('api_key', apiKey);
-    formData.append('timestamp', timestamp);
-    formData.append('signature', signature);
-
-    const response = await fetch(
-      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/destroy`,
-      {
-        method: 'POST',
-        body: formData,
-      }
-    );
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      console.error('[cloudinaryService] Delete proxy error:', err);
+      return false;
+    }
 
     const data = await response.json();
-    return data.result === 'ok';
+    return data.success === true;
   } catch (err) {
     console.error('Failed to delete image from Cloudinary:', err);
     return false;

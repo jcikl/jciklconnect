@@ -8,13 +8,32 @@ export const validateTransactionSplits = functions.firestore
   .document('transactions/{transactionId}')
   .onWrite(async (change, context) => {
     const transactionId = context.params.transactionId;
-    
+
     // Skip if document was deleted
     if (!change.after.exists) {
       return null;
     }
 
-    const transaction = change.after.data();
+    const afterData = change.after.data();
+    const beforeData = change.before.data();
+
+    // Self-trigger guard: skip if this write was our own validation write (prevents infinite loop)
+    if (afterData?._validationSource === 'validator') return null;
+
+    // Skip if only _validationSource changed (extra safety net)
+    if (
+      beforeData &&
+      afterData &&
+      beforeData._validationSource !== afterData._validationSource &&
+      beforeData.validationError === afterData.validationError &&
+      beforeData.validatedAt === afterData.validatedAt &&
+      beforeData.amount === afterData.amount &&
+      JSON.stringify(beforeData.splitIds) === JSON.stringify(afterData.splitIds)
+    ) {
+      return null;
+    }
+
+    const transaction = afterData;
     
     // Only validate if transaction has splitIds
     if (!transaction.splitIds || transaction.splitIds.length === 0) {
@@ -39,13 +58,15 @@ export const validateTransactionSplits = functions.firestore
       // Update transaction with validation error
       await db.collection('transactions').doc(transactionId).update({
         validationError: `Split amounts (${splitSum}) do not sum to transaction amount (${transaction.amount})`,
-        validatedAt: admin.firestore.FieldValue.serverTimestamp()
+        validatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        _validationSource: 'validator'
       });
     } else {
       // Clear any previous validation errors
       await db.collection('transactions').doc(transactionId).update({
         validationError: admin.firestore.FieldValue.delete(),
-        validatedAt: admin.firestore.FieldValue.serverTimestamp()
+        validatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        _validationSource: 'validator'
       });
     }
 

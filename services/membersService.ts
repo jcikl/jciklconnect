@@ -22,7 +22,7 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
 import { logWrite, logDelete } from './firestoreLogger';
-import { logError as logServiceError } from './errorLoggingService';
+import { logError as logServiceError, errorLoggingService } from './errorLoggingService';
 import { COLLECTIONS, DEFAULT_LO_ID } from '../config/constants';
 import {
   Member,
@@ -437,6 +437,11 @@ export class MembersService {
     }
 
     try {
+      if (!memberData.name?.trim()) throw new Error('Member name is required');
+      if (!memberData.email?.trim()) throw new Error('Member email is required');
+      const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!EMAIL_RE.test(memberData.email)) throw new Error('Invalid email format');
+
       const payload = {
         ...memberData,
         ...(await this.syncComputedMembershipType(memberData as Partial<Member>)),
@@ -471,7 +476,7 @@ export class MembersService {
       }
 
       if (cleanMemberData.introducer) {
-        this.recalculateIntroducerStats(cleanMemberData.introducer).catch(console.error);
+        this.recalculateIntroducerStats(cleanMemberData.introducer).catch(err => errorLoggingService.logError(err, { action: 'recalculate-introducer-stats', additionalData: { introducer: cleanMemberData.introducer } }));
       }
 
       return docRef.id;
@@ -493,6 +498,11 @@ export class MembersService {
 
       // Shallow-copy to avoid mutating the caller's object (E11)
       updates = { ...updates };
+
+      if (updates.email != null) {
+        const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!EMAIL_RE.test(updates.email)) throw new Error('Invalid email format');
+      }
 
       // mentorId must go through assignMentor() to keep menteeIds bidirectionally in sync (N2 fix)
       if ('mentorId' in updates) {
@@ -627,10 +637,12 @@ export class MembersService {
       // Trigger introducer recalculation if introducer changes
       if (cleanUpdates.introducer !== undefined && (!currentData || cleanUpdates.introducer !== currentData.introducer)) {
         if (currentData?.introducer) {
-          this.recalculateIntroducerStats(currentData.introducer).catch(console.error);
+          const introducer = currentData.introducer;
+          this.recalculateIntroducerStats(introducer).catch(err => errorLoggingService.logError(err, { action: 'recalculate-introducer-stats', additionalData: { introducer } }));
         }
         if (cleanUpdates.introducer) {
-          this.recalculateIntroducerStats(cleanUpdates.introducer).catch(console.error);
+          const introducer = cleanUpdates.introducer;
+          this.recalculateIntroducerStats(introducer).catch(err => errorLoggingService.logError(err, { action: 'recalculate-introducer-stats', additionalData: { introducer } }));
         }
       }
     } catch (error) {

@@ -23,6 +23,7 @@ import { setDevMode, isDevMode as checkDevMode } from '../utils/devMode';
 import { saveAuthState, loadAuthState, clearAuthState, isDevModeStored } from '../utils/authStorage';
 import { MembersService } from '../services/membersService';
 import { BoardManagementService } from '../services/boardManagementService';
+import { errorLoggingService } from '../services/errorLoggingService';
 
 interface AuthContextType {
   user: User | null;
@@ -39,6 +40,7 @@ interface AuthContextType {
   updateMemberProfile: (updates: Partial<Member>) => Promise<void>;
   simulateRole: (role: UserRole | null) => void;
   simulateAsMember: (memberId: string, role: UserRole) => Promise<void>;
+  authError: string | null;
 }
 
 // Persist context reference across Vite HMR reloads to avoid "must be used within provider" errors
@@ -55,6 +57,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [simulatedMemberId, setSimulatedMemberId] = useState<string | null>(null);
   const [originalMember, setOriginalMember] = useState<Member | null>(null);
   const [originalRole, setOriginalRole] = useState<UserRole | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
   // Prevents onAuthStateChanged from signing out a user whose member doc hasn't been written yet
   const isSigningUpRef = useRef(false);
 
@@ -89,7 +92,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       } as User;
 
       setUser(mockUser);
-      const _devEmail = import.meta.env.VITE_DEV_EMAIL as string | undefined;
+      // TODO SEC-003: VITE_DEV_EMAIL is bundled into the browser build. Move to .env.local with DEV_EMAIL (non-VITE_ prefix).
+    const _devEmail = import.meta.env.VITE_DEV_EMAIL as string | undefined;
       const member = (_devEmail && storedState.user.email === _devEmail) ? MOCK_DEV_ADMIN : (storedState.member as Member);
       setMember(member);
       setLoading(false);
@@ -197,12 +201,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             // Only log error if not in dev mode
             if (!checkDevMode() && isMounted) {
               console.error('Error loading member data:', error);
+              errorLoggingService.logError(error, { action: 'auth-state-load' });
               // Don't nullify auth state if we're mid-signup — the member doc hasn't
               // been written yet so getMemberByEmail will throw a permissions error,
               // which is expected. signUp() will set user/member itself on completion.
               if (!isMidSignUp) {
                 setUser(null);
                 setMember(null);
+                setAuthError('无法验证登录状态，请刷新页面或重新登录');
               }
             } else if (checkDevMode()) {
               // In dev mode, silently ignore Firebase errors
@@ -232,6 +238,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const signIn = async (email: string, password: string) => {
     // Developer mock login — credentials set via VITE_DEV_EMAIL / VITE_DEV_PASSWORD env vars
+    // TODO SEC-003: These vars should not be VITE_ prefixed. Move to .env.local with DEV_EMAIL / DEV_PASSWORD prefix.
     const devEmail = import.meta.env.VITE_DEV_EMAIL as string | undefined;
     const devPassword = import.meta.env.VITE_DEV_PASSWORD as string | undefined;
     if (devEmail && devPassword && email === devEmail && password === devPassword) {
@@ -666,6 +673,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       updateMemberProfile,
       simulateRole,
       simulateAsMember,
+      authError,
     }}>
       {children}
     </AuthContext.Provider>

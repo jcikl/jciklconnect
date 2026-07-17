@@ -25,9 +25,11 @@ function getDb() {
   if (!getApps().length) {
     initializeApp({
       credential: cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+        // TODO SEC-010: Preferred var names are FIREBASE_ADMIN_PROJECT_ID / FIREBASE_ADMIN_CLIENT_EMAIL /
+        // FIREBASE_ADMIN_PRIVATE_KEY (no VITE_ prefix). Fallbacks keep backward compat.
+        projectId: process.env.FIREBASE_ADMIN_PROJECT_ID || process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL || process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: (process.env.FIREBASE_ADMIN_PRIVATE_KEY || process.env.FIREBASE_PRIVATE_KEY)?.replace(/\\n/g, '\n'),
       }),
     });
   }
@@ -39,7 +41,7 @@ function getDb() {
  * of this bill is, instead of trusting the webhook POST body. Returns the
  * verified transaction record (or null if ToyyibPay reports nothing for this bill).
  */
-async function verifyBillWithToyyib(billCode) {
+async function verifyBillWithToyyib(billCode, transactionId) {
   const params = new URLSearchParams({ userSecretKey: TOYYIB_SECRET_KEY, billCode });
   const response = await fetch(`${TOYYIB_BASE_URL}/getBillTransactions`, {
     method: 'POST',
@@ -51,11 +53,11 @@ async function verifyBillWithToyyib(billCode) {
   if (!Array.isArray(records) || records.length === 0) return null;
   // Prefer the record matching this transaction_id; otherwise fall back to the most recent.
   const exactMatch = records.find(
-    r => r.billExternalReferenceNo === data.transaction_id || r.id === data.transaction_id
+    r => r.billExternalReferenceNo === transactionId || r.id === transactionId
   );
   if (!exactMatch) {
     console.warn(
-      `[toyyibpay-callback] No exact transaction_id match for ${data.transaction_id} in ${records.length} record(s) — using first record`
+      `[toyyibpay-callback] No exact transaction_id match for ${transactionId} in ${records.length} record(s) — using first record`
     );
   }
   return exactMatch || records[0];
@@ -117,7 +119,7 @@ exports.handler = async (event) => {
   // ── Verify against ToyyibPay's own record before trusting anything ──────────
   let verified;
   try {
-    verified = await verifyBillWithToyyib(billCode);
+    verified = await verifyBillWithToyyib(billCode, transactionId);
   } catch (err) {
     console.error('[toyyibpay-callback] Verification call failed:', err);
     await idempotencyRef.set({ processed: false, error: `verify failed: ${err}`, failedAt: Timestamp.now() }, { merge: true });

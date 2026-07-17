@@ -10,7 +10,7 @@ export const useBehavioralNudging = () => {
   const { showToast } = useToast();
 
   const { data: allNudges, loading, error, reload } = useFirestoreCollection<Nudge>({
-    loader: () => BehavioralNudgingService.getMemberNudges(member!.id),
+    loader: () => BehavioralNudgingService.getMemberNudges(member?.id ?? ''),
     enabled: !!member,
     deps: [member?.id],
   });

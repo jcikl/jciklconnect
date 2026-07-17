@@ -1,5 +1,4 @@
 import { ErrorInfo } from 'react';
-import { withDevMode } from '../utils/devMode';
 
 export interface ErrorLogEntry {
   id: string;
@@ -187,26 +186,43 @@ class ErrorLoggingService {
     }
   }
 
-  // Upload crash reports to Firestore `errorLogs` so APK/web errors are visible remotely
+  // Upload crash reports to Firestore `errorLogs` so APK/web errors are visible remotely.
+  // Skipped only when Firebase is not initialised (e.g. unit-test environments without a firebase config).
   private async reportToExternalService(logEntry: ErrorLogEntry): Promise<void> {
-    return withDevMode(() => {}, async () => {
-      try {
-        // Dynamic import avoids a circular dependency at module-load time
-        const [{ collection, addDoc }, { db }] = await Promise.all([
-          import('firebase/firestore'),
-          import('../config/firebase'),
-        ]);
-        const isNative = typeof (window as any).Capacitor !== 'undefined' && (window as any).Capacitor.isNativePlatform?.();
-        // Firestore rejects undefined values — strip them
-        const payload = JSON.parse(JSON.stringify({
-          ...logEntry,
-          platform: isNative ? 'apk' : 'web',
-        }));
-        await addDoc(collection(db, 'errorLogs'), payload);
-      } catch (error) {
-        console.warn('Failed to report error to Firestore:', error);
+    try {
+      // Dynamic import avoids a circular dependency at module-load time
+      const [{ collection, addDoc }, { db }] = await Promise.all([
+        import('firebase/firestore'),
+        import('../config/firebase'),
+      ]);
+      // If Firebase was never initialised (missing config), db will be null/undefined — skip silently.
+      if (!db) return;
+
+      const isNative = typeof (window as any).Capacitor !== 'undefined' && (window as any).Capacitor.isNativePlatform?.();
+      // Firestore rejects undefined values — strip them
+      const payload = JSON.parse(JSON.stringify({
+        ...logEntry,
+        platform: isNative ? 'apk' : 'web',
+      }));
+
+      let attempts = 0;
+      while (attempts < 3) {
+        try {
+          await addDoc(collection(db, 'errorLogs'), payload);
+          break;
+        } catch (err) {
+          attempts++;
+          if (attempts === 3) {
+            console.error('[errorLoggingService] Failed to write to Firestore after 3 attempts', err);
+          } else {
+            await new Promise(r => setTimeout(r, 1000 * attempts)); // 1 s, 2 s backoff
+          }
+        }
       }
-    });
+    } catch (importErr) {
+      // Firebase module itself failed to load — nothing we can do
+      console.warn('[errorLoggingService] Could not load Firebase for error reporting:', importErr);
+    }
   }
 
   /**

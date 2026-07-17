@@ -8,9 +8,9 @@ export interface TransactionSplit {
   category: 'Projects & Activities' | 'Membership' | 'Administrative' | '';
   type: 'Income' | 'Expense';
   year?: number;
-  projectId?: string;
-  memberId?: string;
-  purpose?: string;
+  projectId?: string | null;
+  memberId?: string | null;
+  purpose?: string | null;
   paymentRequestId?: string;
   amount: number;
   description: string;
@@ -31,13 +31,13 @@ export interface Transaction {
   id: string;
   date: string;
   description: string;
-  purpose?: string;
+  purpose?: string | null;
   amount: number;
   type: 'Income' | 'Expense';
   category: 'Projects & Activities' | 'Membership' | 'Administrative' | ''; // '' used for split-parent records — see financeService.ts
   status: 'Pending' | 'Cleared' | 'Reconciled' | 'Partially Reconciled' | 'Voided';
-  projectId?: string;
-  memberId?: string;
+  projectId?: string | null;
+  memberId?: string | null;
   bankAccountId?: string;
   loId?: string | null;
   reconciledAt?: string;

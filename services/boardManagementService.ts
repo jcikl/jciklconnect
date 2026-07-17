@@ -425,7 +425,6 @@ export class BoardManagementService {
       const member = await MembersService.getMemberById(memberId);
       if (!member) return {};
 
-      const memberAny = member as any;
       const firstText = (...values: unknown[]): string | undefined => {
         const found = values.find((value) => typeof value === 'string' && value.trim().length > 0);
         return typeof found === 'string' ? found.trim() : undefined;
@@ -433,24 +432,24 @@ export class BoardManagementService {
 
       const display = {
         memberName: firstText(
-          memberAny.general?.name,
-          memberAny.general?.fullName,
-          memberAny.fullName,
-          memberAny.name
+          member.general?.name,
+          member.general?.fullName,
+          member.fullName,
+          member.name
         ),
         avatarUrl: firstText(
-          memberAny.general?.avatar,
-          memberAny.general?.avatarUrl,
-          memberAny.avatarUrl,
-          memberAny.avatar,
-          memberAny.profilePicture,
-          memberAny.photoUrl
+          member.general?.avatar,
+          member.general?.avatarUrl,
+          member.avatarUrl,
+          member.avatar,
+          member.profilePicture,
+          member.photoUrl
         ),
         companyName: firstText(
-          memberAny.business?.companyName,
-          memberAny.companyName,
-          memberAny.business?.position,
-          memberAny.business?.departmentAndPosition ?? memberAny.departmentAndPosition
+          member.business?.companyName,
+          member.companyName,
+          member.business?.position,
+          member.business?.departmentAndPosition ?? member.departmentAndPosition
         ),
       };
 
@@ -645,7 +644,7 @@ export class BoardManagementService {
       for (const id of newMemberIds) newCommDirIds.delete(id);
 
       const prevCommDirIds = new Set(
-        previousBoardRecords.flatMap((b) => (b as any).commissionDirectorIds ?? []).filter(Boolean)
+        previousBoardRecords.flatMap((b) => b.commissionDirectorIds ?? []).filter(Boolean)
       );
 
       for (const id of newCommDirIds) {
@@ -711,7 +710,7 @@ export class BoardManagementService {
           query(collection(db, COLLECTIONS.MEMBERS), where('isCurrentCommissionDirector', '==', true))
         );
         const activeCommDirIds = new Set(
-          active.flatMap((b) => (b as any).commissionDirectorIds ?? [])
+          active.flatMap((b) => b.commissionDirectorIds ?? [])
         );
         for (const d of commDirGhostSnap.docs) {
           if (!activeCommDirIds.has(d.id)) {
@@ -721,7 +720,7 @@ export class BoardManagementService {
 
         await this.syncMemberDocumentsForTerm(
           year,
-          active.map((b) => ({ memberId: b.memberId, position: b.position, commissionDirectorIds: (b as any).commissionDirectorIds })),
+          active.map((b) => ({ memberId: b.memberId, position: b.position, commissionDirectorIds: b.commissionDirectorIds })),
           [...active, ...ghostRecords]
         );
       }

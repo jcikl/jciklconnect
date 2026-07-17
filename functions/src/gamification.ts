@@ -7,16 +7,25 @@ const db = admin.firestore();
 // Collections written by this function — triggering on them would cause an infinite loop
 const SELF_TRIGGERING_COLLECTIONS = ['notifications', 'points', 'badgeAwards', 'achievementProgress', 'pointEscrow'];
 
-export const checkBadgeAwards = functions.firestore
+// F04 FIX: only fire on collections that actually affect badge criteria.
+// Firing on every collection wastes reads and risks timeout on large datasets.
+const BADGE_RELEVANT_COLLECTIONS = ['members', 'points', 'eventRegistrations', 'achievements'];
+
+export const checkBadgeAwards = functions
+  .runWith({ timeoutSeconds: 300, memory: '512MB' })
+  .firestore
   .document('{collection}/{documentId}')
   .onWrite(async (change, context) => {
     // Guard: skip if the triggering collection is one we write to, to prevent infinite loops
     const collectionName = context.params.collection;
     if (SELF_TRIGGERING_COLLECTIONS.includes(collectionName)) return null;
 
+    // F04 FIX step 1: skip collections that cannot affect any badge criteria
+    if (!BADGE_RELEVANT_COLLECTIONS.includes(collectionName)) return null;
+
     // Get all active badges
     const badgesSnapshot = await db.collection('badges').get();
-    
+
     if (badgesSnapshot.empty) {
       return null;
     }
@@ -34,25 +43,17 @@ export const checkBadgeAwards = functions.firestore
       return null; // No member to award badge to
     }
 
-    // Check each badge criteria
-    for (const badgeDoc of badgesSnapshot.docs) {
+    // F04 FIX step 2: run all per-badge checks in parallel instead of sequentially
+    // to avoid O(N*M) sequential Firestore reads that cause timeouts.
+    async function checkSingleBadge(badgeDoc: FirebaseFirestore.QueryDocumentSnapshot): Promise<void> {
       const badge = badgeDoc.data();
       const badgeId = badgeDoc.id;
 
       try {
-        // Check if member already has this badge.
-        // Query on 'awardId' to match the service-layer schema written by gamificationService.awardAward().
-        const existingAward = await db.collection('badgeAwards')
-          .where('awardId', '==', badgeId)
-          .where('memberId', '==', memberId)
-          .get();
-
-        if (!existingAward.empty) {
-          continue; // Member already has this badge
-        }
-
-        // Evaluate badge criteria
-        const criteriaResult = await evaluateBadgeCriteria(badge.criteria, memberId);
+        // Evaluate badge criteria (existingAward query removed — F03: the deterministic
+        // document ID below makes a duplicate write a no-op, so the pre-check is redundant
+        // and was itself a race-condition source).
+        const criteriaResult = await evaluateBadgeCriteria(badge.criteria, memberId!);
 
         if (criteriaResult.eligible) {
           // Fetch current member doc so we can append to member.badges atomically
@@ -61,10 +62,12 @@ export const checkBadgeAwards = functions.firestore
           const currentBadges: any[] = (memberData && memberData.badges) ? memberData.badges : [];
           const alreadyInMember = currentBadges.some((b: any) => b.id === badgeId);
 
-          // Atomic batch: write badgeAward record + update member.badges
+          // F03 fix: use a deterministic document ID so concurrent executions that both
+          // pass the criteria check write to the same document. The second batch.set()
+          // is an idempotent overwrite with merge:false; no duplicate record is created.
           const batch = db.batch();
 
-          const badgeAwardRef = db.collection('badgeAwards').doc();
+          const badgeAwardRef = db.collection('badgeAwards').doc(memberId + '_' + badgeId);
           batch.set(badgeAwardRef, {
             // Use 'awardId' to match gamificationService.awardAward() schema so UI hooks can join correctly
             awardId: badgeId,
@@ -74,7 +77,7 @@ export const checkBadgeAwards = functions.firestore
             reason: `Badge awarded automatically: ${badge.name}`,
             criteria: badge.criteria,
             progress: criteriaResult.progress
-          });
+          }, { merge: false });
 
           if (!alreadyInMember) {
             const userBadge = {
@@ -126,12 +129,15 @@ export const checkBadgeAwards = functions.firestore
             console.error(`[checkBadgeAwards] Notification failed for badge ${badgeId} member ${memberId}:`, notifError);
           }
 
-          console.log(`Badge ${badge.name} awarded to member ${memberId}`);
+          console.log(`Badge ${badge.name} awarded to member ${memberId!}`);
         }
       } catch (error) {
-        console.error(`Error checking badge ${badgeId} for member ${memberId}:`, error);
+        console.error(`Error checking badge ${badgeId} for member ${memberId!}:`, error);
       }
     }
+
+    // F04 FIX step 2: run all badge checks in parallel
+    await Promise.all(badgesSnapshot.docs.map(badgeDoc => checkSingleBadge(badgeDoc)));
 
     return null;
   });
@@ -222,7 +228,9 @@ async function checkCustomCriteria(criteria: any, memberId: string): Promise<{ e
 }
 
 // Function to update achievement progress
-export const updateAchievementProgress = functions.firestore
+export const updateAchievementProgress = functions
+  .runWith({ timeoutSeconds: 300, memory: '512MB' })
+  .firestore
   .document('{collection}/{documentId}')
   .onWrite(async (change, context) => {
     // Guard: skip if the triggering collection is one we write to, to prevent infinite loops
@@ -254,78 +262,74 @@ export const updateAchievementProgress = functions.firestore
       const achievementId = achievementDoc.id;
 
       try {
-        // Calculate current progress
+        // Calculate current progress outside the transaction (read-only, no contention risk)
         const progress = await calculateAchievementProgress(achievement, memberId);
-        
-        // Get or create progress record
-        const progressQuery = await db.collection('achievementProgress')
-          .where('memberId', '==', memberId)
-          .where('achievementId', '==', achievementId)
-          .get();
 
-        let progressDoc;
-        if (progressQuery.empty) {
-          // Create new progress record
-          progressDoc = await db.collection('achievementProgress').add({
-            memberId: memberId,
-            achievementId: achievementId,
+        // F07 fix: use a deterministic document ID and wrap the read-compare-write in a
+        // Firestore transaction to eliminate the TOCTOU race where two concurrent executions
+        // both read stale progress and both award the same milestone rewards.
+        const progressRef = db.collection('achievementProgress').doc(memberId + '_' + achievementId);
+
+        let newMilestones: string[] = [];
+
+        await db.runTransaction(async (txn) => {
+          const progressSnap = await txn.get(progressRef);
+          const currentData = progressSnap.exists
+            ? progressSnap.data()!
+            : { memberId, achievementId, currentProgress: 0, completedMilestones: [] };
+
+          // Compute milestones that are newly completed in this invocation
+          newMilestones = progress.completedMilestones.filter(
+            (m: string) => !currentData.completedMilestones.includes(m)
+          );
+
+          if (
+            currentData.currentProgress === progress.current &&
+            newMilestones.length === 0
+          ) {
+            // No change — skip the write to avoid unnecessary document churn
+            return;
+          }
+
+          txn.set(progressRef, {
+            memberId,
+            achievementId,
             currentProgress: progress.current,
             completedMilestones: progress.completedMilestones,
             lastUpdated: admin.firestore.FieldValue.serverTimestamp()
-          });
-        } else {
-          // Update existing progress record
-          progressDoc = progressQuery.docs[0];
-          const currentData = progressDoc.data();
-          
-          // Only update if progress has changed
-          if (currentData.currentProgress !== progress.current || 
-              JSON.stringify(currentData.completedMilestones) !== JSON.stringify(progress.completedMilestones)) {
-            
-            await progressDoc.ref.update({
-              currentProgress: progress.current,
-              completedMilestones: progress.completedMilestones,
-              lastUpdated: admin.firestore.FieldValue.serverTimestamp()
-            });
+          }, { merge: true });
+        });
 
-            // Check for new milestone completions
-            const newMilestones = progress.completedMilestones.filter(
-              (milestone: string) => !currentData.completedMilestones.includes(milestone)
-            );
-
-            // Award rewards for new milestones
-            for (const milestoneLevel of newMilestones) {
-              const milestone = achievement.milestones.find((m: any) => m.level === milestoneLevel);
-              if (milestone) {
-                // Award points
-                if (milestone.pointValue > 0) {
-                  await db.collection('points').add({
-                    memberId: memberId,
-                    points: milestone.pointValue,
-                    reason: `Achievement milestone: ${achievement.name} - ${milestone.level}`,
-                    source: 'achievement',
-                    sourceId: achievementId,
-                    createdAt: admin.firestore.FieldValue.serverTimestamp()
-                  });
-                }
-
-                // Create notification
-                await db.collection('notifications').add({
-                  memberId: memberId,
-                  type: 'achievement_milestone',
-                  title: `Milestone Reached: ${achievement.name}`,
-                  message: `Congratulations! You have reached the ${milestone.level} level of "${achievement.name}".`,
-                  data: {
-                    achievementId: achievementId,
-                    achievementName: achievement.name,
-                    milestoneLevel: milestone.level,
-                    pointsAwarded: milestone.pointValue || 0
-                  },
-                  read: false,
-                  createdAt: admin.firestore.FieldValue.serverTimestamp()
-                });
-              }
+        // Award points and notifications AFTER the transaction so the transaction
+        // stays lightweight and retryable without duplicating side-effects.
+        for (const milestoneLevel of newMilestones) {
+          const milestone = achievement.milestones.find((m: any) => m.level === milestoneLevel);
+          if (milestone) {
+            if (milestone.pointValue > 0) {
+              await db.collection('points').add({
+                memberId: memberId,
+                points: milestone.pointValue,
+                reason: `Achievement milestone: ${achievement.name} - ${milestone.level}`,
+                source: 'achievement',
+                sourceId: achievementId,
+                createdAt: admin.firestore.FieldValue.serverTimestamp()
+              });
             }
+
+            await db.collection('notifications').add({
+              memberId: memberId,
+              type: 'achievement_milestone',
+              title: `Milestone Reached: ${achievement.name}`,
+              message: `Congratulations! You have reached the ${milestone.level} level of "${achievement.name}".`,
+              data: {
+                achievementId: achievementId,
+                achievementName: achievement.name,
+                milestoneLevel: milestone.level,
+                pointsAwarded: milestone.pointValue || 0
+              },
+              read: false,
+              createdAt: admin.firestore.FieldValue.serverTimestamp()
+            });
           }
         }
       } catch (error) {
@@ -364,15 +368,29 @@ async function calculateAchievementProgress(achievement: any, memberId: string):
 }
 
 // Function to calculate points based on rules
-export const calculatePointsFromRules = functions.https.onCall(async (data, context) => {
+export const calculatePointsFromRules = functions
+  .runWith({ timeoutSeconds: 300, memory: '512MB' })
+  .https.onCall(async (data, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
   }
 
-  let { memberId, trigger, activityData } = data;
+  let { memberId, trigger, activityData, idempotencyKey } = data;
 
   if (!memberId || !trigger) {
     throw new functions.https.HttpsError('invalid-argument', 'Member ID and trigger are required');
+  }
+
+  // F06 FIX: if caller supplied an idempotencyKey, check for a prior write before proceeding.
+  // Callers that do not pass idempotencyKey continue to work exactly as before.
+  if (idempotencyKey) {
+    const existing = await db.collection('points')
+      .where('idempotencyKey', '==', idempotencyKey)
+      .limit(1)
+      .get();
+    if (!existing.empty) {
+      return { success: true, cached: true, pointsId: existing.docs[0].id };
+    }
   }
 
   // Security: only ADMIN/SUPER_ADMIN/BOARD may award points to an arbitrary memberId.
@@ -430,7 +448,7 @@ export const calculatePointsFromRules = functions.https.onCall(async (data, cont
 
   // Award the calculated points
   if (totalPoints > 0) {
-    await db.collection('points').add({
+    const pointsDoc: Record<string, any> = {
       memberId: memberId,
       points: totalPoints,
       reason: `Activity: ${trigger}`,
@@ -438,7 +456,12 @@ export const calculatePointsFromRules = functions.https.onCall(async (data, cont
       appliedRules: appliedRules,
       activityData: activityData,
       createdAt: admin.firestore.FieldValue.serverTimestamp()
-    });
+    };
+    // F06 FIX: persist idempotencyKey so future duplicate calls can be detected.
+    if (idempotencyKey) {
+      pointsDoc.idempotencyKey = idempotencyKey;
+    }
+    await db.collection('points').add(pointsDoc);
   }
 
   return {

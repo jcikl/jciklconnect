@@ -264,13 +264,13 @@ export function buildCategoryUpdatePayload(
   };
 
   if (derived.projectId !== undefined) payload.projectId = derived.projectId;
-  else if (cleanup.projectId === null) payload.projectId = null as unknown as string;
+  else if (cleanup.projectId === null) payload.projectId = null;
 
   if (derived.purpose !== undefined) payload.purpose = derived.purpose;
-  else if (cleanup.purpose === null) payload.purpose = null as unknown as string;
+  else if (cleanup.purpose === null) payload.purpose = null;
 
   if (derived.memberId !== undefined) payload.memberId = derived.memberId as string;
-  else if (cleanup.memberId === null) payload.memberId = null as unknown as string;
+  else if (cleanup.memberId === null) payload.memberId = null;
 
   return payload;
 }

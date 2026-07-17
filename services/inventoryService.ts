@@ -634,7 +634,7 @@ export class InventoryService {
       }
 
       // Check if item has transaction reference
-      if ((item as any).lastTransactionId !== transactionId) {
+      if (item.lastTransactionId !== transactionId) {
         issues.push('Inventory item not linked to this transaction');
       }
 
@@ -715,7 +715,7 @@ export class InventoryService {
       let consistentItems = 0;
 
       for (const item of merchandiseItems) {
-        const lastTransactionId = (item as any).lastTransactionId;
+        const lastTransactionId = item.lastTransactionId;
         if (lastTransactionId) {
           const verification = await this.verifyInventoryFinanceConsistency(
             item.id,
@@ -887,7 +887,7 @@ export class InventoryService {
         previousQuantity: item.quantity,
         newQuantity: quantityAfterCheckin,
         reason: 'Checkin',
-        performedBy: (item as any).checkedOutTo || 'unknown',
+        performedBy: item.checkedOutTo || 'unknown',
         date: Timestamp.now(),
         createdAt: Timestamp.now(),
         reference: 'manual checkin',

@@ -185,7 +185,7 @@ export class AdvertisementService {
                     updateDoc(doc(db, COLL, ad.id!), {
                       status: 'Expired',
                       updatedAt: Timestamp.now(),
-                    }).catch(() => {/* best-effort */});
+                    }).catch(err => errorLoggingService.logWarning('广告副作用失败', { action: 'ad-side-effect', additionalData: { error: (err as Error)?.message } }));
                     continue;
                   }
                 }

@@ -12,7 +12,7 @@ export const usePoints = () => {
   const isEligible = !!member && member.role !== 'GUEST' && member.role !== 'INACTIVE';
 
   const { data: pointHistory, loading: loading1, error: error1, reload: reloadHistory } = useFirestoreCollection<PointTransaction>({
-    loader: () => PointsService.getMemberPointHistory(member!.id),
+    loader: () => PointsService.getMemberPointHistory(member?.id ?? ''),
     enabled: isEligible,
     deps: [member?.id, isEligible],
   });

@@ -23,6 +23,7 @@ import { removeUndefined } from '../utils/dataUtils';
 import { withDevMode } from '../utils/devMode';
 import { MOCK_PAYMENT_REQUESTS } from './mockData';
 import { FinanceService, invalidateFinanceCache } from './financeService';
+import { errorLoggingService } from './errorLoggingService';
 
 /** Board positions authorised to approve/reject PRs (情景 25) */
 const APPROVER_BOARD_TITLES = ['President', 'Secretary', 'Honorary Treasurer'];
@@ -151,8 +152,7 @@ export class PaymentRequestService {
     invalidateFinanceCache();
     // Notify approvers if submitted immediately (情景 NN)
     if ((data.status ?? 'submitted') === 'submitted') {
-      const pr = { id: ref.id, ...payload, referenceNumber } as unknown as PaymentRequest;
-      await this._notifyApprovers(pr);
+      await this._notifyApprovers({ applicantName: payload.applicantName, referenceNumber });
     }
     return { id: ref.id, referenceNumber };
   });
@@ -497,6 +497,7 @@ export class PaymentRequestService {
     } catch (err) {
       // Non-fatal: log but don't block the approval
       console.error('[PaymentRequestService] Failed to auto-create expense transaction for PR', pr.id, err);
+      errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { component: 'paymentRequestService', action: '_autoCreateExpenseTransactionForPR' });
       // Mark failure so UI can surface a retry button (情景 I)
       try {
         await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, pr.id), { expenseTxFailed: true });
@@ -614,6 +615,7 @@ export class PaymentRequestService {
           await this._deleteExpenseTransactionForPR(id);
         } catch (err) {
           console.warn('[PaymentRequestService.cancel] Could not delete expense tx (permission denied?)', err);
+          errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { component: 'paymentRequestService', action: 'cancel._deleteExpenseTx' });
           expenseTxCleanupFailed = true;
         }
 
@@ -695,6 +697,7 @@ export class PaymentRequestService {
       }
     } catch (err) {
       console.error('[PaymentRequestService] Failed to delete expense transaction for PR', prId, err);
+      errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { component: 'paymentRequestService', action: '_deleteExpenseTransactionForPR' });
     }
   }
 
@@ -713,6 +716,7 @@ export class PaymentRequestService {
       }
     } catch (err) {
       console.error('[PaymentRequestService] Failed to sync expense transaction amount for PR', pr.id, err);
+      errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { component: 'paymentRequestService', action: '_syncExpenseTransactionAmount' });
       // Surface the failure so finance knows the PR amount and the expense tx are now out of sync.
       try {
         await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, pr.id), { amountSyncFailed: true });
@@ -755,7 +759,7 @@ export class PaymentRequestService {
   }
 
   /** Notify authorised approvers of a new/resubmitted PR (情景 NN) */
-  private static async _notifyApprovers(pr: PaymentRequest): Promise<void> {
+  private static async _notifyApprovers(pr: Pick<PaymentRequest, 'applicantName' | 'referenceNumber'>): Promise<void> {
     try {
       const { MembersService } = await import('./membersService');
       const members = await MembersService.getAllMembers();

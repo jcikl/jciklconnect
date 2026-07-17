@@ -32,6 +32,7 @@ import {
   roleForMembershipType,
 } from './membershipConfigService';
 import { MembersService } from './membersService';
+import { errorLoggingService } from './errorLoggingService';
 
 function chunkArray<T>(arr: T[], size: number): T[][] {
   const chunks: T[][] = [];
@@ -382,11 +383,11 @@ export class FinanceService {
               reconciledBy: parent?.reconciledBy,
               referenceNumber: parent?.referenceNumber,
               paymentRequestId: s.paymentRequestId,
-              projectTransactionId: (s as any).projectTransactionId || null,
-              projectTransactionIds: (s as any).projectTransactionIds || [],
+              projectTransactionId: s.projectTransactionId || null,
+              projectTransactionIds: s.projectTransactionIds || [],
               isSplitChild: true,
               parentTransactionId: s.parentTransactionId,
-            } as any;
+            };
           });
         return [...direct, ...splitVirtuals].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       },
@@ -455,11 +456,11 @@ export class FinanceService {
               reconciledBy: parent.reconciledBy,
               referenceNumber: parent.referenceNumber,
               paymentRequestId: splitData.paymentRequestId || parent.paymentRequestId,
-              projectTransactionId: (splitData as any).projectTransactionId || null,
-              projectTransactionIds: (splitData as any).projectTransactionIds || [],
+              projectTransactionId: (splitData as TransactionSplit).projectTransactionId || null,
+              projectTransactionIds: (splitData as TransactionSplit).projectTransactionIds || [],
               isSplitChild: true,
               parentTransactionId: splitData.parentTransactionId,
-            } as any);
+            });
           }
         });
       }
@@ -492,6 +493,12 @@ export class FinanceService {
       },
       async () => {
         try {
+          if (!Number.isFinite(transactionData.amount) || transactionData.amount <= 0) {
+            throw new Error('Transaction amount must be a positive number');
+          }
+          if (!transactionData.bankAccountId?.trim()) {
+            throw new Error('bankAccountId is required for a transaction');
+          }
           let purpose = transactionData.purpose;
           if (transactionData.category === 'Membership') {
             const year = transactionData.projectId ? parseInt(transactionData.projectId, 10) : new Date(transactionData.date).getFullYear();
@@ -527,6 +534,7 @@ export class FinanceService {
           return docRef.id;
         } catch (error) {
           console.error('Error creating transaction:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { component: 'financeService', action: 'createTransaction' });
           throw error;
         }
       }
@@ -697,7 +705,7 @@ export class FinanceService {
             isSplit: true,
             splitIds,
             originalCategory: localMockTransactions[parentIdx].category,
-            category: '' as any,
+            category: '',
             projectId: '',
             purpose: '',
             projectTransactionIds: [],
@@ -820,7 +828,7 @@ export class FinanceService {
         isSplit: true,
         splitIds,
         originalCategory: parentTransaction.category,
-        category: '' as any,
+        category: '',
         projectId: '',
         purpose: '',
         projectTransactionIds: [],
@@ -1057,16 +1065,16 @@ export class FinanceService {
           const parentTx = parentDoc.exists() ? parentDoc.data() as Transaction : null;
           const originalCategory = (parentTx as any)?.originalCategory || parentTx?.category || '';
 
-          const updateData = {
+          const updateData: Record<string, unknown> = {
             splitIds: remainingIds,
             isSplit: remainingIds.length > 0,
             category: remainingIds.length === 0 ? originalCategory : '',
             updatedAt: Timestamp.now(),
-          } as unknown as Partial<Transaction>;
+          };
 
           if (remainingIds.length === 0) {
-            (updateData as Record<string, unknown>).projectTransactionIds = [];
-            (updateData as Record<string, unknown>).projectTransactionId = null;
+            updateData.projectTransactionIds = [];
+            updateData.projectTransactionId = null;
             updateData.status = parentTx?.prevStatus ?? 'Pending';
             updateData.purpose = '';
           }
@@ -1157,6 +1165,9 @@ export class FinanceService {
       },
       async () => {
     try {
+      if (updates.amount !== undefined && (!Number.isFinite(updates.amount) || updates.amount <= 0)) {
+        throw new Error('Transaction amount must be a positive number');
+      }
       const transactionRef = doc(db, COLLECTIONS.TRANSACTIONS, transactionId);
 
       // Fetch current transaction to check for changes and merge
@@ -1316,6 +1327,7 @@ export class FinanceService {
       invalidateFinanceCache();
     } catch (error) {
       console.error('Error updating transaction:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { component: 'financeService', action: 'updateTransaction' });
       throw error;
     }
       }
@@ -1821,6 +1833,7 @@ export class FinanceService {
           invalidateFinanceCache();
         } catch (error) {
           console.error('Error reversing transaction:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { component: 'financeService', action: 'reverseTransaction' });
           throw error;
         }
       }

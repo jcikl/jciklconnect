@@ -4,7 +4,11 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, '.', '');
+  // SEC-002: Use 'VITE_' prefix so only VITE_-prefixed vars are loaded.
+  // Do NOT use '' (empty prefix) — it loads ALL env vars, including secrets,
+  // and anything placed in the define block would be inlined into the browser bundle.
+  const env = loadEnv(mode, '.', 'VITE_');
+  void env; // env is kept for potential future VITE_ var access; not used for define block below.
   return {
     server: {
       port: 3000,
@@ -48,10 +52,11 @@ export default defineConfig(({ mode }) => {
         },
       }),
     ],
-    define: {
-      'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
-    },
+    // SEC-002 FIX: Removed define entries for API_KEY and GEMINI_API_KEY.
+    // Previously these inlined the Gemini API key into the browser bundle.
+    // If the Gemini key is needed server-side, read it via process.env inside the Netlify function.
+    // The @google/generative-ai SDK is loaded with the key at call-time in aiPredictionService,
+    // which should pass the key from a server endpoint, not from the bundle.
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

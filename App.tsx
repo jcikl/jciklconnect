@@ -175,8 +175,13 @@ export const JCIKLApp: React.FC = () => {
   const [memberPickerList, setMemberPickerList] = useState<{ id: string; name: string; label: string; labelColor: string; avatar?: string }[]>([]);
   const [memberPickerLoading, setMemberPickerLoading] = useState(false);
 
-  const { user, member, loading: authLoading, signOut, simulatedRole, simulatedMemberId, simulateRole, simulateAsMember, isDevMode } = useAuth();
+  const { user, member, loading: authLoading, signOut, simulatedRole, simulatedMemberId, simulateRole, simulateAsMember, isDevMode, authError } = useAuth();
   const { showToast } = useToast();
+
+  // Surface auth-state errors (Firestore/App Check failures during sign-in) as a toast
+  useEffect(() => {
+    if (authError) showToast(authError, 'error');
+  }, [authError, showToast]);
 
   const openMemberPicker = async (role: UserRole | null) => {
     setMemberPickerRole(role);
@@ -673,62 +678,132 @@ export const JCIKLApp: React.FC = () => {
   // Render current view based on selected view
   // Note: Cannot use hooks inside this function - use values from component scope
   const renderCurrentView = (scrollRef?: React.RefObject<HTMLDivElement>) => {
+    // Per-module error boundary: isolates crashes so only the affected module
+    // shows an error instead of the entire content area going blank.
+    const wrapEB = (component: React.ReactNode, moduleName: string) => (
+      <ErrorBoundary fallback={<div className="p-8 text-center text-red-600">{moduleName} 加载失败，请刷新或联系 IT</div>}>
+        {component}
+      </ErrorBoundary>
+    );
+
+    const dashboardFallback = <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
+
     switch (view) {
-      case 'MEMBERS': if (!canAccessWorkspaceModules) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <MembersView searchQuery={searchQuery} initialSelectedMemberId={initialSelectedMemberId} onClearSelection={() => setInitialSelectedMemberId(null)} />;
+      case 'MEMBERS':
+        if (!canAccessWorkspaceModules) return dashboardFallback;
+        return wrapEB(<MembersView searchQuery={searchQuery} initialSelectedMemberId={initialSelectedMemberId} onClearSelection={() => setInitialSelectedMemberId(null)} />, '会员');
       case 'PROJECTS':
-        if (!canViewEventsManagement) {
-          return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
-        }
-        return <ProjectsView onNavigate={handleViewChange} searchQuery={searchQuery} initialSelectedProjectId={initialSelectedProjectId} onClearSelection={() => setInitialSelectedProjectId(null)} />;
+        if (!canViewEventsManagement) return dashboardFallback;
+        return wrapEB(<ProjectsView onNavigate={handleViewChange} searchQuery={searchQuery} initialSelectedProjectId={initialSelectedProjectId} onClearSelection={() => setInitialSelectedProjectId(null)} />, '活动管理');
       case 'FLAGSHIP_PROJECTS_MGT':
-        if (!canViewEventsManagement || isPlainMember) {
-          return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
-        }
-        return <FlagshipProjectsManagementView searchQuery={searchQuery} />;
-      case 'EVENTS': if (!canAccessWorkspaceModules) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <EventsView searchQuery={searchQuery} initialSelectedEventId={initialSelectedEventId} onClearSelection={() => setInitialSelectedEventId(null)} />;
-      case 'FINANCE': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return hasPermission('canViewFinance') ? <FinanceView searchQuery={searchQuery} /> : <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
-      case 'PAYMENT_REQUESTS': if (!hasPermission('canViewFinance') && !canAccessEventsAndPayments) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <PaymentRequestsView searchQuery={searchQuery} />;
-      case 'GAMIFICATION': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <GamificationView />;
-      case 'INVENTORY': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return hasPermission('canViewFinance') ? <InventoryView searchQuery={searchQuery} /> : <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
-      case 'DIRECTORY': return <BusinessDirectoryView searchQuery={searchQuery} initialSelectedBusinessId={initialSelectedBusinessId} onClearSelection={() => setInitialSelectedBusinessId(null)} />;
-      case 'AUTOMATION': if (!isAdmin && !isBoard) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <AutomationStudio />;
-      case 'KNOWLEDGE': return <KnowledgeView searchQuery={searchQuery} />;
-      case 'COMMUNICATION': if (!canAccessWorkspaceModules) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <CommunicationView searchQuery={searchQuery} />;
-      case 'CLUBS': if (member?.role === UserRole.INACTIVE) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <HobbyClubsView searchQuery={searchQuery} />;
-      case 'SURVEYS': if (member?.role === UserRole.INACTIVE) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <SurveysView searchQuery={searchQuery} />;
-      case 'BENEFITS': if (member?.role === UserRole.GUEST || member?.role === UserRole.INACTIVE) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <MemberBenefitsView searchQuery={searchQuery} />;
-      case 'DATA_IMPORT_EXPORT': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <DataImportExportView />;
-      case 'RADAR_IMPORTER': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <RadarDataImporter />;
-      case 'ADVERTISEMENTS': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <AdvertisementsView searchQuery={searchQuery} />;
-      case 'AI_INSIGHTS': if (!isDeveloper && !isAdmin && !isBoard) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <AIInsightsView onNavigate={handleViewChange} searchQuery={searchQuery} />;
-      case 'TEMPLATES': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <TemplatesView searchQuery={searchQuery} />;
-      case 'ACTIVITY_PLANS': if (!canAccessWorkspaceModules && !isBoard && !isAdmin) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <ActivityPlansView searchQuery={searchQuery} />;
-      case 'REPORTS': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <ReportsView />;
-      case 'DEVELOPER': if (!isDeveloper && !isAdmin) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <DeveloperInterface />;
-      case 'TOYYIB': if (!isAdmin && !isBoard && !isDeveloper) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <ToyyibView />;
-      case 'WHAPI_CONFIG': if (!isAdmin && !isBoard && !isDeveloper) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <SystemConfigView initialTab="whapi" />;
-      case 'API_CONFIG': if (!isAdmin && !isBoard && !isDeveloper) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <SystemConfigView initialTab="toyyib" />;
-      case 'MEMBERSHIP_CONFIG': if (!isAdmin && !isBoard) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <SystemConfigView initialTab="membership" />;
-      case 'ACCESS_CONFIG': if (!isAdmin && !isBoard) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <SystemConfigView initialTab="access" />;
-      case 'SYSTEM_CONFIG': if (!isAdmin && !isBoard) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <SystemConfigView />;
-      case 'PUBLICATIONS': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <PublicationsView />;
-      case 'SPONSORSHIPS': if (!isBoard && !isAdmin) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <SponsorshipView searchQuery={searchQuery} />;
+        if (!canViewEventsManagement || isPlainMember) return dashboardFallback;
+        return wrapEB(<FlagshipProjectsManagementView searchQuery={searchQuery} />, '旗舰项目');
+      case 'EVENTS':
+        if (!canAccessWorkspaceModules) return dashboardFallback;
+        return wrapEB(<EventsView searchQuery={searchQuery} initialSelectedEventId={initialSelectedEventId} onClearSelection={() => setInitialSelectedEventId(null)} />, '活动列表');
+      case 'FINANCE':
+        if (member?.role === UserRole.GUEST) return dashboardFallback;
+        if (!hasPermission('canViewFinance')) return dashboardFallback;
+        return wrapEB(<FinanceView searchQuery={searchQuery} />, '财务');
+      case 'PAYMENT_REQUESTS':
+        if (!hasPermission('canViewFinance') && !canAccessEventsAndPayments) return dashboardFallback;
+        return wrapEB(<PaymentRequestsView searchQuery={searchQuery} />, '付款申请');
+      case 'GAMIFICATION':
+        if (member?.role === UserRole.GUEST) return dashboardFallback;
+        return wrapEB(<GamificationView />, '积分系统');
+      case 'INVENTORY':
+        if (member?.role === UserRole.GUEST) return dashboardFallback;
+        if (!hasPermission('canViewFinance')) return dashboardFallback;
+        return wrapEB(<InventoryView searchQuery={searchQuery} />, '库存');
+      case 'DIRECTORY':
+        return wrapEB(<BusinessDirectoryView searchQuery={searchQuery} initialSelectedBusinessId={initialSelectedBusinessId} onClearSelection={() => setInitialSelectedBusinessId(null)} />, '商业目录');
+      case 'AUTOMATION':
+        if (!isAdmin && !isBoard) return dashboardFallback;
+        return wrapEB(<AutomationStudio />, '自动化');
+      case 'KNOWLEDGE':
+        return wrapEB(<KnowledgeView searchQuery={searchQuery} />, '知识库');
+      case 'COMMUNICATION':
+        if (!canAccessWorkspaceModules) return dashboardFallback;
+        return wrapEB(<CommunicationView searchQuery={searchQuery} />, '通讯');
+      case 'CLUBS':
+        if (member?.role === UserRole.INACTIVE) return dashboardFallback;
+        return wrapEB(<HobbyClubsView searchQuery={searchQuery} />, '兴趣小组');
+      case 'SURVEYS':
+        if (member?.role === UserRole.INACTIVE) return dashboardFallback;
+        return wrapEB(<SurveysView searchQuery={searchQuery} />, '问卷');
+      case 'BENEFITS':
+        if (member?.role === UserRole.GUEST || member?.role === UserRole.INACTIVE) return dashboardFallback;
+        return wrapEB(<MemberBenefitsView searchQuery={searchQuery} />, '会员福利');
+      case 'DATA_IMPORT_EXPORT':
+        if (member?.role === UserRole.GUEST || isPlainMember) return dashboardFallback;
+        return wrapEB(<DataImportExportView />, '数据导入导出');
+      case 'RADAR_IMPORTER':
+        if (member?.role === UserRole.GUEST || isPlainMember) return dashboardFallback;
+        return wrapEB(<RadarDataImporter />, 'Radar 导入');
+      case 'ADVERTISEMENTS':
+        if (member?.role === UserRole.GUEST || isPlainMember) return dashboardFallback;
+        return wrapEB(<AdvertisementsView searchQuery={searchQuery} />, '合作推广');
+      case 'AI_INSIGHTS':
+        if (!isDeveloper && !isAdmin && !isBoard) return dashboardFallback;
+        return wrapEB(<AIInsightsView onNavigate={handleViewChange} searchQuery={searchQuery} />, 'AI 洞察');
+      case 'TEMPLATES':
+        if (member?.role === UserRole.GUEST || isPlainMember) return dashboardFallback;
+        return wrapEB(<TemplatesView searchQuery={searchQuery} />, '模板');
+      case 'ACTIVITY_PLANS':
+        if (!canAccessWorkspaceModules && !isBoard && !isAdmin) return dashboardFallback;
+        return wrapEB(<ActivityPlansView searchQuery={searchQuery} />, '活动计划');
+      case 'REPORTS':
+        if (member?.role === UserRole.GUEST || isPlainMember) return dashboardFallback;
+        return wrapEB(<ReportsView />, '报告');
+      case 'DEVELOPER':
+        if (!isDeveloper && !isAdmin) return dashboardFallback;
+        return wrapEB(<DeveloperInterface />, '开发者界面');
+      case 'TOYYIB':
+        if (!isAdmin && !isBoard && !isDeveloper) return dashboardFallback;
+        return wrapEB(<ToyyibView />, 'ToyyibPay');
+      case 'WHAPI_CONFIG':
+        if (!isAdmin && !isBoard && !isDeveloper) return dashboardFallback;
+        return wrapEB(<SystemConfigView initialTab="whapi" />, '系统配置');
+      case 'API_CONFIG':
+        if (!isAdmin && !isBoard && !isDeveloper) return dashboardFallback;
+        return wrapEB(<SystemConfigView initialTab="toyyib" />, '系统配置');
+      case 'MEMBERSHIP_CONFIG':
+        if (!isAdmin && !isBoard) return dashboardFallback;
+        return wrapEB(<SystemConfigView initialTab="membership" />, '会籍配置');
+      case 'ACCESS_CONFIG':
+        if (!isAdmin && !isBoard) return dashboardFallback;
+        return wrapEB(<SystemConfigView initialTab="access" />, '访问配置');
+      case 'SYSTEM_CONFIG':
+        if (!isAdmin && !isBoard) return dashboardFallback;
+        return wrapEB(<SystemConfigView />, '系统配置');
+      case 'PUBLICATIONS':
+        if (member?.role === UserRole.GUEST || isPlainMember) return dashboardFallback;
+        return wrapEB(<PublicationsView />, '刊物');
+      case 'SPONSORSHIPS':
+        if (!isBoard && !isAdmin) return dashboardFallback;
+        return wrapEB(<SponsorshipView searchQuery={searchQuery} />, '赞助');
       default:
         if ((isBoard || isAdmin) && showBoardDashboard) {
-          return <BoardDashboard
+          return wrapEB(
+            <BoardDashboard
+              onNavigate={handleViewChange}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              scrollRef={scrollRef}
+            />,
+            '董事会仪表板'
+          );
+        }
+        return wrapEB(
+          <DashboardHome
+            userRole={(member?.role as UserRole) || UserRole.MEMBER}
             onNavigate={handleViewChange}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             scrollRef={scrollRef}
-          />;
-        }
-        return <DashboardHome
-          userRole={(member?.role as UserRole) || UserRole.MEMBER}
-          onNavigate={handleViewChange}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          scrollRef={scrollRef}
-        />;
+          />,
+          '仪表板'
+        );
     }
   };
 

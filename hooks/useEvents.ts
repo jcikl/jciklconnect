@@ -1,6 +1,7 @@
 // Events Data Hook
 import { EventsService } from '../services/eventsService';
 import { MembersService } from '../services/membersService';
+import { errorLoggingService } from '../services/errorLoggingService';
 import { Event } from '../types';
 import { useToast } from '../components/ui/Common';
 import { useAuth } from './useAuth';
@@ -92,7 +93,10 @@ export const useEvents = (options?: { publicMode?: boolean }) => {
         if (extraFields.emergencyContactPhone != null) profileUpdate.emergencyContactPhone = extraFields.emergencyContactPhone;
         if (extraFields.tshirtSize != null) profileUpdate.tshirtSize = extraFields.tshirtSize;
         if (Object.keys(profileUpdate).length > 0) {
-          MembersService.updateMember(memberId, profileUpdate as Parameters<typeof MembersService.updateMember>[1]).catch(() => {});
+          MembersService.updateMember(memberId, profileUpdate as Parameters<typeof MembersService.updateMember>[1]).catch(err => {
+            errorLoggingService.logError(err, { action: 'update-member-profile-post-registration' });
+            showToast('报名成功，但个人资料更新失败，请手动更新', 'warning');
+          });
         }
       }
       await loadEvents();

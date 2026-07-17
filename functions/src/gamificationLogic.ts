@@ -173,10 +173,25 @@ export const onEventRegistrationUpdate = functions.firestore
                     ? milestones[0].points
                     : standard.pointCap || 10;
 
-            // 3. Create the submission using the real standardId
+            // 3. Duplicate-submission guard: skip if this member already has a submission
+            //    for this event under the NETWORK_EVENT_ATTENDANCE standard.
+            const existing = await db.collection('incentiveSubmissions')
+                .where('memberId', '==', memberId)
+                .where('eventId', '==', eventId)
+                .where('type', '==', 'NETWORK_EVENT_ATTENDANCE')
+                .limit(1)
+                .get();
+            if (!existing.empty) {
+                console.log(`Duplicate submission guard triggered for memberId=${memberId} eventId=${eventId}`);
+                return null;
+            }
+
+            // 4. Create the submission using the real standardId
             await db.collection('incentiveSubmissions').add({
                 loId: loId,
                 memberId: memberId,
+                eventId: eventId,
+                type: 'NETWORK_EVENT_ATTENDANCE',
                 standardId: standardId,
                 quantity: 1,
                 status: 'APPROVED',

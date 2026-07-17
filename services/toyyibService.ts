@@ -2,6 +2,7 @@ import { collection, doc, setDoc, getDocs, deleteDoc, serverTimestamp, addDoc, u
 import { getAuth } from 'firebase/auth';
 import { db } from '../config/firebase';
 import { COLLECTIONS, TOYYIB_CONFIG } from '../config/constants';
+import { errorLoggingService } from './errorLoggingService';
 
 export interface CreateBillParams {
   billName: string;
@@ -110,8 +111,16 @@ export class ToyyibService {
       };
     }
 
+    if (!Number.isFinite(params.billAmount) || params.billAmount <= 0) {
+      throw new Error('billAmount must be a positive number (in RM)');
+    }
+    const effectiveCategoryCode = params.categoryCode || TOYYIB_CONFIG.CATEGORY_CODE;
+    if (!effectiveCategoryCode?.trim()) {
+      throw new Error('No ToyyibPay category code — set VITE_TOYYIB_CATEGORY_CODE in environment');
+    }
+
     const data = await proxyCall('createBill', {
-      categoryCode: params.categoryCode || TOYYIB_CONFIG.CATEGORY_CODE,
+      categoryCode: effectiveCategoryCode,
       billName: params.billName,
       billDescription: params.billDescription,
       billPriceSetting: '0',
@@ -132,7 +141,7 @@ export class ToyyibService {
       // Persist to Firestore for per-category aggregation
       const billRecord: Omit<ToyyibBillRecord, 'createdAt'> & { createdAt: any } = {
         billCode,
-        categoryCode: params.categoryCode || TOYYIB_CONFIG.CATEGORY_CODE,
+        categoryCode: effectiveCategoryCode,
         billName: params.billName,
         billDescription: params.billDescription,
         billAmount: params.billAmount,
@@ -152,9 +161,10 @@ export class ToyyibService {
             billCount: increment(1),
             updatedAt: serverTimestamp(),
           });
-        } catch {
+        } catch (catErr) {
           // Category doc may not exist yet (e.g. legacy default code not seeded); non-fatal
           console.warn('[ToyyibService] Could not increment billCount for category:', usedCategoryCode);
+          errorLoggingService.logError(catErr instanceof Error ? catErr : new Error(String(catErr)), { component: 'toyyibService', action: 'createBill.incrementBillCount' });
         }
       }
       return {
@@ -477,6 +487,7 @@ export class ToyyibService {
       return Array.isArray(data) ? data : [];
     } catch (error) {
       console.error('ToyyibPay getSettlements failed:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { component: 'toyyibService', action: 'getSettlements' });
       return [];
     }
   }

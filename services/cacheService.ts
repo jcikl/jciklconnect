@@ -280,12 +280,15 @@ export const staticDataCache = new CacheService({
   useLocalStorage: true
 });
 
-// Auto cleanup every 10 minutes
-setInterval(() => {
+// Module-level interval for automatic cache cleanup every 10 minutes.
+// Intentional persistent side effect. Call stopCacheCleanup() in test teardown.
+const _cacheCleanupInterval = setInterval(() => {
   apiCache.cleanup();
   userDataCache.cleanup();
   staticDataCache.cleanup();
 }, 10 * 60 * 1000);
+
+export function stopCacheCleanup(): void { clearInterval(_cacheCleanupInterval); }
 
 export { CacheService };
 export default CacheService;

@@ -38,10 +38,13 @@ interface RadioGroupProps {
   error?: string;
 }
 
-export const Input: React.FC<InputProps> = ({ label, error, icon, helperText, className = '', type, onChange, ...props }) => {
+export const Input: React.FC<InputProps> = ({ label, error, icon, helperText, className = '', type, onChange, onBlur, ...props }) => {
   const [showPassword, setShowPassword] = useState(false);
+  const [emailError, setEmailError] = useState<string | undefined>(undefined);
   const isPassword = type === 'password';
   const inputType = isPassword && showPassword ? 'text' : type;
+  const EMAIL_FORMAT_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const displayError = error ?? emailError;
 
   const EMAIL_RE = /[^a-zA-Z0-9@._+\-]/g;
 
@@ -79,6 +82,15 @@ export const Input: React.FC<InputProps> = ({ label, error, icon, helperText, cl
     document.execCommand('insertText', false, filtered);
   };
 
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    if (type === 'email' && e.target.value) {
+      setEmailError(EMAIL_FORMAT_RE.test(e.target.value) ? undefined : 'Invalid email address');
+    } else {
+      setEmailError(undefined);
+    }
+    onBlur?.(e);
+  };
+
   const handleEmailCompositionEnd = (e: React.CompositionEvent<HTMLInputElement>) => {
     if (type !== 'email') return;
     const input = e.currentTarget;
@@ -108,6 +120,7 @@ export const Input: React.FC<InputProps> = ({ label, error, icon, helperText, cl
         <input
           type={inputType}
           onChange={handleChange}
+          onBlur={handleBlur}
           onKeyDown={handleEmailKeyDown}
           onPaste={handleEmailPaste}
           onCompositionEnd={handleEmailCompositionEnd}
@@ -118,7 +131,7 @@ export const Input: React.FC<InputProps> = ({ label, error, icon, helperText, cl
             transition-colors
             ${icon ? 'pl-10' : 'pl-3'}
             ${isPassword ? 'pr-10' : 'pr-3'}
-            ${error ? 'border-red-300 focus:border-red-500 focus:ring-red-500/20' : 'border-slate-300'}
+            ${displayError ? 'border-red-300 focus:border-red-500 focus:ring-red-500/20' : 'border-slate-300'}
             ${className}
           `}
           {...props}
@@ -138,8 +151,8 @@ export const Input: React.FC<InputProps> = ({ label, error, icon, helperText, cl
           </button>
         )}
       </div>
-      {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
-      {helperText && !error && <p className="mt-1 text-sm text-slate-500">{helperText}</p>}
+      {displayError && <p className="mt-1 text-sm text-red-600">{displayError}</p>}
+      {helperText && !displayError && <p className="mt-1 text-sm text-slate-500">{helperText}</p>}
     </div>
   );
 };

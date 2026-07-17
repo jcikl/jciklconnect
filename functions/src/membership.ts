@@ -32,16 +32,16 @@ export const checkMemberPromotion = functions.firestore
       progress.jciInspireCompleted;
 
     if (allRequirementsMet && !progress.promotedToFull) {
-      // Promote to Full Member
-      await db.collection('members').doc(memberId).update({
+      // Promote to Full Member — batch member update + notification atomically
+      const batch = db.batch();
+      batch.update(db.collection('members').doc(memberId), {
         membershipType: 'full',
         'promotionProgress.promotedToFull': true,
         'promotionProgress.completedDate': admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
-
-      // Create notification
-      await db.collection('notifications').add({
+      const notifRef = db.collection('notifications').doc();
+      batch.set(notifRef, {
         memberId: memberId,
         type: 'promotion',
         title: 'Congratulations! You have been promoted to Full Member',
@@ -49,6 +49,7 @@ export const checkMemberPromotion = functions.firestore
         read: false,
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       });
+      await batch.commit();
 
       console.log(`Member ${memberId} promoted from Probation to Full Member`);
     }
@@ -57,7 +58,7 @@ export const checkMemberPromotion = functions.firestore
   });
 
 // Function to handle annual dues renewal
-export const generateDuesRenewal = functions.https.onCall(async (data, context) => {
+export const generateDuesRenewal = functions.runWith({ timeoutSeconds: 300 }).https.onCall(async (data, context) => {
   // Verify admin permissions
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
@@ -83,6 +84,13 @@ export const generateDuesRenewal = functions.https.onCall(async (data, context) 
 
   const renewalMemberIds = new Set(previousYearDues.docs.map(doc => doc.data().memberId));
 
+  // Pre-fetch ALL dues transactions for targetYear in one query (avoids N+1 per-member queries)
+  const existingDuesTxns = await db.collection('transactions')
+    .where('type', '==', 'DUES')
+    .where('duesYear', '==', duesYear)
+    .get();
+  const membersWithDues = new Set(existingDuesTxns.docs.map(d => d.data().memberId));
+
   // Get all current members
   const membersSnapshot = await db.collection('members').get();
   const batch = db.batch();
@@ -91,14 +99,9 @@ export const generateDuesRenewal = functions.https.onCall(async (data, context) 
   for (const memberDoc of membersSnapshot.docs) {
     const member = memberDoc.data();
     const memberId = memberDoc.id;
-    
-    // Skip if already has dues transaction for this year
-    const existingDues = await db.collection('duesTransactions')
-      .where('memberId', '==', memberId)
-      .where('duesYear', '==', duesYear)
-      .get();
-    
-    if (!existingDues.empty) {
+
+    // Skip if already has dues transaction for this year (single-query idempotency check)
+    if (membersWithDues.has(memberId)) {
       continue;
     }
 
@@ -140,11 +143,12 @@ export const generateDuesRenewal = functions.https.onCall(async (data, context) 
         continue;
     }
 
-    // Create dues transaction
-    const duesTransactionRef = db.collection('duesTransactions').doc();
+    // Create dues transaction (type: 'DUES' + duesYear field enables single-query idempotency check)
+    const duesTransactionRef = db.collection('transactions').doc();
     batch.set(duesTransactionRef, {
       memberId: memberId,
       membershipType: member.membershipType,
+      type: 'DUES',
       duesYear: duesYear,
       amount: amount,
       status: amount === 0 ? 'paid' : 'pending', // Senators are automatically paid
@@ -196,20 +200,43 @@ export const autoInitiateDuesRenewal = functions.pubsub
     const eligibleMemberIds = new Set<string>();
     for (const doc of txSnap.docs) {
       const d = doc.data();
-      const txYear = d.projectId ? parseInt((d.projectId as string).split(' ')[0]) : 0;
+      // Use duesYear field when present; fall back to parsing projectId for historical docs
+      let txYear: number;
+      if (d.duesYear != null) {
+        txYear = d.duesYear as number;
+      } else {
+        txYear = d.projectId ? parseInt((d.projectId as string).split(' ')[0]) : 0;
+        if (d.projectId) console.warn(`[autoInitiateDuesRenewal] Doc ${doc.id} missing duesYear — fell back to projectId parse`);
+      }
       if (txYear === prevYear && d.memberId) eligibleMemberIds.add(d.memberId as string);
     }
 
-    // Find already-initiated transactions for targetYear (idempotency)
+    // Find already-initiated transactions for targetYear (idempotency via dedicated duesYear field)
     const existingSnap = await db.collection('transactions')
       .where('category', '==', 'Membership')
       .where('type', '==', 'Income')
+      .where('duesYear', '==', targetYear)
       .get();
     const alreadyInitiated = new Set<string>();
     for (const doc of existingSnap.docs) {
       const d = doc.data();
-      const txYear = d.projectId ? parseInt((d.projectId as string).split(' ')[0]) : 0;
-      if (txYear === targetYear && d.memberId) alreadyInitiated.add(d.memberId as string);
+      if (d.memberId) alreadyInitiated.add(d.memberId as string);
+    }
+    // Secondary fallback: catch historical docs that lack duesYear (written before this fix)
+    if (alreadyInitiated.size === 0) {
+      const fallbackSnap = await db.collection('transactions')
+        .where('category', '==', 'Membership')
+        .where('type', '==', 'Income')
+        .get();
+      for (const doc of fallbackSnap.docs) {
+        const d = doc.data();
+        if (d.duesYear != null) continue; // already handled above
+        const txYear = d.projectId ? parseInt((d.projectId as string).split(' ')[0]) : 0;
+        if (txYear === targetYear && d.memberId) {
+          console.warn(`[autoInitiateDuesRenewal] Fallback idempotency: doc ${doc.id} matched via projectId parse`);
+          alreadyInitiated.add(d.memberId as string);
+        }
+      }
     }
 
     let created = 0;
@@ -241,6 +268,7 @@ export const autoInitiateDuesRenewal = functions.pubsub
         category: 'Membership',
         status: 'Pending',
         amount: totalDues,
+        duesYear: targetYear,
         projectId: `${targetYear} membership`,
         transactionType: 'dues',
         description: `${targetYear} ${type} Dues Renewal`,

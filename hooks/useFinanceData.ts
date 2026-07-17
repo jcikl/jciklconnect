@@ -1462,7 +1462,10 @@ export function useFinanceData(searchQuery?: string) {
       } catch (markPaidErr) {
         // Compensate: undo the match so we don't leave a half-applied link.
         if (matchedViaPair) {
-          await FinanceService.unmatchTransactions(expenseTx!.id!, bankTxId).catch(() => {});
+          await FinanceService.unmatchTransactions(expenseTx!.id!, bankTxId).catch(rollbackErr => {
+            errorLoggingService.logError(rollbackErr, { action: 'compensate-unmatch-failed' });
+            showToast('支付标记失败，数据回滚也未完成，请联系财务手动检查', 'error');
+          });
         } else {
           // Revert the direct bank tx update
           await FinanceService.updateTransaction(bankTxId, {
@@ -1470,7 +1473,10 @@ export function useFinanceData(searchQuery?: string) {
             status: 'Cleared',
             reconciledAt: undefined,
             reconciledBy: undefined,
-          }).catch(() => {});
+          }).catch(rollbackErr => {
+            errorLoggingService.logError(rollbackErr, { action: 'compensate-unmatch-failed' });
+            showToast('支付标记失败，数据回滚也未完成，请联系财务手动检查', 'error');
+          });
         }
         throw markPaidErr;
       }

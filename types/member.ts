@@ -160,6 +160,7 @@ export interface Member {
 
   general?: {
     name: string;
+    fullName?: string;
     chineseName?: string;
     idNumber: string;
     dob: string;
@@ -168,6 +169,7 @@ export interface Member {
     race: RaceType;
     nationality: string;
     avatarUrl?: string;
+    avatar?: string;
     ethnicity?: string;
     dietaryPreference?: 'vegetarian' | 'halal' | 'normal' | null;
   };
@@ -274,6 +276,8 @@ export interface Member {
   nationality?: string;
   avatarUrl?: string;
   avatar?: string;
+  profilePicture?: string;
+  photoUrl?: string;
   address?: string;
   phone?: string;
   alternatePhone?: string;

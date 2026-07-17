@@ -6,13 +6,17 @@ import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { initializeAppCheck, ReCaptchaV3Provider, AppCheck } from 'firebase/app-check';
 import { isDevMode } from '../utils/devMode';
 
+// No hardcoded fallbacks — if env var is missing, Firebase init will fail loudly (intentional).
+// SEC-009: Hardcoded Firebase config fallbacks removed. All values must come from environment variables.
+// Note: public/firebase-messaging-sw.js intentionally retains hardcoded values — service workers
+// cannot access Vite env vars (import.meta.env is unavailable in that context).
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyCVjUeVrU_OJFrP0eR416EVuUOixmHmY0Q',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'jci-lo-management-app.firebaseapp.com',
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'jci-lo-management-app',
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'jci-lo-management-app.firebasestorage.app',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '212717402010',
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:212717402010:web:f8d6fd34154c8bab85ec23',
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
 // Validate Firebase configuration

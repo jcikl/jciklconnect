@@ -211,12 +211,23 @@ export const sendEventReminders = functions.pubsub
       return null;
     }
 
-    const batch = db.batch();
+    // F08 fix: flush batches at BATCH_LIMIT to stay under the 500-op Firestore cap
+    const BATCH_LIMIT = 490;
+    let batch = db.batch();
+    let batchCount = 0;
     let reminderCount = 0;
+
+    const flushBatch = async () => {
+      if (batchCount > 0) {
+        await batch.commit();
+        batch = db.batch();
+        batchCount = 0;
+      }
+    };
 
     for (const eventDoc of upcomingEventsSnapshot.docs) {
       const event = eventDoc.data();
-      
+
       // Send reminder to all registered attendees
       if (event.attendees && Array.isArray(event.attendees)) {
         for (const attendeeId of event.attendees) {
@@ -236,13 +247,19 @@ export const sendEventReminders = functions.pubsub
             createdAt: admin.firestore.FieldValue.serverTimestamp()
           });
 
+          batchCount++;
           reminderCount++;
+
+          if (batchCount >= BATCH_LIMIT) {
+            await flushBatch();
+          }
         }
       }
     }
 
+    await flushBatch();
+
     if (reminderCount > 0) {
-      await batch.commit();
       console.log(`Sent ${reminderCount} event reminders`);
     }
 
@@ -330,18 +347,7 @@ export const sendBirthdayNotifications = functions.pubsub
 
     console.log(`Birthdays today: ${birthdayMembers.map(m => m.name).join(', ')}`);
 
-    // 1. Send personal birthday wish to each birthday member
-    const personalWishes = birthdayMembers.map(({ id, name }) =>
-      sendFcmPush(
-        id,
-        `Happy Birthday, ${name}! 🎂`,
-        'Wishing you a wonderful day filled with joy! From everyone at JCI KL.',
-        'birthday_self',
-        { type: 'birthday_self' }
-      ).catch(err => console.error(`Failed birthday push for ${id}:`, err))
-    );
-
-    // 2. Announce to all other members
+    // 2. Determine other members for announcements
     const allMemberIds = membersSnap.docs.map(d => d.id);
     const birthdayIds = new Set(birthdayMembers.map(m => m.id));
     const otherMemberIds = allMemberIds.filter(id => !birthdayIds.has(id));
@@ -352,17 +358,100 @@ export const sendBirthdayNotifications = functions.pubsub
         ? `Today is ${birthdayNames}'s birthday! 🎉 Send them your wishes.`
         : `Today is ${birthdayNames}'s birthday! 🎉 Send them your wishes.`;
 
-    const announcements = otherMemberIds.map(id =>
-      sendFcmPush(
+    // F12 fix: collect all Firestore notification objects first, then write in
+    // batches of 490 to avoid rate-limiting from hundreds of concurrent .add() calls.
+    // FCM sends remain as Promise.all (they cannot be Firestore-batched).
+    const BATCH_LIMIT = 490;
+    const now2 = admin.firestore.FieldValue.serverTimestamp();
+
+    type NotifPayload = Record<string, unknown>;
+    const firestoreNotifs: NotifPayload[] = [];
+
+    // Personal birthday wishes
+    for (const { id, name } of birthdayMembers) {
+      firestoreNotifs.push({
+        memberId: id,
+        type: 'birthday_self',
+        title: `Happy Birthday, ${name}! 🎂`,
+        message: 'Wishing you a wonderful day filled with joy! From everyone at JCI KL.',
+        data: { type: 'birthday_self' },
+        read: false,
+        createdAt: now2,
+        timestamp: now2,
+      });
+    }
+
+    // Announcements to other members
+    for (const id of otherMemberIds) {
+      firestoreNotifs.push({
+        memberId: id,
+        type: 'birthday_announcement',
+        title: 'Birthday Today! 🎂',
+        message: announcementBody,
+        data: { type: 'birthday_announcement', names: birthdayNames },
+        read: false,
+        createdAt: now2,
+        timestamp: now2,
+      });
+    }
+
+    // Write Firestore notifications in capped batches
+    let fsBatch = db.batch();
+    let fsCount = 0;
+    for (const payload of firestoreNotifs) {
+      fsBatch.set(db.collection('notifications').doc(), payload);
+      fsCount++;
+      if (fsCount >= BATCH_LIMIT) {
+        await fsBatch.commit();
+        fsBatch = db.batch();
+        fsCount = 0;
+      }
+    }
+    if (fsCount > 0) await fsBatch.commit();
+
+    // Send FCM pushes concurrently (cannot be batched via Firestore)
+    // Look up FCM tokens and send — kept separate from Firestore writes above.
+    const sendFcmOnly = async (
+      memberId: string,
+      title: string,
+      body: string,
+      data: Record<string, string>
+    ): Promise<void> => {
+      const userDoc = await db.collection('users').doc(memberId).get();
+      const fcmToken: string | undefined = userDoc.data()?.fcmToken;
+      if (!fcmToken) return;
+      await admin.messaging().send({
+        token: fcmToken,
+        notification: { title, body },
+        webpush: {
+          notification: {
+            icon: '/favicon-128x128.png',
+            badge: '/favicon-64x64.png',
+          },
+        },
+        data,
+      });
+    };
+
+    const personalFcm = birthdayMembers.map(({ id, name }) =>
+      sendFcmOnly(
+        id,
+        `Happy Birthday, ${name}! 🎂`,
+        'Wishing you a wonderful day filled with joy! From everyone at JCI KL.',
+        { type: 'birthday_self' }
+      ).catch(err => console.error(`Failed birthday FCM for ${id}:`, err))
+    );
+
+    const announcementFcm = otherMemberIds.map(id =>
+      sendFcmOnly(
         id,
         'Birthday Today! 🎂',
         announcementBody,
-        'birthday_announcement',
         { type: 'birthday_announcement', names: birthdayNames }
-      ).catch(err => console.error(`Failed announcement push for ${id}:`, err))
+      ).catch(err => console.error(`Failed announcement FCM for ${id}:`, err))
     );
 
-    await Promise.all([...personalWishes, ...announcements]);
+    await Promise.all([...personalFcm, ...announcementFcm]);
 
     console.log(
       `Birthday notifications sent: ${birthdayMembers.length} personal, ${otherMemberIds.length} announcements.`

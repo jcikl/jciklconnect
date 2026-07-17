@@ -93,6 +93,10 @@ export class PointsService {
       relatedEntityType = sourceTypeOrRelatedEntityType;
     }
 
+    if (!Number.isFinite(points) || points <= 0) {
+      throw new Error('Points must be a positive finite number');
+    }
+
     return withDevMode(
       () => {
         console.log(`[DEV MODE] Awarding ${points} points to member ${memberId} for ${category}`);
@@ -1333,7 +1337,7 @@ export class PointsService {
       // P1-B: if the caller passes 0 points, derive a sensible default from the standard's
       // first milestone so scoreAwarded is never silently zeroed on approval.
       let resolvedPoints = grantedPoints;
-      if (resolvedPoints === 0) {
+      if (resolvedPoints <= 0) {
         try {
           const stdSnap = await getDoc(doc(db, COLLECTIONS.INCENTIVE_STANDARDS, submission.standardId));
           if (stdSnap.exists()) {

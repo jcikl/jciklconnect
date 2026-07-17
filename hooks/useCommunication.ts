@@ -21,7 +21,7 @@ export const useCommunication = () => {
   });
 
   const { data: notifications, loading: loading2, error: error2, reload: reloadNotifications } = useFirestoreCollection<Notification>({
-    loader: () => CommunicationService.getNotifications(member!.id),
+    loader: () => CommunicationService.getNotifications(member?.id ?? ''),
     enabled,
     deps: [enabled, member?.id],
   });

@@ -19,7 +19,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS, DEFAULT_LO_ID } from '../config/constants';
-import { Event } from '../types';
+import { Event, ProjectCommitteeMember } from '../types';
 import { EventRegistrationService } from './eventRegistrationService';
 import { isDevMode, withDevMode } from '../utils/devMode';
 import { errorLoggingService } from './errorLoggingService';
@@ -70,7 +70,7 @@ export class EventsService {
       imageUrl: (data.imageUrl ?? data.logoUrl) as string | undefined,
       organizerId: data.organizerId ?? undefined,
       registeredMembers: data.registeredMembers as string[] ?? [],
-      committee: data.committee as any[] ?? undefined,
+      committee: data.committee as ProjectCommitteeMember[] | undefined ?? undefined,
     } as Event;
   }
 
@@ -149,6 +149,13 @@ export class EventsService {
       },
       async () => {
         try {
+          if (eventData.endDate && new Date(eventData.endDate) < new Date(eventData.date)) {
+            throw new Error('Event end date must be on or after start date');
+          }
+          if (eventData.maxAttendees != null && (!Number.isInteger(eventData.maxAttendees) || eventData.maxAttendees < 1)) {
+            throw new Error('maxAttendees must be a positive integer');
+          }
+
           const payload: Record<string, unknown> = {
             title: eventData.title,
             description: eventData.description ?? null,
@@ -605,7 +612,7 @@ export class EventsService {
 
           // 按当年签到记录重算出席对比（签到次数 vs 已过月份）
           const { MembersService } = await import('./membersService');
-          MembersService.recalculateAttendance(memberId).catch(console.error);
+          MembersService.recalculateAttendance(memberId).catch(err => errorLoggingService.logError(err, { action: 'recalculate-attendance', additionalData: { memberId } }));
         } catch (error) {
           console.error('Error marking attendance:', error);
           throw error;
@@ -675,7 +682,7 @@ export class EventsService {
           }
 
           const { MembersService } = await import('./membersService');
-          MembersService.recalculateAttendance(memberId).catch(console.error);
+          MembersService.recalculateAttendance(memberId).catch(err => errorLoggingService.logError(err, { action: 'recalculate-attendance', additionalData: { memberId } }));
         } catch (error) {
           console.error('Error undoing attendance:', error);
           throw error;
