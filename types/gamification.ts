@@ -68,6 +68,8 @@ export interface PointsRule {
   multiplier: number;
   weight: number;
   enabled: boolean;
+  /** If true, the rule can fire multiple times for the same member (no global dedup check). */
+  isRepeatable?: boolean;
   createdAt?: string;
   updatedAt?: string;
   createdBy?: string;
@@ -91,6 +93,8 @@ export interface PointsRuleExecution {
   pointsAwarded: number;
   calculation: PointsCalculationBreakdown;
   executedAt: string;
+  /** LO identifier for cross-LO isolation queries. */
+  loId?: string;
 }
 
 export interface PointsCalculationBreakdown {

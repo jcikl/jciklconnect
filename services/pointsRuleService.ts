@@ -14,6 +14,8 @@ import {
   limit,
   Timestamp,
   writeBatch,
+  runTransaction,
+  serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
@@ -291,7 +293,8 @@ export class PointsRuleService {
     trigger: string,
     triggerData: Record<string, any>,
     memberId: string,
-    triggerId?: string // deterministic de-dup key (e.g. eventId, taskId)
+    triggerId?: string, // deterministic de-dup key (e.g. eventId, taskId)
+    loId?: string       // FIX 5: pass through for loId field on execution record
   ): Promise<PointsRuleExecution[]> {
     if (isDevMode()) {
       console.log('[DEV MODE] executeRules called:', { trigger, memberId, triggerId });
@@ -313,53 +316,60 @@ export class PointsRuleService {
 
         const calculation = this.calculatePoints([rule], triggerData);
 
-        // --- Duplicate-execution prevention ---
-        // Use a deterministic doc ID so a second call with the same (ruleId, memberId, triggerId)
-        // is a no-op at the Firestore level. If triggerId is absent we still check via query.
+        // FIX 3: repeatable rules skip all dedup checks
+        if (!rule.isRepeatable) {
+          // --- Duplicate-execution prevention ---
+          const dedupeId = triggerId
+            ? `${rule.id}_${memberId}_${triggerId}`
+            : null;
+
+          if (dedupeId) {
+            // FIX 2: atomic dedup via runTransaction — reserve slot or detect existing
+            const dedupeRef = doc(db, COLLECTIONS.POINTS_RULE_EXECUTIONS, dedupeId);
+            let alreadyExecuted = false;
+            try {
+              await runTransaction(db, async (transaction) => {
+                const existing = await transaction.get(dedupeRef);
+                if (existing.exists()) {
+                  alreadyExecuted = true;
+                  return;
+                }
+                // Reserve the slot atomically; full payload written after awardPoints succeeds
+                transaction.set(dedupeRef, {
+                  ruleId: rule.id,
+                  memberId,
+                  trigger,
+                  reservedAt: serverTimestamp(),
+                  status: 'pending',
+                });
+              });
+            } catch (txError) {
+              errorLoggingService.logError(txError as Error, {
+                action: 'PointsRuleService.executeRules.dedupeTransaction',
+                additionalData: { ruleId: rule.id, memberId },
+              });
+              continue;
+            }
+            if (alreadyExecuted) continue;
+          } else {
+            // Fallback: query-based de-dup (no triggerId → non-repeatable rule)
+            const dupSnap = await getDocs(
+              query(
+                collection(db, COLLECTIONS.POINTS_RULE_EXECUTIONS),
+                where('ruleId', '==', rule.id),
+                where('memberId', '==', memberId),
+                limit(1)
+              )
+            );
+            if (!dupSnap.empty) continue;
+          }
+        }
+
         const dedupeId = triggerId
           ? `${rule.id}_${memberId}_${triggerId}`
           : null;
 
-        if (dedupeId) {
-          const existingRef = doc(db, COLLECTIONS.POINTS_RULE_EXECUTIONS, dedupeId);
-          const existingSnap = await getDoc(existingRef);
-          if (existingSnap.exists()) {
-            // Already executed — skip silently
-            continue;
-          }
-        } else {
-          // Fallback: query-based de-dup (no triggerId provided)
-          const dupSnap = await getDocs(
-            query(
-              collection(db, COLLECTIONS.POINTS_RULE_EXECUTIONS),
-              where('ruleId', '==', rule.id),
-              where('memberId', '==', memberId),
-              limit(1)
-            )
-          );
-          if (!dupSnap.empty) continue;
-        }
-
-        // --- Write execution record ---
-        const executionPayload = {
-          ruleId: rule.id,
-          ruleName: rule.name,
-          memberId,
-          trigger,
-          triggerData,
-          pointsAwarded: calculation.finalPoints,
-          calculation,
-          executedAt: Timestamp.now(),
-        };
-
-        if (dedupeId) {
-          // setDoc with deterministic ID guarantees exactly-once semantics
-          await setDoc(doc(db, COLLECTIONS.POINTS_RULE_EXECUTIONS, dedupeId), executionPayload);
-        } else {
-          await addDoc(collection(db, COLLECTIONS.POINTS_RULE_EXECUTIONS), executionPayload);
-        }
-
-        // --- Actually award the points (P0 fix) ---
+        // FIX 1: award points FIRST — if this throws, no committed record exists
         await PointsService.awardPoints(
           memberId,
           calculation.finalPoints,
@@ -369,10 +379,38 @@ export class PointsRuleService {
           'points_rule'
         );
 
+        // --- Write (or overwrite) the full execution record after successful award ---
+        // FIX 5: include loId if provided
+        const executionPayload: Record<string, any> = {
+          ruleId: rule.id,
+          ruleName: rule.name,
+          memberId,
+          trigger,
+          triggerData,
+          pointsAwarded: calculation.finalPoints,
+          calculation,
+          executedAt: Timestamp.now(),
+          status: 'completed',
+          ...(loId ? { loId } : {}),
+        };
+
+        if (dedupeId) {
+          await setDoc(doc(db, COLLECTIONS.POINTS_RULE_EXECUTIONS, dedupeId), executionPayload);
+        } else {
+          await addDoc(collection(db, COLLECTIONS.POINTS_RULE_EXECUTIONS), executionPayload);
+        }
+
         const execution: PointsRuleExecution = {
           id: dedupeId ?? `exec-${Date.now()}`,
-          ...executionPayload,
+          ruleId: rule.id,
+          ruleName: rule.name,
+          memberId,
+          trigger,
+          triggerData,
+          pointsAwarded: calculation.finalPoints,
+          calculation,
           executedAt: new Date().toISOString(),
+          ...(loId ? { loId } : {}),
         };
         executions.push(execution);
       }
@@ -472,29 +510,36 @@ export class PointsRuleService {
         ],
       }),
       async () => {
+    // FIX 4: TTL cache for analytics (5 min)
+    const analyticsCacheKey = `${CACHE_PREFIX_POINTS_RULES}analytics-${ruleId}`;
+    return apiCache.getOrSet(
+      analyticsCacheKey,
+      async () => {
     try {
       const rule = await this.getPointsRuleById(ruleId);
       if (!rule) return null;
 
+      // FIX 4: cap at 500 docs to avoid full collection scan
       const executionsSnapshot = await getDocs(
         query(
           collection(db, COLLECTIONS.POINTS_RULE_EXECUTIONS),
           where('ruleId', '==', ruleId),
-          orderBy('executedAt', 'desc')
+          orderBy('executedAt', 'desc'),
+          limit(500)
         )
       );
 
-      const executions = executionsSnapshot.docs.map(doc => doc.data() as PointsRuleExecution);
-      
+      const executions = executionsSnapshot.docs.map(d => d.data() as PointsRuleExecution);
+
       const executionCount = executions.length;
       const totalPointsAwarded = executions.reduce((sum, exec) => sum + exec.pointsAwarded, 0);
       const averagePointsPerExecution = executionCount > 0 ? totalPointsAwarded / executionCount : 0;
-      
+
       const triggerCounts: Record<string, number> = {};
       executions.forEach(exec => {
         triggerCounts[exec.trigger] = (triggerCounts[exec.trigger] || 0) + 1;
       });
-      
+
       const topTriggers = Object.entries(triggerCounts)
         .map(([trigger, count]) => ({ trigger, count }))
         .sort((a, b) => b.count - a.count)
@@ -513,6 +558,9 @@ export class PointsRuleService {
       console.error('Error getting rule analytics:', error);
       throw error;
     }
+      },
+      CACHE_TTL_POINTS_RULES
+    );
   });
   }
 
