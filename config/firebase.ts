@@ -3,7 +3,6 @@ import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth, setPersistence, browserSessionPersistence } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
-import { initializeAppCheck, ReCaptchaV3Provider, AppCheck } from 'firebase/app-check';
 import { isDevMode } from '../utils/devMode';
 
 // No hardcoded fallbacks — if env var is missing, Firebase init will fail loudly (intentional).
@@ -53,8 +52,6 @@ let app: FirebaseApp;
 let auth: Auth;
 let db: Firestore;
 let storage: FirebaseStorage;
-let appCheck: AppCheck | undefined;
-
 if (typeof window !== 'undefined') {
   app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
   auth = getAuth(app);
@@ -85,29 +82,8 @@ if (typeof window !== 'undefined') {
   }
   storage = getStorage(app);
 
-  // Firebase App Check — blocks requests from non-app clients
-  // In dev: set window.FIREBASE_APPCHECK_DEBUG_TOKEN = true in browser console to get a debug token
-  // In production: uses reCAPTCHA v3 (requires VITE_RECAPTCHA_SITE_KEY env var)
-  const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
-  // AUTH-005: App Check must not be silently skipped in production — a missing key means
-  // direct Firestore/Auth API calls from scripts or Postman will be accepted without attestation.
-  if (import.meta.env.PROD && !recaptchaSiteKey) {
-    throw new Error(
-      '[firebase] VITE_RECAPTCHA_SITE_KEY is required in production — App Check cannot be disabled. ' +
-      'Set the key in the Netlify dashboard and ensure App Check enforcement is enabled in the Firebase Console.'
-    );
-  }
-  if (import.meta.env.PROD && recaptchaSiteKey) {
-    appCheck = initializeAppCheck(app, {
-      provider: new ReCaptchaV3Provider(recaptchaSiteKey),
-      isTokenAutoRefreshEnabled: true,
-    });
-  } else if (import.meta.env.DEV) {
-    // Expose debug token flag so devs can copy the token from the console and register it in Firebase Console
-    (self as unknown as Record<string, unknown>).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
-  }
 }
 
-export { app, auth, db, storage, appCheck };
+export { app, auth, db, storage };
 export default app;
 
