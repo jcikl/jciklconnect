@@ -1,5 +1,6 @@
 import React, { useState, lazy, Suspense } from 'react';
-import { Card, Tabs, useToast, ConfirmDialog, CONFIRM_CLOSED, Spinner } from '../../ui/Common';
+import { Card, Tabs, useToast, ConfirmDialog, CONFIRM_CLOSED } from '../../ui/Common';
+import { LoadingSpinner as Spinner } from '../../ui/Loading';
 import type { ConfirmState } from '../../ui/Common';
 import { Project } from '../../../types';
 import { ProjectReportService, ProjectReport } from '../../../services/projectReportService';
