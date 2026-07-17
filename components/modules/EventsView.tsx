@@ -15,6 +15,7 @@ import { DEFAULT_LO_ID, COLLECTIONS } from '../../config/constants';
 import { EventBudgetService, EventBudget, BudgetItem } from '../../services/eventBudgetService';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../config/firebase';
+import { BoardManagementService } from '../../services/boardManagementService';
 import { EventFeedbackService, EventFeedback, EventFeedbackSummary } from '../../services/eventFeedbackService';
 import { EventRegistrationService } from '../../services/eventRegistrationService';
 import { EventsService } from '../../services/eventsService';
@@ -31,6 +32,7 @@ import { EventFeedbackTab } from './Events/EventFeedbackTab';
 import { EventFeedbackModal } from './Events/EventFeedbackModal';
 import { EventQRCheckIn } from './Events/EventQRCheckIn';
 import { FinanceService } from '../../services/financeService';
+import { errorLoggingService } from '../../services/errorLoggingService';
 
 type ViewMode = 'list' | 'calendar';
 
@@ -38,8 +40,9 @@ export const EventsView: React.FC<{ searchQuery?: string; initialSelectedEventId
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [activeTab, setActiveTab] = useState('Upcoming');
   const [completedLimit, setCompletedLimit] = useState(30);
+  const [upcomingLimit, setUpcomingLimit] = useState(20);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
-  const { events, loading, error, registerForEvent, markAttendance, updateEvent, cancelRegistration } = useEvents();
+  const { events, loading, error, loadEvents, registerForEvent, markAttendance, updateEvent, cancelRegistration } = useEvents();
   const { member } = useAuth();
   const { showToast } = useToast();
   const loId = (member as { loId?: string })?.loId ?? DEFAULT_LO_ID;
@@ -57,8 +60,8 @@ export const EventsView: React.FC<{ searchQuery?: string; initialSelectedEventId
     }
   }, [initialSelectedEventId, events, onClearSelection]);
 
-  // Reset completed limit when switching back to Completed tab or when search changes.
-  useEffect(() => { setCompletedLimit(30); }, [activeTab, searchQuery]);
+  // Reset limits when switching tabs or when search changes.
+  useEffect(() => { setCompletedLimit(30); setUpcomingLimit(20); }, [activeTab, searchQuery]);
 
   const filteredEvents = useMemo(() => {
     const today = new Date();
@@ -141,9 +144,10 @@ export const EventsView: React.FC<{ searchQuery?: string; initialSelectedEventId
               error={error}
               empty={filteredEvents.length === 0}
               emptyMessage="No events found in this category."
+              onRetry={loadEvents}
             >
               <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {(activeTab === 'Completed' ? filteredEvents.slice(0, completedLimit) : filteredEvents).map(event => (
+                {(activeTab === 'Completed' ? filteredEvents.slice(0, completedLimit) : filteredEvents.slice(0, upcomingLimit)).map(event => (
                   <EventRow
                     key={event.id}
                     event={event}
@@ -161,6 +165,13 @@ export const EventsView: React.FC<{ searchQuery?: string; initialSelectedEventId
                   </Button>
                 </div>
               )}
+              {activeTab === 'Upcoming' && filteredEvents.length > upcomingLimit && (
+                <div className="hidden md:flex justify-center pb-4">
+                  <Button variant="outline" size="sm" onClick={() => setUpcomingLimit(prev => prev + 20)}>
+                    Load more ({filteredEvents.length - upcomingLimit} remaining)
+                  </Button>
+                </div>
+              )}
             </LoadingState>
           </Card>
 
@@ -171,9 +182,10 @@ export const EventsView: React.FC<{ searchQuery?: string; initialSelectedEventId
               error={error}
               empty={filteredEvents.length === 0}
               emptyMessage="No events found in this category."
+              onRetry={loadEvents}
             >
               <div className="grid grid-cols-1 gap-4">
-                {(activeTab === 'Completed' ? filteredEvents.slice(0, completedLimit) : filteredEvents).map(event => (
+                {(activeTab === 'Completed' ? filteredEvents.slice(0, completedLimit) : filteredEvents.slice(0, upcomingLimit)).map(event => (
                   <EventRow
                     key={event.id}
                     event={event}
@@ -188,6 +200,13 @@ export const EventsView: React.FC<{ searchQuery?: string; initialSelectedEventId
                 <div className="md:hidden flex justify-center pt-2">
                   <Button variant="outline" size="sm" onClick={() => setCompletedLimit(prev => prev + 30)}>
                     Load more ({filteredEvents.length - completedLimit} remaining)
+                  </Button>
+                </div>
+              )}
+              {activeTab === 'Upcoming' && filteredEvents.length > upcomingLimit && (
+                <div className="md:hidden flex justify-center pt-2">
+                  <Button variant="outline" size="sm" onClick={() => setUpcomingLimit(prev => prev + 20)}>
+                    Load more ({filteredEvents.length - upcomingLimit} remaining)
                   </Button>
                 </div>
               )}
@@ -252,6 +271,8 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   members,
 }) => {
   const [activeTab, setActiveTab] = useState<'details' | 'participants' | 'stats' | 'feedback'>('details');
+  // localEvent holds a fresh copy of the event fetched on modal open so attendees count is current
+  const [localEvent, setLocalEvent] = useState<Event>(event);
   const [eventFeedback, setEventFeedback] = useState<EventFeedbackSummary | null>(null);
   const [participations, setParticipations] = useState<EventRegistration[]>([]);
   const [loadingFeedback, setLoadingFeedback] = useState(false);
@@ -271,6 +292,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   const [addingParticipant, setAddingParticipant] = useState(false);
   const [addForm, setAddForm] = useState<{ dietary: 'normal' | 'vegetarian' | 'halal'; tshirtSize: string }>({ dietary: 'normal', tshirtSize: '' });
   const [showRegForm, setShowRegForm] = useState(false);
+  const [isRegSubmitting, setIsRegSubmitting] = useState(false);
   const [regForm, setRegForm] = useState<RegistrationFormData>({
     dietary: ((member?.general?.dietaryPreference ?? member?.dietaryPreference) as 'normal' | 'vegetarian' | 'halal') ?? 'normal',
     emergencyContactName: '',
@@ -285,19 +307,18 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
 
   useEffect(() => {
     const currentYear = new Date().getFullYear();
-    getDocs(query(collection(db, 'boardMembers'), where('isActive', '==', true)))
-      .then(snap => {
+    BoardManagementService.getCurrentBoardMembers()
+      .then(docs => {
         const commIds = new Set<string>();
         const bmIds = new Set<string>();
         const posMap = new Map<string, string>();
-        snap.docs.forEach(d => {
-          const data = d.data();
-          if (parseInt(data.term, 10) === currentYear) {
+        docs.forEach(data => {
+          if (parseInt(String(data.term), 10) === currentYear) {
             if (data.memberId) {
-              bmIds.add(data.memberId as string);
-              if (data.position) posMap.set(data.memberId as string, data.position as string);
+              bmIds.add(data.memberId);
+              if (data.position) posMap.set(data.memberId, data.position);
             }
-            (data.commissionDirectorIds ?? [] as string[]).forEach((id: string) => commIds.add(id));
+            ((data as any).commissionDirectorIds ?? [] as string[]).forEach((id: string) => commIds.add(id));
           }
         });
         setCommDirIds(commIds);
@@ -391,8 +412,10 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
           createdAt: event.date ?? new Date().toISOString(),
         }));
       setParticipations([...list, ...guestEntries, ...syntheticEntries]);
-    } catch {
+    } catch (err) {
       setParticipations([]);
+      showToast('加载参与者失败，请刷新重试', 'error');
+      errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { action: 'loadParticipations' });
     } finally {
       setLoadingParticipants(false);
     }
@@ -409,6 +432,14 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
       setLoadingFeedback(false);
     }
   }, [event.id, showToast]);
+
+  // Refresh attendees count from Firestore when modal opens so capacity check is accurate
+  useEffect(() => {
+    setLocalEvent(event);
+    EventsService.getEventById(event.id)
+      .then(fresh => { if (fresh) setLocalEvent(fresh); })
+      .catch(() => {});
+  }, [event.id]);
 
   useEffect(() => {
     if (activeTab === 'feedback') {
@@ -437,9 +468,15 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   };
 
   const handleRegFormSubmit = () => {
-    setShowRegForm(false);
-    setLocalRegistered(true);
-    onRegister(regForm);
+    if (isRegSubmitting) return;
+    setIsRegSubmitting(true);
+    try {
+      setShowRegForm(false);
+      setLocalRegistered(true);
+      onRegister(regForm);
+    } finally {
+      setIsRegSubmitting(false);
+    }
   };
 
   const handleSelfCancel = async () => {
@@ -651,7 +688,9 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   const isSelfCancelled = myRegistration?.status === 'cancelled' && !isRegistered;
   // canSelfCancel: use doc status if available, otherwise fall back to registeredMembers array (pre-Story-8.1 registrations)
   const canSelfCancel = !!isRegistered && myRegistration?.status !== 'checked_in' && !!onCancelRegistration && event.status !== 'Completed';
-  const attendancePercent = event.maxAttendees ? Math.round(((event.attendees || 0) / event.maxAttendees) * 100) : 0;
+  const attendancePercent = localEvent.maxAttendees ? Math.round(((localEvent.attendees || 0) / localEvent.maxAttendees) * 100) : 0;
+
+  const isFull = !!(localEvent.maxAttendees && (localEvent.attendees ?? 0) >= localEvent.maxAttendees);
 
   const registerButton = (
     <div className="flex flex-col gap-2">
@@ -660,9 +699,11 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
           ? 'h-14 bg-green-500 text-white hover:bg-red-500 shadow-green-100 flex-col gap-0'
           : isRegistered
             ? 'h-12 bg-green-500 text-white shadow-green-100 cursor-default'
-            : 'h-12 bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100'
+            : isFull
+              ? 'h-12 bg-slate-400 text-white cursor-not-allowed'
+              : 'h-12 bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100'
           }`}
-        disabled={(!!isRegistered && !canSelfCancel) || event.status === 'Completed' || event.status === 'Cancelled'}
+        disabled={(!!isRegistered && !canSelfCancel) || event.status === 'Completed' || event.status === 'Cancelled' || (isFull && !isRegistered)}
         onClick={canSelfCancel ? handleSelfCancel : (!isRegistered ? handleRegister : undefined)}
       >
         {event.status === 'Completed' ? <span>Event Ended</span>
@@ -673,7 +714,8 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                   <span className="text-[10px] font-normal normal-case tracking-normal opacity-80">Tap to cancel</span>
                 </div>
               : isRegistered ? <><CheckCircle size={18} className="stroke-[3]" /><span>Registered</span></>
-                : <><CheckCircle size={18} className="stroke-[3]" /><span>Register Now</span></>}
+                : isFull ? <span>Sold Out</span>
+                  : <><CheckCircle size={18} className="stroke-[3]" /><span>Register Now</span></>}
       </Button>
     </div>
   );
@@ -789,14 +831,14 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                       </div>
                     </div>
                     {/* Attendance */}
-                    {event.maxAttendees && (
+                    {localEvent.maxAttendees && (
                       <div className="flex items-center gap-3 px-3.5 py-3 bg-white">
                         <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
                           <Users size={14} className="text-jci-blue" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Spots</p>
-                          <p className="text-sm font-semibold text-slate-800">{event.attendees || 0} / {event.maxAttendees} registered</p>
+                          <p className="text-sm font-semibold text-slate-800">{localEvent.attendees || 0} / {localEvent.maxAttendees} registered</p>
                           <div className="mt-1 w-full h-1 bg-slate-100 rounded-full overflow-hidden">
                             <div style={{ width: `${Math.min(100, attendancePercent)}%` }} className="h-full bg-jci-blue rounded-full" />
                           </div>
@@ -1274,14 +1316,14 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                     <p className="text-sm font-semibold text-slate-800">{event.location || 'TBA (To Be Announced)'}</p>
                   </div>
                 </div>
-                {event.maxAttendees && (
+                {localEvent.maxAttendees && (
                   <div className="flex items-start gap-3 py-3">
                     <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
                       <Users size={15} className="text-jci-blue" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Attendance</p>
-                      <p className="text-sm font-semibold text-slate-800">{event.attendees || 0} / {event.maxAttendees} spots</p>
+                      <p className="text-sm font-semibold text-slate-800">{localEvent.attendees || 0} / {localEvent.maxAttendees} spots</p>
                       <div className="mt-1.5 w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
                         <div style={{ width: `${Math.min(100, attendancePercent)}%` }} className="h-full bg-jci-blue rounded-full" />
                       </div>
@@ -1333,7 +1375,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
           footer={
             <div className="flex gap-3 justify-end">
               <Button variant="outline" onClick={() => setShowRegForm(false)}>取消</Button>
-              <Button onClick={handleRegFormSubmit}>确认报名</Button>
+              <Button onClick={handleRegFormSubmit} disabled={isRegSubmitting}>确认报名</Button>
             </div>
           }
         >

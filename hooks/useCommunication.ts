@@ -7,6 +7,10 @@ import { useAuth } from './useAuth';
 import { isDevMode } from '../utils/devMode';
 import { useFirestoreCollection } from './useFirestoreCollection';
 
+// TODO (P2-DEDUP): notifications are also fetched by useNotifications, causing a duplicate
+// Firestore read of the same collection. When CommunicationView and App.tsx are refactored
+// to source notifications from useNotifications instead, remove the notifications fetch below.
+
 export const useCommunication = () => {
   const { member, loading: authLoading, isDevMode: isDevModeFromAuth } = useAuth();
   const { showToast } = useToast();

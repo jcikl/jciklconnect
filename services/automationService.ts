@@ -186,11 +186,37 @@ export class AutomationService {
   }
 
   // Delete workflow
+  // P0: archive all workflow_executions before deleting the parent document so
+  //     execution records are not left as orphans.  Uses where('status','!=','archived')
+  //     so already-archived docs are never re-fetched and the loop terminates.
   static async deleteWorkflow(workflowId: string): Promise<void> {
     return withDevMode(
       () => {},
       async () => {
         try {
+          // Archive execution records in pages of 400 (writeBatch limit is 500)
+          let hasMore = true;
+          while (hasMore) {
+            const execSnap = await getDocs(
+              query(
+                collection(db, COLLECTIONS.WORKFLOW_EXECUTIONS),
+                where('workflowId', '==', workflowId),
+                where('status', '!=', 'archived'),
+                limit(400)
+              )
+            );
+            if (execSnap.empty) {
+              hasMore = false;
+              break;
+            }
+            const batch = writeBatch(db);
+            execSnap.docs.forEach(execDoc => {
+              batch.update(execDoc.ref, { status: 'archived' });
+            });
+            await batch.commit();
+            if (execSnap.docs.length < 400) hasMore = false;
+          }
+
           await deleteDoc(doc(db, COLLECTIONS.WORKFLOWS, workflowId));
         } catch (error) {
           errorLoggingService.logError(error as Error, { action: 'AutomationService.deleteWorkflow' });
@@ -253,11 +279,42 @@ export class AutomationService {
         throw new Error('Workflow not found or inactive');
       }
 
+      // ── P1: Execution depth guard (prevents infinite self-trigger loops) ────
+      if ((context._executionDepth ?? 0) >= 5) {
+        throw new Error(
+          `AutomationService: 执行深度超限（${context._executionDepth}），可能存在无限循环。workflowId=${workflowId}`
+        );
+      }
+
       // ── Fix P1: Build idempotency key to match workflowService schema ────────
       const triggerId: string =
         context.triggerId ?? context.entityId ?? triggeredBy ?? 'manual';
       // P1 — exclude timestamp so the same trigger never spawns a second execution
       const idempotencyKey = `${workflowId}_${triggerId}`;
+
+      // ── P1: Idempotency guard — skip if already running or succeeded ─────────
+      const dupSnap = await getDocs(
+        query(
+          collection(db, COLLECTIONS.WORKFLOW_EXECUTIONS),
+          where('workflowId', '==', workflowId),
+          where('idempotencyKey', '==', idempotencyKey),
+          where('status', 'in', ['running', 'success']),
+          limit(1)
+        )
+      );
+      if (!dupSnap.empty) {
+        const existingId = dupSnap.docs[0].id;
+        console.log(
+          `AutomationService: workflow already executed for this trigger, skipping. executionId=${existingId}`
+        );
+        return {
+          id: existingId,
+          ...dupSnap.docs[0].data(),
+          startedAt: dupSnap.docs[0].data().startedAt?.toDate?.()?.toISOString() ?? dupSnap.docs[0].data().startedAt,
+          completedAt: dupSnap.docs[0].data().completedAt?.toDate?.()?.toISOString() ?? dupSnap.docs[0].data().completedAt,
+        } as WorkflowExecution;
+      }
+      // ─────────────────────────────────────────────────────────────────────────
 
       // ── Fix P1: Recover stuck executions (running > 30 min) ─────────────────
       const thirtyMinutesAgo = Timestamp.fromMillis(Date.now() - 30 * 60 * 1000);
@@ -319,7 +376,13 @@ export class AutomationService {
           };
 
           try {
-            const stepResult = await this.executeStep(step, { ...context, executionId, workflowId });
+            // P1: propagate incremented depth so nested executeWorkflow calls can guard.
+            const stepResult = await this.executeStep(step, {
+              ...context,
+              executionId,
+              workflowId,
+              _executionDepth: (context._executionDepth ?? 0) + 1,
+            });
             // P1 — propagate conditionResult back to outer context so subsequent steps can read it
             if (step.type === 'conditional' && stepResult && stepResult.conditionResult !== undefined) {
               context._conditionResult = stepResult.conditionResult;

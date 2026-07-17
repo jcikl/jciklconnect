@@ -1,4 +1,5 @@
 // Events Data Hook
+import { useRef } from 'react';
 import { EventsService } from '../services/eventsService';
 import { MembersService } from '../services/membersService';
 import { errorLoggingService } from '../services/errorLoggingService';
@@ -12,6 +13,8 @@ export const useEvents = (options?: { publicMode?: boolean }) => {
   const publicMode = options?.publicMode ?? false;
   const { showToast } = useToast();
   const { member, loading: authLoading, isDevMode: isDevModeFromAuth } = useAuth();
+  // Prevents duplicate submissions from rapid double-clicks.
+  const isSubmittingRef = useRef(false);
 
   const inDevMode = isDevMode() || isDevModeFromAuth;
   // In public mode always fetch; otherwise require auth to resolve + member present (or devMode)
@@ -35,6 +38,8 @@ export const useEvents = (options?: { publicMode?: boolean }) => {
   const loading = (!publicMode && authLoading) || loading1;
 
   const createEvent = async (eventData: Omit<Event, 'id'>) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       const id = await EventsService.createEvent(eventData);
       await loadEvents();
@@ -44,10 +49,14 @@ export const useEvents = (options?: { publicMode?: boolean }) => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create event';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
   const updateEvent = async (eventId: string, updates: Partial<Event>) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await EventsService.updateEvent(eventId, updates);
       await loadEvents();
@@ -56,10 +65,14 @@ export const useEvents = (options?: { publicMode?: boolean }) => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update event';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
   const deleteEvent = async (eventId: string) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await EventsService.deleteEvent(eventId);
       await loadEvents();
@@ -68,6 +81,8 @@ export const useEvents = (options?: { publicMode?: boolean }) => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete event';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
@@ -81,6 +96,8 @@ export const useEvents = (options?: { publicMode?: boolean }) => {
       tshirtSize?: string | null;
     }
   ) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await EventsService.registerForEvent(eventId, memberId, extraFields);
       if (extraFields && memberId) {
@@ -105,10 +122,14 @@ export const useEvents = (options?: { publicMode?: boolean }) => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to register for event';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
   const markAttendance = async (eventId: string, memberId: string) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await EventsService.markAttendance(eventId, memberId);
       await loadEvents();
@@ -117,6 +138,8 @@ export const useEvents = (options?: { publicMode?: boolean }) => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to mark attendance';
       showToast(errorMessage, 'error');
       // Don't re-throw: caller often doesn't await, which causes unhandled rejection
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
@@ -127,6 +150,8 @@ export const useEvents = (options?: { publicMode?: boolean }) => {
     cancelledByName: string,
     cancelledByRole: 'self' | 'admin' | 'board' | 'committee'
   ) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await EventsService.cancelRegistration(eventId, memberId, cancelledBy, cancelledByName, cancelledByRole);
       await loadEvents();
@@ -134,6 +159,8 @@ export const useEvents = (options?: { publicMode?: boolean }) => {
       const errorMessage = err instanceof Error ? err.message : 'Cancellation failed';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 

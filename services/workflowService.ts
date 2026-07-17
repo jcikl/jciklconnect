@@ -198,10 +198,12 @@ export class WorkflowService {
           // so that execution records are not orphaned on partial failure.
           let hasMore = true;
           while (hasMore) {
+            // P0: filter out already-archived docs so the loop terminates naturally.
             const execSnap = await getDocs(
               query(
                 collection(db, EXEC_COL()),
                 where('workflowId', '==', workflowId),
+                where('status', '!=', 'archived'),
                 limit(400)
               )
             );
@@ -275,9 +277,16 @@ export class WorkflowService {
 
           // ── P0-A: Idempotency guard ─────────────────────────────────────────
           // Build a key from workflowId + triggerId (or minute-boundary timestamp).
-          const triggerId: string =
-            context.triggerId ??
-            `${workflowId}_${Math.floor(executionStartTime / 60_000)}`;
+          // P1: fallback uses randomUUID so two simultaneous "no-triggerId" calls
+          // each get a unique key and are never incorrectly deduplicated.
+          // Callers should always pass context.triggerId to get proper dedup.
+          const triggerId: string = context.triggerId ?? (() => {
+            console.warn(
+              'WorkflowService.executeWorkflow: no triggerId in context; ' +
+              'generating random idempotency key — pass context.triggerId for dedup'
+            );
+            return crypto.randomUUID();
+          })();
           const idempotencyKey = `${workflowId}_${triggerId}`;
 
           // Check whether this trigger was already processed.
@@ -512,9 +521,17 @@ export class WorkflowService {
         break;
       }
 
-      case 'update_data':
-        console.log('WorkflowService: update_data step:', step.config, context);
+      case 'update_data': {
+        // P2: actually perform the update using config.collection, config.docId, config.fields.
+        const config = step.config;
+        if (!config.collection || !config.docId || !config.fields) {
+          throw new Error(
+            'update_data step requires config.collection, config.docId, and config.fields'
+          );
+        }
+        await updateDoc(doc(db, config.collection as string, config.docId as string), config.fields as Record<string, unknown>);
         break;
+      }
 
       case 'award_points': {
         const memberId = step.config.memberId || context.memberId;
@@ -657,7 +674,9 @@ export class WorkflowService {
       () => [],
       async () => {
         try {
-          // Role guard: only board members and admins may read execution logs.
+          // P2: JS-layer role guard (belt-and-suspenders).
+          // TODO: add isAdmin()||isBoard() to firestore.rules workflow_executions
+          //       read rule so direct SDK access is also restricted.
           const currentUid = auth?.currentUser?.uid;
           if (!currentUid) throw new Error('Unauthenticated');
           const callerSnap = await getDoc(doc(db, 'members', currentUid));

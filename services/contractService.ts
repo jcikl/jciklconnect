@@ -191,10 +191,11 @@ export class ContractService {
      if (penalty > 0) {
        const signerId = data.signerId || data.memberId;
        try {
+         // P0 fix: correct signature is (memberId, category, amount, description, ...)
          await PointsService.awardPoints(
            signerId,
-           -Math.abs(penalty),
            'penalty',
+           -Math.abs(penalty),
            `Contract failure penalty: ${contractId}`,
            contractId,
            'contract'

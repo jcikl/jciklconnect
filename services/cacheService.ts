@@ -85,6 +85,10 @@ class CacheService {
       return null;
     }
 
+    // Move to end of Map to implement LRU (most-recently-used stays at tail)
+    this.memoryCache.delete(key);
+    this.memoryCache.set(key, entry);
+
     return entry.data;
   }
 
@@ -262,16 +266,18 @@ class CacheService {
 }
 
 // Create different cache instances for different use cases
+// useLocalStorage is false for apiCache: Firestore Timestamp objects cannot be safely
+// serialised to JSON and back (they become plain strings, breaking instanceof checks).
 export const apiCache = new CacheService({
   ttl: 5 * 60 * 1000, // 5 minutes for API responses
   maxSize: 50,
-  useLocalStorage: true
+  useLocalStorage: false
 });
 
 export const userDataCache = new CacheService({
   ttl: 15 * 60 * 1000, // 15 minutes for user data
   maxSize: 20,
-  useLocalStorage: true
+  useLocalStorage: false
 });
 
 export const staticDataCache = new CacheService({
@@ -280,14 +286,21 @@ export const staticDataCache = new CacheService({
   useLocalStorage: true
 });
 
-// Module-level interval for automatic cache cleanup every 10 minutes.
-// Intentional persistent side effect. Call stopCacheCleanup() in test teardown.
+/**
+ * Module-level interval for automatic cache cleanup every 10 minutes.
+ * This is an intentional persistent side-effect.
+ *
+ * @important In test environments this interval leaks between test suites.
+ * Call `stopCacheCleanup()` in your test teardown (`afterAll`) to prevent
+ * "open handles" warnings from Jest/Vitest.
+ */
 const _cacheCleanupInterval = setInterval(() => {
   apiCache.cleanup();
   userDataCache.cleanup();
   staticDataCache.cleanup();
 }, 10 * 60 * 1000);
 
+/** Call this in test teardown (afterAll) to prevent interval leaks. */
 export function stopCacheCleanup(): void { clearInterval(_cacheCleanupInterval); }
 
 export { CacheService };

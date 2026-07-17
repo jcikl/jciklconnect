@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Tabs } from '../ui/Common';
+import { AsyncErrorBoundary } from '../ui/AsyncErrorBoundary';
 import { LOStarDashboard } from './LOStarDashboard';
 import { IncentiveProgramManager } from './IncentiveProgramManager';
 import { BehavioralNudgingConfig } from './BehavioralNudgingConfig';
@@ -37,7 +38,7 @@ export const GamificationView: React.FC<{ searchQuery?: string }> = ({ searchQue
       ) : activeTab === 'nudging' ? (
         <BehavioralNudgingConfig />
       ) : (
-        <LOStarDashboard />
+        <AsyncErrorBoundary><LOStarDashboard /></AsyncErrorBoundary>
       )}
     </div>
   );

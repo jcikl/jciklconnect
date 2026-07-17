@@ -648,7 +648,12 @@ export class MembersService {
       } catch (syncErr) {
         console.warn('syncPublicListing failed after updateMember — member update was saved successfully:', syncErr);
       }
-      await this.syncBoardMemberDisplayFields(memberId, mergedMember as Member);
+      try {
+        await this.syncBoardMemberDisplayFields(memberId, mergedMember as Member);
+      } catch (syncErr) {
+        // P2 fix: sync failure must not abort the member update — log and continue.
+        errorLoggingService.logError(syncErr as Error, { component: 'updateMember', additionalData: { action: 'syncBoardMemberDisplayFields', memberId } });
+      }
 
       // Trigger introducer recalculation if introducer changes
       if (cleanUpdates.introducer !== undefined && (!currentData || cleanUpdates.introducer !== currentData.introducer)) {

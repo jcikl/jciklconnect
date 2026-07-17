@@ -30,7 +30,7 @@ export const useMemberMutations = ({ onSuccess }: UseMemberMutationsOptions = {}
       showToast(err instanceof Error ? err.message : 'Failed to create member', 'error');
       throw err;
     }
-  }, [user?.uid, onSuccess]);
+  }, [user?.uid, onSuccess, showToast]);
 
   const updateMember = useCallback(async (memberId: string, updates: Partial<Member>): Promise<void> => {
     try {
@@ -41,7 +41,7 @@ export const useMemberMutations = ({ onSuccess }: UseMemberMutationsOptions = {}
       showToast(err instanceof Error ? err.message : 'Failed to update member', 'error');
       throw err;
     }
-  }, [user?.uid, onSuccess]);
+  }, [user?.uid, onSuccess, showToast]);
 
   const deleteMember = useCallback(async (memberId: string): Promise<void> => {
     try {
@@ -57,7 +57,7 @@ export const useMemberMutations = ({ onSuccess }: UseMemberMutationsOptions = {}
       }
       throw err;
     }
-  }, [onSuccess]);
+  }, [onSuccess, showToast]);
 
   const batchUpdateMembers = useCallback(async (memberIds: string[], updates: Partial<Member>): Promise<void> => {
     try {
@@ -68,7 +68,7 @@ export const useMemberMutations = ({ onSuccess }: UseMemberMutationsOptions = {}
       showToast(err instanceof Error ? err.message : 'Failed to update members', 'error');
       throw err;
     }
-  }, [onSuccess]);
+  }, [onSuccess, showToast]);
 
   const batchDeleteMembers = useCallback(async (memberIds: string[]): Promise<void> => {
     try {
@@ -79,7 +79,7 @@ export const useMemberMutations = ({ onSuccess }: UseMemberMutationsOptions = {}
       showToast(err instanceof Error ? err.message : 'Failed to delete members', 'error');
       throw err;
     }
-  }, [onSuccess]);
+  }, [onSuccess, showToast]);
 
   return { createMember, updateMember, deleteMember, batchUpdateMembers, batchDeleteMembers };
 };

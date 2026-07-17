@@ -21,6 +21,7 @@ import {
 import {
   collection,
   addDoc,
+  getDoc,
   getDocs,
   query,
   where,
@@ -478,7 +479,8 @@ export class PromotionService {
     memberId: string,
     promotedBy: string,
     method: 'automatic' | 'manual' = 'automatic',
-    reason?: string
+    reason?: string,
+    promotionRequestId?: string
   ): Promise<PromotionHistory | null> {
     const member = await this.getMemberById(memberId);
     if (!member) {
@@ -537,6 +539,17 @@ export class PromotionService {
       batch.set(promotionRef, { ...promotion, promotionDate: serverTimestamp() });
     }
 
+    // P1 fix: if a promotionRequestId was supplied, stamp it approved in the same batch
+    // so the request status and the member promotion are atomic.
+    if (promotionRequestId && !isDevMode()) {
+      const reqRef = doc(db, COLLECTIONS.MANUAL_PROMOTION_REQUESTS, promotionRequestId);
+      batch.update(reqRef, {
+        status: 'approved',
+        approvedBy: promotedBy,
+        approvedAt: serverTimestamp()
+      });
+    }
+
     await batch.commit();
 
     // Send notification AFTER batch succeeds
@@ -581,14 +594,10 @@ export class PromotionService {
 
     const savedId = await this.saveManualPromotionRequest(request);
 
-    // If override is true, perform promotion immediately and mark request approved atomically
+    // P1 fix: if override is true, pass savedId so the request status is stamped
+    // approved inside the same writeBatch as the member promotion — atomically.
     if (overrideRequirements) {
-      await this.promoteToOfficialMember(memberId, requestedBy, 'manual', reason);
-      await updateDoc(doc(db, COLLECTIONS.MANUAL_PROMOTION_REQUESTS, savedId), {
-        status: 'approved',
-        approvedBy: requestedBy,
-        approvedAt: serverTimestamp()
-      });
+      await this.promoteToOfficialMember(memberId, requestedBy, 'manual', reason, savedId);
       request.status = 'approved';
     }
 
@@ -887,13 +896,10 @@ export class PromotionService {
     }
     try {
       const requestRef = doc(db, COLLECTIONS.MANUAL_PROMOTION_REQUESTS, requestId);
-      // Fetch the request to get memberId
-      const snap = await getDocs(query(
-        collection(db, COLLECTIONS.MANUAL_PROMOTION_REQUESTS),
-        where('__name__', '==', requestId)
-      ));
-      if (snap.empty) throw new Error(`Manual promotion request ${requestId} not found`);
-      const requestData = { ...snap.docs[0].data(), id: requestId } as ManualPromotionRequest;
+      // Fetch the request by direct document reference (where('__name__') never works in queries)
+      const snap = await getDoc(requestRef);
+      if (!snap.exists()) throw new Error(`Manual promotion request ${requestId} not found`);
+      const requestData = { ...snap.data(), id: requestId } as ManualPromotionRequest;
 
       // Trigger promotion first; update status only after success to keep them in sync
       try {
@@ -951,8 +957,28 @@ export class PromotionService {
     activityType: string,
     activityData: Record<string, string | number | boolean>
   ): Promise<void> {
-    // Simulate recording activity
-    console.log(`Recorded ${activityType} activity for member ${memberId}`, activityData);
+    // Map activityType to the corresponding promotionProgress field
+    const fieldMap: Record<string, string> = {
+      bod_meeting: 'bodMeetingAttended',
+      event_organizing: 'eventOrganizerParticipation',
+      event_participation: 'eventParticipation',
+      course_completion: 'jciInspireCompleted',
+    };
+    const field = fieldMap[activityType];
+    if (field && !isDevMode()) {
+      try {
+        // Persist increment to Firestore so progress survives page reloads
+        await MembersService.updateMember(memberId, {
+          promotionProgress: {
+            [field]: (activityData.value ?? 1) as string | number
+          }
+        } as unknown as Partial<Member>);
+      } catch (err) {
+        console.warn(`[recordMemberActivity] Failed to persist ${activityType} for ${memberId}:`, err);
+      }
+    } else {
+      console.log(`Recorded ${activityType} activity for member ${memberId}`, activityData);
+    }
   }
 
   private static async getPromotionSettings(): Promise<PromotionSettings> {

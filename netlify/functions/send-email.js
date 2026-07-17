@@ -70,6 +70,19 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers: cors, body: JSON.stringify({ success: false, error: 'Invalid provider. Must be sendgrid, resend, or mailgun.' }) };
   }
 
+  // P1: Validate and allowlist the from address to prevent header injection.
+  const ALLOWED_FROM = ['no-reply@jcikl.cc', 'noreply@jcikl.cc'];
+  const sender = from && ALLOWED_FROM.includes(from) ? from : 'no-reply@jcikl.cc';
+
+  // P1: Guard against recipient flooding and oversized HTML payloads.
+  const toArr = Array.isArray(to) ? to : [to];
+  if (toArr.length > 50) {
+    return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'Too many recipients' }) };
+  }
+  if (html && html.length > 100000) {
+    return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'HTML body too large' }) };
+  }
+
   // Normalise `to` to a string (single address) or comma-joined string
   const toAddress = Array.isArray(to) ? to.join(',') : to;
 
@@ -90,7 +103,7 @@ exports.handler = async (event) => {
           personalizations: [{
             to: Array.isArray(to) ? to.map(e => ({ email: e })) : [{ email: to }],
           }],
-          from: { email: from || 'no-reply@jcikl.cc', name: 'JCI Kuala Lumpur' },
+          from: { email: sender, name: 'JCI Kuala Lumpur' },
           subject,
           content: [{ type: 'text/html', value: html }],
         }),
@@ -113,7 +126,7 @@ exports.handler = async (event) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: from || 'JCI Kuala Lumpur <no-reply@jcikl.cc>',
+          from: sender,
           to: Array.isArray(to) ? to : [to],
           subject,
           html,
@@ -134,7 +147,7 @@ exports.handler = async (event) => {
 
       // Mailgun uses form-encoded body
       const params = new URLSearchParams();
-      params.append('from', from || `JCI Kuala Lumpur <no-reply@${domain}>`);
+      params.append('from', sender);
       params.append('to', toAddress);
       params.append('subject', subject);
       params.append('html', html);

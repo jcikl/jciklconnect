@@ -9,10 +9,13 @@ import {
   updateDoc,
   deleteDoc,
   writeBatch,
+  runTransaction,
   query,
   where,
   orderBy,
   Timestamp,
+  arrayUnion,
+  arrayRemove,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
@@ -316,23 +319,25 @@ export class ProjectsService {
       () => {},
       async () => {
         try {
-          const project = await this.getProjectById(projectId);
-          if (!project) throw new Error(`Project ${projectId} not found`);
-
-          const current = project.registeredMembers ?? [];
-          const max = project.maxAttendees ?? 500;
-
-          if (current.includes(memberId)) {
-            throw new Error('Member is already registered for this project.');
-          }
-          if (current.length >= max) {
-            throw new Error('Project has reached maximum capacity.');
-          }
-
+          // P0 FIX: use runTransaction so capacity check + write are atomic — prevents
+          // over-registration when multiple members register concurrently.
           const projectRef = doc(db, COLLECTIONS.PROJECTS, projectId);
-          await updateDoc(projectRef, {
-            registeredMembers: [...current, memberId],
-            updatedAt: Timestamp.now(),
+          await runTransaction(db, async (txn) => {
+            const snap = await txn.get(projectRef);
+            if (!snap.exists()) throw new Error(`Project ${projectId} not found`);
+            const data = snap.data() as import('../types').Project;
+            const current: string[] = data.registeredMembers ?? [];
+            const max = data.maxAttendees ?? 500;
+            if (current.includes(memberId)) {
+              throw new Error('Member is already registered for this project.');
+            }
+            if (current.length >= max) {
+              throw new Error('Project has reached maximum capacity.');
+            }
+            txn.update(projectRef, {
+              registeredMembers: arrayUnion(memberId),
+              updatedAt: Timestamp.now(),
+            });
           });
           this.invalidateProjectsCache();
         } catch (error) {
@@ -349,13 +354,11 @@ export class ProjectsService {
       () => {},
       async () => {
         try {
-          const project = await this.getProjectById(projectId);
-          if (!project) throw new Error(`Project ${projectId} not found`);
-
-          const current = (project.registeredMembers ?? []).filter((id: string) => id !== memberId);
+          // P1 FIX: use arrayRemove instead of reading and rewriting the full array,
+          // which prevents overwriting concurrent writes.
           const projectRef = doc(db, COLLECTIONS.PROJECTS, projectId);
           await updateDoc(projectRef, {
-            registeredMembers: current,
+            registeredMembers: arrayRemove(memberId),
             updatedAt: Timestamp.now(),
           });
           this.invalidateProjectsCache();
@@ -570,18 +573,28 @@ export class ProjectsService {
 
           await updateDoc(taskRef, updateData);
 
-          // If task is completed, award points
+          // If task is completed, award points.
+          // P2 FIX: reuse existingData merged with updates instead of a second getDoc.
+          // P1 FIX: wrap in try/catch so a points failure doesn't fail the task update itself.
           if (updates.status === 'Done') {
-            const taskDoc = await getDoc(taskRef);
-            const task = taskDoc.data() as Task;
-
-            if (task.assignee && task.projectId) {
-              await PointsService.awardTaskCompletionPoints(
-                task.assignee,
-                task.projectId,
-                taskId,
-                task.priority
-              );
+            const mergedTask = { ...existingData, ...updates } as Task;
+            if (mergedTask.assignee && mergedTask.projectId) {
+              try {
+                await PointsService.awardTaskCompletionPoints(
+                  mergedTask.assignee,
+                  mergedTask.projectId,
+                  taskId,
+                  mergedTask.priority
+                );
+              } catch (pointsErr) {
+                const { errorLoggingService } = await import('./errorLoggingService');
+                errorLoggingService.logError(pointsErr as Error, {
+                  component: 'ProjectsService',
+                  action: 'updateTask.awardTaskCompletionPoints',
+                  additionalData: { taskId, memberId: mergedTask.assignee },
+                });
+                // Non-fatal: task update succeeded; points will need manual reconciliation.
+              }
             }
           }
         } catch (error) {

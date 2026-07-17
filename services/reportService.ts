@@ -78,8 +78,11 @@ export class ReportService {
       }),
       async () => {
         try {
-          const summary = await FinanceService.getFinancialSummary();
-          const transactions = await FinanceService.getAllTransactions();
+          // P2-fix: when a date range is given, pass the year to getAllTransactions so the
+          // server-side query is scoped instead of pulling all years into memory.
+          const filterYear = options.startDate ? options.startDate.getFullYear() : undefined;
+          const summary = await FinanceService.getFinancialSummary(filterYear);
+          const transactions = await FinanceService.getAllTransactions(filterYear);
 
           // Filter transactions by date range if provided
           let filteredTransactions = transactions;

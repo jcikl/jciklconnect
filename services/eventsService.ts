@@ -329,12 +329,17 @@ export class EventsService {
             }
 
             if (existingSnap.exists() && existingSnap.data().status === 'cancelled') {
-              // Reactivation path — update existing doc
+              // Reactivation path — update existing doc AND increment attendees counter
               txn.update(regRef, {
                 status: 'registered',
                 updatedAt: Timestamp.now(),
                 ...(extraFields?.registeredBy ? { registeredBy: extraFields.registeredBy } : {}),
                 ...(extraFields?.registeredByName ? { registeredByName: extraFields.registeredByName } : {}),
+              });
+              // P1 FIX: reactivation must also increment the event attendees count
+              txn.update(eventRef, {
+                attendees: increment(1),
+                registeredMembers: arrayUnion(memberId),
               });
             } else {
               // New registration — set deterministic doc
@@ -355,12 +360,12 @@ export class EventsService {
               if (extraFields?.registeredBy) payload.registeredBy = extraFields.registeredBy;
               if (extraFields?.registeredByName) payload.registeredByName = extraFields.registeredByName;
               txn.set(regRef, payload);
+              // New registration path — increment event attendees counter
+              txn.update(eventRef, {
+                attendees: increment(1),
+                registeredMembers: arrayUnion(memberId),
+              });
             }
-
-            txn.update(eventRef, {
-              attendees: increment(1),
-              registeredMembers: arrayUnion(memberId),
-            });
           });
 
           this.invalidateEventsCache(); // P1-C: invalidate after attendee count changes
@@ -780,28 +785,40 @@ export class EventsService {
       // the duplicate checks as getDocs outside the transaction first, then
       // write inside it. This is safe for the common case; extreme concurrent
       // submissions are additionally protected by the Firestore rules' hasOnly guard.
-      const col = collection(db, COLLECTIONS.GUEST_REGISTRATIONS);
-      const [emailSnap, phoneSnap] = await Promise.all([
-        getDocs(query(col, where('eventId', '==', eventId), where('email', '==', guestData.email))),
-        getDocs(query(col, where('eventId', '==', eventId), where('phone', '==', guestData.phone))),
-      ]);
-      const hasActive = (snap: { docs: { data(): Record<string, unknown> }[] }) =>
-        snap.docs.some(d => d.data()['status'] !== 'Cancelled');
-      if (hasActive(emailSnap)) throw new Error('This email has already been registered for this event.');
-      if (hasActive(phoneSnap)) throw new Error('This phone number has already been registered for this event.');
+      // P0 FIX: use deterministic doc IDs + runTransaction to make dedup check atomic.
+      // The main record uses eventId_email as its ID. A lightweight phone-index doc lets
+      // us check phone uniqueness inside the same transaction without a collection query.
+      const emailKey = guestData.email.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      const phoneKey = guestData.phone.replace(/[^0-9]/g, '');
+      const mainDocRef = doc(db, COLLECTIONS.GUEST_REGISTRATIONS, `${eventId}_${emailKey}`);
+      const phoneIndexRef = doc(db, COLLECTIONS.GUEST_REGISTRATIONS, `${eventId}_phone_${phoneKey}`);
 
-      const guestRegistration: Record<string, unknown> = {
-        eventId,
-        name: guestData.name,
-        email: guestData.email,
-        phone: guestData.phone,
-        registeredAt: Timestamp.now(),
-        status: 'Pending' as const,
-      };
-      if (guestData.organization != null) guestRegistration['organization'] = guestData.organization;
-      if (guestData.notes != null) guestRegistration['notes'] = guestData.notes;
+      await runTransaction(db, async (txn) => {
+        const [mainSnap, phoneSnap] = await Promise.all([
+          txn.get(mainDocRef),
+          txn.get(phoneIndexRef),
+        ]);
+        if (mainSnap.exists() && mainSnap.data()['status'] !== 'Cancelled') {
+          throw new Error('This email has already been registered for this event.');
+        }
+        if (phoneSnap.exists() && phoneSnap.data()['status'] !== 'Cancelled') {
+          throw new Error('This phone number has already been registered for this event.');
+        }
 
-      await addDoc(col, guestRegistration);
+        const guestRegistration: Record<string, unknown> = {
+          eventId,
+          name: guestData.name,
+          email: guestData.email,
+          phone: guestData.phone,
+          registeredAt: Timestamp.now(),
+          status: 'Pending' as const,
+        };
+        if (guestData.organization != null) guestRegistration['organization'] = guestData.organization;
+        if (guestData.notes != null) guestRegistration['notes'] = guestData.notes;
+
+        txn.set(mainDocRef, guestRegistration);
+        txn.set(phoneIndexRef, { eventId, email: guestData.email, phone: guestData.phone, status: 'Pending', _indexFor: 'phone' });
+      });
       apiCache.delete(`guestRegistrations:event:${eventId}`);
     } catch (error) {
       errorLoggingService.logError(error as Error, {

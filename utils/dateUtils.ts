@@ -21,6 +21,7 @@ export const formatDate = (date: string | Date | undefined | null): string => {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
+    timeZone: 'Asia/Kuala_Lumpur',
   });
 };
 
@@ -62,6 +63,7 @@ export const formatDateTime = (date: string | Date | null | undefined): string =
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'Asia/Kuala_Lumpur',
   });
 };
 
@@ -72,6 +74,7 @@ export const formatTime = (date: string | Date | null | undefined): string => {
   return d.toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'Asia/Kuala_Lumpur',
   });
 };
 
@@ -94,7 +97,7 @@ export const formatRelativeTime = getRelativeTime;
 
 export const isToday = (date: string | Date): boolean => {
   const d = typeof date === 'string' ? new Date(date) : date;
-  const today = new Date();
+  const today = nowMYT();
   return (
     d.getDate() === today.getDate() &&
     d.getMonth() === today.getMonth() &&
@@ -104,12 +107,12 @@ export const isToday = (date: string | Date): boolean => {
 
 export const isPast = (date: string | Date): boolean => {
   const d = typeof date === 'string' ? new Date(date) : date;
-  return d.getTime() < new Date().getTime();
+  return d.getTime() < nowMYT().getTime();
 };
 
 export const isFuture = (date: string | Date): boolean => {
   const d = typeof date === 'string' ? new Date(date) : date;
-  return d.getTime() > new Date().getTime();
+  return d.getTime() > nowMYT().getTime();
 };
 
 export const getCalendarYear = (date?: Date): number => {

@@ -161,6 +161,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
   const [loading, setLoading] = useState(false);
   const [showManualPromotionModal, setShowManualPromotionModal] = useState(false);
   const [manualPromotionReason, setManualPromotionReason] = useState('');
+  const [isSubmittingManual, setIsSubmittingManual] = useState(false);
   // Editable text inputs for each requirement
   const [editValues, setEditValues] = useState<Record<string, string>>({});
   const [engagementEditValues, setEngagementEditValues] = useState<Record<string, { detail: string; date: string }>>({});
@@ -574,6 +575,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
   };
 
   const handlePromoteMember = async (memberId: string, method: 'automatic' | 'manual' = 'automatic') => {
+    if (!currentUser?.id) { showToast('请先登录', 'error'); return; }
     setIsPromoting(true);
     try {
       const promotion = await PromotionService.promoteToOfficialMember(
@@ -598,11 +600,14 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
   };
 
   const handleManualPromotionRequest = async () => {
+    if (isSubmittingManual) return;
+    if (!currentUser?.id) { showToast('请先登录', 'error'); return; }
     if (!selectedMemberId || !manualPromotionReason.trim()) {
       showToast('Please provide a reason for manual promotion', 'warning');
       return;
     }
 
+    setIsSubmittingManual(true);
     try {
       await PromotionService.createManualPromotionRequest(
         selectedMemberId,
@@ -622,6 +627,8 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
       loadData();
     } catch (err: any) {
       showToast(err.message || 'Failed to submit promotion request', 'error');
+    } finally {
+      setIsSubmittingManual(false);
     }
   };
 
@@ -1490,7 +1497,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
             <Button
               className="flex-1"
               onClick={handleManualPromotionRequest}
-              disabled={!manualPromotionReason.trim()}
+              disabled={isSubmittingManual || !manualPromotionReason.trim()}
             >
               <Check size={16} className="mr-2" />
               Submit Request

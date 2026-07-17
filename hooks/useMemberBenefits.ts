@@ -1,6 +1,6 @@
 // Member Benefits Data Hook
 // Wraps MemberBenefitsService with React state (loading / error / data).
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '@/components/ui/Common';
 import {
   MemberBenefitsService,
@@ -15,18 +15,24 @@ export const useMemberBenefits = (memberId?: string) => {
   const [error, setError] = useState<string | null>(null);
   const { showToast } = useToast();
 
+  // Prevents state updates after the component has unmounted.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
   const loadBenefits = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const data = await MemberBenefitsService.getMemberBenefits();
-      setBenefits(data);
+      if (mountedRef.current) setBenefits(data);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load benefits';
-      setError(msg);
-      showToast(msg, 'error');
+      if (mountedRef.current) { setError(msg); showToast(msg, 'error'); }
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }, [showToast]);
 
@@ -34,10 +40,10 @@ export const useMemberBenefits = (memberId?: string) => {
     if (!memberId) return;
     try {
       const data = await MemberBenefitsService.getBenefitUsage(memberId);
-      setUsageHistory(data);
+      if (mountedRef.current) setUsageHistory(data);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load usage history';
-      showToast(msg, 'error');
+      if (mountedRef.current) showToast(msg, 'error');
     }
   }, [memberId, showToast]);
 

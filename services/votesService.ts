@@ -342,6 +342,14 @@ export class VotesService {
     try {
       const voteRef = doc(db, COLLECTIONS.VOTES, voteId);
 
+      // P0 fix: getDocs (collection query) is not allowed inside runTransaction.
+      // Fetch cast document refs BEFORE the transaction; then use transaction.get()
+      // per-ref inside the transaction so Firestore can track them for consistency.
+      const castsSnapPre = await getDocs(
+        collection(db, COLLECTIONS.VOTES, voteId, 'voteCasts')
+      );
+      const castRefs = castsSnapPre.docs.map(d => d.ref);
+
       // P1 — wrap entire tally in runTransaction to prevent concurrent double-close
       let tallyResult: TallyResult = { success: false, reason: 'Transaction incomplete' };
 
@@ -356,11 +364,11 @@ export class VotesService {
           return; // skip writes
         }
 
-        // Fetch all cast records from the subcollection (reads must happen before writes in a transaction)
-        const castsSnap = await getDocs(
-          collection(db, COLLECTIONS.VOTES, voteId, 'voteCasts')
-        );
-        const casts = castsSnap.docs.map(d => d.data() as VoteCastDoc);
+        // Read each cast document via transaction.get so Firestore tracks them.
+        const castSnaps = await Promise.all(castRefs.map(ref => transaction.get(ref)));
+        const casts = castSnaps
+          .filter(snap => snap.exists())
+          .map(snap => snap.data() as VoteCastDoc);
         const totalCast = casts.length;
 
         // P1-B — quorum enforcement

@@ -12,6 +12,7 @@ import {
   orderBy,
   limit,
   writeBatch,
+  increment,
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -159,11 +160,26 @@ export class WebhookService {
   }
 
   // Delete webhook
+  // P1: cascade-delete webhook_logs before removing the parent webhook document.
   static async deleteWebhook(webhookId: string): Promise<void> {
     return withDevMode(
       () => { console.log('[Dev Mode] Would delete webhook:', webhookId); },
       async () => {
         try {
+          // Delete all webhook_logs for this webhook first (up to 400 per batch)
+          const logsSnap = await getDocs(
+            query(
+              collection(db, COLLECTIONS.WEBHOOK_LOGS || 'webhook_logs'),
+              where('webhookId', '==', webhookId),
+              limit(400)
+            )
+          );
+          if (!logsSnap.empty) {
+            const batch = writeBatch(db);
+            logsSnap.docs.forEach(d => batch.delete(d.ref));
+            await batch.commit();
+          }
+
           const docRef = doc(db, COLLECTIONS.WEBHOOKS || 'webhooks', webhookId);
           await deleteDoc(docRef);
         } catch (error) {
@@ -182,79 +198,115 @@ export class WebhookService {
       return false;
     }
 
-    try {
-      const startTime = Date.now();
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        ...webhook.headers,
-      };
+    const startTime = Date.now();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...webhook.headers,
+    };
 
-      // Add webhook signature if secret is configured
-      if (webhook.secret) {
-        // In production, generate HMAC signature
-        headers['X-Webhook-Signature'] = 'signature-placeholder';
+    // Build the body string upfront so the HMAC can be computed over it.
+    const bodyString = webhook.method !== 'GET'
+      ? JSON.stringify({
+          event,
+          data,
+          timestamp: new Date().toISOString(),
+          ...webhook.payload,
+        })
+      : undefined;
+
+    // P1: Real HMAC-SHA256 signature instead of placeholder string.
+    if (webhook.secret && bodyString) {
+      const encoder = new TextEncoder();
+      const keyMaterial = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode(webhook.secret),
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign']
+      );
+      const sig = await crypto.subtle.sign('HMAC', keyMaterial, encoder.encode(bodyString));
+      const hexSig = Array.from(new Uint8Array(sig))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+      headers['X-Webhook-Signature'] = 'sha256=' + hexSig;
+    }
+
+    // P1: retry with retryPolicy.
+    const maxRetries = webhook.retryPolicy?.maxRetries ?? 0;
+    const retryDelay = webhook.retryPolicy?.retryDelay ?? 1000;
+
+    let lastError: Error | null = null;
+    let response: Response | null = null;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      if (attempt > 0) {
+        await new Promise(r => setTimeout(r, retryDelay));
       }
-
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 10000);
-      let response: Response;
       try {
         response = await fetch(webhook.url, {
           method: webhook.method,
           headers,
-          body: webhook.method !== 'GET' ? JSON.stringify({
-            event,
-            data,
-            timestamp: new Date().toISOString(),
-            ...webhook.payload,
-          }) : undefined,
+          body: bodyString,
           signal: controller.signal,
         });
         clearTimeout(timeout);
+        if (response.ok) break; // success — stop retrying
+        // Non-2xx: capture but keep retrying if retries remain
+        lastError = new Error(`HTTP ${response.status} ${response.statusText}`);
       } catch (err) {
         clearTimeout(timeout);
-        throw err;
+        lastError = err instanceof Error ? err : new Error(String(err));
+        response = null;
       }
+    }
 
-      const duration = Date.now() - startTime;
-      const success = response.ok;
+    const duration = Date.now() - startTime;
 
-      // Log webhook execution
-      await this.logWebhookExecution({
-        webhookId,
-        event,
-        status: success ? 'success' : 'failed',
-        responseCode: response.status,
-        responseBody: (await response.text().catch(() => '')).slice(0, 2000),
-        triggeredAt: new Date(),
-        duration,
-      });
+    if (response && response.ok) {
+      try {
+        await this.logWebhookExecution({
+          webhookId,
+          event,
+          status: 'success',
+          responseCode: response.status,
+          responseBody: (await response.text().catch(() => '')).slice(0, 2000),
+          triggeredAt: new Date(),
+          duration,
+        });
+      } catch { /* non-fatal */ }
 
-      // Update webhook stats
-      await this.updateWebhook(webhookId, {
-        lastTriggered: new Date(),
-        successCount: webhook.successCount + (success ? 1 : 0),
-        failureCount: webhook.failureCount + (success ? 0 : 1),
-      });
+      // P1: use increment() to avoid read-then-write race on counters.
+      try {
+        await updateDoc(doc(db, COLLECTIONS.WEBHOOKS || 'webhooks', webhookId), {
+          lastTriggered: Timestamp.now(),
+          successCount: increment(1),
+        });
+      } catch { /* non-fatal */ }
 
-      return success;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      
-      // Log failed execution
-      await this.logWebhookExecution({
-        webhookId,
-        event,
-        status: 'failed',
-        error: errorMessage,
-        triggeredAt: new Date(),
-      });
+      return true;
+    } else {
+      const errorMessage = lastError?.message ?? (response ? `HTTP ${response.status}` : 'Unknown error');
 
-      // Update failure count
-      await this.updateWebhook(webhookId, {
-        lastTriggered: new Date(),
-        failureCount: webhook.failureCount + 1,
-      });
+      try {
+        await this.logWebhookExecution({
+          webhookId,
+          event,
+          status: 'failed',
+          responseCode: response?.status,
+          error: errorMessage,
+          triggeredAt: new Date(),
+          duration,
+        });
+      } catch { /* non-fatal */ }
+
+      try {
+        await updateDoc(doc(db, COLLECTIONS.WEBHOOKS || 'webhooks', webhookId), {
+          lastTriggered: Timestamp.now(),
+          failureCount: increment(1),
+        });
+      } catch { /* non-fatal */ }
 
       return false;
     }

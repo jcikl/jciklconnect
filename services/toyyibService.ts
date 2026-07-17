@@ -1,4 +1,4 @@
-import { collection, doc, setDoc, getDocs, deleteDoc, serverTimestamp, addDoc, updateDoc, query, where, orderBy, limit, increment } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, deleteDoc, serverTimestamp, addDoc, updateDoc, query, where, orderBy, limit, increment, writeBatch } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { db } from '../config/firebase';
 import { COLLECTIONS, TOYYIB_CONFIG } from '../config/constants';
@@ -179,21 +179,18 @@ export class ToyyibService {
       };
       if (params.memberId) billRecord.memberId = params.memberId;
       if (params.projectId) billRecord.projectId = params.projectId;
-      await addDoc(collection(db, COLLECTIONS.TOYYIB_BILLS), billRecord);
-      // P1-D: Increment billCount on the parent category so it stays accurate
+      // P1-fix: write bill record + increment category billCount atomically via writeBatch
       const usedCategoryCode = params.categoryCode || TOYYIB_CONFIG.CATEGORY_CODE;
+      const billBatch = writeBatch(db);
+      const billRef = doc(collection(db, COLLECTIONS.TOYYIB_BILLS));
+      billBatch.set(billRef, billRecord);
       if (usedCategoryCode) {
-        try {
-          await updateDoc(doc(db, COLLECTIONS.TOYYIB_CATEGORIES, usedCategoryCode), {
-            billCount: increment(1),
-            updatedAt: serverTimestamp(),
-          });
-        } catch (catErr) {
-          // Category doc may not exist yet (e.g. legacy default code not seeded); non-fatal
-          console.warn('[ToyyibService] Could not increment billCount for category:', usedCategoryCode);
-          errorLoggingService.logError(catErr instanceof Error ? catErr : new Error(String(catErr)), { component: 'toyyibService', action: 'createBill.incrementBillCount' });
-        }
+        billBatch.update(doc(db, COLLECTIONS.TOYYIB_CATEGORIES, usedCategoryCode), {
+          billCount: increment(1),
+          updatedAt: serverTimestamp(),
+        });
       }
+      await billBatch.commit();
       return {
         billCode,
         paymentUrl: `https://${TOYYIB_CONFIG.IS_SANDBOX ? 'dev.' : ''}toyyibpay.com/${billCode}`
@@ -417,10 +414,18 @@ export class ToyyibService {
     const billpaymentStatus: string = String(txn.billpaymentStatus ?? '2');
     const billPaymentDate: string = txn.billPaymentDate ?? '';
 
+    // P1-fix: only overwrite status when the incoming status is at least as final as the stored one.
+    // Priority: 1 (paid) > 4 (settling) > 2 (pending) > 3 (failed)
+    const STATUS_PRIORITY: Record<string, number> = { '1': 4, '4': 3, '2': 2, '3': 1 };
     const snap = await getDocs(query(collection(db, COLLECTIONS.TOYYIB_BILLS), where('billCode', '==', billCode), limit(1)));
     const match = snap.docs[0];
     if (match) {
-      await updateDoc(doc(db, COLLECTIONS.TOYYIB_BILLS, match.id), { billpaymentStatus, billPaymentDate });
+      const existingStatus = String(match.data().billpaymentStatus ?? '2');
+      const existingPriority = STATUS_PRIORITY[existingStatus] ?? 0;
+      const incomingPriority = STATUS_PRIORITY[billpaymentStatus] ?? 0;
+      if (incomingPriority >= existingPriority) {
+        await updateDoc(doc(db, COLLECTIONS.TOYYIB_BILLS, match.id), { billpaymentStatus, billPaymentDate });
+      }
     }
     return { billpaymentStatus, billPaymentDate };
   }
@@ -480,7 +485,7 @@ export class ToyyibService {
       linkedType: 'membership',
       linkedYear: String(year),
       createdAt: serverTimestamp(),
-    });
+    }, { merge: true });
     return categoryCode;
   }
 
@@ -510,7 +515,7 @@ export class ToyyibService {
       linkedProjectId: projectId,
       linkedProjectName: projectTitle,
       createdAt: serverTimestamp(),
-    });
+    }, { merge: true });
     return categoryCode;
   }
 

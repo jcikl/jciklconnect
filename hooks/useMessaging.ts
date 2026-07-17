@@ -36,6 +36,10 @@ export const useMessaging = () => {
     }
   }, [member, showToast]);
 
+  // Tracks the most-recently requested conversationId so that a slow fetch
+  // for a previous conversation does not overwrite messages for the current one.
+  const conversationIdRef = useRef<string | null>(null);
+
   // Load messages for a conversation
   const loadMessages = useCallback(async (conversationId: string) => {
     if (isDevMode()) {
@@ -43,10 +47,13 @@ export const useMessaging = () => {
       return;
     }
 
+    conversationIdRef.current = conversationId;
+
     try {
       setLoading(true);
       setError(null);
       const data = await MessagingService.getMessages(conversationId);
+      if (conversationIdRef.current !== conversationId) return;
       setMessages(data);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load messages';
@@ -170,6 +177,7 @@ export const useMessaging = () => {
 
     const unsubscribe = MessagingService.subscribeToConversations(member.id, (newConversations) => {
       setConversations(newConversations);
+      setLoading(false);
     });
 
     return () => {

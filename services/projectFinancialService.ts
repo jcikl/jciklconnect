@@ -761,19 +761,32 @@ class ProjectFinancialService {
         });
       }
 
-      // Batch-fetch all transactions for all projects in chunks of 10 (avoids N+1)
+      // Batch-fetch all transactions and transaction splits for all projects in chunks of 10
       const projectIds = projects.map(p => p.id);
       const txChunks = chunkArray(projectIds, 10);
-      const txSnapshots = await Promise.all(
-        txChunks.map(chunk =>
+      const [txSnapshots, splitSnapshots] = await Promise.all([
+        Promise.all(txChunks.map(chunk =>
           getDocs(query(collection(db, COLLECTIONS.TRANSACTIONS), where('projectId', 'in', chunk)))
-        )
-      );
+        )),
+        Promise.all(txChunks.map(chunk =>
+          getDocs(query(collection(db, COLLECTIONS.TRANSACTION_SPLITS), where('projectId', 'in', chunk)))
+        )),
+      ]);
       const txByProject = new Map<string, { type?: string; amount?: number }[]>();
       txSnapshots.forEach(snap =>
         snap.docs.forEach(d => {
           const data = d.data();
           const pid: string = data.projectId;
+          if (!txByProject.has(pid)) txByProject.set(pid, []);
+          txByProject.get(pid)!.push(data);
+        })
+      );
+      // Include split-level income/expense amounts (P1-fix: splits may be the actual categorised amounts)
+      splitSnapshots.forEach(snap =>
+        snap.docs.forEach(d => {
+          const data = d.data();
+          const pid: string = data.projectId;
+          if (!pid) return;
           if (!txByProject.has(pid)) txByProject.set(pid, []);
           txByProject.get(pid)!.push(data);
         })

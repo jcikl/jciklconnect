@@ -7,12 +7,15 @@ import {
   addDoc,
   updateDoc,
   writeBatch,
+  runTransaction,
   query,
   where,
   orderBy,
   limit,
   Timestamp,
   arrayRemove,
+  arrayUnion,
+  increment,
   deleteField,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -153,36 +156,36 @@ export const EventRegistrationService = {
         return id;
       },
       async () => {
-        // P1 fix: check for an existing non-cancelled registration before creating a new one.
-        // This prevents duplicate registrations when the user double-clicks or retries.
-        const dupCheck = await getDocs(query(
-          collection(db, COLLECTIONS.EVENT_REGISTRATIONS),
-          where('eventId', '==', eventId),
-          where('memberId', '==', memberId),
-          where('status', 'in', ['registered', 'paid', 'checked_in'])
-        ));
-        if (!dupCheck.empty) {
-          throw new Error('会员已注册此活动');
-        }
+        // P0 FIX: use deterministic doc ID and runTransaction so dedup check + write are atomic.
+        const deterministicId = `${eventId}_${memberId}`;
+        const regRef = doc(db, COLLECTIONS.EVENT_REGISTRATIONS, deterministicId);
 
-        const payload: Record<string, unknown> = {
-          eventId,
-          memberId,
-          status: 'registered',
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
-          loId: lid,
-        };
-        if (extraFields?.dietary) payload.dietary = extraFields.dietary;
-        if (extraFields?.isVegetarian != null) payload.isVegetarian = extraFields.isVegetarian;
-        if (extraFields?.emergencyContactName) payload.emergencyContactName = extraFields.emergencyContactName;
-        if (extraFields?.emergencyContactPhone) payload.emergencyContactPhone = extraFields.emergencyContactPhone;
-        if (extraFields?.tshirtSize) payload.tshirtSize = extraFields.tshirtSize;
-        if (extraFields?.memberName) payload.memberName = extraFields.memberName;
-        if (extraFields?.registeredBy) payload.registeredBy = extraFields.registeredBy;
-        if (extraFields?.registeredByName) payload.registeredByName = extraFields.registeredByName;
-        const ref = await addDoc(collection(db, COLLECTIONS.EVENT_REGISTRATIONS), payload);
-        return ref.id;
+        await runTransaction(db, async (txn) => {
+          const snap = await txn.get(regRef);
+          if (snap.exists() && snap.data().status !== 'cancelled') {
+            throw new Error('会员已注册此活动');
+          }
+
+          const payload: Record<string, unknown> = {
+            eventId,
+            memberId,
+            status: 'registered',
+            createdAt: snap.exists() ? snap.data().createdAt : Timestamp.now(),
+            updatedAt: Timestamp.now(),
+            loId: lid,
+          };
+          if (extraFields?.dietary) payload.dietary = extraFields.dietary;
+          if (extraFields?.isVegetarian != null) payload.isVegetarian = extraFields.isVegetarian;
+          if (extraFields?.emergencyContactName) payload.emergencyContactName = extraFields.emergencyContactName;
+          if (extraFields?.emergencyContactPhone) payload.emergencyContactPhone = extraFields.emergencyContactPhone;
+          if (extraFields?.tshirtSize) payload.tshirtSize = extraFields.tshirtSize;
+          if (extraFields?.memberName) payload.memberName = extraFields.memberName;
+          if (extraFields?.registeredBy) payload.registeredBy = extraFields.registeredBy;
+          if (extraFields?.registeredByName) payload.registeredByName = extraFields.registeredByName;
+          txn.set(regRef, payload);
+        });
+
+        return deterministicId;
       }
     );
   },
@@ -305,11 +308,13 @@ export const EventRegistrationService = {
         const ref = doc(db, COLLECTIONS.EVENT_REGISTRATIONS, registrationId);
         const snap = await getDoc(ref);
         const financeTransactionId: string | undefined = snap.exists() ? snap.data().financeTransactionId : undefined;
+        const regEventId: string | undefined = snap.exists() ? snap.data().eventId : undefined;
+        const regMemberId: string | undefined = snap.exists() ? snap.data().memberId : undefined;
 
-        // P1 fix: commit the status change FIRST, then clean up the finance transaction.
-        // If finance deletion fails, the registration is still properly cancelled and
-        // the finance team can void the transaction manually.
-        await updateDoc(ref, {
+        // P1 FIX: use writeBatch to atomically cancel the registration AND decrement the
+        // event's attendees counter / remove memberId from registeredMembers in one commit.
+        const batch = writeBatch(db);
+        batch.update(ref, {
           status: 'cancelled',
           cancelledAt: Timestamp.now(),
           cancelledBy,
@@ -318,6 +323,14 @@ export const EventRegistrationService = {
           financeTransactionId: null,
           updatedAt: Timestamp.now(),
         });
+        if (regEventId && regMemberId && snap.exists() && snap.data().status !== 'cancelled') {
+          const eventRef = doc(db, COLLECTIONS.PROJECTS, regEventId);
+          batch.update(eventRef, {
+            attendees: increment(-1),
+            registeredMembers: arrayRemove(regMemberId),
+          });
+        }
+        await batch.commit();
 
         if (financeTransactionId) {
           try {

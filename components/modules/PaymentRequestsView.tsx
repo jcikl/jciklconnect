@@ -1,7 +1,7 @@
 ﻿// Payment Requests “ submit, my applications, finance list and review
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Plus, RefreshCw, CheckCircle, XCircle, Search, X, FileText, Download, Eye, Clock, Copy, Check, Landmark, DollarSign, Paperclip, Sparkles, Building2, User, Trash2 } from 'lucide-react';
-import { Button, Card, Modal, useToast, Tabs, Badge, PageHeader } from '../ui/Common';
+import { Button, Card, Modal, useToast, Tabs, Badge, PageHeader, ConfirmDialog } from '../ui/Common';
 import { SubmitPaymentRequestModal } from './PaymentRequests/SubmitPaymentRequestModal';
 import { Input, Select } from '../ui/Form';
 import { FirstUseBanner } from '../ui/FirstUseBanner';
@@ -94,7 +94,11 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
   // Reset pagination when filters change so results aren't artificially truncated.
   useEffect(() => { setFinanceListLimit(50); }, [searchQuery, statusFilter]);
 
+  type PRConfirmState = { type: 'delete' | 'cancel'; id: string } | null;
+  const [prConfirmState, setPrConfirmState] = useState<PRConfirmState>(null);
+
   const canViewFinance = hasPermission('canViewFinance');
+  const canEditFinance = hasPermission('canEditFinance');
   const loId = (member as { loId?: string })?.loId ?? DEFAULT_LO_ID;
   const activityRefFilter = isActivityFinance ? (member as { activityFinanceActivityId?: string | null })?.activityFinanceActivityId ?? null : null;
 
@@ -234,6 +238,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
 
   const handleApproveReject = async (id: string, status: 'approved' | 'rejected', rejectionReason?: string) => {
     if (!user?.uid) return;
+    if (!canEditFinance && !isAdmin) { showToast('Insufficient permissions', 'error'); return; }
     setActioningId(id);
     const reviewerBoardTitle = (member as any)?.currentBoardPosition ?? (member as any)?.jciCareer?.currentBoardPosition;
     try {
@@ -284,7 +289,16 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
       showToast('只能删除草稿、已取消或已拒绝的申请', 'error');
       return;
     }
-    if (!confirm('Permanently delete this payment request? This cannot be undone.')) return;
+    setPrConfirmState({ type: 'delete', id });
+  };
+
+  const executeDeletePR = async (id: string) => {
+    const DELETABLE_STATUSES: PaymentRequestStatus[] = ['draft', 'cancelled', 'rejected'];
+    const pr = [...myList, ...financeList].find(p => p.id === id);
+    if (pr && !DELETABLE_STATUSES.includes(pr.status)) {
+      showToast('只能删除草稿、已取消或已拒绝的申请', 'error');
+      return;
+    }
     setActioningId(id);
     try {
       await PaymentRequestService.deletePR(id);
@@ -298,9 +312,13 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
     }
   };
 
-  const handleCancel = async (id: string) => {
+  const handleCancel = (id: string) => {
     if (!user?.uid) return;
-    if (!confirm('Are you sure you want to cancel this payment request?')) return;
+    setPrConfirmState({ type: 'cancel', id });
+  };
+
+  const executeCancel = async (id: string) => {
+    if (!user?.uid) return;
     setActioningId(id);
     try {
       await PaymentRequestService.cancel(id, user.uid);
@@ -1005,7 +1023,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                                     <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); handlePreviewPDF(pr); }} title="View PDF">
                                       <Eye size={13} />
                                     </Button>
-                                    {pr.status === 'submitted' && (
+                                    {pr.status === 'submitted' && (canEditFinance || isAdmin) && (
                                       <>
                                         <Button size="sm" variant="success" onClick={(e) => { e.stopPropagation(); handleApproveReject(pr.id, 'approved'); }} disabled={actioningId !== null} title="Approve">
                                           <CheckCircle size={13} />
@@ -1244,6 +1262,26 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
         preselectedProjectId={submitPreselectedProjectId}
         preselectedCategory={submitPreselectedCategory}
         onSuccess={(ref) => { setSuccessRef(ref); loadMyList(); }}
+      />
+
+      {/* P1: Delete / Cancel confirmation dialog */}
+      <ConfirmDialog
+        open={!!prConfirmState}
+        title={prConfirmState?.type === 'delete' ? 'Delete Payment Request' : 'Cancel Payment Request'}
+        message={prConfirmState?.type === 'delete'
+          ? 'Permanently delete this payment request? This cannot be undone.'
+          : 'Are you sure you want to cancel this payment request?'}
+        confirmLabel={prConfirmState?.type === 'delete' ? 'Delete' : 'Cancel Request'}
+        cancelLabel="Go Back"
+        variant="danger"
+        onConfirm={() => {
+          if (!prConfirmState) return;
+          const { type, id } = prConfirmState;
+          setPrConfirmState(null);
+          if (type === 'delete') executeDeletePR(id);
+          else executeCancel(id);
+        }}
+        onCancel={() => setPrConfirmState(null)}
       />
 
       {/* Rejection reason dialog */}

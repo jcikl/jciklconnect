@@ -1,10 +1,13 @@
 import { ErrorInfo } from 'react';
 import { auth } from '../config/firebase';
 
-function sanitizeContext(obj: Record<string, unknown>): Record<string, unknown> {
-  const SENSITIVE = ['password', 'token', 'secret', 'key', 'credential', 'apikey', 'api_key'];
+function sanitizeContext(obj: unknown, depth = 0): unknown {
+  if (depth > 3 || obj === null || typeof obj !== 'object') return obj;
+  const SENSITIVE_RE = /password|token|secret|key|credential|apikey|api_key/i;
   return Object.fromEntries(
-    Object.entries(obj).filter(([k]) => !SENSITIVE.some(s => k.toLowerCase().includes(s)))
+    Object.entries(obj as Record<string, unknown>)
+      .filter(([k]) => !SENSITIVE_RE.test(k))
+      .map(([k, v]) => [k, sanitizeContext(v, depth + 1)])
   );
 }
 
@@ -57,8 +60,11 @@ class ErrorLoggingService {
 
   private saveLogsToStorage(): void {
     try {
-      // Only keep the most recent logs in localStorage
-      const recentLogs = this.logs.slice(-this.maxLogs);
+      // Only store minimal fields in localStorage — stack traces, componentStack,
+      // and context may contain sensitive data or exceed storage quotas.
+      const recentLogs = this.logs.slice(-this.maxLogs).map(({ id, timestamp, level, message }) => ({
+        id, timestamp, level, message,
+      }));
       localStorage.setItem('errorLogs', JSON.stringify(recentLogs));
     } catch (error) {
       console.warn('Failed to save error logs to storage:', error);
@@ -210,7 +216,7 @@ class ErrorLoggingService {
       // Sanitize and strip sensitive keys from context before writing to Firestore
       const sanitizedLogEntry = {
         ...logEntry,
-        context: logEntry.context ? sanitizeContext(logEntry.context as Record<string, unknown>) : undefined,
+        context: logEntry.context ? sanitizeContext(logEntry.context as Record<string, unknown>) as Record<string, unknown> : undefined,
       };
       // Firestore rejects undefined values — strip them
       const payload = JSON.parse(JSON.stringify({

@@ -2,6 +2,7 @@
 import { useFirestoreCollection } from './useFirestoreCollection';
 import { AdvertisementService, Advertisement, PromotionPackage } from '../services/advertisementService';
 import { useToast } from '../components/ui/Common';
+import { errorLoggingService } from '../services/errorLoggingService';
 
 export const useAdvertisements = () => {
   const { showToast } = useToast();
@@ -57,11 +58,21 @@ export const useAdvertisements = () => {
   };
 
   const recordImpression = async (adId: string) => {
-    await AdvertisementService.recordImpression(adId);
+    try {
+      await AdvertisementService.recordImpression(adId);
+    } catch (err) {
+      errorLoggingService.logError(err, { action: 'recordImpression', additionalData: { adId } });
+      // Analytics call — swallow error so it never disrupts the user experience
+    }
   };
 
   const recordClick = async (adId: string) => {
-    await AdvertisementService.recordClick(adId);
+    try {
+      await AdvertisementService.recordClick(adId);
+    } catch (err) {
+      errorLoggingService.logError(err, { action: 'recordClick', additionalData: { adId } });
+      // Analytics call — swallow error so it never disrupts the user experience
+    }
   };
 
   const getBenefitUsageHistory = async (benefitId?: string, memberId?: string) => {

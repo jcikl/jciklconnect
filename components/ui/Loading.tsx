@@ -47,6 +47,7 @@ interface LoadingStateProps {
   children: React.ReactNode;
   emptyMessage?: string;
   empty?: boolean;
+  onRetry?: () => void;
 }
 
 export const LoadingState: React.FC<LoadingStateProps> = ({
@@ -55,6 +56,7 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
   children,
   emptyMessage = 'No data available',
   empty = false,
+  onRetry,
 }) => {
   if (loading) {
     return (
@@ -73,6 +75,14 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
         <div className="text-center">
           <p className="text-red-600 font-medium mb-2">Error loading data</p>
           <p className="text-slate-500 text-sm">{error}</p>
+          {onRetry && (
+            <button
+              onClick={onRetry}
+              className="mt-3 px-4 py-1.5 text-sm font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+            >
+              Try Again
+            </button>
+          )}
         </div>
       </div>
     );

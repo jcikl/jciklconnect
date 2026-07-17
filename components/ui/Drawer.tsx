@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 interface DrawerProps {
@@ -30,7 +30,7 @@ export const Drawer: React.FC<DrawerProps> = ({
   footer,
 }) => {
   const panelRef = useRef<HTMLDivElement>(null);
-  const titleId = 'drawer-title';
+  const titleId = useId();
 
   useEffect(() => {
     if (!isOpen) return;

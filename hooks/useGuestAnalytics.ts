@@ -7,11 +7,13 @@ export function useGuestAnalytics(days: number) {
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
+    let ignore = false;
     setLoading(true);
     guestAnalyticsService.getSummary(days)
-      .then(result => { setData(result); setError(null); })
-      .catch(err => setError(err instanceof Error ? err : new Error(String(err))))
-      .finally(() => setLoading(false));
+      .then(r => { if (!ignore) { setData(r); setError(null); } })
+      .catch(e => { if (!ignore) setError(e instanceof Error ? e : new Error(String(e))); })
+      .finally(() => { if (!ignore) setLoading(false); });
+    return () => { ignore = true; };
   }, [days]);
 
   return { data, loading, error };

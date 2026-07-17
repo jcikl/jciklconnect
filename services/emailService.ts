@@ -16,8 +16,7 @@ export interface EmailConfig {
   fromName: string;
   smtpHost?: string;
   smtpPort?: number;
-  smtpUser?: string;
-  smtpPassword?: string;
+  // SMTP credentials must never be in client code — use server-side env vars only
   smtpSecure?: boolean;
   region?: string; // For AWS SES
 }

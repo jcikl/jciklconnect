@@ -424,14 +424,21 @@ export class PaymentRequestService {
         }
       },
       async () => {
-        await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id), {
+        // P1-fix: guard against marking non-approved PRs as paid.
+        const prRef = doc(db, COLLECTIONS.PAYMENT_REQUESTS, id);
+        const prSnap = await getDoc(prRef);
+        if (!prSnap.exists()) throw new Error('Payment request not found');
+        if ((prSnap.data() as PaymentRequest).status !== 'approved') {
+          throw new Error('只有 approved 状态的付款申请可以标记为已付款');
+        }
+        await updateDoc(prRef, {
           status: 'paid',
           paidAt: bankTxDate,
           updatedAt: Timestamp.now(),
         });
         invalidateFinanceCache();
         // Notify applicant (AA)
-        const snap = await getDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id));
+        const snap = await getDoc(prRef);
         if (snap.exists()) {
           const pr = { id: snap.id, ...snap.data() } as PaymentRequest;
           await this._notifyApplicant(pr, 'paid');
@@ -496,21 +503,22 @@ export class PaymentRequestService {
         await this._notifyApprovers(pr);
       },
       async () => {
-        // E7: fetch current status before resubmitting to guard against invalid transitions.
+        // P1-fix: use runTransaction so the status check and the update are atomic.
         const ref = doc(db, COLLECTIONS.PAYMENT_REQUESTS, id);
-        const snap0 = await getDoc(ref);
-        if (!snap0.exists()) throw new Error('Payment request not found');
-        const currentStatus = (snap0.data() as PaymentRequest).status;
-        if (currentStatus !== 'rejected') {
-          throw new Error('Only rejected payment requests can be resubmitted');
-        }
-        await updateDoc(ref, {
-          status: 'submitted',
-          rejectionReason: null,
-          reviewedBy: null,
-          reviewedAt: null,
-          updatedAt: Timestamp.now(),
-          updatedBy,
+        await runTransaction(db, async (tx) => {
+          const snap0 = await tx.get(ref);
+          if (!snap0.exists()) throw new Error('Payment request not found');
+          if ((snap0.data() as PaymentRequest).status !== 'rejected') {
+            throw new Error('Only rejected payment requests can be resubmitted');
+          }
+          tx.update(ref, {
+            status: 'submitted',
+            rejectionReason: null,
+            reviewedBy: null,
+            reviewedAt: null,
+            updatedAt: Timestamp.now(),
+            updatedBy,
+          });
         });
         invalidateFinanceCache();
         const snap = await getDoc(ref);
@@ -660,26 +668,34 @@ export class PaymentRequestService {
         if (pr) await this._notifyApplicant(pr, 'cancelled');
       },
       async () => {
-        // Update PR status first so the cancellation is recorded even if expense tx cleanup fails.
-        await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id), {
+        // P0-fix: find linked expense transaction BEFORE writing, then cancel PR + delete tx atomically.
+        const expenseQ = query(
+          collection(db, COLLECTIONS.TRANSACTIONS),
+          where('paymentRequestId', '==', id),
+          where('type', '==', 'Expense')
+        );
+        const expenseSnap = await getDocs(expenseQ);
+
+        const batch = writeBatch(db);
+        const prRef = doc(db, COLLECTIONS.PAYMENT_REQUESTS, id);
+        batch.update(prRef, {
           status: 'cancelled',
           updatedAt: Timestamp.now(),
           updatedBy: userId,
         });
+        for (const txDoc of expenseSnap.docs) {
+          const tx = txDoc.data() as Transaction;
+          if (tx.status !== 'Reconciled' && tx.status !== 'Partially Reconciled') {
+            batch.delete(txDoc.ref);
+          } else {
+            console.warn('[PaymentRequestService.cancel] Skipping delete of reconciled expense tx', txDoc.id, '— must be voided manually');
+          }
+        }
+        await batch.commit();
         invalidateFinanceCache();
 
-        // Attempt to delete linked expense transaction (情景 G).
-        // Non-finance applicants lack the Firestore delete permission on transactions, so we
-        // catch that error and warn — the PR status is already correctly 'cancelled'.
-        try {
-          await this._deleteExpenseTransactionForPR(id);
-        } catch (err) {
-          console.warn('[PaymentRequestService.cancel] Could not delete expense tx (permission denied?); PR is cancelled but expense tx may need manual cleanup', err);
-          errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { component: 'paymentRequestService', action: 'cancel._deleteExpenseTx' });
-        }
-
         // Notify applicant (AA)
-        const snap = await getDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id));
+        const snap = await getDoc(prRef);
         if (snap.exists()) await this._notifyApplicant({ id: snap.id, ...snap.data() } as PaymentRequest, 'cancelled');
       }
     );
@@ -750,29 +766,6 @@ export class PaymentRequestService {
     } catch (err) {
       console.error('[PaymentRequestService] Failed to delete expense transaction for PR', prId, err);
       errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { component: 'paymentRequestService', action: '_deleteExpenseTransactionForPR' });
-    }
-  }
-
-  /** Update amount on the expense transaction linked to this PR (情景 R) */
-  private static async _syncExpenseTransactionAmount(pr: PaymentRequest): Promise<void> {
-    try {
-      const q = query(
-        collection(db, COLLECTIONS.TRANSACTIONS),
-        where('paymentRequestId', '==', pr.id),
-        where('type', '==', 'Expense')
-      );
-      const snap = await getDocs(q);
-      const linked = snap.docs.map(d => ({ id: d.id, ...d.data() } as import('../types').Transaction));
-      for (const tx of linked) {
-        await FinanceService.updateTransaction(tx.id, { amount: pr.totalAmount || pr.amount });
-      }
-    } catch (err) {
-      console.error('[PaymentRequestService] Failed to sync expense transaction amount for PR', pr.id, err);
-      errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { component: 'paymentRequestService', action: '_syncExpenseTransactionAmount' });
-      // Surface the failure so finance knows the PR amount and the expense tx are now out of sync.
-      try {
-        await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, pr.id), { amountSyncFailed: true });
-      } catch { /* ignore */ }
     }
   }
 

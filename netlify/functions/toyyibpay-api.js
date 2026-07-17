@@ -8,16 +8,16 @@ const { initializeApp, getApps, cert } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
 const { getFirestore } = require('firebase-admin/firestore');
 
+const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID;
+const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
+const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n');
+if (!projectId || !clientEmail || !privateKey) {
+  throw new Error('[toyyibpay-api] Missing FIREBASE_ADMIN_* env vars');
+}
+
 if (!getApps().length) {
   initializeApp({
-    credential: cert({
-      // TODO SEC-010: Rename Netlify dashboard vars to FIREBASE_ADMIN_PROJECT_ID,
-      // FIREBASE_ADMIN_CLIENT_EMAIL, FIREBASE_ADMIN_PRIVATE_KEY (no VITE_ prefix).
-      // VITE_ naming risks accidentally bundling these into the browser build if added to .env.
-      projectId: process.env.FIREBASE_ADMIN_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL || process.env.VITE_FIREBASE_CLIENT_EMAIL,
-      privateKey: (process.env.FIREBASE_ADMIN_PRIVATE_KEY || process.env.VITE_FIREBASE_PRIVATE_KEY)?.replace(/\\n/g, '\n'),
-    }),
+    credential: cert({ projectId, clientEmail, privateKey }),
   });
 }
 

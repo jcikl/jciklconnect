@@ -110,17 +110,20 @@ const EventRowBase: React.FC<{
               <span>{event.attendees}{event.maxAttendees ? `/${event.maxAttendees}` : ''} registered</span>
             </div>
           </div>
-          {isUpcoming && handleRegister && (
-            <Button
-              size="sm"
-              variant={isRegistered ? "success" : "primary"}
-              disabled={!!isRegistered}
-              className="mt-auto w-full text-xs"
-              onClick={handleRegister}
-            >
-              {isRegistered ? 'Registered' : 'Register'}
-            </Button>
-          )}
+          {isUpcoming && handleRegister && (() => {
+            const isFull = !!(event.maxAttendees && (event.attendees ?? 0) >= event.maxAttendees);
+            return (
+              <Button
+                size="sm"
+                variant={isRegistered ? "success" : "primary"}
+                disabled={!!isRegistered || (isFull && !isRegistered)}
+                className="mt-auto w-full text-xs"
+                onClick={handleRegister}
+              >
+                {isRegistered ? 'Registered' : isFull ? 'Full' : 'Register'}
+              </Button>
+            );
+          })()}
         </div>
       </div>
     );
@@ -171,17 +174,20 @@ const EventRowBase: React.FC<{
             <span>{event.attendees}{event.maxAttendees ? `/${event.maxAttendees}` : ''} registered</span>
           </div>
         </div>
-        {isUpcoming && handleRegister && (
-          <Button
-            size="sm"
-            variant={isRegistered ? "success" : "primary"}
-            disabled={!!isRegistered}
-            className="mt-auto w-full"
-            onClick={handleRegister}
-          >
-            {isRegistered ? 'Registered' : 'Register'}
-          </Button>
-        )}
+        {isUpcoming && handleRegister && (() => {
+          const isFull = !!(event.maxAttendees && (event.attendees ?? 0) >= event.maxAttendees);
+          return (
+            <Button
+              size="sm"
+              variant={isRegistered ? "success" : "primary"}
+              disabled={!!isRegistered || (isFull && !isRegistered)}
+              className="mt-auto w-full"
+              onClick={handleRegister}
+            >
+              {isRegistered ? 'Registered' : isFull ? 'Full' : 'Register'}
+            </Button>
+          );
+        })()}
       </div>
     </div>
   );

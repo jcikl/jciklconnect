@@ -475,7 +475,7 @@ export const ButtonGroup: React.FC<ButtonGroupProps> = ({ label, name, options, 
               type="radio"
               name={name}
               value={opt.value}
-              defaultChecked={value === opt.value}
+              checked={value === opt.value}
               onChange={(e) => onChange?.(e.target.value)}
               className="hidden"
             />

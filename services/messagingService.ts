@@ -10,6 +10,7 @@ import {
   orderBy,
   limit,
   increment,
+  arrayUnion,
   Timestamp,
   onSnapshot,
 } from 'firebase/firestore';
@@ -307,9 +308,10 @@ export class MessagingService {
       () => {},
       async () => {
         try {
-          // Fetch conversation and unread messages in parallel
+          // P1: limit to 490 to leave headroom for the conversation update op in the same batch.
+          // Fetch conversation and unread messages in parallel.
           const [messages, conversationDoc] = await Promise.all([
-            this.getMessages(conversationId, 500),
+            this.getMessages(conversationId, 490),
             getDoc(doc(db, CONV_COLLECTION, conversationId)),
           ]);
 
@@ -319,11 +321,11 @@ export class MessagingService {
 
           const batch = writeBatch(db);
 
-          // Update each unread message's readBy array
+          // P1: use arrayUnion so concurrent markAsRead calls don't clobber each other.
           for (const message of unreadMessages) {
             const messageRef = doc(db, MSG_COLLECTION, message.id!);
             batch.update(messageRef, {
-              readBy: [...message.readBy, memberId],
+              readBy: arrayUnion(memberId),
             });
           }
 

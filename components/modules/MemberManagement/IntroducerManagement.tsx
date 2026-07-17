@@ -82,7 +82,7 @@ export const IntroducerManagement: React.FC<Props> = ({
         const short = obj?.name || '';
         const full = obj?.fullName || '';
         const name = short && full && short !== full ? `${short} (${full})` : short || full || 'Unknown Member';
-        return { id, name, count, avatar: obj?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0097D7&color=fff` };
+        return { id, name, count, avatar: obj?.avatar || '' };
       })
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
@@ -220,7 +220,7 @@ export const IntroducerManagement: React.FC<Props> = ({
         return {
           id,
           name,
-          avatar: memberObj?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(id)}&background=0097D7&color=fff`,
+          avatar: memberObj?.avatar || '',
           count
         };
       })
@@ -397,7 +397,11 @@ export const IntroducerManagement: React.FC<Props> = ({
                 <div key={recruiter.id} className="flex items-center justify-between text-sm py-1 border-b border-slate-100 last:border-0">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-black text-slate-400 w-4">#{idx + 1}</span>
-                    <img src={recruiter.avatar} alt="" className="w-6 h-6 rounded-full" />
+                    {recruiter.avatar ? (
+                      <img src={recruiter.avatar} alt="" className="w-6 h-6 rounded-full" />
+                    ) : (
+                      <div style={{background:'#0097D7', color:'#fff', borderRadius:'50%', width:24, height:24, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:600}}>{recruiter.name.charAt(0).toUpperCase()}</div>
+                    )}
                     <span className="font-semibold text-slate-800 truncate max-w-[140px]">{recruiter.name}</span>
                   </div>
                   <Badge variant="success" className="font-black text-xs shrink-0">{recruiter.count} recruited</Badge>
@@ -564,11 +568,11 @@ export const IntroducerManagement: React.FC<Props> = ({
                                 key={inv.id}
                                 className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md border border-slate-200 text-xs font-semibold"
                               >
-                                <img
-                                  src={inv.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(inv.name)}&background=0097D7&color=fff`}
-                                  className="w-4 h-4 rounded-full"
-                                  alt=""
-                                />
+                                {inv.avatar ? (
+                                  <img src={inv.avatar} className="w-4 h-4 rounded-full" alt="" />
+                                ) : (
+                                  <div style={{background:'#0097D7', color:'#fff', borderRadius:'50%', width:16, height:16, display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:600}}>{inv.name.charAt(0).toUpperCase()}</div>
+                                )}
                                 <span>{displayName}</span>
                               </div>
                             );

@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useMemo, useCallback, useTransition, lazy, Suspense } from 'react';
 import { DollarSign, PieChart, ArrowUpRight, ArrowDownRight, RefreshCw, AlertCircle, FileText, Plus, X, Download, TrendingUp, TrendingDown, BarChart3, CheckCircle, AlertTriangle, Edit, Trash2, Briefcase, Upload, Layers, Settings, Search, Link2, SlidersHorizontal, ChevronDown, ShieldAlert } from 'lucide-react';
-import { Card, Button, Badge, StatCard, StatCardsContainer, Modal, useToast, Tabs, Drawer } from '../ui/Common';
+import { Card, Button, Badge, StatCard, StatCardsContainer, Modal, useToast, Tabs, Drawer, ConfirmDialog } from '../ui/Common';
 import { Input, Select } from '../ui/Form';
 import { Combobox } from '../ui/Combobox';
 import { LoadingState } from '../ui/Loading';
@@ -59,7 +59,11 @@ const FinanceAlertsPanel: React.FC<{ userId: string }> = ({ userId }) => {
     finally { setLoading(false); }
   }, [showToast]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    const interval = setInterval(() => { load(); }, 60000);
+    return () => clearInterval(interval);
+  }, [load]);
 
   if (!loading && alerts.length === 0) return null;
 
@@ -280,6 +284,27 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
     handleDeleteProjectTrx,
     handleProjectTrxPaste,
   } = useFinanceData(searchQuery);
+
+  // P1: submit-guard states
+  const [isAddingTransaction, setIsAddingTransaction] = useState(false);
+  const [isUpdatingTransaction, setIsUpdatingTransaction] = useState(false);
+  // P1: project-trx delete confirm
+  const [deleteProjectTxConfirm, setDeleteProjectTxConfirm] = useState<string | null>(null);
+  // P1: batch delete confirm
+  const [showBatchDeleteConfirm, setShowBatchDeleteConfirm] = useState(false);
+
+  const wrappedHandleAddTransaction = async (e: React.FormEvent<HTMLFormElement>) => {
+    setIsAddingTransaction(true);
+    try { await handleAddTransaction(e); }
+    finally { setIsAddingTransaction(false); }
+  };
+
+  const wrappedHandleUpdateTransaction = async (e: React.FormEvent<HTMLFormElement>) => {
+    setIsUpdatingTransaction(true);
+    try { await handleUpdateTransaction(e); }
+    finally { setIsUpdatingTransaction(false); }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
@@ -897,11 +922,11 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
         footer={
           <div className="flex gap-2 w-full">
             <Button variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-            <Button className="flex-1" type="submit" form="record-transaction-form">Save Transaction</Button>
+            <Button className="flex-1" type="submit" form="record-transaction-form" disabled={isAddingTransaction}>Save Transaction</Button>
           </div>
         }
       >
-        <form id="record-transaction-form" onSubmit={handleAddTransaction} className="space-y-6">
+        <form id="record-transaction-form" onSubmit={wrappedHandleAddTransaction} className="space-y-6">
           <Suspense fallback={<div className="py-8 text-center text-slate-400 text-sm">Loading...</div>}>
           <TransactionForm
             mode="create"
@@ -946,7 +971,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
                 className="flex-1 shadow-sm"
                 type="submit"
                 form="edit-transaction-form"
-                disabled={editingTransaction.status === 'Reconciled' || editingTransaction.status === 'Partially Reconciled'}
+                disabled={editingTransaction.status === 'Reconciled' || editingTransaction.status === 'Partially Reconciled' || isUpdatingTransaction}
               >
                 Update Transaction
               </Button>
@@ -959,7 +984,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
               This transaction is <strong>{editingTransaction.status}</strong> and cannot be edited. Delink it from all project transactions to unlock.
             </div>
           )}
-          <form id="edit-transaction-form" onSubmit={handleUpdateTransaction} className="space-y-6">
+          <form id="edit-transaction-form" onSubmit={wrappedHandleUpdateTransaction} className="space-y-6">
             <Suspense fallback={<div className="py-8 text-center text-slate-400 text-sm">Loading...</div>}>
             <TransactionForm
               mode="edit"
@@ -1331,7 +1356,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
                                       size="sm"
                                       variant="ghost"
                                       className="p-1"
-                                      onClick={() => handleDeleteProjectTrx(tx.id)}
+                                      onClick={() => setDeleteProjectTxConfirm(tx.id)}
                                     >
                                       <Trash2 size={14} className="text-red-500" />
                                     </Button>
@@ -1600,7 +1625,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
                   <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider">Batch Set</span>
                 </button>
                 <button
-                  onClick={handleBatchDelete}
+                  onClick={() => setShowBatchDeleteConfirm(true)}
                   className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 text-red-400 hover:text-red-300 transition-all px-2 py-1 rounded-lg hover:bg-white/5"
                 >
                   <Trash2 size={18} />
@@ -1643,6 +1668,28 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
       )}
 
       {/* Add Administrative Project ID Modal (è¡Œæ”¿è´¹æˆ·å£) */}
+      {/* P1: Project Trx Delete Confirm */}
+      <ConfirmDialog
+        open={!!deleteProjectTxConfirm}
+        title="Delete Project Transaction"
+        message="Are you sure you want to delete this project transaction? This cannot be undone."
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={() => { if (deleteProjectTxConfirm) handleDeleteProjectTrx(deleteProjectTxConfirm); setDeleteProjectTxConfirm(null); }}
+        onCancel={() => setDeleteProjectTxConfirm(null)}
+      />
+
+      {/* P1: Batch Delete Confirm */}
+      <ConfirmDialog
+        open={showBatchDeleteConfirm}
+        title="Delete Selected Transactions"
+        message={`Will delete ${selectedTxIds.size + selectedSplitIds.size} record(s). This operation cannot be undone.`}
+        confirmLabel="Delete All"
+        variant="danger"
+        onConfirm={() => { setShowBatchDeleteConfirm(false); handleBatchDelete(); }}
+        onCancel={() => setShowBatchDeleteConfirm(false)}
+      />
+
       <Modal
         isOpen={isAddAdministrativeProjectOpen}
         onClose={() => setIsAddAdministrativeProjectOpen(false)}

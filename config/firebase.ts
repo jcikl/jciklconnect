@@ -3,6 +3,7 @@ import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth, setPersistence, browserSessionPersistence } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
+import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 import { isDevMode } from '../utils/devMode';
 
 // No hardcoded fallbacks — if env var is missing, Firebase init will fail loudly (intentional).
@@ -81,6 +82,17 @@ if (typeof window !== 'undefined') {
     db = getFirestore(app);
   }
   storage = getStorage(app);
+
+  // P0: Initialize App Check with ReCaptchaV3Provider.
+  // Conditional on env var so local dev without a key doesn't crash.
+  if (import.meta.env.VITE_RECAPTCHA_SITE_KEY) {
+    initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(import.meta.env.VITE_RECAPTCHA_SITE_KEY),
+      isTokenAutoRefreshEnabled: true,
+    });
+  } else {
+    console.warn('[Firebase] App Check not initialized: VITE_RECAPTCHA_SITE_KEY not set');
+  }
 
 }
 

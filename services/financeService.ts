@@ -14,6 +14,7 @@ import {
   startAfter,
   Timestamp,
   writeBatch,
+  runTransaction,
   increment,
   getDoc as getFirestoreDoc,
   documentId,
@@ -22,7 +23,7 @@ import {
 import { db, auth } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { Transaction, BankAccount, ReconciliationRecord, ReconciliationDiscrepancy, TransactionSplit, TransactionType, MembershipDues, MembershipRecord, MembershipStatus, MembershipType, FinanceAlert } from '../types';
-import { withDevMode } from '../utils/devMode';
+import { withDevMode, isDevMode } from '../utils/devMode';
 import { getMYTYear } from '../utils/dateUtils';
 import { MOCK_TRANSACTIONS, MOCK_ACCOUNTS, MOCK_MEMBERS } from './mockData';
 import { formatCurrency } from '../utils/formatUtils';
@@ -996,12 +997,14 @@ export class FinanceService {
         try {
           const splitRef = doc(db, COLLECTIONS.TRANSACTION_SPLITS, splitId);
 
-          // Fetch current split before applying updates (needed for inventory diff)
+          // TX-W2: read current split, validate amount totals, then write atomically.
+          // Firestore v9 transactions don't support collection queries (only doc reads),
+          // so sibling validation is done outside; the runTransaction ensures the write
+          // is atomic with a fresh read of the split document.
           const currentDoc = await getDoc(splitRef);
           if (!currentDoc.exists()) throw new Error('Split not found');
-          const currentSplit = currentDoc.data() as TransactionSplit;
+          let currentSplit = currentDoc.data() as TransactionSplit;
 
-          // TX-W2: validate BEFORE writing so we never commit an invalid split amount.
           if (updates.amount !== undefined) {
             const allSplits = await this.getTransactionSplits(currentSplit.parentTransactionId);
             const totalSplitAmount = allSplits.reduce((sum, s) => {
@@ -1018,9 +1021,14 @@ export class FinanceService {
             }
           }
 
-          await updateDoc(splitRef, {
-            ...removeUndefined(updates),
-            updatedAt: Timestamp.now(),
+          await runTransaction(db, async (tx) => {
+            const freshSnap = await tx.get(splitRef);
+            if (!freshSnap.exists()) throw new Error('Split not found');
+            currentSplit = freshSnap.data() as TransactionSplit;
+            tx.update(splitRef, {
+              ...removeUndefined(updates),
+              updatedAt: Timestamp.now(),
+            });
           });
 
           // TS-E3: invalidate cache after every split update so reads reflect the change
@@ -1817,16 +1825,6 @@ export class FinanceService {
             await this.syncTransactionWithInventory(transaction, true);
           }
 
-          // If this is a matched income tx, remove the match from the linked bank tx first
-          if (transaction?.matchedBankTxIds?.length) {
-            const { EventPaymentMatchingService } = await import('./eventPaymentMatchingService');
-            for (const bankTxId of transaction.matchedBankTxIds) {
-              await EventPaymentMatchingService.removeMatch(transactionId, bankTxId).catch((err) =>
-                console.warn('[deleteTransaction] Could not clean up bank tx link:', err)
-              );
-            }
-          }
-
           if (transaction?.projectTransactionIds?.length) {
             const ptBatch = writeBatch(db);
             for (const ptId of transaction.projectTransactionIds) {
@@ -1866,6 +1864,17 @@ export class FinanceService {
             deletionBatch.update(bankAccountRef, { currentBalance: increment(-amountDelta) });
           }
           await deletionBatch.commit();
+
+          // If this is a matched income tx, remove the match from the linked bank tx AFTER
+          // the deletion batch commits so a removeMatch failure never orphans the deleted tx.
+          if (transaction?.matchedBankTxIds?.length) {
+            const { EventPaymentMatchingService } = await import('./eventPaymentMatchingService');
+            for (const bankTxId of transaction.matchedBankTxIds) {
+              await EventPaymentMatchingService.removeMatch(transactionId, bankTxId).catch((err) =>
+                console.warn('[deleteTransaction] Could not clean up bank tx link:', err)
+              );
+            }
+          }
 
           // Clean up split side-effects after the batch succeeds
           if (childSplits.length > 0) {
@@ -1946,7 +1955,9 @@ export class FinanceService {
             reversalReason: reason,
             reversedBy: operatorId,
             createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
+            // Store as Firestore Timestamp so server-side ordering is accurate (cast bypasses
+            // the string alias in the TS interface — Firestore handles the conversion on read).
+            updatedAt: Timestamp.now() as unknown as string,
           };
 
           const batch = writeBatch(db);
@@ -1956,7 +1967,7 @@ export class FinanceService {
             status: 'Voided',
             reversalReason: reason,
             reversedBy: operatorId,
-            updatedAt: new Date().toISOString(),
+            updatedAt: Timestamp.now(),
           });
           // SYNC-003: reverse the original transaction's balance impact atomically.
           // The reversal entry is Voided so it does not affect currentBalance itself.
@@ -2079,6 +2090,14 @@ export class FinanceService {
         where('projectTransactionIds', 'array-contains', transactionId)
       );
       const splitsSnapshot = await getDocs(splitsQuery);
+      // E3-fix: validate project tx existence before building the batch so we fail
+      // fast and never commit split updates without the corresponding project tx delete.
+      const projectTrxRef = doc(db, COLLECTIONS.PROJECT_TRANSACTIONS, transactionId);
+      const projectTrxSnap = await getDoc(projectTrxRef);
+      if (!projectTrxSnap.exists()) {
+        throw new Error('Project transaction not found: ' + transactionId);
+      }
+
       const splitBatch = writeBatch(db);
       // Collect parent-status updates and auto-generated deletes for post-batch processing
       const parentStatusUpdates: Array<{ parentTransactionId: string; splitId: string }> = [];
@@ -2103,6 +2122,8 @@ export class FinanceService {
           parentStatusUpdates.push({ parentTransactionId: split.parentTransactionId, splitId: docSnap.id });
         }
       }
+      // Include the project transaction delete in the same batch (P0-fix: atomic with split updates)
+      splitBatch.delete(projectTrxRef);
       await splitBatch.commit();
       // Delete auto-generated splits and update parent statuses after batch commits
       for (const splitId of autoGenDeletes) {
@@ -2120,14 +2141,6 @@ export class FinanceService {
           });
         }
       }
-
-      // E3: delete the project transaction document AFTER all reference cleanup has succeeded
-      const projectTrxRef = doc(db, COLLECTIONS.PROJECT_TRANSACTIONS, transactionId);
-      const projectTrxSnap = await getDoc(projectTrxRef);
-      if (!projectTrxSnap.exists()) {
-        throw new Error('Project transaction not found: ' + transactionId);
-      }
-      await deleteDoc(projectTrxRef);
 
       // E1: invalidate cache after successful delete + cascade
       invalidateFinanceCache();
@@ -2607,23 +2620,28 @@ export class FinanceService {
 
   // Get transactions by category
   static async getTransactionsByCategory(category: Transaction['category']): Promise<Transaction[]> {
-    try {
-      const q = query(
-        collection(db, COLLECTIONS.TRANSACTIONS),
-        where('category', '==', category),
-        orderBy('date', 'desc')
-      );
-
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        date: doc.data().date?.toDate?.()?.toISOString() || doc.data().date,
-      } as Transaction));
-    } catch (error) {
-      console.error('Error fetching transactions by category:', error);
-      throw error;
+    if (isDevMode()) {
+      return localMockTransactions.filter(t => t.category === category);
     }
+    return apiCache.getOrSet(`finance:byCategory:${category}`, async () => {
+      try {
+        const q = query(
+          collection(db, COLLECTIONS.TRANSACTIONS),
+          where('category', '==', category),
+          orderBy('date', 'desc')
+        );
+
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          date: doc.data().date?.toDate?.()?.toISOString() || doc.data().date,
+        } as Transaction));
+      } catch (error) {
+        console.error('Error fetching transactions by category:', error);
+        throw error;
+      }
+    }, 180000);
   }
 
   // Get financial summary
@@ -2675,30 +2693,41 @@ export class FinanceService {
         return transactionYear === targetYear;
       });
 
-      let totalIncome = 0;
-      let totalExpenses = 0;
-      const byCategory: Record<string, { income: number; expenses: number }> = {};
+      // Use integer cents to avoid floating-point drift when summing many amounts.
+      let totalIncomeCents = 0;
+      let totalExpensesCents = 0;
+      const byCategoryCents: Record<string, { income: number; expenses: number }> = {};
 
       filtered.forEach(t => {
         if (t.type === 'Income') {
-          totalIncome += t.amount;
-          if (!byCategory[t.category]) {
-            byCategory[t.category] = { income: 0, expenses: 0 };
+          totalIncomeCents += Math.round(t.amount * 100);
+          if (!byCategoryCents[t.category]) {
+            byCategoryCents[t.category] = { income: 0, expenses: 0 };
           }
-          byCategory[t.category].income += t.amount;
+          byCategoryCents[t.category].income += Math.round(t.amount * 100);
         } else {
-          totalExpenses += Math.abs(t.amount);
-          if (!byCategory[t.category]) {
-            byCategory[t.category] = { income: 0, expenses: 0 };
+          totalExpensesCents += Math.round(Math.abs(t.amount) * 100);
+          if (!byCategoryCents[t.category]) {
+            byCategoryCents[t.category] = { income: 0, expenses: 0 };
           }
-          byCategory[t.category].expenses += Math.abs(t.amount);
+          byCategoryCents[t.category].expenses += Math.round(Math.abs(t.amount) * 100);
         }
       });
+
+      const totalIncome = totalIncomeCents / 100;
+      const totalExpenses = totalExpensesCents / 100;
+      const byCategory: Record<string, { income: number; expenses: number }> = {};
+      for (const cat of Object.keys(byCategoryCents)) {
+        byCategory[cat] = {
+          income: byCategoryCents[cat].income / 100,
+          expenses: byCategoryCents[cat].expenses / 100,
+        };
+      }
 
       return {
         totalIncome,
         totalExpenses,
-        netBalance: totalIncome - totalExpenses,
+        netBalance: (totalIncomeCents - totalExpensesCents) / 100,
         byCategory,
       };
     } catch (error) {
@@ -2772,10 +2801,11 @@ export class FinanceService {
           // Skip inactive members — they retain historical records but do not renew
           if ((member.role as string) === 'INACTIVE') continue;
 
-          // Check if renewal already exists — reuse the already-fetched list (no O(N) inner query)
+          // Check if renewal already exists — reuse the already-fetched list (no O(N) inner query).
+          // Exclude Voided transactions so a reversed dues payment does not block re-renewal.
           const alreadyRenewed = allMembershipTransactions.some(t => {
             const transactionYear = new Date(t.date).getFullYear();
-            return transactionYear === year && t.memberId === memberId && t.type === 'Income';
+            return transactionYear === year && t.memberId === memberId && t.type === 'Income' && t.status !== 'Voided';
           });
           if (alreadyRenewed) continue;
 

@@ -76,6 +76,7 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
   const [memberGroupPhotoUploading, setMemberGroupPhotoUploading] = useState(false);
   const [memberGroupPhotoUploadProgress, setMemberGroupPhotoUploadProgress] = useState(0);
   const [termSettings, setTermSettings] = useState<Partial<BoardTermSettings>>({});
+  const [removingDirectorId, setRemovingDirectorId] = useState<string | null>(null);
   const { showToast } = useToast();
 
   const positions = BoardManagementService.getDefaultBoardPositions();
@@ -266,17 +267,20 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
           commissionDirectorAvatars: data.commissionDirectorAvatars,
         }));
 
-      await Promise.all([
-        BoardManagementService.setBoardForTerm(selectedTerm, list),
-        BoardManagementService.setBoardTermSettings(selectedTerm, {
+      try {
+        await BoardManagementService.setBoardForTerm(selectedTerm, list);
+        await BoardManagementService.setBoardTermSettings(selectedTerm, {
           presidentTheme: termSettings.presidentTheme,
           tagline: termSettings.tagline,
           shortDescription: termSettings.shortDescription,
           logoUrl: termSettings.logoUrl,
           groupPhotoUrl: termSettings.groupPhotoUrl,
           memberGroupPhotoUrl: termSettings.memberGroupPhotoUrl,
-        }),
-      ]);
+        });
+      } catch (err) {
+        showToast('保存失败，请重试', 'error');
+        return;
+      }
       // Sync member docs immediately after save so replaced members lose board flags
       await BoardManagementService.syncCurrentYearBoardAssignees().catch(() => {});
       showToast(`Board for ${selectedTerm} updated successfully`, 'success');
@@ -755,9 +759,16 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                                       <Camera size={11} />
                                       <input type="file" accept="image/*" className="hidden" disabled={isDirUp || !m} onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f && m) handleBodAvatarUpload(m, f, position, 'commission'); }} />
                                     </label>
-                                    <button onClick={() => handleRemoveCommissionDirector(position, id)} className="hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-full transition-colors p-0.5">
-                                      <Trash2 size={11} />
-                                    </button>
+                                    {removingDirectorId === `${position}:${id}` ? (
+                                      <span className="flex items-center gap-1 text-xs">
+                                        <button onClick={() => { handleRemoveCommissionDirector(position, id); setRemovingDirectorId(null); }} className="text-red-500 hover:underline">确认</button>
+                                        <button onClick={() => setRemovingDirectorId(null)} className="text-slate-400 hover:underline">取消</button>
+                                      </span>
+                                    ) : (
+                                      <button onClick={() => setRemovingDirectorId(`${position}:${id}`)} className="hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-full transition-colors p-0.5">
+                                        <Trash2 size={11} />
+                                      </button>
+                                    )}
                                   </>
                                 )}
                               </div>

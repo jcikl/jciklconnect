@@ -11,11 +11,7 @@ const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID;
 const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
 const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
-console.log('[send-invite] init check:', {
-  hasProjectId: !!projectId,
-  hasClientEmail: !!clientEmail,
-  hasPrivateKey: !!privateKey,
-});
+// P1: Credential boolean log removed — it leaks presence/absence of secrets to logs.
 
 if (!getApps().length) {
   initializeApp({
@@ -100,9 +96,11 @@ exports.handler = async (event) => {
     // configured in Firebase Console → Authentication → Templates).
     // The REST endpoint triggers the actual email delivery without a third-party
     // email service; the only requirement is the project's Web API key.
-    const apiKey = process.env.VITE_FIREBASE_API_KEY;
+    // P1: Use FIREBASE_WEB_API_KEY (no VITE_ prefix) — set this separately in the Netlify dashboard.
+    // VITE_-prefixed vars are bundled into the browser by Vite and must not be used server-side.
+    const apiKey = process.env.FIREBASE_WEB_API_KEY;
     if (!apiKey) {
-      throw new Error('VITE_FIREBASE_API_KEY env var missing — cannot send reset email');
+      throw new Error('FIREBASE_WEB_API_KEY env var missing — cannot send reset email');
     }
     const resetRes = await fetch(
       `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${apiKey}`,
@@ -134,7 +132,7 @@ exports.handler = async (event) => {
       throw sendError;
     }
 
-    console.log('[send-invite] Password reset email sent to', email);
+    console.log('[send-invite] Password reset email sent, target redacted');
 
     // Log successful send
     try {

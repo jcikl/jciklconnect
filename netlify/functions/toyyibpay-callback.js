@@ -417,16 +417,23 @@ exports.handler = async (event) => {
         if (!existingEventTxSnap.empty) {
           console.log('[toyyibpay-callback] Duplicate webhook: event tx already exists for billCode:', billCode);
           txRef = existingEventTxSnap.docs[0].ref;
+          // Link transaction ID back to eventRegistration (non-batch path for duplicate case)
+          evtUpdate.financeTransactionId = txRef.id;
+          await evtRegDoc.ref.update(evtUpdate);
         } else {
+          // P1: Write transaction + eventRegistration update atomically via batch
+          // to prevent the state where a transaction exists but the registration is not linked.
           txData.idempotencyKey = eventIdempotencyKey;
-          txRef = await db.collection('transactions').add(txData);
+          const batch = db.batch();
+          txRef = db.collection('transactions').doc();
+          batch.set(txRef, txData);
+          const evtUpdateWithTxId = { ...evtUpdate, financeTransactionId: txRef.id };
+          batch.update(evtRegDoc.ref, evtUpdateWithTxId);
+          await batch.commit();
         }
-
-        // Link transaction ID back to eventRegistration
-        evtUpdate.financeTransactionId = txRef.id;
+      } else {
+        await evtRegDoc.ref.update(evtUpdate);
       }
-
-      await evtRegDoc.ref.update(evtUpdate);
     }
 
     // ── Rollback branch: payment failed or reversed (status 3) ─────────────

@@ -261,6 +261,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, [isDevMode]);
 
+  // P2: Idle session timeout — sign out after 30 minutes of inactivity.
+  useEffect(() => {
+    const IDLE_MS = 30 * 60 * 1000; // 30 min
+    let idleTimer = setTimeout(() => { if (user) firebaseSignOut(auth); }, IDLE_MS);
+    const reset = () => { clearTimeout(idleTimer); idleTimer = setTimeout(() => { if (user) firebaseSignOut(auth); }, IDLE_MS); };
+    window.addEventListener('mousemove', reset);
+    window.addEventListener('keydown', reset);
+    return () => { clearTimeout(idleTimer); window.removeEventListener('mousemove', reset); window.removeEventListener('keydown', reset); };
+  }, [user]);
+
   const signIn = useCallback(async (email: string, password: string) => {
     // AUTH-006: Dev mock login is compiled OUT of production builds via the import.meta.env.DEV
     // guard. VITE_DEV_EMAIL / VITE_DEV_PASSWORD are still VITE_-prefixed (bundled), but because
@@ -364,8 +374,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const signUp = useCallback(async (email: string, password: string, name: string, additionalData?: Record<string, any>) => {
     // Check if in developer mode
-    const _devEmailForSignUp = import.meta.env.VITE_DEV_EMAIL as string | undefined;
-    if (checkDevMode() || (_devEmailForSignUp && email === _devEmailForSignUp)) {
+    // P0: Guard with import.meta.env.DEV so the dev-email comparison is compiled out of production.
+    const _devEmailForSignUp = import.meta.env.DEV ? (import.meta.env.VITE_DEV_EMAIL as string | undefined) : undefined;
+    if (checkDevMode() || (import.meta.env.DEV && _devEmailForSignUp && email === _devEmailForSignUp)) {
       // In developer mode, simulate sign up
       const mockUser = {
         uid: `mock-user-${Date.now()}`,
@@ -583,14 +594,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const resetPassword = useCallback(async (email: string) => {
     // AUTH-003: 60-second client-side cooldown to prevent inbox-flooding abuse.
+    // P2: Use sessionStorage instead of useRef so the cooldown survives page refreshes.
     const COOLDOWN_MS = 60_000;
     const now = Date.now();
-    const elapsed = now - lastResetRequestRef.current;
+    const ssKey = 'pw_reset_' + email;
+    const lastRequest = parseInt(sessionStorage.getItem(ssKey) || '0');
+    const elapsed = now - lastRequest;
     if (elapsed < COOLDOWN_MS) {
       const remaining = Math.ceil((COOLDOWN_MS - elapsed) / 1000);
       throw new Error(`请等待 ${remaining} 秒后再重新发送重置邮件。`);
     }
-    lastResetRequestRef.current = now;
+    sessionStorage.setItem(ssKey, String(now));
     try {
       await sendPasswordResetEmail(auth, email);
     } catch (err: any) {

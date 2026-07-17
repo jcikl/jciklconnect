@@ -529,12 +529,26 @@ export class ActivityPlansService {
   /** Delete an activity plan. */
   // FIX P0: was COLLECTIONS.PROJECTS
   // FIX P1: added withDevMode, cache invalidation, errorLoggingService
+  // FIX P2: clean up version-chain docs that reference this plan before deleting the main doc
   static async deleteActivityPlan(planId: string): Promise<void> {
     return withDevMode<void>(
       () => {},
       async () => {
         try {
-          await deleteDoc(doc(db, COLLECTIONS.ACTIVITY_PLANS, planId)); // FIX P0
+          // P2 FIX: query and batch-delete any docs whose previousVersionId points to this plan,
+          // preventing orphaned version-chain references after deletion.
+          const versionChainSnap = await getDocs(
+            query(
+              collection(db, COLLECTIONS.ACTIVITY_PLANS),
+              where('previousVersionId', '==', planId)
+            )
+          );
+
+          const batch = writeBatch(db);
+          versionChainSnap.docs.forEach(d => batch.delete(d.ref));
+          batch.delete(doc(db, COLLECTIONS.ACTIVITY_PLANS, planId));
+          await batch.commit();
+
           this.invalidateActivityPlansCache(); // FIX P1
         } catch (error) {
           errorLoggingService.logError(error as Error, {

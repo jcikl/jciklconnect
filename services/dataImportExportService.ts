@@ -415,6 +415,18 @@ export class DataImportExportService {
 
     const arrayFields = ['skills', 'hobbies', 'businessCategory', 'interestedIndustries'];
 
+    // Pre-fetch all existing member emails in one Firestore read to avoid O(n) per-row queries.
+    // Map: normalised email → member id, used by checkIfRecordExists below.
+    const existingMemberEmailToId = new Map<string, string>();
+    if (entityType === 'members') {
+      const allMembers = await MembersService.getAllMembers();
+      for (const m of allMembers) {
+        if (m.email && m.id) {
+          existingMemberEmailToId.set(m.email.toLowerCase(), m.id);
+        }
+      }
+    }
+
     // Normalize all rows first
     const normalizedRows: Array<{ row: any; originalIndex: number }> = data.map((row, index) => {
       const normalizedRow: any = {};
@@ -459,7 +471,7 @@ export class DataImportExportService {
       try {
         for (const { row: normalizedRow, originalIndex } of batch) {
           try {
-            const existingId = await this.checkIfRecordExists(normalizedRow, entityType);
+            const existingId = await this.checkIfRecordExists(normalizedRow, entityType, existingMemberEmailToId);
             if (existingId) {
               await this.updateRecord(existingId, normalizedRow, entityType);
               summary.updated++;
@@ -636,10 +648,18 @@ export class DataImportExportService {
     return !isNaN(date.getTime());
   }
 
-  private static async checkIfRecordExists(row: any, entityType: string): Promise<string | null> {
+  private static async checkIfRecordExists(
+    row: any,
+    entityType: string,
+    existingMemberEmailToId?: Map<string, string>
+  ): Promise<string | null> {
     if (entityType === 'members' && row.email) {
+      // Use the pre-fetched map when available (avoids one Firestore read per row)
+      if (existingMemberEmailToId) {
+        return existingMemberEmailToId.get(row.email.toLowerCase()) ?? null;
+      }
       const member = await MembersService.getMemberByEmail(row.email);
-      return member ? member.id : null;
+      return member ? (member.id ?? null) : null;
     }
 
     // For other entities, we might need different logic
@@ -701,6 +721,10 @@ export class DataImportExportService {
     entityType: string,
     userId: string
   ): string[] {
+    // TODO: move to server-side Netlify Function for enforcement.
+    // This client-side guard is UX convenience only — a determined caller can bypass it.
+    // eslint-disable-next-line no-console
+    console.warn('[SECURITY] Client-side field filtering is UX-only; enforce in server');
     const restrictedFields = ['password', 'ssn', 'bankAccount'];
     // Sensitive member fields: only ADMIN+ should export these
     // We check if the current user is the same as userId and rely on server-side role enforcement.

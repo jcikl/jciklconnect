@@ -14,6 +14,7 @@ import {
     orderBy,
     limit,
     Timestamp,
+    increment,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
@@ -194,27 +195,29 @@ export class GamificationService {
                         batch.update(memberRef, { badges: arrayUnion(userBadge) });
                     }
 
-                    await batch.commit();
-
-                    // Write 2: Award points — separate from batch due to PointsService
-                    // internal complexity. If this fails, the badge record is already
-                    // committed, so we log the error rather than propagating it.
-                    if (award.pointsReward > 0) {
-                        try {
-                            await PointsService.awardPoints(
-                                memberId,
-                                'achievement',
-                                award.pointsReward,
-                                `Award unlocked: ${award.name}`
-                            );
-                        } catch (pointsError) {
-                            console.error(
-                                '[awardAward] Points award failed after badge was committed:',
-                                { awardId, memberId, pointsError }
-                            );
-                            // Badge is recorded; points failure is survivable — do not rethrow
-                        }
+                    // P1 fix: inline points award in the same batch so the badge record
+                    // and the member's point balance are always committed together.
+                    if (award.pointsReward > 0 && member) {
+                        const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
+                        batch.update(memberRef, {
+                            points: increment(award.pointsReward),
+                            updatedAt: Timestamp.now(),
+                        });
+                        // Also create a points transaction record in the same batch
+                        const pointsTxRef = doc(collection(db, COLLECTIONS.POINTS));
+                        batch.set(pointsTxRef, {
+                            memberId,
+                            points: award.pointsReward,
+                            amount: award.pointsReward,
+                            category: 'achievement',
+                            description: `Award unlocked: ${award.name}`,
+                            relatedEntityId: awardId,
+                            relatedEntityType: 'award',
+                            createdAt: Timestamp.now(),
+                        });
                     }
+
+                    await batch.commit();
 
                     // Best-effort notification — must not roll back the committed badge
                     try {
@@ -273,10 +276,13 @@ export class GamificationService {
             if (criteriaType === 'points_threshold') {
                 progressValue = memberPoints;
             } else if (criteriaType === 'event_count' || criteriaType === 'event_attendance') {
+                // P1 fix: query EVENT_REGISTRATIONS for checked-in attendances instead of
+                // counting points transactions (points may be awarded for reasons unrelated
+                // to actual event attendance, inflating the count).
                 const snap = await getDocs(query(
-                    collection(db, COLLECTIONS.POINTS),
+                    collection(db, COLLECTIONS.EVENT_REGISTRATIONS),
                     where('memberId', '==', memberId),
-                    where('category', '==', 'event_attendance')
+                    where('status', '==', 'checked_in')
                 ));
                 progressValue = snap.size;
             } else if (criteriaType === 'project_count' || criteriaType === 'project_completion') {

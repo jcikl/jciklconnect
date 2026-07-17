@@ -6,6 +6,7 @@ import {
   getDocs,
   setDoc,
   updateDoc,
+  runTransaction,
   query,
   where,
   Timestamp,
@@ -74,17 +75,19 @@ export class EventFeedbackService {
           const deterministicId = `${feedback.eventId}_${feedback.memberId}`;
           const docRef = doc(db, FEEDBACK_COLLECTION(), deterministicId);
 
-          const existingSnap = await getDoc(docRef);
-          if (existingSnap.exists()) {
-            throw new Error('您已提交过此活动的反馈');
-          }
-
-          const feedbackData = {
-            ...feedback,
-            submittedAt: Timestamp.now(),
-          };
-
-          await setDoc(docRef, feedbackData);
+          // P0 FIX: wrap existence check + write in runTransaction to eliminate the
+          // race window between getDoc and setDoc in concurrent submissions.
+          await runTransaction(db, async (txn) => {
+            const existingSnap = await txn.get(docRef);
+            if (existingSnap.exists()) {
+              throw new Error('您已提交过此活动的反馈');
+            }
+            const feedbackData = {
+              ...feedback,
+              submittedAt: Timestamp.now(),
+            };
+            txn.set(docRef, feedbackData);
+          });
 
           // P1 — invalidate cache so subsequent reads reflect new submission
           invalidateFeedbackCache(feedback.eventId);
@@ -206,15 +209,9 @@ export class EventFeedbackService {
       () => false,
       async () => {
         try {
-          const snapshot = await getDocs(
-            query(
-              collection(db, FEEDBACK_COLLECTION()),
-              where('eventId', '==', eventId),
-              where('memberId', '==', memberId)
-            )
-          );
-
-          return !snapshot.empty;
+          // P2 FIX: use deterministic doc ID for O(1) point-read instead of a collection query.
+          const snap = await getDoc(doc(db, FEEDBACK_COLLECTION(), `${eventId}_${memberId}`));
+          return snap.exists();
         } catch (error) {
           errorLoggingService.logError(error as Error, {
             action: 'EventFeedbackService.hasMemberSubmittedFeedback',

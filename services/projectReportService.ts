@@ -1,4 +1,7 @@
 // Project Report Service - Generates automated project reports
+import { collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
+import { db } from '../config/firebase';
+import { COLLECTIONS } from '../config/constants';
 import { Project, Task, Member } from '../types';
 import { ProjectsService } from './projectsService';
 import { MembersService } from './membersService';
@@ -124,6 +127,7 @@ export interface ReportExportOptions {
 }
 
 export class ProjectReportService {
+  /** @deprecated In-memory map kept only so exportReport's templateId lookup still compiles; real CRUD uses Firestore. */
   private static templates: Map<string, ReportTemplate> = new Map();
 
   // Generate project report with specified type
@@ -403,30 +407,58 @@ export class ProjectReportService {
   }
 
   // Create report template (Requirements 7.4)
+  // P1 FIX: persist templates to Firestore instead of an in-memory Map that resets on redeploy.
   static async createReportTemplate(
     templateData: Omit<ReportTemplate, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>,
     createdBy: string
   ): Promise<ReportTemplate> {
+    const payload = {
+      ...templateData,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+      createdBy,
+    };
+    const ref = await addDoc(collection(db, COLLECTIONS.TEMPLATES), payload);
     const template: ReportTemplate = {
       ...templateData,
-      id: `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: ref.id,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       createdBy,
     };
-
-    this.templates.set(template.id, template);
+    this.templates.set(template.id, template); // keep in-memory copy for exportReport lookup
     return template;
   }
 
   // Get report template
   static async getReportTemplate(templateId: string): Promise<ReportTemplate | null> {
-    return this.templates.get(templateId) || null;
+    // Check in-memory cache first, then fall back to Firestore.
+    if (this.templates.has(templateId)) return this.templates.get(templateId)!;
+    const snap = await getDoc(doc(db, COLLECTIONS.TEMPLATES, templateId));
+    if (!snap.exists()) return null;
+    const data = snap.data();
+    const template: ReportTemplate = {
+      ...data,
+      id: snap.id,
+      createdAt: data.createdAt?.toDate?.()?.toISOString() ?? data.createdAt,
+      updatedAt: data.updatedAt?.toDate?.()?.toISOString() ?? data.updatedAt,
+    } as ReportTemplate;
+    this.templates.set(templateId, template);
+    return template;
   }
 
   // List all report templates
   static async listReportTemplates(): Promise<ReportTemplate[]> {
-    return Array.from(this.templates.values());
+    const snap = await getDocs(collection(db, COLLECTIONS.TEMPLATES));
+    return snap.docs.map(d => {
+      const data = d.data();
+      return {
+        ...data,
+        id: d.id,
+        createdAt: data.createdAt?.toDate?.()?.toISOString() ?? data.createdAt,
+        updatedAt: data.updatedAt?.toDate?.()?.toISOString() ?? data.updatedAt,
+      } as ReportTemplate;
+    });
   }
 
   // Update report template
@@ -434,24 +466,32 @@ export class ProjectReportService {
     templateId: string,
     updates: Partial<Omit<ReportTemplate, 'id' | 'createdAt' | 'createdBy'>>
   ): Promise<ReportTemplate> {
-    const existing = this.templates.get(templateId);
-    if (!existing) {
-      throw new Error('Template not found');
-    }
+    const ref = doc(db, COLLECTIONS.TEMPLATES, templateId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) throw new Error('Template not found');
+
+    await updateDoc(ref, { ...updates, updatedAt: Timestamp.now() });
 
     const updated: ReportTemplate = {
-      ...existing,
+      ...snap.data(),
       ...updates,
+      id: templateId,
+      createdAt: snap.data().createdAt?.toDate?.()?.toISOString() ?? snap.data().createdAt,
       updatedAt: new Date().toISOString(),
-    };
-
+    } as ReportTemplate;
     this.templates.set(templateId, updated);
     return updated;
   }
 
   // Delete report template
   static async deleteReportTemplate(templateId: string): Promise<boolean> {
-    return this.templates.delete(templateId);
+    try {
+      await deleteDoc(doc(db, COLLECTIONS.TEMPLATES, templateId));
+      this.templates.delete(templateId);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   // Export report with options (Requirements 7.5)

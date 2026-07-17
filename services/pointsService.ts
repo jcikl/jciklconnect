@@ -496,21 +496,11 @@ export class PointsService {
       async () => {
         try {
           const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
-          const memberDoc = await getDoc(memberRef);
-
-          if (!memberDoc.exists()) {
-            throw new Error('Member not found');
-          }
-
-          const currentPoints = memberDoc.data().points || 0;
-          const newPoints = currentPoints + pointsDelta;
-
-          // Update points and tier
-          const tier = this.calculateTier(newPoints);
-
+          // P0 fix: atomic increment — eliminates the read-modify-write race condition.
+          // Tier recalculation is intentionally omitted here; callers that need tier
+          // updates (e.g. approveClaim) handle it in their own batch.
           await updateDoc(memberRef, {
-            points: newPoints,
-            tier,
+            points: increment(pointsDelta),
             updatedAt: Timestamp.now(),
           });
 
@@ -620,9 +610,16 @@ export class PointsService {
 
               const docSnap = snapshot.docs[0];
               const data = docSnap.data();
+              // P1 fix: compatibility layer for two coexisting schemas in POINTS_RULES collection.
+              // PointsService schema uses { basePoints, active }; PointsRuleService schema uses
+              // { pointValue, enabled }. Normalise here so both schemas produce a usable PointRule.
+              const basePoints = data.basePoints ?? data.pointValue ?? 10;
+              const active = data.active ?? data.enabled ?? true;
               return {
                 id: docSnap.id,
                 ...data,
+                basePoints,
+                active,
                 createdAt: data.createdAt?.toDate?.() || data.createdAt || new Date(),
                 updatedAt: data.updatedAt?.toDate?.() || data.updatedAt || new Date(),
               } as PointRule;
@@ -777,8 +774,13 @@ export class PointsService {
     pointsByCategory: Record<string, number>;
     recentTransactions: PointTransaction[];
   }> {
-    const history = await this.getMemberPointHistory(memberId);
-    const totalPoints = history.reduce((sum, t) => sum + t.points, 0);
+    // P2 fix: use member.points as the authoritative total instead of summing transaction
+    // history (history may be incomplete after deletions or back-fills).
+    const [history, memberSnap] = await Promise.all([
+      this.getMemberPointHistory(memberId),
+      getDoc(doc(db, COLLECTIONS.MEMBERS, memberId)),
+    ]);
+    const totalPoints: number = memberSnap.exists() ? (memberSnap.data().points || 0) : 0;
     const tier = this.calculateTier(totalPoints);
 
     // Group points by category
@@ -1470,7 +1472,13 @@ export class PointsService {
         // The separate updateMemberPoints call that previously followed batch.commit()
         // has been removed — this increment replaces it.
         const memberRef = doc(db, COLLECTIONS.MEMBERS, submission.memberId);
-        batch.update(memberRef, { points: increment(resolvedPoints) });
+
+        // P0 fix: calculate new tier based on current + awarded points so member.tier
+        // is always in sync after claim approval.
+        const memberSnap = await getDoc(memberRef);
+        const currentPoints: number = memberSnap.exists() ? (memberSnap.data().points || 0) : 0;
+        const newTier = PointsService.calculateTier(currentPoints + resolvedPoints);
+        batch.update(memberRef, { points: increment(resolvedPoints), tier: newTier, updatedAt: Timestamp.now() });
       }
 
       await batch.commit();

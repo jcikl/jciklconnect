@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Save, Shield } from 'lucide-react';
 import { Button, useToast, Tabs } from '../ui/Common';
+import { usePermissions } from '../../hooks/usePermissions';
 import { UserRole } from '../../types';
 
 // Reuse same Toggle as MembershipConfigView
@@ -64,6 +65,7 @@ const PermList: React.FC<{
 export const AccessConfigView: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const { showToast } = useToast();
+  const { isAdmin } = usePermissions();
 
   const [boardPerms, setBoardPerms] = useState<Perms>({ ...ALL_ON });
   const [activeTab, setActiveTab] = useState<'dynamic' | 'roles'>('dynamic');
@@ -78,10 +80,11 @@ export const AccessConfigView: React.FC = () => {
   });
 
   const handleSave = async () => {
+    console.warn('[TODO] AccessConfigView.handleSave: implement real Firestore persistence');
     setSaving(true);
     try {
       await new Promise(r => setTimeout(r, 800));
-      showToast('Access permissions updated successfully', 'success');
+      showToast('访问配置持久化尚未实现，此更改仅在当前会话有效', 'warning');
     } catch (e) {
       showToast('Failed to update access permissions', 'error');
     } finally {
@@ -90,6 +93,8 @@ export const AccessConfigView: React.FC = () => {
   };
 
   const isSuperAdmin = selectedRole === UserRole.SUPER_ADMIN;
+
+  if (!isAdmin) return <div className="p-4 text-center text-gray-500">权限不足，需要管理员角色</div>;
 
   return (
     <div className="space-y-4">

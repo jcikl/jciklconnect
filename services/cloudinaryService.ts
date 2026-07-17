@@ -10,11 +10,14 @@ export const trimCloudinaryImage = (url: string): string => {
   return url.replace('/image/upload/', '/image/upload/e_trim/');
 };
 
+// Module-level assignment only — validation is deferred to uploadToCloudinary() so that
+// lazy-importing this module does not throw during page initialisation.
 const CLOUD_NAME: string = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-if (!CLOUD_NAME) throw new Error('VITE_CLOUDINARY_CLOUD_NAME env var is not set');
 const UPLOAD_PRESET: string = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-if (!UPLOAD_PRESET) throw new Error('VITE_CLOUDINARY_UPLOAD_PRESET env var is not set');
 const MEMBER_AVATAR_ASSET_ROOT = import.meta.env.VITE_CLOUDINARY_MEMBER_AVATAR_ASSET_ROOT || 'jciklconnect';
+if (!import.meta.env.VITE_CLOUDINARY_MEMBER_AVATAR_ASSET_ROOT) {
+  console.warn('VITE_CLOUDINARY_MEMBER_AVATAR_ASSET_ROOT not set, using default: jciklconnect');
+}
 
 type MemberAvatarFolderSource = {
   id?: string;
@@ -161,6 +164,10 @@ export const uploadToCloudinary = (
     resourceType?: 'image' | 'raw' | 'auto';
   }
 ): Promise<string> => {
+  // Validate env vars here (deferred from module level) so lazy imports don't throw on load.
+  if (!CLOUD_NAME) return Promise.reject(new Error('VITE_CLOUDINARY_CLOUD_NAME env var is not set'));
+  if (!UPLOAD_PRESET) return Promise.reject(new Error('VITE_CLOUDINARY_UPLOAD_PRESET env var is not set'));
+
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     const formData = new FormData();

@@ -375,7 +375,8 @@ export function useFinanceData(searchQuery?: string) {
       await loadProjectTrxList(selectedProjectFilter);
       await loadProjectAccounts();
     } catch (err) {
-      showToast('Failed to add transaction', 'error');
+      errorLoggingService.logError(err, { action: 'handleAddProjectTrx' });
+      showToast(err instanceof Error ? err.message : '操作失败', 'error');
     }
   }, [selectedProjectFilter, projectTrxAddForm, showToast, loadProjectTrxList, loadProjectAccounts]);
 
@@ -394,7 +395,8 @@ export function useFinanceData(searchQuery?: string) {
       await loadProjectTrxList(selectedProjectFilter);
       await loadProjectAccounts();
     } catch (err) {
-      showToast('Failed to update transaction', 'error');
+      errorLoggingService.logError(err, { action: 'handleUpdateProjectTrx' });
+      showToast(err instanceof Error ? err.message : '操作失败', 'error');
     }
   }, [selectedProjectFilter, projectTrxEditForm, showToast, loadProjectTrxList, loadProjectAccounts]);
 
@@ -407,7 +409,8 @@ export function useFinanceData(searchQuery?: string) {
       await loadProjectTrxList(selectedProjectFilter);
       await loadProjectAccounts();
     } catch (err) {
-      showToast('Failed to delete transaction', 'error');
+      errorLoggingService.logError(err, { action: 'handleDeleteProjectTrx' });
+      showToast(err instanceof Error ? err.message : '操作失败', 'error');
     }
   }, [selectedProjectFilter, showToast, loadProjectTrxList, loadProjectAccounts]);
 

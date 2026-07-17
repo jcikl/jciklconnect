@@ -18,6 +18,9 @@ import {
 } from '../types';
 import { errorLoggingService } from './errorLoggingService';
 import { isDevMode } from '../utils/devMode';
+import { collection, addDoc, Timestamp } from 'firebase/firestore';
+import { db } from '../config/firebase';
+import { COLLECTIONS } from '../config/constants';
 
 export type ActionResult = { ok: true; data?: Record<string, unknown> } | { ok: false; reason: string };
 
@@ -363,24 +366,35 @@ class RuleExecutionService {
   }
 
   /**
-   * Log rule execution
+   * Log rule execution — in-memory cache + async Firestore write.
+   * P1 fix: persist to workflow_executions so logs survive page reloads.
    */
   private logExecution(execution: RuleExecution): void {
     this.executionHistory.push(execution);
-    
+
     // Keep only last 1000 executions to prevent memory issues
     if (this.executionHistory.length > 1000) {
       this.executionHistory = this.executionHistory.slice(-1000);
     }
 
-    // In a real implementation, this would save to database
-    console.log('Rule execution logged:', {
-      ruleId: execution.ruleId,
-      status: execution.status,
-      duration: execution.duration,
-      conditionsCount: execution.conditionsEvaluated.length,
-      actionsCount: execution.actionsExecuted.length,
-    });
+    // P1 fix: persist to Firestore (best-effort — never block the rule execution flow)
+    if (!isDevMode()) {
+      addDoc(collection(db, COLLECTIONS.WORKFLOW_EXECUTIONS), {
+        ...execution,
+        workflowId: execution.ruleId,
+        createdAt: Timestamp.now(),
+      }).catch(err => {
+        console.warn('[RuleExecutionService] Failed to persist execution log to Firestore:', err);
+      });
+    } else {
+      console.log('Rule execution logged:', {
+        ruleId: execution.ruleId,
+        status: execution.status,
+        duration: execution.duration,
+        conditionsCount: execution.conditionsEvaluated.length,
+        actionsCount: execution.actionsExecuted.length,
+      });
+    }
   }
 
   /**

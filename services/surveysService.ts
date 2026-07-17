@@ -313,13 +313,24 @@ export class SurveysService {
         let targetMemberIds: string[] = [];
         if (survey.targetAudience === 'Specific Group' && survey.specificMemberIds?.length) {
           targetMemberIds = survey.specificMemberIds;
+        } else if (survey.targetAudience === 'All Members') {
+          const { MembersService } = await import('./membersService');
+          const allMembers = await MembersService.getAllMembers();
+          targetMemberIds = allMembers
+            .filter(m => m.role !== 'INACTIVE')
+            .map(m => m.id!)
+            .filter(Boolean);
+        } else if (survey.targetAudience === 'Board') {
+          const { MembersService } = await import('./membersService');
+          const allMembers = await MembersService.getAllMembers();
+          targetMemberIds = allMembers
+            .filter(m => m.role === 'BOARD' || m.role === 'ADMIN' || m.role === 'SUPER_ADMIN')
+            .map(m => m.id!)
+            .filter(Boolean);
         } else {
-          // For board-wide / all-member audiences we rely on CommunicationService
-          // to fan out. Send a broadcast notification keyed to a placeholder memberId
-          // that the notification system resolves to the full audience.
-          // If that pattern is unavailable, at minimum log intent.
+          // Fallback: notify creator only and log intent
           errorLoggingService.logInfo(
-            `distributeSurvey: in-app broadcast for audience "${survey.targetAudience}" — individual member IDs not resolved; sending to creators only`,
+            `distributeSurvey: in-app broadcast for audience "${survey.targetAudience}" — individual member IDs not resolved; sending to creator only`,
             { component: 'SurveysService', action: 'distributeSurvey' }
           );
           targetMemberIds = [survey.createdBy];
@@ -329,22 +340,29 @@ export class SurveysService {
           throw new Error('No target members resolved for in-app distribution');
         }
 
-        const notifPromises = targetMemberIds.map(memberId =>
-          CommunicationService.createNotification({
-            memberId,
-            title: `New Survey: ${survey.title}`,
-            message: survey.description
-              ? `${survey.description} — Please complete the survey before ${survey.endDate}.`
-              : `Please complete the survey before ${survey.endDate}.`,
-            type: 'info',
-          }).catch(err => {
-            errorLoggingService.logError(err, { component: 'SurveysService', action: `distributeSurvey:notify:${memberId}` });
-            return null;
-          })
-        );
+        // Send in batches of 50 to avoid Firestore write bursts / function timeouts
+        const NOTIFY_BATCH_SIZE = 50;
+        const notifMessage = survey.description
+          ? `${survey.description} — Please complete the survey before ${survey.endDate}.`
+          : `Please complete the survey before ${survey.endDate}.`;
 
-        const results = await Promise.all(notifPromises);
-        notificationsSent = results.filter(r => r !== null).length;
+        for (let i = 0; i < targetMemberIds.length; i += NOTIFY_BATCH_SIZE) {
+          const batchIds = targetMemberIds.slice(i, i + NOTIFY_BATCH_SIZE);
+          const batchResults = await Promise.all(
+            batchIds.map(memberId =>
+              CommunicationService.createNotification({
+                memberId,
+                title: `New Survey: ${survey.title}`,
+                message: notifMessage,
+                type: 'info',
+              }).catch(err => {
+                errorLoggingService.logError(err, { component: 'SurveysService', action: `distributeSurvey:notify:${memberId}` });
+                return null;
+              })
+            )
+          );
+          notificationsSent += batchResults.filter(r => r !== null).length;
+        }
       }
 
       // Email channel: logged as intent (email infra not yet wired)
@@ -358,7 +376,7 @@ export class SurveysService {
       // Update survey record with distribution channels and optional shareable link
       await this.updateSurvey(surveyId, {
         distributionChannels: channels,
-        shareableLink: channels.includes('link') ? `https://jci-kl.app/survey/${surveyId}` : undefined,
+        shareableLink: channels.includes('link') ? `${import.meta.env.VITE_APP_BASE_URL || 'https://jci-kl.app'}/survey/${surveyId}` : undefined,
       });
 
       return { emailsSent: 0, notificationsSent };
