@@ -55,17 +55,23 @@ export const Modal: React.FC<ModalProps> = ({
 }) => {
   const containerRef = React.useRef<HTMLDivElement>(null);
 
+  // Initial focus — runs only when modal opens/closes, not on every render
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const container = containerRef.current;
+    if (!container) return;
+    // Focus the first input/textarea if present, otherwise fall back to first focusable
+    const firstInput = container.querySelector<HTMLElement>('input:not([disabled]), textarea:not([disabled])');
+    const focusable = getFocusableModal(container);
+    (firstInput ?? focusable[0])?.focus();
+  }, [isOpen]);
+
+  // Keyboard trap + body scroll lock — kept separate so onClose identity changes don't retrigger focus
   React.useEffect(() => {
     if (!isOpen) return;
     const previousFocus = document.activeElement as HTMLElement | null;
     document.body.style.overflow = 'hidden';
-
-    // Move focus into modal
     const container = containerRef.current;
-    if (container) {
-      const focusable = getFocusableModal(container);
-      if (focusable.length > 0) focusable[0].focus();
-    }
 
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { onClose(); return; }
