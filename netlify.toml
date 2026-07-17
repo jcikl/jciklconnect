@@ -36,12 +36,6 @@
 [functions]
   node_bundler = "esbuild"
 
-# CFG-008: Declare the birthday-notifications scheduled function using Netlify's
-# scheduler syntax. [functions."name"] is the correct TOML form — [[functions]]
-# conflicts with the [functions] table above.
-[functions."birthday-notifications"]
-  schedule = "0 0 * * *"
-
 [[plugins]]
   package = "@netlify/plugin-functions-install-core"
 
