@@ -9,6 +9,13 @@ export const sendNotification = functions.https.onCall(async (data, context) => 
     throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
   }
 
+  // Only BOARD, ADMIN, and SUPER_ADMIN may send notifications to other members
+  const callerDoc = await db.collection('members').doc(context.auth.uid).get();
+  const callerRole = callerDoc.data()?.role;
+  if (!['ADMIN', 'SUPER_ADMIN', 'BOARD'].includes(callerRole)) {
+    throw new functions.https.HttpsError('permission-denied', 'Insufficient role to send notifications');
+  }
+
   const { memberId, type, title, message, data: notificationData } = data;
 
   if (!memberId || !type || !title || !message) {

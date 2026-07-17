@@ -18,9 +18,29 @@ if (!getApps().length) {
 // - Member, auth exists → { isMember: true, authExists: true }  (wrong password case)
 // - Member, no auth     → creates Auth account → { isMember: true, created: true }
 //   (caller should then call sendPasswordResetEmail client-side)
+// Requires a valid Firebase ID token from a BOARD, ADMIN, or SUPER_ADMIN caller.
 export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
+  }
+
+  // Verify caller identity — only privileged roles may check/create auth accounts
+  const authHeader = event.headers.authorization || event.headers.Authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
+  }
+  const idToken = authHeader.split('Bearer ')[1];
+  try {
+    const auth = getAuth();
+    const decoded = await auth.verifyIdToken(idToken);
+    const db = getFirestore();
+    const callerDoc = await db.collection('members').doc(decoded.uid).get();
+    const callerRole = callerDoc.data()?.role;
+    if (!['ADMIN', 'SUPER_ADMIN', 'BOARD'].includes(callerRole)) {
+      return { statusCode: 403, body: JSON.stringify({ error: 'Forbidden' }) };
+    }
+  } catch {
+    return { statusCode: 401, body: JSON.stringify({ error: 'Invalid or expired token' }) };
   }
 
   let email;

@@ -10,7 +10,8 @@ import {
   MemberEngagementRequirementProgress,
   Event,
   UserRole,
-  MemberTier
+  MemberTier,
+  MembershipType
 } from '../types';
 import { MembersService } from './membersService';
 import {
@@ -381,7 +382,7 @@ export class PromotionService {
     await MembersService.updateMember(memberId, {
       'jciCareer.engagementProgress': updatedEngagement,
       engagementProgress: updatedEngagement,
-    } as any);
+    } as unknown as Partial<Member>); // Firestore dotted field paths are not representable in Partial<Member>
   }
 
   /**
@@ -863,11 +864,11 @@ export class PromotionService {
         ...((await this.getMemberById(memberId))?.promotionProgress || {}),
         [field]: value
       }
-    } as any);
+    } as unknown as Partial<Member>); // computed field key not statically checkable against MemberPromotionProgress
   }
 
   private static async updateMembershipType(memberId: string, newType: string): Promise<void> {
-    await MembersService.updateMember(memberId, { membershipType: newType as any });
+    await MembersService.updateMember(memberId, { membershipType: newType as MembershipType });
     console.log(`Updated member ${memberId} to ${newType} membership`);
   }
 

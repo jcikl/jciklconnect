@@ -470,17 +470,26 @@ export class EventsService {
           const checkedIn = active.filter(reg => reg.status === 'checked_in');
           if (checkedIn.length > 0) {
             const { PointsService } = await import('./pointsService');
+            // Fix 2: one query for all event-related point records, then match by memberId in memory
+            // instead of N per-member queries inside the loop.
+            const allPointsSnap = await getDocs(
+              query(
+                collection(db, COLLECTIONS.POINTS),
+                where('relatedEntityId', '==', eventId)
+              )
+            );
+            const pointsByMember = new Map<string, number>();
+            allPointsSnap.docs.forEach(d => {
+              const data = d.data();
+              const mid = data.memberId as string;
+              if (mid) {
+                pointsByMember.set(mid, (pointsByMember.get(mid) ?? 0) + (data.amount ?? data.points ?? 0));
+              }
+            });
             await Promise.allSettled(
               checkedIn.map(async reg => {
                 try {
-                  const pointSnap = await getDocs(
-                    query(
-                      collection(db, COLLECTIONS.POINTS),
-                      where('memberId', '==', reg.memberId),
-                      where('relatedEntityId', '==', eventId)
-                    )
-                  );
-                  const total = pointSnap.docs.reduce((sum, d) => sum + (d.data().amount ?? d.data().points ?? 0), 0);
+                  const total = pointsByMember.get(reg.memberId) ?? 0;
                   if (total > 0) {
                     await PointsService.awardPoints(
                       reg.memberId,

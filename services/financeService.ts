@@ -195,7 +195,9 @@ export class FinanceService {
 
           const q = query(
             collection(db, COLLECTIONS.TRANSACTIONS),
-            where('date', '<', boundaryTimestamp)
+            where('date', '<', boundaryTimestamp),
+            orderBy('date', 'desc'),
+            limit(500)
           );
 
           const snapshot = await getDocs(q);
@@ -236,7 +238,8 @@ export class FinanceService {
         try {
           const q = query(
             collection(db, COLLECTIONS.TRANSACTIONS),
-            where('bankAccountId', '==', bankAccountId)
+            where('bankAccountId', '==', bankAccountId),
+            limit(500)
           );
           const snapshot = await getDocs(q);
           const years = new Set<number>();
@@ -270,7 +273,8 @@ export class FinanceService {
       },
       async () => {
         try {
-          const q = query(collection(db, COLLECTIONS.TRANSACTIONS));
+          // TODO: replace with a dedicated 'transactionYears' summary document for O(1) lookup
+          const q = query(collection(db, COLLECTIONS.TRANSACTIONS), limit(1000));
           const snapshot = await getDocs(q);
           const years = new Set<number>();
           snapshot.docs.forEach(doc => {
@@ -1694,25 +1698,32 @@ export class FinanceService {
             await ptBatch.commit();
           }
 
-          // TX-W1: revertPaid BEFORE deleteDoc — if deleteDoc succeeded but revertPaid failed,
-          // the paymentRequest would stay 'paid' with no linked transaction.
+          // TX-W1 (atomic): revert PR status + delete splits + delete transaction in ONE batch.
+          // Previously revertPaid was a separate updateDoc call before the deletion batch, so a
+          // crash between those two steps left the PR permanently 'paid' with no linked transaction.
+          // Now all three writes commit together — they all succeed or all fail.
+          const childSplits = await this.getTransactionSplits(transactionId);
+          const deletionBatch = writeBatch(db);
+
+          // Include PR status revert in the same batch if applicable
           if (transaction?.paymentRequestId) {
-            const { PaymentRequestService } = await import('./paymentRequestService');
-            await PaymentRequestService.revertPaid(transaction.paymentRequestId);
+            const prRef = doc(db, COLLECTIONS.PAYMENT_REQUESTS, transaction.paymentRequestId);
+            deletionBatch.update(prRef, {
+              status: 'approved',
+              paidAt: null,
+              updatedAt: Timestamp.now(),
+            });
           }
 
-          // Delete child splits AND the parent transaction atomically to avoid orphaned records.
-          // E3: both the splits and the main doc go into the same writeBatch so they succeed
-          // or fail together. If there are no splits, fall back to a plain deleteDoc.
-          const childSplits = await this.getTransactionSplits(transactionId);
+          // Delete child splits atomically with the parent transaction (E3)
+          for (const split of childSplits) {
+            deletionBatch.delete(doc(db, COLLECTIONS.TRANSACTION_SPLITS, split.id));
+          }
+          deletionBatch.delete(doc(db, COLLECTIONS.TRANSACTIONS, transactionId));
+          await deletionBatch.commit();
+
+          // Clean up split side-effects after the batch succeeds
           if (childSplits.length > 0) {
-            const splitBatch = writeBatch(db);
-            for (const split of childSplits) {
-              splitBatch.delete(doc(db, COLLECTIONS.TRANSACTION_SPLITS, split.id));
-            }
-            splitBatch.delete(doc(db, COLLECTIONS.TRANSACTIONS, transactionId));
-            await splitBatch.commit();
-            // Clean up side-effects for each deleted split (after the batch succeeds)
             const { InventoryService } = await import('./inventoryService');
             for (const split of childSplits) {
               if (split.inventoryLinkId && split.inventoryQuantity) {
@@ -1726,8 +1737,6 @@ export class FinanceService {
                 );
               }
             }
-          } else {
-            await deleteDoc(doc(db, COLLECTIONS.TRANSACTIONS, transactionId));
           }
 
           invalidateFinanceCache();
@@ -2051,23 +2060,38 @@ export class FinanceService {
       );
       const splitSnapshot = await getDocs(splitQuery);
       const splitTransactions: Transaction[] = [];
-      for (const splitDoc of splitSnapshot.docs) {
-        const split = { id: splitDoc.id, ...splitDoc.data() } as TransactionSplit;
-        const parentDoc = await getDoc(doc(db, COLLECTIONS.TRANSACTIONS, split.parentTransactionId));
-        const parent = parentDoc.exists() ? parentDoc.data() : {};
-        splitTransactions.push({
-          id: split.id,
-          date: this.normalizeTransactionDate((parent as any).date),
-          description: split.description,
-          purpose: split.purpose,
-          amount: split.amount,
-          type: (parent as any).type || 'Income',
-          category: 'Membership',
-          status: (parent as any).status || 'Pending',
-          projectId: canonicalProjectId,
-          memberId,
-          parentTransactionId: split.parentTransactionId,
-        } as Transaction);
+      if (splitSnapshot.docs.length > 0) {
+        // Fix 5: batch-read parent transactions instead of one getDoc per split (N+1 → ceil(N/30) reads)
+        const parentIds = [...new Set(
+          splitSnapshot.docs
+            .map(d => (d.data() as TransactionSplit).parentTransactionId)
+            .filter(Boolean)
+        )];
+        const parentMap = new Map<string, Record<string, unknown>>();
+        for (let i = 0; i < parentIds.length; i += 30) {
+          const chunk = parentIds.slice(i, i + 30);
+          const parentsSnap = await getDocs(
+            query(collection(db, COLLECTIONS.TRANSACTIONS), where(documentId(), 'in', chunk))
+          );
+          parentsSnap.docs.forEach(pd => parentMap.set(pd.id, pd.data() as Record<string, unknown>));
+        }
+        for (const splitDoc of splitSnapshot.docs) {
+          const split = { id: splitDoc.id, ...splitDoc.data() } as TransactionSplit;
+          const parent = parentMap.get(split.parentTransactionId) ?? {};
+          splitTransactions.push({
+            id: split.id,
+            date: this.normalizeTransactionDate((parent as any).date),
+            description: split.description,
+            purpose: split.purpose,
+            amount: split.amount,
+            type: (parent as any).type || 'Income',
+            category: 'Membership',
+            status: (parent as any).status || 'Pending',
+            projectId: canonicalProjectId,
+            memberId,
+            parentTransactionId: split.parentTransactionId,
+          } as Transaction);
+        }
       }
 
       const allMembershipTransactions = [...transactions, ...splitTransactions];

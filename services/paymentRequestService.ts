@@ -18,7 +18,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS, DEFAULT_LO_ID, REFERENCE_NUMBER_PREFIX } from '../config/constants';
-import { PaymentRequest, PaymentRequestStatus } from '../types';
+import { PaymentRequest, PaymentRequestStatus, Transaction } from '../types';
 import { removeUndefined } from '../utils/dataUtils';
 import { withDevMode } from '../utils/devMode';
 import { MOCK_PAYMENT_REQUESTS } from './mockData';
@@ -491,7 +491,7 @@ export class PaymentRequestService {
         purpose: pr.purpose || undefined,
         year,
         source: 'manual',
-      } as any);
+      } as Omit<Transaction, 'id'>);
       // Clear failure flag on success
       await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, pr.id), { expenseTxFailed: false });
     } catch (err) {
@@ -721,14 +721,14 @@ export class PaymentRequestService {
   }
 
   /** Write in-app notification to a member (情景 AA) */
-  private static async _writeNotification(memberId: string, title: string, message: string): Promise<void> {
+  private static async _writeNotification(memberId: string, title: string, message: string, type = 'info'): Promise<void> {
     try {
       await import('firebase/firestore').then(async ({ collection: col, addDoc: add, Timestamp: Ts }) => {
         await add(col(db, COLLECTIONS.NOTIFICATIONS), {
           memberId,
           title,
           message,
-          type: 'info',
+          type,
           read: false,
           timestamp: Ts.now(),
         });

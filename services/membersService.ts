@@ -226,9 +226,10 @@ export class MembersService {
     const result = { ...data };
 
     // 1. General
-    const general = {
+    type MemberGeneral = NonNullable<Member['general']>;
+    const general: Partial<MemberGeneral> & { fullName?: string } = {
       ...(existing?.general || {}),
-    } as any;
+    };
     if (data.name !== undefined) general.name = data.name;
     if (data.fullName !== undefined) general.fullName = data.fullName;
     if (data.chineseName !== undefined) general.chineseName = data.chineseName;
@@ -264,11 +265,15 @@ export class MembersService {
     }
 
     // 2. Contact
-    const contact = {
+    type MemberContact = NonNullable<Member['contact']>;
+    const contact: Partial<Omit<MemberContact, 'socials' | 'emergency'>> & {
+      socials: Partial<MemberContact['socials']>;
+      emergency: Partial<MemberContact['emergency']>;
+    } = {
       ...(existing?.contact || {}),
       socials: { ...(existing?.contact?.socials || {}) },
       emergency: { ...(existing?.contact?.emergency || {}) }
-    } as any;
+    };
     if (data.email !== undefined) contact.email = data.email;
     if (data.phone !== undefined) contact.phone = data.phone;
     if (data.alternatePhone !== undefined) contact.alternatePhone = data.alternatePhone;
@@ -298,9 +303,9 @@ export class MembersService {
     }
 
     // 3. Others
-    const others = {
+    const others: Partial<NonNullable<Member['others']>> = {
       ...(existing?.others || {}),
-    } as any;
+    };
     if (data.bio !== undefined) others.bio = data.bio;
     if (data.shirtStyle !== undefined) others.shirtStyle = data.shirtStyle;
     else if (data.cutStyle !== undefined) others.shirtStyle = data.cutStyle;
@@ -315,9 +320,9 @@ export class MembersService {
     }
 
     // 4. Business
-    const business = {
+    const business: Partial<NonNullable<Member['business']>> = {
       ...(existing?.business || {}),
-    } as any;
+    };
     if (data.companyName !== undefined) business.companyName = data.companyName;
     if (data.companyWebsite !== undefined) business.companyWebsite = data.companyWebsite;
     if (data.companyLogoUrl !== undefined) business.companyLogoUrl = data.companyLogoUrl;
@@ -357,10 +362,15 @@ export class MembersService {
     }
 
     // 5. JCI Career
-    const jciCareer = {
+    type MemberJciCareer = NonNullable<Member['jciCareer']>;
+    // senatorship uses Record<string,unknown> because legacy import fields (senatorshipId, senatorCertified,
+    // senatorshipBoardValidated) are stored here but not declared in JciSenatorship.
+    const jciCareer: Partial<Omit<MemberJciCareer, 'senatorship'>> & {
+      senatorship: Partial<MemberJciCareer['senatorship']> & Record<string, unknown>;
+    } = {
       ...(existing?.jciCareer || {}),
       senatorship: { ...(existing?.jciCareer?.senatorship || {}) }
-    } as any;
+    };
     if (data.membershipType !== undefined) jciCareer.membershipType = data.membershipType;
     // membershipStatus legacy field removed (E5) — use membership[year].status instead
     if (data.joinDate !== undefined) jciCareer.joinDate = data.joinDate;
@@ -867,7 +877,8 @@ export class MembersService {
     try {
       const q = query(
         collection(db, COLLECTIONS.MEMBERS),
-        where('role', '==', role)
+        where('role', '==', role),
+        limit(200)
       );
 
       const snapshot = await getDocs(q);
