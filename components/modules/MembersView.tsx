@@ -213,7 +213,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
   // Filter members based on search + column filters
   const filteredMembers = useMemberSearch({
     members,
-    searchTerm,
+    searchTerm: '',
     searchQuery,
     roleFilters,
     membershipTypeFilters,
