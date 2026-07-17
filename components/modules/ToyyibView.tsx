@@ -3,7 +3,7 @@ import { CreditCard, ExternalLink, Plus, RefreshCw, Download, AlertCircle, Link2
 import { doc, updateDoc, deleteField } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { COLLECTIONS } from '../../config/constants';
-import { Card, Button, Badge, Modal, useToast } from '../ui/Common';
+import { Card, Button, Badge, Modal, useToast, ConfirmDialog, ConfirmState, CONFIRM_CLOSED } from '../ui/Common';
 import { Input } from '../ui/Form';
 import { ToyyibService, ToyyibBillRecord, ToyyibCategory } from '../../services/toyyibService';
 import { ProjectsService } from '../../services/projectsService';
@@ -17,6 +17,7 @@ import { Combobox } from '../ui/Combobox';
 
 export const ToyyibView: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
   const { showToast } = useToast();
+  const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
   const [activeTab, setActiveTab] = useState<'category' | 'bill' | 'settlement'>('category');
   const [categories, setCategories] = useState<ToyyibCategory[]>([]);
   const [bills, setBills] = useState<ToyyibBillRecord[]>([]);
@@ -476,31 +477,39 @@ export const ToyyibView: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
                               <button
                                 title="撤回 — 清除 ToyyibPay 账单记录"
                                 className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                                onClick={async () => {
+                                onClick={() => {
                                   if (!member.id) return;
-                                  if (!window.confirm(`撤回 ${member.name} ${testYear} 年会费账单记录？`)) return;
-                                  try {
-                                    await updateDoc(doc(db, COLLECTIONS.MEMBERS, member.id), {
-                                      [`membership.${testYear}.toyyibBillCode`]: deleteField(),
-                                      [`membership.${testYear}.toyyibPaymentUrl`]: deleteField(),
-                                      [`membership.${testYear}.toyyibPaymentStatus`]: deleteField(),
-                                    });
-                                    setTestMembers(prev => prev.map(m => m.id !== testMemberId ? m : {
-                                      ...m,
-                                      membership: {
-                                        ...m.membership,
-                                        [String(testYear)]: {
-                                          ...m.membership?.[String(testYear)],
-                                          toyyibBillCode: undefined,
-                                          toyyibPaymentUrl: undefined,
-                                          toyyibPaymentStatus: undefined,
-                                        },
-                                      },
-                                    }));
-                                    showToast('已撤回账单记录', 'success');
-                                  } catch {
-                                    showToast('撤回失败', 'error');
-                                  }
+                                  setConfirmState({
+                                    open: true,
+                                    title: '撤回账单记录',
+                                    message: `撤回 ${member.name} ${testYear} 年会费账单记录？`,
+                                    variant: 'danger',
+                                    onConfirm: async () => {
+                                      setConfirmState(CONFIRM_CLOSED);
+                                      try {
+                                        await updateDoc(doc(db, COLLECTIONS.MEMBERS, member.id!), {
+                                          [`membership.${testYear}.toyyibBillCode`]: deleteField(),
+                                          [`membership.${testYear}.toyyibPaymentUrl`]: deleteField(),
+                                          [`membership.${testYear}.toyyibPaymentStatus`]: deleteField(),
+                                        });
+                                        setTestMembers(prev => prev.map(m => m.id !== testMemberId ? m : {
+                                          ...m,
+                                          membership: {
+                                            ...m.membership,
+                                            [String(testYear)]: {
+                                              ...m.membership?.[String(testYear)],
+                                              toyyibBillCode: undefined,
+                                              toyyibPaymentUrl: undefined,
+                                              toyyibPaymentStatus: undefined,
+                                            },
+                                          },
+                                        }));
+                                        showToast('已撤回账单记录', 'success');
+                                      } catch {
+                                        showToast('撤回失败', 'error');
+                                      }
+                                    },
+                                  });
                                 }}
                               >
                                 <Undo2 size={13} />
@@ -1428,6 +1437,7 @@ export const ToyyibView: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
           </div>
         )}
       </Modal>
+      <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
     </div>
   );
 };

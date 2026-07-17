@@ -331,9 +331,9 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
             className="mt-1 overflow-hidden text-xs text-slate-500 whitespace-nowrap text-ellipsis flex items-center gap-1.5"
             title={`${tx.isSplit ? 'Split' : (tx.category || '—')} | ${getTransactionAccountLabel(tx)} | ${tx.purpose || '—'}`}
           >
-            {tx.status === 'Pending' && <span className="shrink-0 inline-flex items-center px-1.5 py-0 rounded text-[10px] font-semibold bg-amber-100 text-amber-700">Pending</span>}
-            {tx.matchStatus === 'full' && <span className="shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0 rounded text-[10px] font-semibold bg-teal-100 text-teal-700"><Link2Off size={9} />Matched</span>}
-            {tx.status === 'Voided' && <span className="shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0 rounded text-[10px] font-semibold bg-slate-200 text-slate-500"><Ban size={9} />Voided</span>}
+            {tx.status === 'Pending' && <Badge variant="warning" className="shrink-0 py-0 text-[10px]">Pending</Badge>}
+            {tx.matchStatus === 'full' && <Badge variant="success" icon={<Link2Off size={9} />} className="shrink-0 py-0 text-[10px]">Matched</Badge>}
+            {tx.status === 'Voided' && <Badge variant="neutral" icon={<Ban size={9} />} className="shrink-0 py-0 text-[10px]">Voided</Badge>}
             <span className="font-medium text-slate-600">{tx.isSplit ? 'Split' : (tx.category || '—')}</span>
             <span className="text-slate-300">|</span>
             <span>{getTransactionAccountLabel(tx)}</span>

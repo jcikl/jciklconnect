@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Megaphone, Plus, Edit, Trash2, Eye, MousePointerClick, TrendingUp, Calendar, Image as ImageIcon, Link as LinkIcon, BarChart3, Download, Filter, Upload, Globe, Clock, UserPlus } from 'lucide-react';
-import { Button, Card, Badge, Modal, useToast, Tabs, StatCardsContainer, ProgressBar } from '../ui/Common';
+import { Button, Card, Badge, Modal, useToast, Tabs, StatCardsContainer, ProgressBar, PageHeader, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
+import type { ConfirmState } from '../ui/Common';
 import { Input, Select, Textarea } from '../ui/Form';
 import { LoadingState } from '../ui/Loading';
 import { useAdvertisements } from '../../hooks/useAdvertisements';
@@ -37,6 +38,7 @@ const AdImage: React.FC<AdImageProps> = ({ imageUrl, title }) => {
 };
 
 export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
+  const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedAd, setSelectedAd] = useState<Advertisement | null>(null);
   const [activeTab, setActiveTab] = useState<'ads' | 'packages' | 'analytics' | 'guest'>('ads');
@@ -201,12 +203,7 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Partnership & Promotions</h2>
-          <p className="text-slate-500">Manage promotional content and partnership campaigns.</p>
-        </div>
-      </div>
+      <PageHeader title="Partnership & Promotions" description="Manage promotional content and partnership campaigns." />
 
       <Card noPadding>
         <div className="px-4 md:px-6 pt-4">
@@ -309,7 +306,7 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
                                 </button>
                                 <button
                                   className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                                  onClick={async () => { if (window.confirm('Delete this partnership?')) await deleteAdvertisement(ad.id!); }}
+                                  onClick={() => setConfirmState({ open: true, title: 'Delete Partnership', message: 'Delete this partnership?', variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await deleteAdvertisement(ad.id!); } })}
                                 >
                                   <Trash2 size={14} />
                                 </button>
@@ -370,7 +367,7 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
                             <Edit size={15} />
                           </button>
                           <button className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                            onClick={async () => { if (window.confirm('Delete this partnership?')) await deleteAdvertisement(ad.id!); }}>
+                            onClick={() => setConfirmState({ open: true, title: 'Delete Partnership', message: 'Delete this partnership?', variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await deleteAdvertisement(ad.id!); } })}>
                             <Trash2 size={15} />
                           </button>
                         </div>
@@ -612,6 +609,7 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
           drawerOnMobile
         />
       )}
+      <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
     </div>
   );
 };

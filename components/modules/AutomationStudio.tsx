@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, RefreshCw, Settings, AlertCircle, Webhook as WebhookIcon } from 'lucide-react';
-import { Tabs, Button } from '../ui/Common';
+import { Tabs, Button, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
+import type { ConfirmState } from '../ui/Common';
 import { LoadingState } from '../ui/Loading';
 import { useAutomation } from '../../hooks/useAutomation';
 import { AutomationRule } from '../../types';
@@ -17,6 +18,7 @@ import { RuleConfigModal } from './AutomationStudio/RuleConfigModal';
 import { GlobalSettingsModal } from './AutomationStudio/GlobalSettingsModal';
 
 export const AutomationStudio: React.FC = () => {
+  const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
   const [activeTab, setActiveTab] = useState('Workflows');
   const [selectedWorkflow, setSelectedWorkflow] = useState<Workflow | null>(null);
   const [selectedRule, setSelectedRule] = useState<AutomationRule | null>(null);
@@ -54,14 +56,21 @@ export const AutomationStudio: React.FC = () => {
     }
   };
 
-  const handleDeleteWorkflow = async (workflowId: string) => {
-    if (window.confirm('Are you sure you want to delete this workflow?')) {
-      try {
-        await deleteWorkflow(workflowId);
-      } catch (err) {
-        // Error handled by hook
-      }
-    }
+  const handleDeleteWorkflow = (workflowId: string) => {
+    setConfirmState({
+      open: true,
+      title: 'Delete Workflow',
+      message: 'Are you sure you want to delete this workflow?',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmState(CONFIRM_CLOSED);
+        try {
+          await deleteWorkflow(workflowId);
+        } catch (err) {
+          // Error handled by hook
+        }
+      },
+    });
   };
 
   const handleExecuteWorkflow = async (workflowId: string) => {
@@ -223,6 +232,7 @@ export const AutomationStudio: React.FC = () => {
           }}
         />
       )}
+      <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
     </div>
   );
 };

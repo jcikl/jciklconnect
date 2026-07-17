@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Shield, CheckCircle, Clock, RefreshCw, XCircle, Search } from 'lucide-react';
-import { Card, Button, Badge, useToast } from '../../ui/Common';
+import { Card, Button, Badge, useToast, ConfirmDialog, CONFIRM_CLOSED, ConfirmState } from '../../ui/Common';
 import { Member } from '../../../types';
 import { MembersService } from '../../../services/membersService';
 import { MembershipTypeDisplay } from '../../shared/MembershipTypeDisplay';
@@ -23,6 +23,7 @@ export const SenatorshipManagement: React.FC<Props> = ({
 }) => {
   const { showToast } = useToast();
   const { member: currentUser } = useAuth();
+  const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [localSearch, setLocalSearch] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'date'>('name');
@@ -71,21 +72,27 @@ export const SenatorshipManagement: React.FC<Props> = ({
     }
   };
 
-  const handleRevoke = async (member: Member) => {
+  const handleRevoke = (member: Member) => {
     if (!canRevoke) return;
-    if (!window.confirm(`Revoke board validation for ${member.name}? The senatorship number will become editable again.`)) {
-      return;
-    }
-    setBusyId(member.id);
-    try {
-      await MembersService.revokeSenatorshipValidation(member.id, currentUser?.id);
-      showToast(`Revoked validation for ${member.name}`, 'success');
-      onMembersChanged?.();
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Revoke failed', 'error');
-    } finally {
-      setBusyId(null);
-    }
+    setConfirmState({
+      open: true,
+      title: 'Revoke Board Validation',
+      message: `Revoke board validation for ${member.name}? The senatorship number will become editable again.`,
+      variant: 'warning',
+      onConfirm: async () => {
+        setConfirmState(CONFIRM_CLOSED);
+        setBusyId(member.id);
+        try {
+          await MembersService.revokeSenatorshipValidation(member.id, currentUser?.id);
+          showToast(`Revoked validation for ${member.name}`, 'success');
+          onMembersChanged?.();
+        } catch (err) {
+          showToast(err instanceof Error ? err.message : 'Revoke failed', 'error');
+        } finally {
+          setBusyId(null);
+        }
+      },
+    });
   };
 
   const renderRow = (member: Member, mode: 'pending' | 'validated') => (
@@ -232,6 +239,7 @@ export const SenatorshipManagement: React.FC<Props> = ({
           )}
         </Card>
       </div>
+      <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
     </div>
   );
 };

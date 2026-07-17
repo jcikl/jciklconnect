@@ -1,7 +1,8 @@
 ﻿﻿import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { Settings, Zap, Layout, Kanban, Plus, UserCircle, FileText, Calendar, DollarSign, CheckCircle, XCircle, Clock, Edit, Trash2, Eye, GitBranch, BarChart3, RefreshCw, Download, Search, Copy, MapPin, Users, ChevronDown, ChevronUp, Send, Check, X, Globe, Lock, Layers, Image, MoreVertical, Info, Tag, ExternalLink } from 'lucide-react';
-import { Button, Card, Badge, ProgressBar, Modal, useToast, Tabs, Drawer } from '../ui/Common';
+import { Button, Card, Badge, ProgressBar, Modal, useToast, Tabs, Drawer, PageHeader, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
+import type { ConfirmState } from '../ui/Common';
 import { Input, Select, Textarea, Checkbox } from '../ui/Form';
 import { Combobox } from '../ui/Combobox';
 import { MultiSelectDropdown } from '../ui/MultiSelectDropdown';
@@ -37,6 +38,7 @@ import { TemplatePreviewModal } from './Projects/TemplatePreviewModal';
 // All sub-components extracted to Projects/ subdirectory
 
 export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searchQuery?: string; initialSelectedProjectId?: string | null; onClearSelection?: () => void }> = ({ onNavigate, searchQuery, initialSelectedProjectId, onClearSelection }) => {
+  const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(initialSelectedProjectId ?? null);
   const [isProposalModalOpen, setProposalModalOpen] = useState(false);
   const [createProjectStep, setCreateProjectStep] = useState<1 | 2>(1);
@@ -240,9 +242,11 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
     return filtered;
   }, [projects, activeTab, searchQuery, selectedYear, isPrivileged, member]);
 
-  const handleBatchDelete = async () => {
+  const handleBatchDelete = () => {
     if (selectedProjectIds.size === 0) return;
-    if (!window.confirm(`Are you sure you want to delete ${selectedProjectIds.size} selected events? This action cannot be undone.`)) return;
+    setConfirmState({ open: true, title: 'Delete Events', message: `Are you sure you want to delete ${selectedProjectIds.size} selected events? This action cannot be undone.`, variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await _doBatchDelete(); } });
+  };
+  const _doBatchDelete = async () => {
 
     const idsToDelete = Array.from(selectedProjectIds);
     setBatchOperationProgress({ current: 0, total: idsToDelete.length });
@@ -263,10 +267,11 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
     }
   };
 
-  const handleBatchStatusUpdate = async (newStatus: Project['status']) => {
+  const handleBatchStatusUpdate = (newStatus: Project['status']) => {
     if (selectedProjectIds.size === 0) return;
-    if (!window.confirm(`Are you sure you want to set status to ${newStatus} for ${selectedProjectIds.size} selected events?`)) return;
-
+    setConfirmState({ open: true, title: 'Update Status', message: `Are you sure you want to set status to ${newStatus} for ${selectedProjectIds.size} selected events?`, variant: 'warning', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await _doBatchStatusUpdate(newStatus); } });
+  };
+  const _doBatchStatusUpdate = async (newStatus: Project['status']) => {
     const idsToUpdate = Array.from(selectedProjectIds);
     setBatchOperationProgress({ current: 0, total: idsToUpdate.length });
 
@@ -450,23 +455,12 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
       {selectedProject && (
         <button onClick={() => setSelectedProjectId(null)} className="text-xs text-slate-400 hover:text-jci-blue font-semibold transition-colors">← Events Management</button>
       )}
-      <div className="flex flex-row justify-between items-center gap-2">
-        <div className="min-w-0 flex-1">
-          {selectedProject ? (
+      {selectedProject ? (
+        <div className="flex flex-row justify-between items-center gap-2">
+          <div className="min-w-0 flex-1">
             <h2 className="text-lg md:text-2xl font-bold text-slate-900 truncate leading-tight">{selectedProject.name ?? selectedProject.title ?? 'Project'}</h2>
-          ) : (
-            <>
-              <h2 className="text-2xl font-bold text-slate-900">Events Management</h2>
-              <p className="text-slate-500">Create proposals, track approval, and manage activities.</p>
-            </>
-          )}
-        </div>
-        <div className="flex gap-2 shrink-0">
-          {!selectedProject && (
-            <>
-              <div className="hidden md:flex gap-2"></div>
-            </>
-          )}
+          </div>
+          <div className="flex gap-2 shrink-0">
           {selectedProject && (
             <>
               {/* Desktop: show all workflow buttons */}
@@ -543,7 +537,13 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
             </>
           )}
         </div>
-      </div>
+        </div>
+      ) : (
+        <PageHeader
+          title="Events Management"
+          description="Create proposals, track approval, and manage activities."
+        />
+      )}
 
       {!selectedProject ? (
         <div className="space-y-2">
@@ -664,7 +664,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
                             <Button variant="ghost" size="sm" onClick={() => setPreviewTemplate(template)} title="Preview"><Eye size={14} /></Button>
                             <Button variant="ghost" size="sm" onClick={() => handleUseTemplate(template)} title="Use"><Copy size={14} /></Button>
                             <Button variant="ghost" size="sm" onClick={() => { setSelectedTemplate(template); setTemplateModalOpen(true); }} title="Edit"><Edit size={14} /></Button>
-                            <Button variant="ghost" size="sm" onClick={async () => { if (window.confirm('Delete this template?')) { await deleteEventTemplate(template.id!); } }} className="text-red-500 hover:text-red-700" title="Delete"><Trash2 size={14} /></Button>
+                            <Button variant="ghost" size="sm" onClick={() => setConfirmState({ open: true, title: 'Delete Template', message: 'Delete this template?', variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await deleteEventTemplate(template.id!); } })} className="text-red-500 hover:text-red-700" title="Delete"><Trash2 size={14} /></Button>
                           </div>
                         </div>
                       ))}
@@ -794,7 +794,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
                               <Button variant="ghost" size="sm" onClick={() => setPreviewTemplate(template)} title="Preview"><Eye size={14} /></Button>
                               <Button variant="ghost" size="sm" onClick={() => handleUseTemplate(template)} title="Use"><Copy size={14} /></Button>
                               <Button variant="ghost" size="sm" onClick={() => { setSelectedTemplate(template); setTemplateModalOpen(true); }} title="Edit"><Edit size={14} /></Button>
-                              <Button variant="ghost" size="sm" onClick={async () => { if (window.confirm('Delete this template?')) { await deleteEventTemplate(template.id!); } }} className="text-red-500 hover:text-red-700" title="Delete"><Trash2 size={14} /></Button>
+                              <Button variant="ghost" size="sm" onClick={() => setConfirmState({ open: true, title: 'Delete Template', message: 'Delete this template?', variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await deleteEventTemplate(template.id!); } })} className="text-red-500 hover:text-red-700" title="Delete"><Trash2 size={14} /></Button>
                             </div>
                           </div>
                         ))}
@@ -1114,6 +1114,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
           </div>
         </div>
       </Modal>
+      <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
     </div >
   )
 }

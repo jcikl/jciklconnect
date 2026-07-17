@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { GraduationCap, Award } from 'lucide-react';
-import { Card } from '../../ui/Common';
+import { Card, Badge } from '../../ui/Common';
 import type { Member } from '../../../types';
 import { formatDateToDDMMMYYYY } from '../../../utils/dateUtils';
 
@@ -128,9 +128,9 @@ const MemberDetailActivitiesTabBase: React.FC<MemberDetailActivitiesTabProps> = 
                   </div>
                   <div className="flex items-center gap-2 mb-0.5">
                     <span className="text-xs text-slate-400 font-mono">{formatDateToDDMMMYYYY(role.date)}</span>
-                    <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full ${role.type === 'Trainer' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}`}>
+                    <Badge variant={role.type === 'Trainer' ? 'warning' : 'info'} className="text-[9px] uppercase font-bold py-0.5 px-1.5">
                       {role.type}
-                    </span>
+                    </Badge>
                   </div>
                   <h4 className="text-sm font-bold text-slate-900">{role.projectName}</h4>
                   <p className="text-xs text-slate-500">

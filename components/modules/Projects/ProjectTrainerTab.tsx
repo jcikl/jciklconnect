@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Edit, X } from 'lucide-react';
-import { Button } from '../../ui/Common';
+import { Button, Badge } from '../../ui/Common';
 import { Input } from '../../ui/Form';
 import { MemberSelector } from '../../ui/MemberSelector';
 import { useMembers } from '../../../hooks/useMembers';
@@ -98,7 +98,7 @@ export const ProjectTrainerTab: React.FC<ProjectTrainerTabProps> = ({ project, o
                       <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">{row.role}</span>
                     )}
                     {row.memberId && (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">JCI Member</span>
+                      <Badge variant="success">JCI Member</Badge>
                     )}
                   </div>
                   {row.durationHours && (

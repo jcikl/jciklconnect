@@ -25,6 +25,7 @@ import {
 } from '../../../services/projectReportService';
 import { Project } from '../../../types';
 import * as Forms from '../../ui/Form';
+import { Badge } from '../../ui/Common';
 
 interface ProjectReportGeneratorProps {
   project: Project;
@@ -417,15 +418,9 @@ export const ProjectReportGenerator: React.FC<ProjectReportGeneratorProps> = ({
                         </div>
                         <div className="text-right">
                           <p className="text-sm font-medium">{new Date(deadline.dueDate).toLocaleDateString()}</p>
-                          <span className={`px-2 py-1 rounded text-xs ${
-                            deadline.priority === 'High' 
-                              ? 'bg-red-100 text-red-800' 
-                              : deadline.priority === 'Medium'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-green-100 text-green-800'
-                          }`}>
+                          <Badge variant={deadline.priority === 'High' ? 'error' : deadline.priority === 'Medium' ? 'warning' : 'success'}>
                             {deadline.priority}
-                          </span>
+                          </Badge>
                         </div>
                       </div>
                     ))}
@@ -444,15 +439,9 @@ export const ProjectReportGenerator: React.FC<ProjectReportGeneratorProps> = ({
                     {generatedReport.risksAndIssues.map((risk, index) => (
                       <div key={index} className="p-3 bg-gray-50 rounded">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className={`px-2 py-1 rounded text-xs ${
-                            risk.severity === 'high' 
-                              ? 'bg-red-100 text-red-800' 
-                              : risk.severity === 'medium'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-green-100 text-green-800'
-                          }`}>
+                          <Badge variant={risk.severity === 'high' ? 'error' : risk.severity === 'medium' ? 'warning' : 'success'}>
                             {risk.severity.toUpperCase()} {risk.type.toUpperCase()}
-                          </span>
+                          </Badge>
                         </div>
                         <p className="text-sm">{risk.description}</p>
                         {risk.mitigation && (
@@ -558,18 +547,10 @@ export const ProjectReportGenerator: React.FC<ProjectReportGeneratorProps> = ({
                     <span>{template.sections.filter(s => s.enabled).length}</span>
                   </div>
                   <div className="flex flex-wrap gap-1 mt-2">
-                    {template.formatting.includeCharts && (
-                      <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">Charts</span>
-                    )}
-                    {template.formatting.includeFinancials && (
-                      <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">Financial</span>
-                    )}
-                    {template.formatting.includeTeamDetails && (
-                      <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded">Team</span>
-                    )}
-                    {template.formatting.includeRisks && (
-                      <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded">Risks</span>
-                    )}
+                    {template.formatting.includeCharts && <Badge variant="info">Charts</Badge>}
+                    {template.formatting.includeFinancials && <Badge variant="success">Financial</Badge>}
+                    {template.formatting.includeTeamDetails && <Badge variant="neutral">Team</Badge>}
+                    {template.formatting.includeRisks && <Badge variant="error">Risks</Badge>}
                   </div>
                 </div>
               </div>

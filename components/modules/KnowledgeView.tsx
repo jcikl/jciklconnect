@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { BookOpen, FileText, Download, Award, PlayCircle, Plus, Edit, Trash2, GraduationCap, CheckCircle, Clock, GitBranch, Eye, Search, Filter, X } from 'lucide-react';
-import { Card, Button, ProgressBar, Badge, Tabs, Modal, useToast } from '../ui/Common';
+import { Card, Button, ProgressBar, Badge, Tabs, Modal, useToast, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
+import type { ConfirmState } from '../ui/Common';
 import { Input, Select, Textarea } from '../ui/Form';
 import { LoadingState } from '../ui/Loading';
 import { useKnowledge } from '../../hooks/useKnowledge';
@@ -219,11 +220,13 @@ const LearningPathsTab: React.FC<LearningPathsTabProps> = ({
     canManage,
     onDelete,
 }) => {
+    const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
     const getProgress = (pathId: string) => {
         return myProgress.find(p => p.pathId === pathId);
     };
 
     return (
+        <>
         <LoadingState loading={loading} error={null} empty={paths.length === 0} emptyMessage="No learning paths available">
             <div className="grid md:grid-cols-2 gap-6">
                 {paths.map(path => {
@@ -305,11 +308,7 @@ const LearningPathsTab: React.FC<LearningPathsTabProps> = ({
                                     <Button
                                         variant="ghost"
                                         size="sm"
-                                        onClick={async () => {
-                                            if (window.confirm('Are you sure you want to delete this learning path?')) {
-                                                await onDelete(path.id!);
-                                            }
-                                        }}
+                                        onClick={() => setConfirmState({ open: true, title: 'Delete Learning Path', message: 'Are you sure you want to delete this learning path?', variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await onDelete(path.id!); } })}
                                         className="text-red-500 hover:text-red-700"
                                     >
                                         <Trash2 size={14} />
@@ -321,6 +320,8 @@ const LearningPathsTab: React.FC<LearningPathsTabProps> = ({
                 })}
             </div>
         </LoadingState>
+        <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
+        </>
     );
 };
 
@@ -627,6 +628,7 @@ interface DocumentDetailModalProps {
 }
 
 const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({ document, onClose, canManage }) => {
+    const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
     const [loadingVersions, setLoadingVersions] = useState(false);
     const [documentWithVersions, setDocumentWithVersions] = useState<DocumentWithVersions>(document);
     const [isRestoring, setIsRestoring] = useState<string | null>(null);
@@ -660,10 +662,15 @@ const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({ document, onC
         }
     };
 
-    const handleRestoreVersion = async (versionId: string) => {
+    const handleRestoreVersion = (versionId: string) => {
         if (!document.id || !member) return;
-        if (!window.confirm('Are you sure you want to restore this version? A new version will be created.')) return;
-
+        setConfirmState({
+            open: true,
+            title: 'Restore Version',
+            message: 'Are you sure you want to restore this version? A new version will be created.',
+            variant: 'warning',
+            onConfirm: async () => {
+                setConfirmState(CONFIRM_CLOSED);
         try {
             setIsRestoring(versionId);
             await DocumentsService.restoreVersion(
@@ -679,9 +686,12 @@ const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({ document, onC
         } finally {
             setIsRestoring(null);
         }
+            },
+        });
     };
 
     return (
+        <>
         <Modal isOpen={true} onClose={onClose} title={documentWithVersions.name} size="lg" drawerOnMobile>
             <div className="space-y-6">
                 <div className="grid grid-cols-2 gap-4">
@@ -798,5 +808,7 @@ const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({ document, onC
                 </div>
             </div>
         </Modal>
+        <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
+        </>
     );
 };

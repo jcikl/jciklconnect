@@ -17,13 +17,17 @@ import {
     Badge,
     Modal,
     useToast,
+    ConfirmDialog,
+    CONFIRM_CLOSED,
 } from '../ui/Common';
+import type { ConfirmState } from '../ui/Common';
 import { Input, Select, Textarea } from '../ui/Form';
 import { LoadingState } from '../ui/Loading';
 import { useGamification } from '../../hooks/useGamification';
 import { formatDate } from '../../utils/dateUtils';
 
 export const AwardsManagementView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
+    const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
     const {
         awards,
         memberAwards,
@@ -103,14 +107,21 @@ export const AwardsManagementView: React.FC<{ searchQuery?: string }> = ({ searc
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (window.confirm('Are you sure you want to delete this award definition?')) {
-            try {
-                await deleteAward(id);
-            } catch (err) {
-                console.error('Error deleting award:', err);
-            }
-        }
+    const handleDelete = (id: string) => {
+        setConfirmState({
+            open: true,
+            title: 'Delete Award',
+            message: 'Are you sure you want to delete this award definition?',
+            variant: 'danger',
+            onConfirm: async () => {
+                setConfirmState(CONFIRM_CLOSED);
+                try {
+                    await deleteAward(id);
+                } catch (err) {
+                    console.error('Error deleting award:', err);
+                }
+            },
+        });
     };
 
     const filteredAwards = useMemo(() => {
@@ -348,6 +359,7 @@ export const AwardsManagementView: React.FC<{ searchQuery?: string }> = ({ searc
                     </div>
                 </form>
             </Modal>
+            <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
         </div>
     );
 };

@@ -8,3 +8,7 @@ export { Modal } from './Modal';
 export { Drawer } from './Drawer';
 export { Pagination } from './Pagination';
 export type { PaginationProps } from './Pagination';
+export { PageHeader } from './PageHeader';
+export { ConfirmDialog } from './ConfirmDialog';
+export type { ConfirmState } from './ConfirmDialog';
+export { CONFIRM_CLOSED } from './ConfirmDialog';

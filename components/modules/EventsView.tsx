@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Calendar, MapPin, Users, Filter, Plus, Clock, BrainCircuit, List, FileText, Edit, Trash2, Copy, DollarSign, TrendingUp, AlertTriangle, CheckCircle, RefreshCw, Search, Eye, Star, StarOff, Share2, ArrowLeft, Tag, Info, ChevronDown, Leaf, QrCode } from 'lucide-react';
-import { Card, Button, Badge, Tabs, Modal, useToast, ProgressBar } from '../ui/Common';
+import { Card, Button, Badge, Tabs, Modal, useToast, ProgressBar, PageHeader } from '../ui/Common';
 import { LoadingState } from '../ui/Loading';
 import { useEvents } from '../../hooks/useEvents';
 import { useAuth } from '../../hooks/useAuth';
@@ -81,26 +81,26 @@ export const EventsView: React.FC<{ searchQuery?: string; initialSelectedEventId
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Event List</h2>
-          <p className="text-slate-500">Plan, track, and analyze LO activities.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant={viewMode === 'list' ? 'primary' : 'outline'}
-            onClick={() => setViewMode('list')}
-          >
-            <List size={16} className="mr-2" /> List View
-          </Button>
-          <Button
-            variant={viewMode === 'calendar' ? 'primary' : 'outline'}
-            onClick={() => setViewMode('calendar')}
-          >
-            <Calendar size={16} className="mr-2" /> Calendar View
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Event List"
+        description="Plan, track, and analyze LO activities."
+        action={
+          <div className="flex gap-2">
+            <Button
+              variant={viewMode === 'list' ? 'primary' : 'outline'}
+              onClick={() => setViewMode('list')}
+            >
+              <List size={16} className="mr-2" /> List View
+            </Button>
+            <Button
+              variant={viewMode === 'calendar' ? 'primary' : 'outline'}
+              onClick={() => setViewMode('calendar')}
+            >
+              <Calendar size={16} className="mr-2" /> Calendar View
+            </Button>
+          </div>
+        }
+      />
 
       {viewMode === 'calendar' ? (
         <EventCalendarView

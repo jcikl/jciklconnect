@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { FileText, Plus, Edit, Trash2, Send, CheckCircle, XCircle, Clock, History, Users, Calendar, DollarSign, Target, Eye } from 'lucide-react';
-import { Card, Button, Badge, Modal, useToast, Tabs, Pagination } from '../ui/Common';
+import { Card, Button, Badge, Modal, useToast, Tabs, Pagination, PageHeader, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
+import type { ConfirmState } from '../ui/Common';
 import { Input, Select, Textarea } from '../ui/Form';
 import { LoadingState } from '../ui/Loading';
 import { useActivityPlans } from '../../hooks/useActivityPlans';
@@ -11,6 +12,7 @@ import { formatDate } from '../../utils/dateUtils';
 import { formatCurrency } from '../../utils/formatUtils';
 
 export const ActivityPlansView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
+  const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [isVersionModalOpen, setIsVersionModalOpen] = useState(false);
@@ -162,12 +164,10 @@ export const ActivityPlansView: React.FC<{ searchQuery?: string }> = ({ searchQu
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Activity Plans</h2>
-          <p className="text-slate-500">Propose, review, and manage activity plans.</p>
-        </div>
-        {member && (
+      <PageHeader
+        title="Activity Plans"
+        description="Propose, review, and manage activity plans."
+        action={member ? (
           <Button onClick={() => {
             setSelectedPlan(null);
             setIsModalOpen(true);
@@ -175,8 +175,8 @@ export const ActivityPlansView: React.FC<{ searchQuery?: string }> = ({ searchQu
             <Plus size={16} className="mr-2" />
             Create Activity Plan
           </Button>
-        )}
-      </div>
+        ) : undefined}
+      />
 
       <Card noPadding>
         <div className="">
@@ -302,11 +302,7 @@ export const ActivityPlansView: React.FC<{ searchQuery?: string }> = ({ searchQu
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={async () => {
-                            if (window.confirm('Are you sure you want to delete this activity plan?')) {
-                              await deletePlan(plan.id!);
-                            }
-                          }}
+                          onClick={() => setConfirmState({ open: true, title: 'Delete Activity Plan', message: 'Are you sure you want to delete this activity plan?', variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await deletePlan(plan.id!); } })}
                           className="text-red-500 hover:text-red-700"
                         >
                           <Trash2 size={14} />
@@ -570,6 +566,7 @@ export const ActivityPlansView: React.FC<{ searchQuery?: string }> = ({ searchQu
           </form>
         </Modal>
       )}
+      <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
     </div>
   );
 };

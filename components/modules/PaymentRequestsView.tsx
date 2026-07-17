@@ -1,7 +1,7 @@
 ﻿// Payment Requests “ submit, my applications, finance list and review
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Plus, RefreshCw, CheckCircle, XCircle, Search, X, FileText, Download, Eye, Clock, Copy, Check, Landmark, DollarSign, Paperclip, Sparkles, Building2, User, Trash2 } from 'lucide-react';
-import { Button, Card, Modal, useToast, Tabs, Badge } from '../ui/Common';
+import { Button, Card, Modal, useToast, Tabs, Badge, PageHeader } from '../ui/Common';
 import { SubmitPaymentRequestModal } from './PaymentRequests/SubmitPaymentRequestModal';
 import { Input, Select } from '../ui/Form';
 import { FirstUseBanner } from '../ui/FirstUseBanner';
@@ -56,45 +56,14 @@ const CopyButton: React.FC<{ text: string; label?: string }> = ({ text, label })
   );
 };
 
-function StatusBadge({ status }: { status: PaymentRequestStatus }) {
-  let bg = '';
-  let text = '';
-  let icon = null;
-
-  switch (status) {
-    case 'approved':
-      bg = 'bg-emerald-50 text-emerald-700 border border-emerald-200';
-      text = 'Approved';
-      icon = <CheckCircle size={12} className="inline mr-1 shrink-0" />;
-      break;
-    case 'rejected':
-      bg = 'bg-rose-50 text-rose-700 border border-rose-200';
-      text = 'Rejected';
-      icon = <XCircle size={12} className="inline mr-1 shrink-0" />;
-      break;
-    case 'cancelled':
-      bg = 'bg-slate-100 text-slate-600 border border-slate-200';
-      text = 'Cancelled';
-      icon = <X size={12} className="inline mr-1 shrink-0" />;
-      break;
-    case 'submitted':
-      bg = 'bg-amber-50 text-amber-700 border border-amber-200';
-      text = 'Pending';
-      icon = <Clock size={12} className="inline mr-1 shrink-0" />;
-      break;
-    default:
-      bg = 'bg-slate-100 text-slate-600 border border-slate-200';
-      text = 'Draft';
-      icon = <FileText size={12} className="inline mr-1 shrink-0" />;
-  }
-
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold leading-5 ${bg}`}>
-      {icon}
-      <span>{text}</span>
-    </span>
-  );
-}
+const PR_STATUS_BADGE: Record<PaymentRequestStatus, { variant: React.ComponentProps<typeof Badge>['variant']; icon: React.ReactNode; label: string }> = {
+  approved:  { variant: 'success', icon: <CheckCircle size={11} />, label: 'Approved' },
+  rejected:  { variant: 'error',   icon: <XCircle size={11} />,     label: 'Rejected' },
+  cancelled: { variant: 'neutral', icon: <X size={11} />,           label: 'Cancelled' },
+  submitted: { variant: 'warning', icon: <Clock size={11} />,       label: 'Pending' },
+  draft:     { variant: 'neutral', icon: <FileText size={11} />,    label: 'Draft' },
+  paid:      { variant: 'jci',     icon: <CheckCircle size={11} />, label: 'Paid' },
+};
 
 export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
   const { showToast } = useToast();
@@ -659,12 +628,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
   return (
     <div className="space-y-2">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Payment Requests</h2>
-          <p className="text-sm text-slate-500">Submit and track reimbursement claims</p>
-        </div>
-      </div>
+      <PageHeader title="Payment Requests" description="Submit and track reimbursement claims" />
 
       {successRef && (
         <Card className="p-4 bg-emerald-50 border-emerald-200">
@@ -822,7 +786,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                               <td className="py-3 px-2 text-right text-xs text-slate-500 whitespace-nowrap w-px">{new Date(pr.createdAt).toLocaleDateString()}</td>
                               <td className="py-3 px-2 w-px">
                                 <div className="flex items-center gap-1.5 justify-end">
-                                  <StatusBadge status={pr.status} />
+                                  {(() => { const s = PR_STATUS_BADGE[pr.status] ?? PR_STATUS_BADGE.draft; return <Badge variant={s.variant} icon={s.icon}>{s.label}</Badge>; })()}
                                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); handlePreviewPDF(pr); }} title="View PDF">
                                       <Eye size={13} />
@@ -901,7 +865,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                         >
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2 min-w-0">
-                              <StatusBadge status={pr.status} />
+                              {(() => { const s = PR_STATUS_BADGE[pr.status] ?? PR_STATUS_BADGE.draft; return <Badge variant={s.variant} icon={s.icon}>{s.label}</Badge>; })()}
                               <p className="font-medium text-slate-800 text-sm truncate">{pr.purpose}</p>
                             </div>
                             <p className="font-bold text-jci-blue text-sm shrink-0">{formatCurrency(pr.totalAmount || pr.amount)}</p>
@@ -1001,7 +965,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                               <td className="py-3 px-2 text-right text-xs text-slate-500 whitespace-nowrap w-px">{new Date(pr.createdAt).toLocaleDateString()}</td>
                               <td className="py-3 px-2 w-px">
                                 <div className="flex items-center gap-1.5 justify-end">
-                                  <StatusBadge status={pr.status} />
+                                  {(() => { const s = PR_STATUS_BADGE[pr.status] ?? PR_STATUS_BADGE.draft; return <Badge variant={s.variant} icon={s.icon}>{s.label}</Badge>; })()}
                                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); handlePreviewPDF(pr); }} title="View PDF">
                                       <Eye size={13} />
@@ -1116,7 +1080,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                         >
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2 min-w-0">
-                              <StatusBadge status={pr.status} />
+                              {(() => { const s = PR_STATUS_BADGE[pr.status] ?? PR_STATUS_BADGE.draft; return <Badge variant={s.variant} icon={s.icon}>{s.label}</Badge>; })()}
                               <p className="font-medium text-slate-800 text-sm truncate">{pr.applicantName || '”'}</p>
                             </div>
                             <p className="font-bold text-jci-blue text-sm shrink-0">{formatCurrency(pr.totalAmount || pr.amount)}</p>

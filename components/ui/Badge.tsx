@@ -3,10 +3,12 @@ import React from 'react';
 interface BadgeProps {
   children: React.ReactNode;
   variant?: 'success' | 'warning' | 'error' | 'info' | 'neutral' | 'jci' | 'gold' | 'platinum';
+  icon?: React.ReactNode;
   className?: string;
+  onClick?: () => void;
 }
 
-export const Badge: React.FC<BadgeProps> = ({ children, variant = 'neutral', className = '' }) => {
+export const Badge: React.FC<BadgeProps> = ({ children, variant = 'neutral', icon, className = '', onClick }) => {
   const styles = {
     success: "bg-green-100 text-green-700 ring-1 ring-inset ring-green-600/20",
     warning: "bg-amber-100 text-amber-700 ring-1 ring-inset ring-amber-600/20",
@@ -19,7 +21,11 @@ export const Badge: React.FC<BadgeProps> = ({ children, variant = 'neutral', cla
   };
 
   return (
-    <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${styles[variant]} ${className}`}>
+    <span
+      className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${styles[variant]} ${className}`}
+      onClick={onClick}
+    >
+      {icon && <span className="mr-1 inline-flex items-center">{icon}</span>}
       {children}
     </span>
   );

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { Workflow, WorkflowExecution, WorkflowNodeExecution } from '../../../types';
 import * as Forms from '../../ui/Form';
+import { Badge } from '../../ui/Common';
 
 interface WorkflowTestPanelProps {
   workflow: Workflow;
@@ -189,13 +190,12 @@ const WorkflowTestPanel: React.FC<WorkflowTestPanelProps> = ({ workflow, onClose
     }
   }, [currentExecution]);
 
-  const getStatusColor = (status: string) => {
+  const getStatusVariant = (status: string): React.ComponentProps<typeof Badge>['variant'] => {
     switch (status) {
-      case 'success': return 'text-green-600 bg-green-100';
-      case 'failed': return 'text-red-600 bg-red-100';
-      case 'running': return 'text-blue-600 bg-blue-100';
-      case 'cancelled': return 'text-gray-600 bg-gray-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case 'success': return 'success';
+      case 'failed': return 'error';
+      case 'running': return 'info';
+      default: return 'neutral';
     }
   };
 
@@ -308,10 +308,9 @@ const WorkflowTestPanel: React.FC<WorkflowTestPanelProps> = ({ workflow, onClose
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(execution.status)}`}>
-                            {getStatusIcon(execution.status)}
+                          <Badge variant={getStatusVariant(execution.status)} icon={getStatusIcon(execution.status)}>
                             {execution.status}
-                          </span>
+                          </Badge>
                           <span className="text-sm text-gray-600">
                             {new Date(execution.startedAt).toLocaleTimeString()}
                           </span>
@@ -339,10 +338,9 @@ const WorkflowTestPanel: React.FC<WorkflowTestPanelProps> = ({ workflow, onClose
                         <div className="bg-gray-50 rounded-lg p-4">
                           <div className="flex items-center justify-between mb-3">
                             <h4 className="font-medium text-gray-900">Execution Summary</h4>
-                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(execution.status)}`}>
-                              {getStatusIcon(execution.status)}
+                            <Badge variant={getStatusVariant(execution.status)} icon={getStatusIcon(execution.status)}>
                               {execution.status}
-                            </span>
+                            </Badge>
                           </div>
                           <div className="grid grid-cols-2 gap-4 text-sm">
                             <div>
@@ -381,10 +379,9 @@ const WorkflowTestPanel: React.FC<WorkflowTestPanelProps> = ({ workflow, onClose
                                         {workflow.nodes.find(n => n.id === nodeExec.nodeId)?.data?.label || nodeExec.nodeType}
                                       </span>
                                       <ArrowRight size={14} className="text-gray-400" />
-                                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(nodeExec.status)}`}>
-                                        {getStatusIcon(nodeExec.status)}
+                                      <Badge variant={getStatusVariant(nodeExec.status)} icon={getStatusIcon(nodeExec.status)}>
                                         {nodeExec.status}
-                                      </span>
+                                      </Badge>
                                     </div>
                                     <span className="text-xs text-gray-500">
                                       {nodeExec.duration}ms

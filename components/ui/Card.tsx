@@ -31,14 +31,24 @@ export const Card: React.FC<CardProps> = ({ children, className = '', title, act
   );
 };
 
+const iconBgMap: Record<string, string> = {
+  blue: 'bg-blue-50 dark:bg-blue-900/30 text-blue-600',
+  green: 'bg-green-50 dark:bg-green-900/30 text-green-600',
+  amber: 'bg-amber-50 dark:bg-amber-900/30 text-amber-600',
+  red: 'bg-red-50 dark:bg-red-900/30 text-red-600',
+  purple: 'bg-purple-50 dark:bg-purple-900/30 text-purple-600',
+  slate: 'bg-slate-100 dark:bg-slate-700 text-slate-600',
+};
+
 export const StatCard: React.FC<{
   title: string;
   value: string | number;
   trend?: number;
   icon: React.ReactNode;
+  iconColor?: 'blue' | 'green' | 'amber' | 'red' | 'purple' | 'slate';
   subtext?: string;
   onClick?: () => void;
-}> = ({ title, value, trend, icon, subtext, onClick }) => (
+}> = ({ title, value, trend, icon, iconColor, subtext, onClick }) => (
   <Card onClick={onClick} className="hover:shadow-md transition-shadow min-w-0">
     <div className="flex items-start justify-between gap-1 min-w-0">
       <div className="min-w-0 flex-1">
@@ -46,9 +56,11 @@ export const StatCard: React.FC<{
         <h4 className="text-lg md:text-2xl font-bold text-slate-900 tracking-tight truncate">{value}</h4>
         {subtext && <p className="text-xs text-slate-400 mt-0.5 md:mt-1 truncate">{subtext}</p>}
       </div>
-      <div className="p-1.5 md:p-2.5 bg-slate-50 rounded-lg text-slate-600 flex-shrink-0">
-        {icon}
-      </div>
+      {iconColor ? (
+        <div className={`p-2 rounded-lg flex-shrink-0 ${iconBgMap[iconColor]}`}>{icon}</div>
+      ) : (
+        <div className="p-1.5 md:p-2.5 bg-slate-50 rounded-lg text-slate-600 flex-shrink-0">{icon}</div>
+      )}
     </div>
   </Card>
 );

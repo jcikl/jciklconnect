@@ -4,7 +4,8 @@ import {
   ExternalLink, AlertCircle, CheckCircle, Loader, Search,
   Filter
 } from 'lucide-react';
-import { Button, Card, Badge, Modal, useToast } from '../ui/Common';
+import { Button, Card, Badge, Modal, useToast, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
+import type { ConfirmState } from '../ui/Common';
 import * as Forms from '../ui/Form';
 import {
   PublicationService,
@@ -67,6 +68,7 @@ const emptyForm = (): Omit<Publication, 'id' | 'createdAt' | 'updatedAt'> => ({
 
 export const PublicationsView: React.FC = () => {
   const { showToast } = useToast();
+  const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
 
   const [publications, setPublications] = useState<Publication[]>([]);
   const [loading, setLoading] = useState(true);
@@ -209,18 +211,26 @@ export const PublicationsView: React.FC = () => {
 
   // ── Delete ────────────────────────────────────────────────────────────────────
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this publication? This action cannot be undone.')) return;
-    setDeleting(id);
-    try {
-      await PublicationService.delete(id);
-      showToast('Publication deleted.', 'success');
-      await loadPublications();
-    } catch {
-      showToast('Failed to delete publication.', 'error');
-    } finally {
-      setDeleting(null);
-    }
+  const handleDelete = (id: string) => {
+    setConfirmState({
+      open: true,
+      title: 'Delete Publication',
+      message: 'Are you sure you want to delete this publication? This action cannot be undone.',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmState(CONFIRM_CLOSED);
+        setDeleting(id);
+        try {
+          await PublicationService.delete(id);
+          showToast('Publication deleted.', 'success');
+          await loadPublications();
+        } catch {
+          showToast('Failed to delete publication.', 'error');
+        } finally {
+          setDeleting(null);
+        }
+      },
+    });
   };
 
   // ── Quick toggle status ────────────────────────────────────────────────────────
@@ -523,6 +533,7 @@ export const PublicationsView: React.FC = () => {
           )}
         </div>
       </Modal>
+      <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
     </div>
   );
 };

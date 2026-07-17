@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Briefcase, Plus, Edit, Trash2, Image as ImageIcon, Check, Upload, Folder, Settings, Images } from 'lucide-react';
-import { Card, Button, Modal, useToast, ProgressBar } from '../ui/Common';
+import { Card, Button, Modal, useToast, ProgressBar, ConfirmDialog, CONFIRM_CLOSED, ConfirmState } from '../ui/Common';
 import { Input, Textarea } from '../ui/Form';
 import { LoadingState } from '../ui/Loading';
 import { FlagshipProjectsService } from '../../services/flagshipProjectsService';
@@ -22,6 +22,7 @@ export const FlagshipProjectsManagementView: React.FC<{ searchQuery?: string }> 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { showToast } = useToast();
+  const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
 
   const [isEditModalOpen, setEditModalOpen] = useState(false);
   const [isCreateModalOpen, setCreateModalOpen] = useState(false);
@@ -221,28 +222,35 @@ export const FlagshipProjectsManagementView: React.FC<{ searchQuery?: string }> 
     }
   };
 
-  const handleDeleteProject = async (projectId: string) => {
-    if (window.confirm('Are you sure you want to delete this flagship project? This will remove it from the public display.')) {
-      try {
-        const projectToDelete = projects.find(p => p.id === projectId);
-        await FlagshipProjectsService.deleteProject(projectId);
+  const handleDeleteProject = (projectId: string) => {
+    setConfirmState({
+      open: true,
+      title: 'Delete Flagship Project',
+      message: 'Are you sure you want to delete this flagship project? This will remove it from the public display.',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmState(CONFIRM_CLOSED);
+        try {
+          const projectToDelete = projects.find(p => p.id === projectId);
+          await FlagshipProjectsService.deleteProject(projectId);
 
-        // Also delete all of its images from Cloudinary!
-        if (projectToDelete && projectToDelete.galleryUrls && projectToDelete.galleryUrls.length > 0) {
-          Promise.all(projectToDelete.galleryUrls.map(url => deleteFromCloudinary(url)))
-            .then(results => {
-              const successCount = results.filter(Boolean).length;
-              console.log(`Deleted all ${successCount}/${projectToDelete.galleryUrls!.length} project images from Cloudinary.`);
-            })
-            .catch(err => console.error('Failed to clean up Cloudinary assets on project deletion:', err));
+          // Also delete all of its images from Cloudinary!
+          if (projectToDelete && projectToDelete.galleryUrls && projectToDelete.galleryUrls.length > 0) {
+            Promise.all(projectToDelete.galleryUrls.map(url => deleteFromCloudinary(url)))
+              .then(results => {
+                const successCount = results.filter(Boolean).length;
+                console.log(`Deleted all ${successCount}/${projectToDelete.galleryUrls!.length} project images from Cloudinary.`);
+              })
+              .catch(err => console.error('Failed to clean up Cloudinary assets on project deletion:', err));
+          }
+
+          showToast('Flagship project deleted successfully', 'success');
+          fetchProjects();
+        } catch (err) {
+          showToast('Failed to delete flagship project', 'error');
         }
-
-        showToast('Flagship project deleted successfully', 'success');
-        fetchProjects();
-      } catch (err) {
-        showToast('Failed to delete flagship project', 'error');
-      }
-    }
+      },
+    });
   };
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1054,6 +1062,7 @@ export const FlagshipProjectsManagementView: React.FC<{ searchQuery?: string }> 
           </form>
         </Modal>
       )}
+      <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
     </div>
   );
 };

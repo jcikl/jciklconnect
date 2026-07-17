@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MessageSquare, Bell, FileText, Send, MoreHorizontal, ThumbsUp, TrendingUp, TrendingDown, BarChart3, Info, X, Megaphone, Users, Calendar, Target, Edit, Trash2, Eye } from 'lucide-react';
-import { Card, Button, Tabs, Badge, Modal, useToast } from '../ui/Common';
+import { Card, Button, Tabs, Badge, Modal, useToast, ConfirmDialog, CONFIRM_CLOSED, ConfirmState } from '../ui/Common';
 import { LoadingState } from '../ui/Loading';
 import { ProgressBar } from '../ui/Common';
 import { useCommunication } from '../../hooks/useCommunication';
@@ -15,6 +15,7 @@ import { CommunicationService } from '../../services/communicationService';
 import { NewsPost } from '../../types';
 
 export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
+    const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
     const [activeTab, setActiveTab] = useState('Newsfeed');
     const [postContent, setPostContent] = useState('');
     const [isAnnouncementModalOpen, setIsAnnouncementModalOpen] = useState(false);
@@ -224,15 +225,22 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
                                         setSelectedAnnouncement(post);
                                         setIsAnnouncementModalOpen(true);
                                     }}
-                                    onDelete={async (postId) => {
-                                        if (window.confirm('Are you sure you want to delete this announcement?')) {
-                                            try {
-                                                await CommunicationService.deletePost(postId);
-                                                showToast('Announcement deleted', 'success');
-                                            } catch (err) {
-                                                showToast('Failed to delete announcement', 'error');
-                                            }
-                                        }
+                                    onDelete={(postId) => {
+                                        setConfirmState({
+                                            open: true,
+                                            title: 'Delete Announcement',
+                                            message: 'Are you sure you want to delete this announcement?',
+                                            variant: 'danger',
+                                            onConfirm: async () => {
+                                                setConfirmState(CONFIRM_CLOSED);
+                                                try {
+                                                    await CommunicationService.deletePost(postId);
+                                                    showToast('Announcement deleted', 'success');
+                                                } catch (err) {
+                                                    showToast('Failed to delete announcement', 'error');
+                                                }
+                                            },
+                                        });
                                     }}
                                 />
                             ) : (
@@ -572,6 +580,7 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
                     }
                 }}
             />
+      <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
         </div>
     );
 };

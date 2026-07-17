@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MembershipType, MembershipRuleConfig } from '../../types';
 import { MembershipConfigService, DEFAULT_MEMBERSHIP_RULES } from '../../services/membershipConfigService';
 import { Save, AlertCircle, RefreshCw } from 'lucide-react';
-import { Button, useToast } from '../ui/Common';
+import { Button, useToast, ConfirmDialog, ConfirmState, CONFIRM_CLOSED } from '../ui/Common';
 import { MembersService } from '../../services/membersService';
 
 const MEMBERSHIP_TYPES: MembershipType[] = ['Guest', 'Probation', 'Official', 'Honorary', 'Senator', 'Visiting', 'Associate'];
@@ -28,6 +28,7 @@ export const MembershipConfigView: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [syncingTypes, setSyncingTypes] = useState(false);
   const [syncingRecords, setSyncingRecords] = useState(false);
+  const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
   const { showToast } = useToast();
 
   useEffect(() => { loadRules(); }, []);
@@ -56,27 +57,43 @@ export const MembershipConfigView: React.FC = () => {
     }
   };
 
-  const handleBatchSyncMembershipTypes = async () => {
-    if (!window.confirm('根据当前 Config，批量推断并写入 members.membershipType？\n\n不修改 membership 字段。请先保存 Config 再执行。')) return;
-    setSyncingTypes(true);
-    try {
-      const result = await MembersService.batchSyncMembershipTypes({ year: new Date().getFullYear() });
-      showToast(`membershipType: updated ${result.updated}, unchanged ${result.alreadyCorrect}`, 'success');
-    } catch (e) {
-      showToast('Failed to sync membershipType', 'error');
-    } finally { setSyncingTypes(false); }
+  const handleBatchSyncMembershipTypes = () => {
+    setConfirmState({
+      open: true,
+      title: 'Sync Membership Types',
+      message: '根据当前 Config，批量推断并写入 members.membershipType？\n\n不修改 membership 字段。请先保存 Config 再执行。',
+      variant: 'warning',
+      onConfirm: async () => {
+        setConfirmState(CONFIRM_CLOSED);
+        setSyncingTypes(true);
+        try {
+          const result = await MembersService.batchSyncMembershipTypes({ year: new Date().getFullYear() });
+          showToast(`membershipType: updated ${result.updated}, unchanged ${result.alreadyCorrect}`, 'success');
+        } catch (e) {
+          showToast('Failed to sync membershipType', 'error');
+        } finally { setSyncingTypes(false); }
+      },
+    });
   };
 
-  const handleBatchSyncMembershipRecords = async () => {
+  const handleBatchSyncMembershipRecords = () => {
     const currentYear = new Date().getFullYear();
-    if (!window.confirm(`根据各会员 joined date 与当前 Config，校正从入会年至 ${currentYear} 的所有已有 membership 记录 dues？\n\n仅更新已有记录（不新建）。请先保存 Config。`)) return;
-    setSyncingRecords(true);
-    try {
-      const result = await MembersService.batchSyncMembershipRecords({ year: currentYear, toYear: currentYear, onlyExistingRecords: false });
-      showToast(`membership: updated ${result.updated}, already correct ${result.alreadyCorrect}`, 'success');
-    } catch (e) {
-      showToast('Failed to sync membership records', 'error');
-    } finally { setSyncingRecords(false); }
+    setConfirmState({
+      open: true,
+      title: 'Sync Membership Records',
+      message: `根据各会员 joined date 与当前 Config，校正从入会年至 ${currentYear} 的所有已有 membership 记录 dues？\n\n仅更新已有记录（不新建）。请先保存 Config。`,
+      variant: 'warning',
+      onConfirm: async () => {
+        setConfirmState(CONFIRM_CLOSED);
+        setSyncingRecords(true);
+        try {
+          const result = await MembersService.batchSyncMembershipRecords({ year: currentYear, toYear: currentYear, onlyExistingRecords: false });
+          showToast(`membership: updated ${result.updated}, already correct ${result.alreadyCorrect}`, 'success');
+        } catch (e) {
+          showToast('Failed to sync membership records', 'error');
+        } finally { setSyncingRecords(false); }
+      },
+    });
   };
 
   const updateRule = (type: MembershipType, updates: Partial<MembershipRuleConfig>) =>
@@ -275,7 +292,7 @@ export const MembershipConfigView: React.FC = () => {
         </div>
       </div>
 
-
+      <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
     </div>
   );
 };

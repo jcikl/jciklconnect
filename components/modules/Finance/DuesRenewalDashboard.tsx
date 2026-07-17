@@ -51,7 +51,8 @@ import {
 import type { Transaction } from '../../../types';
 import { buildCategoryFields } from '../../../utils/transactionCategoryUtils';
 import { PaymentButton } from '../../shared/toyyib/PaymentButton';
-import { Tabs } from '../../ui/Common';
+import { Tabs, ConfirmDialog, CONFIRM_CLOSED } from '../../ui/Common';
+import type { ConfirmState } from '../../ui/Common';
 // Re-scan trigger
 
 /** First-year membership dues (base + registration), shown as "New" in breakdown */
@@ -152,6 +153,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
   onInitiateRenewal,
 }) => {
   const selectedYear = year;
+  const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
   const [filterType, setFilterType] = useState<MembershipType | 'all'>('all');
   const [filterStatus, setFilterStatus] = useState<MembershipStatus | 'all'>('all');
   const [filterPrevYearPaid, setFilterPrevYearPaid] = useState(false);
@@ -211,12 +213,10 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
     }
   };
 
-  const handleFixFirstMembershipDues = async () => {
-    const confirmed = window.confirm(
-      '将所有会员「首个会费年份」的应缴 dues 调整为 RM350，并根据已付金额重新计算状态？\n\n仅影响 members.membership 中最早年份的记录。'
-    );
-    if (!confirmed) return;
-
+  const handleFixFirstMembershipDues = () => {
+    setConfirmState({ open: true, title: 'Confirm', message: '将所有会员「首个会费年份」的应缴 dues 调整为 RM350，并根据已付金额重新计算状态？\n\n仅影响 members.membership 中最早年份的记录。', variant: 'warning', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await _doFixFirstMembershipDues(); } });
+  };
+  const _doFixFirstMembershipDues = async () => {
     setFixingFirstDues(true);
     try {
       const result = await MembersService.fixFirstMembershipDuesTo350();
@@ -240,13 +240,10 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
     }
   };
 
-  const handleBatchSyncMembershipTypes = async () => {
-    const confirmed = window.confirm(
-      `根据 ${selectedYear} 年会费记录、角色与 Membership Config，批量推断并写入 members.membershipType？\n\n` +
-        '不会修改 membership 字段。建议先确保 membership 数据准确，或之后执行「同步 membership」。'
-    );
-    if (!confirmed) return;
-
+  const handleBatchSyncMembershipTypes = () => {
+    setConfirmState({ open: true, title: 'Confirm', message: `根据 ${selectedYear} 年会费记录、角色与 Membership Config，批量推断并写入 members.membershipType？\n\n不会修改 membership 字段。建议先确保 membership 数据准确，或之后执行「同步 membership」。`, variant: 'warning', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await _doBatchSyncMembershipTypes(); } });
+  };
+  const _doBatchSyncMembershipTypes = async () => {
     setSyncingMembershipTypes(true);
     try {
       const result = await MembersService.batchSyncMembershipTypes({ year: selectedYear });
@@ -268,13 +265,10 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
     }
   };
 
-  const handleBatchSyncMembershipRecords = async () => {
-    const confirmed = window.confirm(
-      `根据每位会员的 membershipType 与 Membership Config，批量更新 ${selectedYear} 年的 members.membership？\n\n` +
-        '将写入 dues / status 等；可为符合条件会员新建该年记录。不会修改 membershipType。'
-    );
-    if (!confirmed) return;
-
+  const handleBatchSyncMembershipRecords = () => {
+    setConfirmState({ open: true, title: 'Confirm', message: `根据每位会员的 membershipType 与 Membership Config，批量更新 ${selectedYear} 年的 members.membership？\n\n将写入 dues / status 等；可为符合条件会员新建该年记录。不会修改 membershipType。`, variant: 'warning', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await _doBatchSyncMembershipRecords(); } });
+  };
+  const _doBatchSyncMembershipRecords = async () => {
     setSyncingMembershipRecords(true);
     try {
       const result = await MembersService.batchSyncMembershipRecords({
@@ -329,17 +323,14 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
     setWaDismissing(false);
   };
 
-  const handleRunWaCampaign = async () => {
+  const handleRunWaCampaign = () => {
     if (!waCampaign) return;
     const targets = waCampaign.memberIds
       .map(id => members.find(m => m.id === id))
       .filter(Boolean) as typeof members;
-
-    const confirmed = window.confirm(
-      `将为 ${targets.length} 位未缴会费会员逐一打开 WhatsApp 提醒。\n浏览器可能拦截弹出窗口，请确保已允许此页面弹窗。\n\n继续？`
-    );
-    if (!confirmed) return;
-
+    setConfirmState({ open: true, title: 'Send WhatsApp Reminders', message: `将为 ${targets.length} 位未缴会费会员逐一打开 WhatsApp 提醒。\n浏览器可能拦截弹出窗口，请确保已允许此页面弹窗。\n\n继续？`, variant: 'info', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await _doRunWaCampaign(targets); } });
+  };
+  const _doRunWaCampaign = async (targets: typeof members) => {
     let sent = 0;
     for (const m of targets) {
       if (!m?.phone) continue;
@@ -355,7 +346,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
   };
 
   /** Bulk WhatsApp: open wa.me links for all overdue/pending members in current view */
-  const handleBulkWhatsApp = async () => {
+  const handleBulkWhatsApp = () => {
     const targets = mergedRenewals.filter(r =>
       (r.status === 'overdue' || r.status === 'pending' || r.status === 'partial') &&
       (filterType === 'all' || r.membershipType === filterType)
@@ -364,11 +355,9 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
       alert('没有符合条件的待提醒会员（overdue / pending / partial）。');
       return;
     }
-    const confirmed = window.confirm(
-      `将为 ${targets.length} 位会员逐一打开 WhatsApp 提醒。\n浏览器可能拦截弹出窗口，请确保已允许此页面弹窗。\n\n继续？`
-    );
-    if (!confirmed) return;
-
+    setConfirmState({ open: true, title: 'Send WhatsApp Reminders', message: `将为 ${targets.length} 位会员逐一打开 WhatsApp 提醒。\n浏览器可能拦截弹出窗口，请确保已允许此页面弹窗。\n\n继续？`, variant: 'info', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await _doBulkWhatsApp(targets); } });
+  };
+  const _doBulkWhatsApp = async (targets: RenewalWithTargetDues[]) => {
     let sent = 0;
     for (const renewal of targets) {
       const m = members.find(mem => mem.id === renewal.memberId);
@@ -1297,6 +1286,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
         </div>
 
       </div>
+      <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
     </div>
   );
 };

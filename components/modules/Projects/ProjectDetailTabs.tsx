@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Tabs, useToast } from '../../ui/Common';
+import { Card, Tabs, useToast, ConfirmDialog, ConfirmState, CONFIRM_CLOSED } from '../../ui/Common';
 import { Project } from '../../../types';
 import { ProjectAccountsService, ProjectAccount } from '../../../services/projectAccountsService';
 import { ProjectReportService, ProjectReport } from '../../../services/projectReportService';
@@ -30,6 +30,7 @@ export const ProjectDetailTabs: React.FC<ProjectDetailTabsProps> = ({ project, o
   const [loadingReport, setLoadingReport] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   // Modal states removed for inline editing
+  const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -63,14 +64,21 @@ export const ProjectDetailTabs: React.FC<ProjectDetailTabsProps> = ({ project, o
     }
   };
 
-  const handleDeleteProject = async () => {
-    const confirmed = window.confirm('Are you sure you want to delete this project and its activity plan? This action cannot be undone.');
-    if (!confirmed) return;
-    try {
-      await onDeleteProject(projectId);
-    } catch (err) {
-      showToast('Failed to delete project', 'error');
-    }
+  const handleDeleteProject = () => {
+    setConfirmState({
+      open: true,
+      title: 'Delete Project',
+      message: 'Are you sure you want to delete this project and its activity plan? This action cannot be undone.',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmState(CONFIRM_CLOSED);
+        try {
+          await onDeleteProject(projectId);
+        } catch (err) {
+          showToast('Failed to delete project', 'error');
+        }
+      },
+    });
   };
 
   const handleReconcileAccount = async () => {
@@ -201,6 +209,7 @@ export const ProjectDetailTabs: React.FC<ProjectDetailTabsProps> = ({ project, o
       )}
 
       {/* ProjectTransactionModal removed in favor of inline editing */}
+      <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
     </>
   );
 };

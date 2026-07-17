@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Calendar, Plus, Heart, Edit, Trash2 } from 'lucide-react';
-import { Card, Button, AvatarGroup, Badge, Modal, useToast } from '../ui/Common';
+import { Card, Button, AvatarGroup, Badge, Modal, useToast, PageHeader, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
+import type { ConfirmState } from '../ui/Common';
 import { Input, Select, Textarea } from '../ui/Form';
 import { LoadingState } from '../ui/Loading';
 import { useHobbyClubs } from '../../hooks/useHobbyClubs';
@@ -10,6 +11,7 @@ import { HobbyClub, ClubActivity } from '../../types';
 import { Tabs } from '../ui/Common';
 
 export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
+    const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
     const [isCreateModalOpen, setCreateModalOpen] = useState(false);
     const [isEditModalOpen, setEditModalOpen] = useState(false);
     const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
@@ -71,14 +73,21 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
         }
     };
 
-    const handleDeleteClub = async (clubId: string) => {
-        if (window.confirm('Are you sure you want to delete this club?')) {
-            try {
-                await deleteClub(clubId);
-            } catch (err) {
-                // Error is handled in the hook
-            }
-        }
+    const handleDeleteClub = (clubId: string) => {
+        setConfirmState({
+            open: true,
+            title: 'Delete Club',
+            message: 'Are you sure you want to delete this club?',
+            variant: 'danger',
+            onConfirm: async () => {
+                setConfirmState(CONFIRM_CLOSED);
+                try {
+                    await deleteClub(clubId);
+                } catch (err) {
+                    // Error is handled in the hook
+                }
+            },
+        });
     };
 
     const isOwner = (club: HobbyClub) => {
@@ -94,10 +103,7 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
 
     return (
         <div className="space-y-6">
-            <div>
-                <h2 className="text-2xl font-bold text-slate-900">Hobby Clubs</h2>
-                <p className="text-slate-500">Connect with members beyond formal projects.</p>
-            </div>
+            <PageHeader title="Hobby Clubs" description="Connect with members beyond formal projects." />
 
             <Card noPadding>
                 <div className="px-4 md:px-6 pt-4">
@@ -324,6 +330,7 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
                     }}
                 />
             )}
+            <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
         </div>
     );
 };
@@ -450,6 +457,7 @@ interface ClubActivitiesModalProps {
 }
 
 const ClubActivitiesModal: React.FC<ClubActivitiesModalProps> = ({ isOpen, onClose, club, onAdd, onUpdate, onDelete }) => {
+    const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
     const [editing, setEditing] = useState<ClubActivity | null>(null);
     const [saving, setSaving] = useState(false);
     const activities = [...(club.activities || [])].sort((a, b) => a.date.localeCompare(b.date));
@@ -477,6 +485,7 @@ const ClubActivitiesModal: React.FC<ClubActivitiesModalProps> = ({ isOpen, onClo
     };
 
     return (
+        <>
         <Modal isOpen={isOpen} onClose={onClose} title={`Activities - ${club.name}`} size="lg" drawerOnMobile>
             <div className="space-y-5">
                 {/* Existing activities */}
@@ -507,12 +516,7 @@ const ClubActivitiesModal: React.FC<ClubActivitiesModalProps> = ({ isOpen, onClo
                                             </button>
                                             <button
                                                 className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                                                onClick={async () => {
-                                                    if (window.confirm('Delete this activity?')) {
-                                                        if (editing?.id === activity.id) setEditing(null);
-                                                        await onDelete(club.id, activity.id);
-                                                    }
-                                                }}
+                                                onClick={() => setConfirmState({ open: true, title: 'Delete Activity', message: 'Delete this activity?', variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); if (editing?.id === activity.id) setEditing(null); await onDelete(club.id, activity.id); } })}
                                             >
                                                 <Trash2 size={13} />
                                             </button>
@@ -544,6 +548,8 @@ const ClubActivitiesModal: React.FC<ClubActivitiesModalProps> = ({ isOpen, onClo
                 </form>
             </div>
         </Modal>
+        <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
+        </>
     );
 };
 
@@ -558,6 +564,7 @@ interface ClubMembersModalProps {
 }
 
 const ClubMembersModal: React.FC<ClubMembersModalProps> = ({ isOpen, onClose, club, members, getClubMembers, onRemoveMember }) => {
+    const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
     const [clubMemberIds, setClubMemberIds] = useState<string[]>([]);
     const [loadingMembers, setLoadingMembers] = useState(false);
     const { showToast } = useToast();
@@ -586,6 +593,7 @@ const ClubMembersModal: React.FC<ClubMembersModalProps> = ({ isOpen, onClose, cl
     const isOwner = currentMember && club.lead === currentMember.name;
 
     return (
+        <>
         <Modal isOpen={isOpen} onClose={onClose} title={`Members - ${club.name}`} size="lg" drawerOnMobile>
             <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -613,16 +621,7 @@ const ClubMembersModal: React.FC<ClubMembersModalProps> = ({ isOpen, onClose, cl
                                         <Button
                                             variant="ghost"
                                             size="sm"
-                                            onClick={async () => {
-                                                if (window.confirm(`Remove ${member.name} from ${club.name}?`)) {
-                                                    try {
-                                                        await onRemoveMember(member.id);
-                                                        await loadMembers();
-                                                    } catch (err) {
-                                                        // Error handled
-                                                    }
-                                                }
-                                            }}
+                                            onClick={() => setConfirmState({ open: true, title: 'Remove Member', message: `Remove ${member.name} from ${club.name}?`, variant: 'warning', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); try { await onRemoveMember(member.id); await loadMembers(); } catch (err) { /* Error handled */ } } })}
                                             className="text-red-500 hover:text-red-700"
                                         >
                                             Remove
@@ -635,5 +634,7 @@ const ClubMembersModal: React.FC<ClubMembersModalProps> = ({ isOpen, onClose, cl
                 </LoadingState>
             </div>
         </Modal>
+        <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
+        </>
     );
 };

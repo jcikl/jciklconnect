@@ -1,7 +1,7 @@
 // Behavioral Nudging Configuration Component
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Power, PowerOff, AlertCircle, CheckCircle, Lightbulb, Target, TrendingUp, Settings } from 'lucide-react';
-import { Card, Button, Badge, Modal, useToast } from '../ui/Common';
+import { Card, Button, Badge, Modal, useToast, ConfirmDialog, CONFIRM_CLOSED, ConfirmState } from '../ui/Common';
 import { Input, Select, Textarea } from '../ui/Form';
 import { LoadingState } from '../ui/Loading';
 import { BehavioralNudgingService, NudgeRule } from '../../services/behavioralNudgingService';
@@ -14,6 +14,7 @@ export const BehavioralNudgingConfig: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<NudgeRule | null>(null);
   const { showToast } = useToast();
+  const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
 
   useEffect(() => {
     loadRules();
@@ -71,18 +72,23 @@ export const BehavioralNudgingConfig: React.FC = () => {
   };
 
   const handleDelete = async (ruleId: string) => {
-    if (!window.confirm('Are you sure you want to delete this nudge rule?')) {
-      return;
-    }
-
-    try {
-      await BehavioralNudgingService.deleteNudgeRule(ruleId);
-      showToast('Nudge rule deleted successfully', 'success');
-      await loadRules();
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to delete nudge rule';
-      showToast(errorMessage, 'error');
-    }
+    setConfirmState({
+      open: true,
+      title: 'Delete Nudge Rule',
+      message: 'Are you sure you want to delete this nudge rule?',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmState(CONFIRM_CLOSED);
+        try {
+          await BehavioralNudgingService.deleteNudgeRule(ruleId);
+          showToast('Nudge rule deleted successfully', 'success');
+          await loadRules();
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : 'Failed to delete nudge rule';
+          showToast(errorMessage, 'error');
+        }
+      },
+    });
   };
 
   const handleToggle = async (rule: NudgeRule) => {
@@ -333,6 +339,7 @@ export const BehavioralNudgingConfig: React.FC = () => {
           </div>
         </form>
       </Modal>
+      <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
     </div>
   );
 };

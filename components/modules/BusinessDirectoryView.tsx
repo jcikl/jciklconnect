@@ -8,6 +8,7 @@ const BUSINESS_CATEGORIES = [
   'Distributor / Exporter / Importer',
 ];
 import { Card, Button, Badge, Modal, useToast, Tabs } from '../ui/Common';
+import { Input } from '../ui/Form';
 import { MembersOnlyOverlay } from '../ui/MembersOnlyOverlay';
 import { LoadingState } from '../ui/Loading';
 import { useBusinessDirectory } from '../../hooks/useBusinessDirectory';
@@ -1331,11 +1332,9 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onCon
       {/* â”€â”€ Mobile layout â”€â”€ */}
       <div className="md:hidden space-y-2">
         <div className="flex gap-3 items-center bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
-          <div className="relative flex-1">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input type="text" placeholder="Search sister chapter members..."
-              value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
+          <div className="flex-1">
+            <Input icon={<Search size={14} />} placeholder="Search sister chapter members..."
+              value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
           </div>
           <Button variant={activeFiltersCount > 0 ? "secondary" : "outline"} size="sm"
             className="flex items-center gap-2 h-9 px-4 rounded-lg font-medium text-xs shadow-sm bg-white border-slate-200 shrink-0"
@@ -1438,12 +1437,12 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onCon
 
         {/* Main content */}
         <div className="flex-1 min-w-0 space-y-4">
-          <div className="flex gap-3 items-center bg-white p-3 rounded-xl border border-slate-200">
-            <Search size={15} className="text-slate-400 shrink-0" />
-            <input type="text" placeholder="Search by name, company, chapter, industry…"
-              value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1 text-sm bg-transparent outline-none text-slate-800 placeholder-slate-400" />
-            {searchTerm && <button onClick={() => setSearchTerm('')} className="text-slate-400 hover:text-slate-600 text-lg leading-none">×</button>}
+          <div className="flex gap-3 items-center">
+            <div className="flex-1">
+              <Input icon={<Search size={14} />} placeholder="Search by name, company, chapter, industry…"
+                value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+            </div>
+            {searchTerm && <button onClick={() => setSearchTerm('')} className="text-slate-400 hover:text-slate-600 text-lg leading-none shrink-0">×</button>}
           </div>
 
           {filteredMembers.length === 0 ? (

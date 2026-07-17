@@ -1,6 +1,6 @@
 ﻿import React, { useState } from 'react';
 import { MessageSquare, BarChart2, Plus, ArrowRight, Edit, Trash2, Type, List, Star, CheckSquare, Share2, Send, FileText } from 'lucide-react';
-import { Card, Button, Badge, Modal, useToast, Tabs } from '../ui/Common';
+import { Card, Button, Badge, Modal, useToast, Tabs, PageHeader, ConfirmDialog, ConfirmState, CONFIRM_CLOSED } from '../ui/Common';
 import { LoadingState } from '../ui/Loading';
 import { useSurveys } from '../../hooks/useSurveys';
 import { useAuth } from '../../hooks/useAuth';
@@ -29,6 +29,7 @@ export const SurveysView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
     const [isDistributeModalOpen, setIsDistributeModalOpen] = useState(false);
     const [distributingSurvey, setDistributingSurvey] = useState<Survey | null>(null);
     const [selectedChannels, setSelectedChannels] = useState<('email' | 'in-app' | 'link')[]>(['in-app']);
+    const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
     const { surveys, loading, error, createSurvey, submitResponse, updateSurvey, deleteSurvey, getSurveyResponses } = useSurveys();
     const { member } = useAuth();
     const { isAdmin, isBoard } = usePermissions();
@@ -179,10 +180,7 @@ export const SurveysView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
 
     return (
         <div className="space-y-6">
-            <div>
-                <h2 className="text-2xl font-bold text-slate-900">Feedback & Surveys</h2>
-                <p className="text-slate-500 text-sm">Pulse checks, satisfaction surveys, and polls.</p>
-            </div>
+            <PageHeader title="Feedback & Surveys" description="Pulse checks, satisfaction surveys, and polls." />
 
             <Card noPadding>
                 <div className="px-4 md:px-6 pt-4">
@@ -274,7 +272,7 @@ export const SurveysView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                                                         )}
                                                         {canManage && (
                                                             <button className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors" title="Delete"
-                                                                onClick={() => { if (window.confirm('Delete this survey?')) deleteSurvey(survey.id); }}>
+                                                                onClick={() => setConfirmState({ open: true, title: 'Delete Survey', message: 'Delete this survey?', variant: 'danger', onConfirm: () => { setConfirmState(CONFIRM_CLOSED); deleteSurvey(survey.id); } })}>
                                                                 <Trash2 size={14} />
                                                             </button>
                                                         )}
@@ -342,7 +340,7 @@ export const SurveysView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                                             )}
                                             {canManage && (
                                                 <button className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors"
-                                                    onClick={() => { if (window.confirm('Delete this survey?')) deleteSurvey(survey.id); }}>
+                                                    onClick={() => setConfirmState({ open: true, title: 'Delete Survey', message: 'Delete this survey?', variant: 'danger', onConfirm: () => { setConfirmState(CONFIRM_CLOSED); deleteSurvey(survey.id); } })}>
                                                     <Trash2 size={14} />
                                                 </button>
                                             )}
@@ -515,6 +513,7 @@ export const SurveysView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                     drawerOnMobile
                 />
             )}
+        <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
         </div>
     );
 };

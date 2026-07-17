@@ -10,7 +10,7 @@ import {
   BookOpen, Trophy, Network, ChevronRight, LayoutList
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { Button, Card, Badge, ProgressBar, Modal, useToast, Pagination, Tabs } from '../ui/Common';
+import { Button, Card, Badge, ProgressBar, Modal, useToast, Pagination, Tabs, PageHeader } from '../ui/Common';
 import { Input, Select, Textarea, ButtonGroup } from '../ui/Form';
 import { MultiSelectDropdown } from '../ui/MultiSelectDropdown';
 import { MemberEditForm } from './MemberEditForm';
@@ -438,14 +438,11 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
       {!selectedMember ? (
         <>
           {/* â”€â”€ PAGE HEADER â”€â”€ */}
-          <div className="flex items-center justify-between gap-3 mb-4">
-            {/* Left: title */}
-            <div>
-              <h2 className="text-xl font-black text-slate-900 leading-tight">Member Directory</h2>
-              <p className="text-slate-400 text-xs mt-0.5 hidden sm:block">Manage membership, tiers, and engagement.</p>
-            </div>
-            {/* Right: actions */}
-            {canManageMembers && (
+          <PageHeader
+            title="Member Directory"
+            description="Manage membership, tiers, and engagement."
+            className="mb-4"
+            action={canManageMembers ? (
               <div className="flex items-center gap-2">
                 {/* Desktop: full buttons */}
                 <div className="hidden sm:flex items-center gap-2">
@@ -492,8 +489,8 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
                   </button>
                 </div>
               </div>
-            )}
-          </div>
+            ) : undefined}
+          />
 
           {/* â”€â”€ TAB NAVIGATION â”€â”€ */}
           {/* Desktop: scrollable icon+label tabs */}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Badge, useToast, Modal, ProgressBar } from '../ui/Common';
+import { Card, Button, Badge, useToast, Modal, ProgressBar, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
+import type { ConfirmState } from '../ui/Common';
 import { Input, Select, Textarea } from '../ui/Form';
 import { PointsService } from '../../services/pointsService';
 import { IncentiveProgram, IncentiveStandard, IncentiveLogicId } from '../../types';
@@ -8,6 +9,7 @@ import { IncentiveCalculatorService } from '../../services/incentiveCalculatorSe
 import { StandardBatchImportModal } from './Incentive/StandardBatchImportModal';
 
 export const IncentiveProgramManager: React.FC = () => {
+    const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
     const [program, setProgram] = useState<IncentiveProgram | null>(null);
     const [allPrograms, setAllPrograms] = useState<IncentiveProgram[]>([]);
     const [standards, setStandards] = useState<IncentiveStandard[]>([]);
@@ -162,23 +164,28 @@ export const IncentiveProgramManager: React.FC = () => {
         }
     };
 
-    const handleDeleteProgram = async () => {
+    const handleDeleteProgram = () => {
         if (!program) return;
-        const confirmText = `Are you absolutely sure? This will delete the entire ${program.year} program and ALL its associated standards. 
-        \nThis action is permanent and cannot be undone.`;
-
-        if (!window.confirm(confirmText)) return;
-
-        setLoading(true);
-        try {
-            await PointsService.deleteIncentiveProgram(program.id);
-            showToast(`${program.year} Program and its standards have been removed.`, 'success');
-            // Reload without specific year to find next available/active
-            await loadActiveProgram();
-        } catch (err) {
-            showToast('Failed to delete program', 'error');
-            setLoading(false);
-        }
+        const confirmText = `Are you absolutely sure? This will delete the entire ${program.year} program and ALL its associated standards. \nThis action is permanent and cannot be undone.`;
+        setConfirmState({
+            open: true,
+            title: 'Delete Program',
+            message: confirmText,
+            variant: 'danger',
+            onConfirm: async () => {
+                setConfirmState(CONFIRM_CLOSED);
+                setLoading(true);
+                try {
+                    await PointsService.deleteIncentiveProgram(program.id);
+                    showToast(`${program.year} Program and its standards have been removed.`, 'success');
+                    // Reload without specific year to find next available/active
+                    await loadActiveProgram();
+                } catch (err) {
+                    showToast('Failed to delete program', 'error');
+                    setLoading(false);
+                }
+            },
+        });
     };
 
     const handleUpdateKPI = (categoryKey: string, minScore: number) => {
@@ -292,15 +299,23 @@ export const IncentiveProgramManager: React.FC = () => {
         }
     };
 
-    const handleDeleteStandard = async (id: string) => {
-        if (!window.confirm('Are you sure you want to delete this standard?')) return;
-        try {
-            await PointsService.deleteStandard(id);
-            showToast('Standard deleted', 'success');
-            loadActiveProgram();
-        } catch (err) {
-            showToast('Failed to delete standard', 'error');
-        }
+    const handleDeleteStandard = (id: string) => {
+        setConfirmState({
+            open: true,
+            title: 'Delete Standard',
+            message: 'Are you sure you want to delete this standard?',
+            variant: 'danger',
+            onConfirm: async () => {
+                setConfirmState(CONFIRM_CLOSED);
+                try {
+                    await PointsService.deleteStandard(id);
+                    showToast('Standard deleted', 'success');
+                    loadActiveProgram();
+                } catch (err) {
+                    showToast('Failed to delete standard', 'error');
+                }
+            },
+        });
     };
 
     const handleRecalculateAll = async () => {
@@ -795,6 +810,7 @@ export const IncentiveProgramManager: React.FC = () => {
                     </p>
                 </div>
             </Modal>
+            <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
         </div>
     );
 };

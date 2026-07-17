@@ -271,13 +271,9 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
                         <div className="font-bold text-slate-900 break-words">{guest.name}</div>
                         <div className="flex items-center gap-1.5 shrink-0">
                           {paid ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">
-                              <CheckCircle size={10} /> Fee Paid
-                            </span>
+                            <Badge variant="success" icon={<CheckCircle size={10} />} className="text-[10px] py-0.5">Fee Paid</Badge>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                              <AlertCircle size={10} /> Fee Pending
-                            </span>
+                            <Badge variant="warning" icon={<AlertCircle size={10} />} className="text-[10px] py-0.5">Fee Pending</Badge>
                           )}
                           <Badge variant="neutral" className="bg-slate-100 text-slate-600 border-none px-2 py-0 text-[10px] uppercase font-bold tracking-wider">Guest</Badge>
                         </div>

@@ -5,7 +5,8 @@ import {
   ExternalLink, AlertCircle, Settings, Eye, EyeOff, Plus, Trash2, Edit,
   Play, Activity, Shield, Globe
 } from 'lucide-react';
-import { Card, Button, Badge, Tabs, Modal, useToast } from '../ui/Common';
+import { Card, Button, Badge, Tabs, Modal, useToast, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
+import type { ConfirmState } from '../ui/Common';
 import { Input, Select, Textarea } from '../ui/Form';
 import { useWebhooks } from '../../hooks/useWebhooks';
 import { Webhook } from '../../services/webhookService';
@@ -281,6 +282,7 @@ const WebhooksTab: React.FC<WebhooksTabProps> = ({
   onCreate,
 }) => {
   const { showToast } = useToast();
+  const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
 
   if (loading) {
     return <div className="text-center py-8 text-slate-500">Loading webhooks...</div>;
@@ -348,11 +350,7 @@ const WebhooksTab: React.FC<WebhooksTabProps> = ({
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={async () => {
-                      if (window.confirm('Are you sure you want to delete this webhook?')) {
-                        await onDelete(webhook.id!);
-                      }
-                    }}
+                    onClick={() => setConfirmState({ open: true, title: 'Delete Webhook', message: 'Are you sure you want to delete this webhook?', variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await onDelete(webhook.id!); } })}
                   >
                     <Trash2 size={14} />
                   </Button>
@@ -362,6 +360,7 @@ const WebhooksTab: React.FC<WebhooksTabProps> = ({
           ))}
         </div>
       )}
+      <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
     </div>
   );
 };
@@ -384,6 +383,7 @@ const APIKeysTab: React.FC<APIKeysTabProps> = ({
   onCreate,
   onDelete,
 }) => {
+  const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -440,11 +440,7 @@ const APIKeysTab: React.FC<APIKeysTabProps> = ({
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => {
-                    if (window.confirm('Are you sure you want to delete this API key?')) {
-                      onDelete(apiKey.id);
-                    }
-                  }}
+                  onClick={() => setConfirmState({ open: true, title: 'Delete API Key', message: 'Are you sure you want to delete this API key?', variant: 'danger', onConfirm: () => { setConfirmState(CONFIRM_CLOSED); onDelete(apiKey.id); } })}
                 >
                   <Trash2 size={14} />
                 </Button>
@@ -453,6 +449,7 @@ const APIKeysTab: React.FC<APIKeysTabProps> = ({
           ))}
         </div>
       )}
+      <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
     </div>
   );
 };

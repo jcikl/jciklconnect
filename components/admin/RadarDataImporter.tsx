@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Modal, useToast } from '../ui/Common';
+import { Card, Button, Modal, useToast, ConfirmDialog, CONFIRM_CLOSED, ConfirmState } from '../ui/Common';
 import { Input } from '../ui/Form';
 import { MembersService } from '../../services/membersService';
 import { PointsService } from '../../services/pointsService';
@@ -710,6 +710,7 @@ export const RadarDataImporter: React.FC = () => {
 };
 
 const RadarLedgerView = () => {
+  const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -768,10 +769,21 @@ const RadarLedgerView = () => {
     else setSelectedLogs(new Set(logs.map(l => l.id)));
   };
 
-  const handleBatchDelete = async () => {
+  const handleBatchDelete = () => {
     if (selectedLogs.size === 0) return;
-    if (!window.confirm(`Are you sure you want to revert and delete ${selectedLogs.size} selected records?\n\nThis will deduct points from the members' radar stats.`)) return;
+    setConfirmState({
+      open: true,
+      title: 'Delete Selected Records',
+      message: `Are you sure you want to revert and delete ${selectedLogs.size} selected records?\n\nThis will deduct points from the members' radar stats.`,
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmState(CONFIRM_CLOSED);
+        await _doBatchDelete();
+      },
+    });
+  };
 
+  const _doBatchDelete = async () => {
     setDeleting(true);
     try {
       const logsToDelete = logs.filter(l => selectedLogs.has(l.id));
@@ -807,15 +819,23 @@ const RadarLedgerView = () => {
     }
   };
 
-  const handleDelete = async (logId: string, memberId: string, radarKey: string, points: number, year?: string) => {
-    if (!window.confirm(`Are you sure you want to delete this record?\n\nThis will deduct ${points} points from the member's ${radarKey} radar.`)) return;
-    try {
-      await deleteDoc(doc(db, 'RadarContributions', logId));
-      await PointsService.recalculateMemberRadarStats(memberId);
-      fetchLogs();
-    } catch (e) {
-      alert('Error deleting record: ' + e);
-    }
+  const handleDelete = (logId: string, memberId: string, radarKey: string, points: number, year?: string) => {
+    setConfirmState({
+      open: true,
+      title: 'Delete Record',
+      message: `Are you sure you want to delete this record?\n\nThis will deduct ${points} points from the member's ${radarKey} radar.`,
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmState(CONFIRM_CLOSED);
+        try {
+          await deleteDoc(doc(db, 'RadarContributions', logId));
+          await PointsService.recalculateMemberRadarStats(memberId);
+          fetchLogs();
+        } catch (e) {
+          alert('Error deleting record: ' + e);
+        }
+      },
+    });
   };
 
   if (loading) return <Card><div className="p-8 text-center text-slate-500 font-bold">Loading Ledger...</div></Card>;
@@ -826,23 +846,27 @@ const RadarLedgerView = () => {
   }));
 
   return (
-    <LedgerTable
-      logs={processedLogs}
-      selectedLogs={selectedLogs}
-      onToggleSelect={toggleSelect}
-      onToggleSelectAll={toggleSelectAll}
-      onDelete={(log) => handleDelete(log.id, log.memberId, log.radarKey, log.points, log.year ? String(log.year) : undefined)}
-      onBatchDelete={handleBatchDelete}
-      deleting={deleting}
-      hasMore={hasMore}
-      onLoadMore={() => fetchLogs(true)}
-      loadingMore={loadingMore}
-    />
+    <>
+      <LedgerTable
+        logs={processedLogs}
+        selectedLogs={selectedLogs}
+        onToggleSelect={toggleSelect}
+        onToggleSelectAll={toggleSelectAll}
+        onDelete={(log) => handleDelete(log.id, log.memberId, log.radarKey, log.points, log.year ? String(log.year) : undefined)}
+        onBatchDelete={handleBatchDelete}
+        deleting={deleting}
+        hasMore={hasMore}
+        onLoadMore={() => fetchLogs(true)}
+        loadingMore={loadingMore}
+      />
+      <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
+    </>
   );
 };
 
 // ─── Sponsorship Management Tab ─────────────────────────────────────────────
 const RadarSponsorshipManager: React.FC<{ members: Member[] }> = ({ members }) => {
+  const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
   const [sponsorships, setSponsorships] = useState<SponsorshipRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -921,16 +945,24 @@ const RadarSponsorshipManager: React.FC<{ members: Member[] }> = ({ members }) =
     }
   };
 
-  const handleDelete = async (record: SponsorshipRecord) => {
-    if (!window.confirm(`Delete sponsorship from "${record.sponsorName}"?\n\nThis will deduct points from the member.`)) return;
-    try {
-      await SponsorshipsService.deleteSponsorship(record.id, record.memberId);
-      showToast('Sponsorship deleted', 'success');
-      loadSponsorships();
-    } catch (err) {
-      console.error(err);
-      showToast('Failed to delete sponsorship', 'error');
-    }
+  const handleDelete = (record: SponsorshipRecord) => {
+    setConfirmState({
+      open: true,
+      title: 'Delete Sponsorship',
+      message: `Delete sponsorship from "${record.sponsorName}"?\n\nThis will deduct points from the member.`,
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmState(CONFIRM_CLOSED);
+        try {
+          await SponsorshipsService.deleteSponsorship(record.id, record.memberId);
+          showToast('Sponsorship deleted', 'success');
+          loadSponsorships();
+        } catch (err) {
+          console.error(err);
+          showToast('Failed to delete sponsorship', 'error');
+        }
+      },
+    });
   };
 
   const filtered = sponsorships.filter(s => {
@@ -1069,6 +1101,7 @@ const RadarSponsorshipManager: React.FC<{ members: Member[] }> = ({ members }) =
           </form>
         </Modal>
       )}
+      <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
     </div>
   );
 };
@@ -1084,6 +1117,7 @@ const RadarPointsConfigManager: React.FC<RadarPointsConfigManagerProps> = ({
   mappingFunctionStr,
   setMappingFunctionStr
 }) => {
+  const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
   const [config, setConfig] = useState<RadarPointsConfig | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1174,10 +1208,21 @@ const RadarPointsConfigManager: React.FC<RadarPointsConfigManagerProps> = ({
     }
   };
 
-  const handleRecalculateAll = async () => {
+  const handleRecalculateAll = () => {
     if (!config) return;
-    if (!window.confirm(`Save configuration and recalculate radar stats for ALL ${members.length} members?\n\nThis will update every member's leaderboard standings.`)) return;
+    setConfirmState({
+      open: true,
+      title: 'Recalculate All Radar Stats',
+      message: `Save configuration and recalculate radar stats for ALL ${members.length} members?\n\nThis will update every member's leaderboard standings.`,
+      variant: 'warning',
+      onConfirm: async () => {
+        setConfirmState(CONFIRM_CLOSED);
+        await _doRecalculateAll();
+      },
+    });
+  };
 
+  const _doRecalculateAll = async () => {
     setRecalculating(true);
     setRecalcProgress({ current: 0, total: members.length });
 
@@ -1339,6 +1384,7 @@ const RadarPointsConfigManager: React.FC<RadarPointsConfigManagerProps> = ({
           </table>
         </div>
       </Card>
+      <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
     </div>
   );
 };

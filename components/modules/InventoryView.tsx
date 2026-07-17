@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Package, Search, AlertCircle, CheckCircle, Plus, Edit, LogOut, LogIn, Wrench, Bell, Calendar, X, TrendingDown, DollarSign, RefreshCw, Trash2, History, BarChart3, ArrowRightLeft } from 'lucide-react';
-import { Card, Button, Badge, Modal, useToast, Pagination, Tabs } from '../ui/Common';
+import { Card, StatCard, StatCardsContainer, Button, Badge, Modal, useToast, Pagination, Tabs, PageHeader } from '../ui/Common';
 import { Input, Select, Textarea } from '../ui/Form';
 import { LoadingState } from '../ui/Loading';
 import { useInventory } from '../../hooks/useInventory';
@@ -271,38 +271,24 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
   return (
     <div className="space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-xl md:text-2xl font-bold text-slate-900">Asset & Inventory</h2>
-          <p className="text-sm text-slate-500 mt-0.5">Track physical assets, locations, and custodians.</p>
-        </div>
-        <Button onClick={() => setAddModalOpen(true)} size="sm">
-          <Plus size={15} className="mr-1.5" /> Add Item
-        </Button>
-      </div>
+      <PageHeader
+        title="Asset & Inventory"
+        description="Track physical assets, locations, and custodians."
+        action={
+          <Button onClick={() => setAddModalOpen(true)} size="sm">
+            <Plus size={15} className="mr-1.5" /> Add Item
+          </Button>
+        }
+      />
 
       <LoadingState loading={loading} error={error}>
-        {/* KPI Strip — 2-col mobile, 4-col desktop */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[
-            { label: 'Total Assets', value: stats.total, icon: <Package size={17} />, color: 'blue' },
-            { label: 'Available', value: stats.available, icon: <CheckCircle size={17} />, color: 'green' },
-            { label: 'Checked Out', value: stats.checkedOut, icon: <LogOut size={17} />, color: 'amber' },
-            { label: 'Action Needed', value: stats.needsAction, icon: <AlertCircle size={17} />, color: 'red' },
-          ].map(({ label, value, icon, color }) => (
-            <div key={label} className="bg-white rounded-xl border border-slate-100 shadow-sm p-3.5">
-              <div className="flex items-center gap-3">
-                <div className={`w-9 h-9 rounded-lg bg-${color}-50 border border-${color}-100 flex items-center justify-center text-${color}-600 shrink-0`}>
-                  {icon}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide leading-none">{label}</p>
-                  <p className="text-2xl font-bold text-slate-900 leading-tight mt-0.5">{value}</p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+        {/* KPI Strip */}
+        <StatCardsContainer>
+          <StatCard title="Total Assets" value={stats.total} icon={<Package size={18} />} iconColor="blue" />
+          <StatCard title="Available" value={stats.available} icon={<CheckCircle size={18} />} iconColor="green" />
+          <StatCard title="Checked Out" value={stats.checkedOut} icon={<LogOut size={18} />} iconColor="amber" />
+          <StatCard title="Action Needed" value={stats.needsAction} icon={<AlertCircle size={18} />} iconColor="red" />
+        </StatCardsContainer>
 
         {/* Main Content */}
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
@@ -330,16 +316,12 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
             {activeTab === 'items' && (
               <div className="space-y-3">
                 {/* Search bar */}
-                <div className="relative">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                  <input
-                    type="text"
-                    placeholder="Search by name, category, location…"
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white placeholder:text-slate-400"
-                  />
-                </div>
+                <Input
+                  icon={<Search size={14} />}
+                  placeholder="Search by name, category, location…"
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                />
 
                 <LoadingState loading={loading} error={error} empty={filteredItems.length === 0} emptyMessage="No inventory items found">
                   {/* Desktop table */}

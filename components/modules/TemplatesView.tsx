@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { FileText, Plus, Edit, Trash2, Copy, Calendar, DollarSign, Target, CheckSquare, X } from 'lucide-react';
-import { Card, Button, Badge, Modal, useToast, Tabs } from '../ui/Common';
+import { Card, Button, Badge, Modal, useToast, Tabs, ConfirmDialog, ConfirmState, CONFIRM_CLOSED } from '../ui/Common';
 import { Input, Select, Textarea } from '../ui/Form';
 import { LoadingState } from '../ui/Loading';
 import { useTemplates } from '../../hooks/useTemplates';
@@ -34,6 +34,7 @@ export const TemplatesView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
     deleteEventBudgetTemplate,
   } = useTemplates();
   const { isBoard, isAdmin } = usePermissions();
+  const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
   const { showToast } = useToast();
 
   const canManage = isBoard || isAdmin;
@@ -237,11 +238,7 @@ export const TemplatesView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={async () => {
-                              if (window.confirm('Are you sure you want to delete this template?')) {
-                                await deleteEventTemplate(template.id!);
-                              }
-                            }}
+                            onClick={() => setConfirmState({ open: true, title: 'Delete Template', message: 'Are you sure you want to delete this template?', variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await deleteEventTemplate(template.id!); } })}
                             className="text-red-500 hover:text-red-700"
                           >
                             <Trash2 size={14} />
@@ -316,11 +313,7 @@ export const TemplatesView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={async () => {
-                              if (window.confirm('Are you sure you want to delete this template?')) {
-                                await deleteActivityPlanTemplate(template.id!);
-                              }
-                            }}
+                            onClick={() => setConfirmState({ open: true, title: 'Delete Template', message: 'Are you sure you want to delete this template?', variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await deleteActivityPlanTemplate(template.id!); } })}
                             className="text-red-500 hover:text-red-700"
                           >
                             <Trash2 size={14} />
@@ -381,11 +374,7 @@ export const TemplatesView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={async () => {
-                              if (window.confirm('Are you sure you want to delete this template?')) {
-                                await deleteEventBudgetTemplate(template.id!);
-                              }
-                            }}
+                            onClick={() => setConfirmState({ open: true, title: 'Delete Template', message: 'Are you sure you want to delete this template?', variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await deleteEventBudgetTemplate(template.id!); } })}
                             className="text-red-500 hover:text-red-700"
                           >
                             <Trash2 size={14} />
@@ -622,6 +611,7 @@ export const TemplatesView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
         onSubmit={handleBudgetTemplateSubmit}
         drawerOnMobile
       />
+      <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
     </div>
   );
 };
