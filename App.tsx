@@ -69,7 +69,6 @@ const BoardDashboard = lazy(() => import('./components/dashboard/BoardDashboard'
 const DashboardHome = lazy(() => import('./components/dashboard/DashboardHome').then(m => ({ default: m.DashboardHome })));
 const DeveloperInterface = lazy(() => import('./components/modules/DeveloperInterface').then(m => ({ default: m.DeveloperInterface })));
 const ToyyibView = lazy(() => import('./components/modules/ToyyibView').then(m => ({ default: m.ToyyibView })));
-const ApiConfigView = lazy(() => import('./components/modules/ApiConfigView').then(m => ({ default: m.ApiConfigView })));
 const SystemConfigView = lazy(() => import('./components/modules/SystemConfigView').then(m => ({ default: m.SystemConfigView })));
 const PublicationsView = lazy(() => import('./components/modules/PublicationsView').then(m => ({ default: m.PublicationsView })));
 const RadarDataImporter = lazy(() => import('./components/admin/RadarDataImporter').then(m => ({ default: m.RadarDataImporter })));
@@ -711,10 +710,10 @@ export const JCIKLApp: React.FC = () => {
       case 'REPORTS': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <ReportsView />;
       case 'DEVELOPER': if (!isDeveloper && !isAdmin) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <DeveloperInterface />;
       case 'TOYYIB': if (!isAdmin && !isBoard && !isDeveloper) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <ToyyibView />;
-      case 'WHAPI_CONFIG': if (!isAdmin && !isBoard && !isDeveloper) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <ApiConfigView />;
-      case 'API_CONFIG': if (!isAdmin && !isBoard && !isDeveloper) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <ApiConfigView />;
-      case 'MEMBERSHIP_CONFIG': if (!isAdmin && !isBoard) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <SystemConfigView />;
-      case 'ACCESS_CONFIG': if (!isAdmin && !isBoard) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <SystemConfigView />;
+      case 'WHAPI_CONFIG': if (!isAdmin && !isBoard && !isDeveloper) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <SystemConfigView initialTab="whapi" />;
+      case 'API_CONFIG': if (!isAdmin && !isBoard && !isDeveloper) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <SystemConfigView initialTab="toyyib" />;
+      case 'MEMBERSHIP_CONFIG': if (!isAdmin && !isBoard) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <SystemConfigView initialTab="membership" />;
+      case 'ACCESS_CONFIG': if (!isAdmin && !isBoard) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <SystemConfigView initialTab="access" />;
       case 'SYSTEM_CONFIG': if (!isAdmin && !isBoard) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <SystemConfigView />;
       case 'PUBLICATIONS': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <PublicationsView />;
       case 'SPONSORSHIPS': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <SponsorshipView searchQuery={searchQuery} />;
@@ -977,16 +976,9 @@ export const JCIKLApp: React.FC = () => {
                         isCollapsed={isSidebarCollapsed}
                       />
                       <SidebarItem
-                        icon={<CreditCard size={18} />}
-                        label="API Settings"
-                        isActive={view === 'API_CONFIG' || view === 'TOYYIB' || view === 'WHAPI_CONFIG'}
-                        onClick={() => { handleViewChange('API_CONFIG'); setIsSidebarOpen(false); }}
-                        isCollapsed={isSidebarCollapsed}
-                      />
-                      <SidebarItem
                         icon={<SlidersHorizontal size={18} />}
                         label="Config"
-                        isActive={view === 'SYSTEM_CONFIG' || view === 'MEMBERSHIP_CONFIG' || view === 'ACCESS_CONFIG'}
+                        isActive={view === 'SYSTEM_CONFIG' || view === 'MEMBERSHIP_CONFIG' || view === 'ACCESS_CONFIG' || view === 'API_CONFIG' || view === 'TOYYIB' || view === 'WHAPI_CONFIG'}
                         onClick={() => { handleViewChange('SYSTEM_CONFIG'); setIsSidebarOpen(false); }}
                         isCollapsed={isSidebarCollapsed}
                       />
@@ -1493,10 +1485,6 @@ export const JCIKLApp: React.FC = () => {
                         <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('RADAR_IMPORTER'); setShowMobileMenu(false); }}>
                           <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><Zap size={22} /></div>
                           <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Radar</span>
-                        </div>
-                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('API_CONFIG'); setShowMobileMenu(false); }}>
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><CreditCard size={22} /></div>
-                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">API Settings</span>
                         </div>
                         <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('SYSTEM_CONFIG'); setShowMobileMenu(false); }}>
                           <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><SlidersHorizontal size={22} /></div>
