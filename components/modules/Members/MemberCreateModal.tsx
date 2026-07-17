@@ -33,11 +33,14 @@ export const MemberCreateModal: React.FC<MemberCreateModalProps> = ({
   const [hobbies, setHobbies] = useState<string[]>([]);
   const [interestedIndustries, setInterestedIndustries] = useState<string[]>([]);
   const [introducer, setIntroducer] = useState('');
+  // FORM-009: per-field error state for custom validation (e.g. duplicate email)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const handleClose = () => {
     setHobbies([]);
     setInterestedIndustries([]);
     setIntroducer('');
+    setFieldErrors({});
     onClose();
   };
 
@@ -86,9 +89,18 @@ export const MemberCreateModal: React.FC<MemberCreateModalProps> = ({
       tshirtStatus: 'NA',
     };
 
-    await onCreateMember(newMember);
-    handleClose();
-    e.currentTarget.reset();
+    try {
+      await onCreateMember(newMember);
+      handleClose();
+      e.currentTarget.reset();
+    } catch (err: any) {
+      // Surface duplicate-email errors next to the field instead of a generic toast
+      if (err?.message?.toLowerCase().includes('email')) {
+        setFieldErrors(prev => ({ ...prev, email: err.message }));
+      } else {
+        throw err;
+      }
+    }
   };
 
   const toggleHobby = (opt: string, checked: boolean) =>
@@ -124,10 +136,10 @@ export const MemberCreateModal: React.FC<MemberCreateModalProps> = ({
             <section>
               <h3 className="text-sm font-bold text-slate-900 border-b pb-2 mb-4">Identity & Account</h3>
               <div className="grid grid-cols-2 gap-4">
-                <Input name="firstName" label="First Name" placeholder="John" required />
-                <Input name="lastName" label="Last Name" placeholder="Doe" required />
-                <Input name="email" label="Email Address" type="email" placeholder="john@example.com" required />
-                <Input name="phone" label="Phone" type="tel" placeholder="+60..." />
+                <Input name="firstName" label="First Name" placeholder="John" required autoComplete="given-name" />
+                <Input name="lastName" label="Last Name" placeholder="Doe" required autoComplete="family-name" />
+                <Input name="email" label="Email Address" type="email" placeholder="john@example.com" required autoComplete="email" error={fieldErrors.email} onChange={() => setFieldErrors(prev => ({ ...prev, email: '' }))} />
+                <Input name="phone" label="Phone" type="tel" placeholder="+60..." autoComplete="tel" />
               </div>
             </section>
 
@@ -136,7 +148,7 @@ export const MemberCreateModal: React.FC<MemberCreateModalProps> = ({
               <div className="grid grid-cols-2 gap-4">
                 <Input name="fullName" label="Full Name (ID Card)" />
                 <Input name="idNumber" label="ID Number" />
-                <Input name="dateOfBirth" label="Date of Birth" type="date" />
+                <Input name="dateOfBirth" label="Date of Birth" type="date" min="1930-01-01" max={new Date().toISOString().split('T')[0]} />
                 <Select name="nationality" label="Nationality" defaultValue="Malaysia" options={NATIONALITY_OPTIONS.map(c => ({ label: c, value: c }))} />
                 <div className="col-span-2 grid grid-cols-2 gap-4">
                   <div>

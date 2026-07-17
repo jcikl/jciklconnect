@@ -2,6 +2,7 @@
  * Cloudinary Upload Service
  */
 import imageCompression from 'browser-image-compression';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
 /** Injects e_trim into a Cloudinary URL to auto-remove transparent/uniform-color borders. */
 export const trimCloudinaryImage = (url: string): string => {
@@ -264,7 +265,8 @@ export const deleteFromCloudinary = async (url: string): Promise<boolean> => {
     }
     const idToken = await user.getIdToken();
 
-    const response = await fetch('/.netlify/functions/cloudinary-delete', {
+    // ERR-R-005: timeout prevents spinner hanging if Netlify function hangs.
+    const response = await fetchWithTimeout('/.netlify/functions/cloudinary-delete', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

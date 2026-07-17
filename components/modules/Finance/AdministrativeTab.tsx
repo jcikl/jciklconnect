@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Plus, Edit, Trash2, Briefcase, FileText, ChevronDown } from 'lucide-react';
-import { Button, Badge } from '../../ui/Common';
+import { Button, Badge, ConfirmDialog, CONFIRM_CLOSED } from '../../ui/Common';
+import type { ConfirmState } from '../../ui/Common';
 import { LoadingState } from '../../ui/Loading';
 import { formatCurrency } from '../../../utils/formatUtils';
 import { formatDate } from '../../../utils/dateUtils';
@@ -49,6 +50,22 @@ const AdministrativeTabBase: React.FC<AdministrativeTabProps> = ({
   setIsAddAdministrativeProjectOpen,
   projects,
 }) => {
+  const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
+
+  const requestDeleteTransaction = (id: string, description?: string) => {
+    setConfirmState({
+      open: true,
+      title: 'Delete Transaction',
+      message: `Are you sure you want to permanently delete "${description || 'this transaction'}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      variant: 'danger',
+      onConfirm: () => {
+        handleDeleteTransaction(id);
+        setConfirmState(CONFIRM_CLOSED);
+      },
+    });
+  };
+
   const [adminPRs, setAdminPRs] = React.useState<PaymentRequest[]>([]);
   const [prStatusFilter, setPrStatusFilter] = React.useState<PaymentRequestStatus | 'all'>('all');
 
@@ -92,6 +109,7 @@ const AdministrativeTabBase: React.FC<AdministrativeTabProps> = ({
     : adminTransactionsWithFilter;
 
   return (
+    <>
     <div className="space-y-4">
       {/* ── Admin Account Cards – horizontal scroll both mobile + desktop ── */}
       <div className="flex items-center justify-between mb-1">
@@ -310,7 +328,7 @@ const AdministrativeTabBase: React.FC<AdministrativeTabProps> = ({
                             <td className="py-2.5 px-3 text-center">
                               <div className="flex justify-center gap-0.5">
                                 <button aria-label={`Edit transaction: ${tx.description}`} onClick={() => handleEditTransaction(tx)} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"><Edit size={13} /></button>
-                                <button aria-label={`Delete transaction: ${tx.description}`} onClick={() => handleDeleteTransaction(tx.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 size={13} /></button>
+                                <button aria-label={`Delete transaction: ${tx.description}`} onClick={() => requestDeleteTransaction(tx.id, tx.description)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 size={13} /></button>
                               </div>
                             </td>
                           )}
@@ -353,7 +371,7 @@ const AdministrativeTabBase: React.FC<AdministrativeTabProps> = ({
                           {hasPermission('canEditFinance') && (
                             <div className="flex items-center gap-0.5 shrink-0">
                               <button aria-label={`Edit transaction: ${tx.description}`} onClick={() => handleEditTransaction(tx)} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"><Edit size={13} /></button>
-                              <button aria-label={`Delete transaction: ${tx.description}`} onClick={() => handleDeleteTransaction(tx.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 size={13} /></button>
+                              <button aria-label={`Delete transaction: ${tx.description}`} onClick={() => requestDeleteTransaction(tx.id, tx.description)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 size={13} /></button>
                             </div>
                           )}
                         </div>
@@ -366,6 +384,16 @@ const AdministrativeTabBase: React.FC<AdministrativeTabProps> = ({
         </div>
       </div>
     </div>
+    <ConfirmDialog
+      open={confirmState.open}
+      title={confirmState.title}
+      message={confirmState.message}
+      confirmLabel={confirmState.confirmLabel}
+      variant={confirmState.variant}
+      onConfirm={confirmState.onConfirm}
+      onCancel={() => setConfirmState(CONFIRM_CLOSED)}
+    />
+    </>
   );
 };
 

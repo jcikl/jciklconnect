@@ -197,9 +197,9 @@ export const TransactionForm: React.FC<Props> = ({
         )}
 
         {isEdit ? (
-          <Input name="date" label="Date" type="date" defaultValue={((getVal('date') as string) || '').split('T')[0]} required />
+          <Input name="date" label="Date" type="date" defaultValue={((getVal('date') as string) || '').split('T')[0]} required max={new Date().toISOString().split('T')[0]} />
         ) : (
-          <Input name="date" label="Date" type="date" defaultValue={new Date().toISOString().split('T')[0]} required />
+          <Input name="date" label="Date" type="date" defaultValue={new Date().toISOString().split('T')[0]} required max={new Date().toISOString().split('T')[0]} />
         )}
       </div>
 
@@ -242,9 +242,9 @@ export const TransactionForm: React.FC<Props> = ({
           <div className="w-full">
             {isEdit ? (
               editingTransaction?.category === 'Administrative' ? (
-                <Input name="year" label="Year" type="number" value={String(editingAdministrativeYear)} onChange={(e) => { const val = parseInt(e.target.value, 10); setEditingAdministrativeYear?.(val); setEditingModalYear?.(String(val)); }} placeholder="e.g. 2024" />
+                <Input name="year" label="Year" type="number" min={2020} max={2040} value={String(editingAdministrativeYear)} onChange={(e) => { const val = parseInt(e.target.value, 10); setEditingAdministrativeYear?.(val); setEditingModalYear?.(String(val)); }} placeholder="e.g. 2024" />
               ) : editingTransaction?.category === 'Membership' ? (
-                <Input name="year" label="Year" type="number" value={String(editingMembershipYear)} onChange={(e) => { const val = parseInt(e.target.value, 10) || new Date().getFullYear(); setEditingMembershipYear?.(val); setEditingModalYear?.(String(val)); }} placeholder="e.g. 2024" />
+                <Input name="year" label="Year" type="number" min={2020} max={2040} value={String(editingMembershipYear)} onChange={(e) => { const val = parseInt(e.target.value, 10) || new Date().getFullYear(); setEditingMembershipYear?.(val); setEditingModalYear?.(String(val)); }} placeholder="e.g. 2024" />
               ) : (
                 <Select
                   name="year"
@@ -260,7 +260,7 @@ export const TransactionForm: React.FC<Props> = ({
                 />
               )
             ) : recordFormCategory === 'Membership' ? (
-              <Input name="year" label="Year" type="number" value={recordFormYear ? String(recordFormYear) : ''} onChange={(e: any) => setRecordFormYear?.(parseInt(e.target.value, 10))} placeholder="e.g. 2024" />
+              <Input name="year" label="Year" type="number" min={2020} max={2040} value={recordFormYear ? String(recordFormYear) : ''} onChange={(e: any) => setRecordFormYear?.(parseInt(e.target.value, 10))} placeholder="e.g. 2024" />
             ) : (
               <Select
                 name="year"

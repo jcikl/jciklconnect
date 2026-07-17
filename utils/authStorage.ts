@@ -1,5 +1,6 @@
-import { Member } from '../types';
-
+// SEC-A-002: Store only minimal bootstrap fields — never the full Member object.
+// The full Member record is loaded from Firestore on app start (already cached by cacheService).
+// Storing it here would expose PII (email, phone, IC, membership history) to any JS on the origin.
 const AUTH_STORAGE_KEY = 'jci_auth_state';
 const DEV_MODE_KEY = 'jci_dev_mode';
 
@@ -10,7 +11,8 @@ export interface StoredAuthState {
     email: string;
     displayName: string;
   };
-  member: Member;
+  /** @deprecated Full member object is no longer persisted here. Pass null or omit. */
+  member?: null;
 }
 
 /**
@@ -18,7 +20,12 @@ export interface StoredAuthState {
  */
 export const saveAuthState = (state: StoredAuthState): void => {
   try {
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(state));
+    // Only persist the minimal bootstrap subset — never include the full Member object.
+    const minimal: StoredAuthState = {
+      isDevMode: state.isDevMode,
+      user: { uid: state.user.uid, email: state.user.email, displayName: state.user.displayName },
+    };
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(minimal));
     localStorage.setItem(DEV_MODE_KEY, state.isDevMode ? 'true' : 'false');
   } catch (error) {
     console.error('Error saving auth state to localStorage:', error);

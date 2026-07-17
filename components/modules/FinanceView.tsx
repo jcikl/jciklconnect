@@ -603,8 +603,8 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
                 {!prReconcileLoading && prPendingReconciliation.length > 0 && (
                   <span className="text-[11px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">{prPendingReconciliation.length} pending</span>
                 )}
-                <button onClick={loadPrPendingReconciliation} disabled={prReconcileLoading} className="p-1.5 rounded-lg text-slate-400 hover:text-jci-blue hover:bg-blue-50 transition-colors">
-                  <RefreshCw size={14} className={prReconcileLoading ? 'animate-spin' : ''} />
+                <button onClick={loadPrPendingReconciliation} disabled={prReconcileLoading} aria-label="Refresh reconciliation list" className="p-2.5 rounded-lg text-slate-400 hover:text-jci-blue hover:bg-blue-50 transition-colors">
+                  <RefreshCw size={14} aria-hidden="true" className={prReconcileLoading ? 'animate-spin' : ''} />
                 </button>
               </div>
             </div>

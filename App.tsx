@@ -107,6 +107,7 @@ const GuestAboutPage = lazy(() => import('./components/pages/guest/GuestAboutPag
 const GuestEnewslettersPage = lazy(() => import('./components/pages/guest/GuestEnewslettersPage').then(m => ({ default: m.GuestEnewslettersPage ?? m.default })));
 const GuestDirectoryPage = lazy(() => import('./components/pages/guest/GuestDirectoryPage').then(m => ({ default: m.GuestDirectoryPage ?? m.default })));
 const GuestPartnershipPage = lazy(() => import('./components/pages/guest/GuestPartnershipPage').then(m => ({ default: m.GuestPartnershipPage ?? m.default })));
+const NotFoundPage = lazy(() => import('./components/pages/NotFoundPage').then(m => ({ default: m.NotFoundPage })));
 
 // REMOVED: inline GuestLandingPage definition (moved to components/pages/guest/GuestLandingPage.tsx)
 // REMOVED: inline GuestEventsPage definition (moved to components/pages/guest/GuestEventsPage.tsx)
@@ -654,7 +655,7 @@ export const JCIKLApp: React.FC = () => {
             <Route path="/directory" element={<GuestDirectoryPage {...guestPageProps} />} />
             <Route path="/partnerships" element={<GuestPartnershipPage {...guestPageProps} />} />
             <Route path="/roadmap" element={<div />} />
-            <Route path="*" element={<GuestLandingPage {...guestPageProps} />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
         <LoginModal

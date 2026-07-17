@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { Users, Calendar, ChevronRight, FolderKanban, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/Common';
 import { useEvents } from '@/hooks/useEvents';
@@ -51,8 +52,31 @@ export const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
     International: 'from-jci-blue to-sky-500',
   };
 
+  const ogImage = termSettings?.memberGroupPhotoUrl || '/JCI%20Kuala%20Lumpur-transparent.png';
+
   return (
     <div className="min-h-screen bg-slate-50">
+      <Helmet>
+        <title>JCI Kuala Lumpur — Be Better. Do Better.</title>
+        <meta name="description" content="JCI Kuala Lumpur is the first Malaysia Junior Chamber Chapter — a global network of young active citizens creating positive change since 1954." />
+        <link rel="canonical" href="https://jcikl.cc/" />
+        <meta property="og:title" content="JCI Kuala Lumpur — Be Better. Do Better." />
+        <meta property="og:description" content="JCI Kuala Lumpur is the first Malaysia Junior Chamber Chapter — a global network of young active citizens creating positive change since 1954." />
+        <meta property="og:image" content={ogImage} />
+        <meta property="og:url" content="https://jcikl.cc/" />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <script type="application/ld+json">{JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "Organization",
+          "name": "JCI Kuala Lumpur",
+          "url": "https://jcikl.cc",
+          "logo": "https://jcikl.cc/JCI%20Kuala%20Lumpur-transparent.png",
+          "foundingDate": "1954",
+          "address": { "@type": "PostalAddress", "addressLocality": "Kuala Lumpur", "addressCountry": "MY" },
+          "sameAs": ["https://jci.cc"]
+        })}</script>
+      </Helmet>
       <GuestHeader currentPage="home" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
 
       <main id="main-content">
@@ -151,7 +175,7 @@ export const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                       <img src={termSettings.memberGroupPhotoUrl} alt="JCI KL Members" className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full bg-white/5 backdrop-blur-sm flex items-center justify-center p-10">
-                        <img src="/JCI Kuala Lumpur-transparent.png" alt="JCI KL" className="w-full h-full object-contain drop-shadow-lg" />
+                        <img src="/JCI Kuala Lumpur-transparent.png" alt="JCI KL" width="400" height="400" className="w-full h-full object-contain drop-shadow-lg" />
                       </div>
                     )}
                     {/* Photo overlay label */}
@@ -426,6 +450,8 @@ export const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                   <img
                     src={p.image}
                     alt={p.title}
+                    width="400"
+                    height="533"
                     className="absolute inset-0 w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
                   />
                   {/* Colour tint overlay */}

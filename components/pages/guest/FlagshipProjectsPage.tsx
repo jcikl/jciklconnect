@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { Briefcase, ChevronLeft, ChevronRight, Image as ImageIcon, X } from 'lucide-react';
 import { Button, Modal } from '@/components/ui/Common';
 import { FlagshipProjectsService } from '@/services/flagshipProjectsService';
@@ -45,6 +46,17 @@ export const FlagshipProjectsPage = ({ onLogin, onRegister, onPageChange }: {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <Helmet>
+        <title>Flagship Projects — JCI Kuala Lumpur</title>
+        <meta name="description" content="Discover JCI Kuala Lumpur's flagship community and development projects creating positive change across Kuala Lumpur." />
+        <link rel="canonical" href="https://jcikl.cc/projects" />
+        <meta property="og:title" content="Flagship Projects — JCI Kuala Lumpur" />
+        <meta property="og:description" content="Discover JCI Kuala Lumpur's flagship community and development projects." />
+        <meta property="og:image" content="/JCI%20Kuala%20Lumpur-transparent.png" />
+        <meta property="og:url" content="https://jcikl.cc/projects" />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:card" content="summary_large_image" />
+      </Helmet>
       <GuestHeader currentPage="projects" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
 
       <main id="main-content">

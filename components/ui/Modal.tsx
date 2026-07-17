@@ -23,6 +23,15 @@ interface ModalProps {
   onScroll?: (e: React.UIEvent<HTMLDivElement>) => void;
 }
 
+// Returns all focusable elements within a container
+function getFocusableModal(container: HTMLElement): HTMLElement[] {
+  return Array.from(
+    container.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+  );
+}
+
 export const Modal: React.FC<ModalProps> = ({
   isOpen,
   onClose,
@@ -44,22 +53,42 @@ export const Modal: React.FC<ModalProps> = ({
   mobileHeight,
   onScroll,
 }) => {
-  React.useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (isOpen && e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [isOpen, onClose]);
+  const containerRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
+    if (!isOpen) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    document.body.style.overflow = 'hidden';
+
+    // Move focus into modal
+    const container = containerRef.current;
+    if (container) {
+      const focusable = getFocusableModal(container);
+      if (focusable.length > 0) focusable[0].focus();
     }
-    return () => { document.body.style.overflow = ''; };
-  }, [isOpen]);
+
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { onClose(); return; }
+      if (e.key === 'Tab' && container) {
+        const focusable = getFocusableModal(container);
+        if (focusable.length === 0) { e.preventDefault(); return; }
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+        } else {
+          if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+
+    return () => {
+      window.removeEventListener('keydown', handler);
+      document.body.style.overflow = '';
+      previousFocus?.focus();
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -76,6 +105,7 @@ export const Modal: React.FC<ModalProps> = ({
 
   const modalContent = (
     <div
+      ref={containerRef}
       className="fixed inset-0 z-50 p-4 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in md:p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       role="dialog"

@@ -374,6 +374,18 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
       return;
     }
 
+    // FORM-002: JS validation for Select fields that browser won't validate via hidden inputs
+    if (!newLevel || !newPillar || !projectType || !newCategory) {
+      showToast('Please fill in all required classification fields (Level, Pillar, Type, Category)', 'error');
+      return;
+    }
+
+    // FORM-007: Cross-field date validation
+    if (newEventEndDate && newEventStartDate && newEventEndDate < newEventStartDate) {
+      showToast('End date must be on or after start date', 'error');
+      return;
+    }
+
     const formData = new FormData(e.currentTarget);
     try {
       // Create new project with Activity Plan fields
@@ -1010,11 +1022,11 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
                     <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l-4 border-jci-blue/40 pl-2 mb-2">Schedule</p>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                       <Input name="proposedDate" label="Proposed *" type="date" value={newProposedDate}
-                        onChange={(e) => setNewProposedDate(e.target.value)} icon={<Calendar size={16} />} required />
+                        onChange={(e) => setNewProposedDate(e.target.value)} icon={<Calendar size={16} />} required min={new Date().toISOString().split('T')[0]} />
                       <Input name="eventStartDate" label="Start Date *" type="date" value={newEventStartDate}
-                        onChange={(e) => setNewEventStartDate(e.target.value)} icon={<Calendar size={16} />} required />
+                        onChange={(e) => setNewEventStartDate(e.target.value)} icon={<Calendar size={16} />} required min={new Date().toISOString().split('T')[0]} />
                       <Input name="eventEndDate" label="End Date" type="date" value={newEventEndDate}
-                        onChange={(e) => setNewEventEndDate(e.target.value)} icon={<Calendar size={16} />} />
+                        onChange={(e) => setNewEventEndDate(e.target.value)} icon={<Calendar size={16} />} min={newEventStartDate || new Date().toISOString().split('T')[0]} />
                       <div />
                       <Input name="eventStartTime" label="Start Time" type="time" value={newEventStartTime}
                         onChange={(e) => setNewEventStartTime(e.target.value)} icon={<Clock size={16} />} />

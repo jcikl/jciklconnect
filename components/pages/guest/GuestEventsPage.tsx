@@ -1,4 +1,5 @@
 import React, { useState, useMemo, lazy, Suspense } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, Calendar, CheckCircle, MapPin, Users } from 'lucide-react';
 import { Button, Badge, Modal, useToast } from '@/components/ui/Common';
 import * as Forms from '@/components/ui/Form';
@@ -27,6 +28,8 @@ export const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
     organization: '',
     notes: '',
   });
+  const [guestHoneypot, setGuestHoneypot] = useState('');
+  const [guestConsentChecked, setGuestConsentChecked] = useState(false);
   const { showToast } = useToast();
   const upcomingEvents = useMemo(() => {
     const today = new Date();
@@ -43,6 +46,17 @@ export const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <Helmet>
+        <title>Events — JCI Kuala Lumpur</title>
+        <meta name="description" content="Browse upcoming JCI Kuala Lumpur events — networking sessions, training workshops, community projects, and international exchanges." />
+        <link rel="canonical" href="https://jcikl.cc/events" />
+        <meta property="og:title" content="Events — JCI Kuala Lumpur" />
+        <meta property="og:description" content="Browse upcoming JCI Kuala Lumpur events — networking sessions, training workshops, community projects, and international exchanges." />
+        <meta property="og:image" content="/JCI%20Kuala%20Lumpur-transparent.png" />
+        <meta property="og:url" content="https://jcikl.cc/events" />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:card" content="summary_large_image" />
+      </Helmet>
       <GuestHeader currentPage="events" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
 
       <main id="main-content">
@@ -258,6 +272,12 @@ export const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
                   id="guest-registration-form"
                   onSubmit={async (e) => {
                     e.preventDefault();
+                    // Honeypot check — bots fill hidden fields, humans don't
+                    if (guestHoneypot) return;
+                    if (!guestConsentChecked) {
+                      showToast('Please agree to the Privacy Policy to continue.', 'error');
+                      return;
+                    }
                     try {
                       const { EventsService } = await import('@/services/eventsService');
                       await EventsService.registerGuestForEvent(selectedEvent.id, guestRegistrationData);
@@ -349,6 +369,36 @@ export const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
                         className="!mb-0"
                       />
                     </div>
+                  </div>
+
+                  {/* Honeypot — hidden from real users, catches bots */}
+                  <input
+                    type="text"
+                    name="website"
+                    value={guestHoneypot}
+                    onChange={(e) => setGuestHoneypot(e.target.value)}
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    style={{ display: 'none' }}
+                  />
+
+                  {/* PDPA consent — required by Malaysia Personal Data Protection Act 2010 */}
+                  <div className="flex items-start gap-3 pt-2">
+                    <input
+                      type="checkbox"
+                      id="guest-pdpa-consent"
+                      checked={guestConsentChecked}
+                      onChange={(e) => setGuestConsentChecked(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 rounded border-slate-300 text-jci-blue focus:ring-jci-blue flex-shrink-0"
+                      required
+                    />
+                    <label htmlFor="guest-pdpa-consent" className="text-[11px] text-slate-500 leading-relaxed">
+                      I agree to the{' '}
+                      <a href="https://jcikl.cc/privacy" target="_blank" rel="noopener noreferrer" className="text-jci-blue hover:underline font-semibold">
+                        Privacy Policy
+                      </a>{' '}
+                      and consent to JCI Kuala Lumpur processing my personal data for event registration and communication purposes.
+                    </label>
                   </div>
                 </form>
               </div>

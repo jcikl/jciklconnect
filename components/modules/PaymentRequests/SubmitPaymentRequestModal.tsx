@@ -73,15 +73,13 @@ export const SubmitPaymentRequestModal: React.FC<SubmitPaymentRequestModalProps>
     if (user || member) {
       setFormApplicantName(member?.name || user?.displayName || '');
       setFormApplicantEmail(user?.email || '');
-      const savedBankName = localStorage.getItem('pr_bank_name');
-      const savedAccountHolder = localStorage.getItem('pr_account_holder');
-      const savedAccountNumber = localStorage.getItem('pr_account_number');
+      // SEC-A-003: Bank account details are no longer persisted in localStorage (PII risk).
+      // Pre-populate from the member's existing paymentInfo stored in Firestore instead.
+      const paymentInfo = (member as { paymentInfo?: { bankName?: string; accountHolder?: string; accountNumber?: string } })?.paymentInfo;
+      if (paymentInfo?.bankName) setFormBankName(paymentInfo.bankName);
+      if (paymentInfo?.accountHolder) setFormAccountHolder(paymentInfo.accountHolder);
+      if (paymentInfo?.accountNumber) setFormAccountNumber(paymentInfo.accountNumber);
       const savedClaimFromBankAccountId = localStorage.getItem('pr_claim_from_bank_account_id');
-
-      if (savedBankName) setFormBankName(savedBankName);
-      if (savedAccountHolder) setFormAccountHolder(savedAccountHolder);
-      if (savedAccountNumber) setFormAccountNumber(savedAccountNumber);
-      if (savedClaimFromBankAccountId) setFormClaimFromBankAccountId(savedClaimFromBankAccountId);
 
       // Auto-fill position from project committee role when opened from budget tab
       if (preselectedProjectId && member?.id) {
@@ -194,9 +192,7 @@ export const SubmitPaymentRequestModal: React.FC<SubmitPaymentRequestModalProps>
         attachmentUrls,
       }, user.uid);
 
-      localStorage.setItem('pr_bank_name', formBankName);
-      localStorage.setItem('pr_account_holder', formAccountHolder);
-      localStorage.setItem('pr_account_number', formAccountNumber);
+      // SEC-A-003: Bank account details (name, holder, number) are NOT stored in localStorage.
       localStorage.setItem('pr_claim_from_bank_account_id', formClaimFromBankAccountId || '');
       localStorage.setItem('pr_applicant_position', formApplicantPosition);
 
@@ -329,7 +325,7 @@ export const SubmitPaymentRequestModal: React.FC<SubmitPaymentRequestModalProps>
                       <Input label={`Item ${idx + 1}`} value={item.purpose} onChange={(e) => updateItem(idx, { purpose: e.target.value })} placeholder="Description (e.g. Venue rental)" required />
                     </div>
                     <div className="w-28 shrink-0">
-                      <Input label="RM" type="number" min="0.01" step="0.01" value={item.amount || ''} onChange={(e) => updateItem(idx, { amount: parseFloat(e.target.value) || 0 })} placeholder="0.00" required />
+                      <Input label="RM" type="number" min="0.01" max={50000} step="0.01" value={item.amount || ''} onChange={(e) => updateItem(idx, { amount: parseFloat(e.target.value) || 0 })} placeholder="0.00" required />
                     </div>
                     {formItems.length > 1 && (
                       <button type="button" onClick={() => removeItem(idx)} className="mb-0.5 p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors shrink-0">
@@ -407,9 +403,9 @@ export const SubmitPaymentRequestModal: React.FC<SubmitPaymentRequestModalProps>
             <div className="grid md:grid-cols-2 gap-4">
               <Select label="Claim From JCI Account" value={formClaimFromBankAccountId} onChange={(e) => setFormClaimFromBankAccountId(e.target.value)}
                 options={[{ value: '', label: 'Select JCI Account...' }, ...bankAccounts.map(a => ({ value: a.id, label: a.name }))]} required />
-              <Input label="Your Recipient Bank" value={formBankName} onChange={(e) => setFormBankName(e.target.value)} placeholder="e.g. Maybank, CIMB, Public Bank" required />
-              <Input label="Account Holder Name" value={formAccountHolder} onChange={(e) => setFormAccountHolder(e.target.value)} placeholder="Must match bank record" required />
-              <Input label="Bank Account Number" value={formAccountNumber} onChange={(e) => setFormAccountNumber(e.target.value.replace(/\D/g, ''))} placeholder="Numbers only" inputMode="numeric" required />
+              <Input label="Your Recipient Bank" value={formBankName} onChange={(e) => setFormBankName(e.target.value)} placeholder="e.g. Maybank, CIMB, Public Bank" required autoComplete="organization" />
+              <Input label="Account Holder Name" value={formAccountHolder} onChange={(e) => setFormAccountHolder(e.target.value)} placeholder="Must match bank record" required autoComplete="name" />
+              <Input label="Bank Account Number" value={formAccountNumber} onChange={(e) => setFormAccountNumber(e.target.value.replace(/\D/g, ''))} placeholder="Numbers only" inputMode="numeric" required autoComplete="off" />
             </div>
             <Input label="Remark / Special Instructions (Optional)" value={formRemark} onChange={(e) => setFormRemark(e.target.value)} placeholder="Add any additional notes here..." />
           </div>

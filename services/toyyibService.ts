@@ -3,6 +3,7 @@ import { getAuth } from 'firebase/auth';
 import { db } from '../config/firebase';
 import { COLLECTIONS, TOYYIB_CONFIG } from '../config/constants';
 import { errorLoggingService } from './errorLoggingService';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
 export interface CreateBillParams {
   billName: string;
@@ -76,7 +77,9 @@ async function proxyCall(action: string, params: Record<string, string> = {}): P
   const idToken = await getAuth().currentUser?.getIdToken().catch(() => null);
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (idToken) headers['Authorization'] = `Bearer ${idToken}`;
-  const response = await fetch('/.netlify/functions/toyyibpay-api', {
+  // ERR-R-005: use fetchWithTimeout so a hung Netlify function doesn't leave
+  // the caller's spinner running indefinitely.
+  const response = await fetchWithTimeout('/.netlify/functions/toyyibpay-api', {
     method: 'POST',
     headers,
     body: JSON.stringify({ action, ...params }),

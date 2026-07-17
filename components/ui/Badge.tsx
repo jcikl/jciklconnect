@@ -24,6 +24,13 @@ export const Badge: React.FC<BadgeProps> = ({ children, variant = 'neutral', ico
     <span
       className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${styles[variant]} ${className}`}
       onClick={onClick}
+      {...(onClick ? {
+        role: 'button',
+        tabIndex: 0,
+        onKeyDown: (e: React.KeyboardEvent<HTMLSpanElement>) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); }
+        },
+      } : {})}
     >
       {icon && <span className="mr-1 inline-flex items-center">{icon}</span>}
       {children}
@@ -38,7 +45,14 @@ export const ProgressBar: React.FC<{ progress: number; color?: string; label?: s
         <span>{label}</span>
         <span>{Math.round(progress)}%</span>
       </div>}
-      <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+      <div
+        className="w-full bg-slate-100 rounded-full h-2 overflow-hidden"
+        role="progressbar"
+        aria-valuenow={Math.round(progress)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={label ?? 'Progress'}
+      >
         <div
           className={`${color} h-2 rounded-full transition-all duration-500 ease-out`}
           style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}

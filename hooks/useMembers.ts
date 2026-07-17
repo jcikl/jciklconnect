@@ -115,6 +115,8 @@ export interface UsePaginatedMembersResult {
   loadMore: () => Promise<void>;
   hasMore: boolean;
   loading: boolean;
+  /** ERR-R-006: error message from the last failed loadMore(), null when healthy. */
+  error: string | null;
 }
 
 /**
@@ -127,19 +129,28 @@ export const usePaginatedMembers = (pageSize = 50): UsePaginatedMembersResult =>
   const [lastDoc, setLastDoc] = useState<DocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
+  // ERR-R-006: expose error so callers can surface a failure state instead of empty+no-spinner.
+  const [error, setError] = useState<string | null>(null);
+  const { showToast } = useToast();
 
   const loadMore = useCallback(async () => {
     if (loading || !hasMore) return;
     setLoading(true);
+    setError(null);
     try {
       const result = await MembersService.getMembersPaginated(pageSize, lastDoc ?? undefined);
       setMembers(prev => [...prev, ...result.members]);
       setLastDoc(result.lastDoc);
       setHasMore(result.hasMore);
+    } catch (err) {
+      // ERR-R-006: catch errors so they don't propagate as unhandled rejections.
+      const msg = err instanceof Error ? err.message : 'Failed to load members';
+      setError(msg);
+      showToast(msg, 'error');
     } finally {
       setLoading(false);
     }
-  }, [loading, hasMore, lastDoc, pageSize]);
+  }, [loading, hasMore, lastDoc, pageSize, showToast]);
 
   // Initial load
   useEffect(() => {
@@ -147,5 +158,5 @@ export const usePaginatedMembers = (pageSize = 50): UsePaginatedMembersResult =>
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { members, loadMore, hasMore, loading };
+  return { members, loadMore, hasMore, loading, error };
 };

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 import { Briefcase, ChevronRight, Gift, Lock, Unlock } from 'lucide-react';
 import { Button, Modal, useToast } from '@/components/ui/Common';
@@ -77,6 +78,17 @@ export const GuestPartnershipPage = ({ onLogin, onRegister, onPageChange }: {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <Helmet>
+        <title>Partnerships & Member Benefits — JCI Kuala Lumpur</title>
+        <meta name="description" content="Explore exclusive partnership deals and member benefits available to JCI Kuala Lumpur members. Unlock discounts, perks, and business opportunities." />
+        <link rel="canonical" href="https://jcikl.cc/partnerships" />
+        <meta property="og:title" content="Partnerships & Member Benefits — JCI Kuala Lumpur" />
+        <meta property="og:description" content="Exclusive deals and member benefits for JCI Kuala Lumpur members." />
+        <meta property="og:image" content="/JCI%20Kuala%20Lumpur-transparent.png" />
+        <meta property="og:url" content="https://jcikl.cc/partnerships" />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:card" content="summary_large_image" />
+      </Helmet>
       <GuestHeader currentPage="partnerships" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
 
       <main id="main-content">

@@ -23,6 +23,7 @@ import {
 import { db, auth } from '../config/firebase';
 import { logWrite, logDelete } from './firestoreLogger';
 import { logError as logServiceError, errorLoggingService } from './errorLoggingService';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { COLLECTIONS, DEFAULT_LO_ID } from '../config/constants';
 import {
   Member,
@@ -602,7 +603,8 @@ export class MembersService {
       // Auth email sync — runs AFTER Firestore succeeds so we can revert if Auth rejects
       if (emailChanging) {
         try {
-          const res = await fetch('/.netlify/functions/update-auth-email', {
+          // ERR-R-005: timeout prevents spinner hanging if Netlify function hangs.
+          const res = await fetchWithTimeout('/.netlify/functions/update-auth-email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ uid: memberId, newEmail }),

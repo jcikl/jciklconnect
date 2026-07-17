@@ -158,8 +158,8 @@ function evaluateCondition(config: any, data: any): boolean {
 async function executeAction(config: any, data: any): Promise<any> {
   switch (config.type) {
     case 'send_email':
-      // In a real implementation, this would send an email
-      console.log(`Sending email to ${config.to}: ${config.subject}`);
+      // SEC-A-009: Do not log recipient email or subject — use a correlation reference only.
+      console.log(`send_email action triggered (type: ${config.notificationType ?? 'email'})`);
       return { emailSent: true, to: config.to };
       
     case 'update_field': {

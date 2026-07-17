@@ -165,12 +165,18 @@ exports.handler = async (event) => {
         sanitized.billCallbackUrl = webhookSecret
           ? `${baseCallbackUrl}?secret=${encodeURIComponent(webhookSecret)}`
           : baseCallbackUrl;
-        // Restrict return URL to our own domain
+        // Restrict return URL to our own domain (SEC-A-010).
+        // localhost is only allowed in non-production environments to prevent payment
+        // gateway callbacks from following http:// redirects in production.
         const returnUrl = params.billReturnUrl || '';
+        const isProduction = process.env.NODE_ENV === 'production' ||
+          (process.env.URL || '').includes('app.jcikl.cc');
         const isAllowedReturn =
           returnUrl.startsWith('https://app.jcikl.cc') ||
-          returnUrl.startsWith('http://localhost:3000') ||
-          returnUrl.startsWith('http://localhost:3001');
+          (!isProduction && (
+            returnUrl.startsWith('http://localhost:3000') ||
+            returnUrl.startsWith('http://localhost:3001')
+          ));
         sanitized.billReturnUrl = isAllowedReturn
           ? returnUrl
           : 'https://app.jcikl.cc/payment/result';

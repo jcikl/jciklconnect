@@ -1,8 +1,27 @@
 // Nudge Banner Component - Displays behavioral nudges
 import React from 'react';
 import { X, TrendingUp, AlertCircle, Lightbulb, Target, CheckCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Button, Badge } from './Common';
 import { Nudge } from '../../services/behavioralNudgingService';
+
+const ALLOWED_HOSTS = ['app.jcikl.cc'];
+
+/** SEC-A-001: Validate nudge actionUrl to prevent open-redirect. */
+function safeNavigate(url: string, navigate: ReturnType<typeof useNavigate>): void {
+  try {
+    const parsed = new URL(url, window.location.origin);
+    if (parsed.origin === window.location.origin || ALLOWED_HOSTS.includes(parsed.hostname)) {
+      // Same origin or explicitly allowlisted — use React Router to stay in-app
+      navigate(parsed.pathname + parsed.search + parsed.hash);
+    } else {
+      console.warn('NudgeBanner: blocked external redirect to', parsed.hostname);
+    }
+  } catch {
+    // Relative path (URL constructor threw) — safe to navigate directly
+    navigate(url);
+  }
+}
 
 interface NudgeBannerProps {
   nudge: Nudge;
@@ -11,6 +30,7 @@ interface NudgeBannerProps {
 }
 
 export const NudgeBanner: React.FC<NudgeBannerProps> = ({ nudge, onDismiss, onAction }) => {
+  const navigate = useNavigate();
   const getIcon = () => {
     switch (nudge.type) {
       case 'positive_reinforcement':
@@ -79,7 +99,7 @@ export const NudgeBanner: React.FC<NudgeBannerProps> = ({ nudge, onDismiss, onAc
               variant="outline"
               onClick={() => {
                 if (nudge.actionUrl) {
-                  window.location.href = nudge.actionUrl;
+                  safeNavigate(nudge.actionUrl, navigate);
                 }
                 onAction?.();
               }}

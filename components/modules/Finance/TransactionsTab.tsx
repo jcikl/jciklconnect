@@ -1,7 +1,8 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Search, ChevronDown, Edit, Trash2, Link2Off, Ban } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Button, Badge } from '../../ui/Common';
+import { Button, Badge, ConfirmDialog, CONFIRM_CLOSED } from '../../ui/Common';
+import type { ConfirmState } from '../../ui/Common';
 import { LoadingState } from '../../ui/Loading';
 import { Input } from '../../ui/Form';
 import { formatCurrency } from '../../../utils/formatUtils';
@@ -114,6 +115,22 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
   hasMoreTransactions,
   setTransactionLimit,
 }) => {
+  const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
+
+  const requestDeleteTransaction = (id: string, description?: string) => {
+    setConfirmState({
+      open: true,
+      title: 'Delete Transaction',
+      message: `Are you sure you want to permanently delete "${description || 'this transaction'}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      variant: 'danger',
+      onConfirm: () => {
+        handleDeleteTransaction(id);
+        setConfirmState(CONFIRM_CLOSED);
+      },
+    });
+  };
+
   const activeFilterCount = [
     txTypeFilter !== 'All',
     txStatusFilter !== 'All',
@@ -363,7 +380,7 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
                 <Ban size={16} />
               </Button>
             ) : (
-              <Button variant="ghost" size="sm" onClick={() => handleDeleteTransaction(tx.id)} className="text-slate-600 hover:text-red-600 p-1" title="Delete transaction">
+              <Button variant="ghost" size="sm" onClick={() => requestDeleteTransaction(tx.id, tx.description)} className="text-slate-600 hover:text-red-600 p-1" title="Delete transaction">
                 <Trash2 size={16} />
               </Button>
             )}
@@ -453,7 +470,7 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
                     <Ban size={14} />
                   </button>
                 ) : (
-                  <button onClick={() => handleDeleteTransaction(tx.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors" title="Delete">
+                  <button onClick={() => requestDeleteTransaction(tx.id, tx.description)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors" title="Delete">
                     <Trash2 size={14} />
                   </button>
                 )}
@@ -713,6 +730,15 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
           )}
         </LoadingState>
       </div>
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        confirmLabel={confirmState.confirmLabel}
+        variant={confirmState.variant}
+        onConfirm={confirmState.onConfirm}
+        onCancel={() => setConfirmState(CONFIRM_CLOSED)}
+      />
     </div>
   );
 };

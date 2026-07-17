@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { BookOpen, ChevronLeft, ChevronRight, Download, ExternalLink, FileText, Printer, Share2 } from 'lucide-react';
 import { Button, Modal, useToast } from '@/components/ui/Common';
 import { PublicationService, toGoogleDrivePreviewUrl, extractGoogleDriveFileId } from '@/services/publicationService';
@@ -157,6 +158,17 @@ export const GuestEnewslettersPage = ({ onLogin, onRegister, onPageChange }: {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <Helmet>
+        <title>E-Newsletters — JCI Kuala Lumpur</title>
+        <meta name="description" content="Read JCI Kuala Lumpur's latest e-newsletters covering chapter news, events, member highlights, and community updates." />
+        <link rel="canonical" href="https://jcikl.cc/enewsletters" />
+        <meta property="og:title" content="E-Newsletters — JCI Kuala Lumpur" />
+        <meta property="og:description" content="Read JCI Kuala Lumpur's latest e-newsletters and chapter updates." />
+        <meta property="og:image" content="/JCI%20Kuala%20Lumpur-transparent.png" />
+        <meta property="og:url" content="https://jcikl.cc/enewsletters" />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:card" content="summary_large_image" />
+      </Helmet>
       <GuestHeader currentPage="enewsletters" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
 
       <main id="main-content">

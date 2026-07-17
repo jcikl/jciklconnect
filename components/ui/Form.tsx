@@ -39,6 +39,7 @@ interface RadioGroupProps {
 }
 
 export const Input: React.FC<InputProps> = ({ label, error, icon, helperText, className = '', type, onChange, onBlur, ...props }) => {
+  const inputId = (props as { id?: string }).id ?? (label ? label.replace(/\s+/g, '-').toLowerCase() + '-field' : undefined);
   const [showPassword, setShowPassword] = useState(false);
   const [emailError, setEmailError] = useState<string | undefined>(undefined);
   const isPassword = type === 'password';
@@ -106,7 +107,7 @@ export const Input: React.FC<InputProps> = ({ label, error, icon, helperText, cl
   return (
     <div className="w-full">
       {label && (
-        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+        <label htmlFor={inputId} className="block text-sm font-medium text-slate-700 mb-1.5">
           {label}
           {props.required && <span className="text-red-500 ml-1">*</span>}
         </label>
@@ -118,6 +119,7 @@ export const Input: React.FC<InputProps> = ({ label, error, icon, helperText, cl
           </div>
         )}
         <input
+          id={inputId}
           type={inputType}
           onChange={handleChange}
           onBlur={handleBlur}
@@ -158,10 +160,14 @@ export const Input: React.FC<InputProps> = ({ label, error, icon, helperText, cl
 };
 
 export const Select: React.FC<SelectProps> = ({ label, options, error, helperText, className = '', ...props }) => {
+  const selectId = (props as { id?: string }).id ?? (label ? label.replace(/\s+/g, '-').toLowerCase() + '-select' : undefined);
+  const listboxId = selectId ? selectId + '-listbox' : undefined;
   const [isOpen, setIsOpen] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
   // Support both controlled and uncontrolled
   const [internalValue, setInternalValue] = useState<string>((props.value as string) || props.defaultValue || '');
+  const [focusedIndex, setFocusedIndex] = useState<number>(-1);
+  const optionRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -215,10 +221,49 @@ export const Select: React.FC<SelectProps> = ({ label, options, error, helperTex
     };
   }, [isOpen, updateDropdownPosition]);
 
+  const handleButtonKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!isOpen) { setIsOpen(true); setFocusedIndex(0); return; }
+      const newIndex = e.key === 'ArrowDown'
+        ? Math.min(focusedIndex + 1, options.length - 1)
+        : Math.max(focusedIndex - 1, 0);
+      setFocusedIndex(newIndex);
+      optionRefs.current[newIndex]?.focus();
+    } else if (e.key === 'Escape') {
+      setIsOpen(false);
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setIsOpen(!isOpen);
+      if (!isOpen) setFocusedIndex(0);
+    }
+  };
+
+  const handleOptionKeyDown = (e: React.KeyboardEvent<HTMLDivElement>, idx: number, opt: { label: string; value: string }) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); const next = Math.min(idx + 1, options.length - 1); setFocusedIndex(next); optionRefs.current[next]?.focus(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); const prev = Math.max(idx - 1, 0); setFocusedIndex(prev); optionRefs.current[prev]?.focus(); }
+    else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectOption(opt); }
+    else if (e.key === 'Escape') { setIsOpen(false); buttonRef.current?.focus(); }
+    else if (e.key === 'Tab') { setIsOpen(false); }
+  };
+
+  const selectOption = (opt: { label: string; value: string }) => {
+    const syntheticEvent = {
+      target: { value: opt.value, name: props.name || '' },
+      currentTarget: { value: opt.value, name: props.name || '' },
+      preventDefault: () => {},
+      stopPropagation: () => {},
+    } as React.ChangeEvent<HTMLSelectElement>;
+    if (props.value === undefined) setInternalValue(opt.value);
+    props.onChange?.(syntheticEvent);
+    setIsOpen(false);
+    buttonRef.current?.focus();
+  };
+
   return (
     <div className="w-full relative" ref={containerRef}>
       {label && (
-        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+        <label htmlFor={selectId} className="block text-sm font-medium text-slate-700 mb-1.5">
           {label}
           {props.required && <span className="text-red-500 ml-1">*</span>}
         </label>
@@ -226,9 +271,14 @@ export const Select: React.FC<SelectProps> = ({ label, options, error, helperTex
       <div className="relative group">
         <button
           ref={buttonRef}
+          id={selectId}
           type="button"
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={() => { setIsOpen(!isOpen); if (!isOpen) setFocusedIndex(0); }}
+          onKeyDown={handleButtonKeyDown}
           disabled={props.disabled}
+          aria-expanded={isOpen}
+          aria-haspopup="listbox"
+          aria-controls={listboxId}
           className={`
             block w-full rounded-lg border-slate-300 shadow-sm py-2 px-3 text-left
             focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 sm:text-sm
@@ -264,6 +314,9 @@ export const Select: React.FC<SelectProps> = ({ label, options, error, helperTex
       {isOpen && createPortal(
         <div
           ref={dropdownRef}
+          id={listboxId}
+          role="listbox"
+          aria-label={label}
           className="fixed z-[9999] mt-1 rounded-lg border border-slate-200 bg-white shadow-xl py-1 animate-in fade-in zoom-in-95 duration-100"
           style={{
             top: dropdownPosition.top,
@@ -278,32 +331,15 @@ export const Select: React.FC<SelectProps> = ({ label, options, error, helperTex
               <p className="text-xs text-slate-400 italic">No options available</p>
             </div>
           ) : (
-            options.map((opt) => (
+            options.map((opt, idx) => (
               <div
                 key={opt.value}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // Create a proper synthetic event object
-                  const syntheticEvent = {
-                    target: {
-                      value: opt.value,
-                      name: props.name || ''
-                    },
-                    currentTarget: {
-                      value: opt.value,
-                      name: props.name || ''
-                    },
-                    preventDefault: () => { },
-                    stopPropagation: () => { }
-                  } as React.ChangeEvent<HTMLSelectElement>;
-
-                  if (props.value === undefined) {
-                    setInternalValue(opt.value);
-                  }
-
-                  props.onChange?.(syntheticEvent);
-                  setIsOpen(false);
-                }}
+                ref={el => { optionRefs.current[idx] = el; }}
+                role="option"
+                aria-selected={internalValue === opt.value}
+                tabIndex={-1}
+                onClick={(e) => { e.stopPropagation(); selectOption(opt); }}
+                onKeyDown={(e) => handleOptionKeyDown(e, idx, opt)}
                 className={`
                   px-3 py-2 text-sm cursor-pointer transition-colors
                   ${internalValue === opt.value
@@ -327,15 +363,17 @@ export const Select: React.FC<SelectProps> = ({ label, options, error, helperTex
 };
 
 export const Textarea: React.FC<TextareaProps> = ({ label, error, helperText, className = '', ...props }) => {
+  const textareaId = (props as { id?: string }).id ?? (label ? label.replace(/\s+/g, '-').toLowerCase() + '-textarea' : undefined);
   return (
     <div className="w-full">
       {label && (
-        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+        <label htmlFor={textareaId} className="block text-sm font-medium text-slate-700 mb-1.5">
           {label}
           {props.required && <span className="text-red-500 ml-1">*</span>}
         </label>
       )}
       <textarea
+        id={textareaId}
         className={`
           block w-full rounded-lg border-slate-300 shadow-sm py-2 px-3
           focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 sm:text-sm

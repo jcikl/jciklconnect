@@ -1,4 +1,5 @@
 import React, { lazy, Suspense } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { Button } from '@/components/ui/Common';
 import { GuestHeader } from '@/components/layout/GuestHeader';
 import { GuestFooter } from '@/components/layout/GuestFooter';
@@ -14,6 +15,17 @@ export const GuestDirectoryPage = ({ onLogin, onRegister, onPageChange }: {
 }) => {
   return (
     <div className="min-h-screen bg-slate-50">
+      <Helmet>
+        <title>Member Business Directory — JCI Kuala Lumpur</title>
+        <meta name="description" content="Discover JCI Kuala Lumpur member businesses. Connect with 200+ active members across 10+ industries and unlock exclusive member-only deals." />
+        <link rel="canonical" href="https://jcikl.cc/directory" />
+        <meta property="og:title" content="Member Business Directory — JCI Kuala Lumpur" />
+        <meta property="og:description" content="Discover JCI Kuala Lumpur member businesses across 10+ industries." />
+        <meta property="og:image" content="/JCI%20Kuala%20Lumpur-transparent.png" />
+        <meta property="og:url" content="https://jcikl.cc/directory" />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:card" content="summary_large_image" />
+      </Helmet>
       <GuestHeader currentPage="directory" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
 
       <main id="main-content">
@@ -62,11 +74,19 @@ export const GuestDirectoryPage = ({ onLogin, onRegister, onPageChange }: {
         <section className="relative py-20 bg-gradient-to-br from-jci-navy to-jci-blue overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-amber-400/10 via-transparent to-transparent pointer-events-none" />
           <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            {/* Avatar stack */}
+            {/* Avatar stack — inline SVG placeholders, no external requests */}
             <div className="flex justify-center -space-x-2.5 mb-6">
-              {['E4A&background=0097D7', 'NW&background=1a3d7c', 'LK&background=FFC300&color=1a3d7c', 'RB&background=0a5fba'].map((q, i) => (
-                <img key={i} src={`https://ui-avatars.com/api/?name=${q}&color=fff&size=48&bold=true`}
-                  className="w-11 h-11 rounded-full border-2 border-jci-navy shadow-md" alt="member" />
+              {[
+                { initials: 'EA', bg: '#0097D7', fg: '#fff' },
+                { initials: 'NW', bg: '#1a3d7c', fg: '#fff' },
+                { initials: 'LK', bg: '#FFC300', fg: '#1a3d7c' },
+                { initials: 'RB', bg: '#0a5fba', fg: '#fff' },
+              ].map(({ initials, bg, fg }, i) => (
+                <svg key={i} width="44" height="44" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg"
+                  className="rounded-full border-2 border-jci-navy shadow-md flex-shrink-0" aria-hidden="true">
+                  <circle cx="22" cy="22" r="22" fill={bg} />
+                  <text x="22" y="27" textAnchor="middle" fontSize="14" fontWeight="bold" fill={fg} fontFamily="system-ui,sans-serif">{initials}</text>
+                </svg>
               ))}
               <div className="w-11 h-11 rounded-full border-2 border-jci-navy bg-white/10 backdrop-blur flex items-center justify-center text-white text-[10px] font-black">+196</div>
             </div>

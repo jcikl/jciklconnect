@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { AlertTriangle, Info, Trash2 } from 'lucide-react';
 import { Button } from './Button';
 
@@ -23,6 +23,25 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    // Move focus to first focusable element (Cancel button) on open
+    const focusable = dialogRef.current?.querySelectorAll<HTMLElement>('button:not([disabled])');
+    if (focusable && focusable.length > 0) focusable[0].focus();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCancel();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      previousFocus?.focus();
+    };
+  }, [open, onCancel]);
+
   if (!open) return null;
 
   const icons = {
@@ -38,12 +57,18 @@ export function ConfirmDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40" onClick={onCancel} />
-      <div className="relative bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-md p-6 flex flex-col gap-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onCancel} aria-hidden="true" />
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-dialog-title"
+        className="relative bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-md p-6 flex flex-col gap-4"
+      >
         <div className="flex items-start gap-3">
-          <div className="shrink-0 mt-0.5">{icons[variant]}</div>
+          <div className="shrink-0 mt-0.5" aria-hidden="true">{icons[variant]}</div>
           <div>
-            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">{title}</h3>
+            <h3 id="confirm-dialog-title" className="text-base font-semibold text-slate-900 dark:text-slate-100">{title}</h3>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{message}</p>
           </div>
         </div>

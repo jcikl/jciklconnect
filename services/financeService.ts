@@ -2264,7 +2264,10 @@ export class FinanceService {
       // E4: invalidate members cache so UI reflects the updated dues status immediately
       MembersService.invalidateMembersCache();
 
-      console.log(`Synced membership for member ${memberId} year ${year}. Status: ${status}, Amount: ${totalAmount}`);
+      // SEC-A-007: Gate financial PII log to dev only.
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`Synced membership for member ${memberId} year ${year}. Status: ${status}, Amount: ${totalAmount}`);
+      }
     } catch (error) {
       console.error('Error syncing member membership:', error);
       // E5: re-throw so callers know the sync failed

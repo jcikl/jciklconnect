@@ -43,7 +43,7 @@ export const WhapiConfigView: React.FC<{ embedded?: boolean }> = ({ embedded }) 
     }
     const savedGroupId = localStorage.getItem('whapi_sync_group_id');
     if (savedGroupId) setGroupId(savedGroupId);
-    const savedAdminPhone = localStorage.getItem('whapi_admin_phone');
+    const savedAdminPhone = sessionStorage.getItem('whapi_admin_phone');
     if (savedAdminPhone) setAdminPhone(savedAdminPhone);
   }, []);
 
@@ -432,7 +432,7 @@ export const WhapiConfigView: React.FC<{ embedded?: boolean }> = ({ embedded }) 
                   value={adminPhone}
                   onChange={(e) => {
                     setAdminPhone(e.target.value);
-                    localStorage.setItem('whapi_admin_phone', e.target.value);
+                    sessionStorage.setItem('whapi_admin_phone', e.target.value);
                   }}
                   placeholder="e.g. +60123456789"
                   className="w-full text-xs"

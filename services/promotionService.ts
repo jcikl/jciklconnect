@@ -890,7 +890,10 @@ export class PromotionService {
         await MembersService.updateMember(memberId, { membership: updatedMembership });
       }
     }
-    console.log(`Updated member ${memberId} dues to RM${newAmount}`);
+    // SEC-A-008: Gate financial PII log to dev only.
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Updated member ${memberId} dues to RM${newAmount}`);
+    }
   }
 
   private static async savePromotionHistory(promotion: PromotionHistory): Promise<void> {
@@ -926,7 +929,10 @@ export class PromotionService {
       retryCount: 0
     };
 
-    console.log(`Sent promotion notification to ${notification.memberEmail}`);
+    // SEC-A-006: Do not log email addresses in production (PII).
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Sent promotion notification id=${notification.id ?? '?'}`);
+    }
   }
 
   private static async recordMemberActivity(

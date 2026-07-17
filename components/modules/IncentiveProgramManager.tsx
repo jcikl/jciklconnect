@@ -559,8 +559,8 @@ export const IncentiveProgramManager: React.FC = () => {
                                                             </div>
                                                         </div>
                                                         <div className="flex gap-1">
-                                                            <button onClick={(e) => { e.stopPropagation(); handleOpenStandardModal(std); }} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"><Edit size={16} /></button>
-                                                            <button onClick={(e) => { e.stopPropagation(); handleDeleteStandard(std.id!); }} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"><Trash2 size={16} /></button>
+                                                            <button onClick={(e) => { e.stopPropagation(); handleOpenStandardModal(std); }} aria-label="Edit standard" className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"><Edit size={16} aria-hidden="true" /></button>
+                                                            <button onClick={(e) => { e.stopPropagation(); handleDeleteStandard(std.id!); }} aria-label="Delete standard" className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"><Trash2 size={16} aria-hidden="true" /></button>
                                                         </div>
                                                     </div>
                                                 ))}

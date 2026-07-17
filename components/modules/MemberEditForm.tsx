@@ -561,6 +561,8 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                 <input
                   name="attendanceRate"
                   type="number"
+                  min={0}
+                  max={100}
                   value={String(formValues.attendanceRate)}
                   onChange={(e) => { const v = parseInt(e.target.value, 10); handleChange('attendanceRate', isNaN(v) ? 0 : v); }}
                   disabled={!canEditSystemStatus}

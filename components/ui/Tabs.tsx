@@ -57,6 +57,7 @@ export const Tabs: React.FC<TabsProps> = ({
       <select
         value={activeTab}
         onChange={e => onTabChange(e.target.value)}
+        aria-label="Navigate sections"
         className="w-full text-sm font-semibold border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:ring-2 focus:ring-jci-blue outline-none appearance-none cursor-pointer text-slate-800"
       >
         {normalized.map(t => (
@@ -80,11 +81,13 @@ export const Tabs: React.FC<TabsProps> = ({
         onScroll={fullWidth ? undefined : checkScroll}
         className={`${mobileFallback === 'select' ? 'hidden md:block' : ''} ${fullWidth ? 'py-1' : 'overflow-x-auto no-scrollbar scroll-smooth py-1'}`}
       >
-        <nav className={`flex space-x-1.5 p-1 bg-slate-100 border border-slate-200/50 rounded-xl ${fullWidth ? 'w-full' : 'w-max'}`} aria-label="Tabs">
+        <nav role="tablist" className={`flex space-x-1.5 p-1 bg-slate-100 border border-slate-200/50 rounded-xl ${fullWidth ? 'w-full' : 'w-max'}`} aria-label="Tabs">
           {normalized.map((tab) => (
             <button
               key={tab.id}
               type="button"
+              role="tab"
+              aria-selected={activeTab === tab.id}
               onClick={(e) => { e.preventDefault(); onTabChange(tab.id); }}
               className={`whitespace-nowrap px-4 py-2 rounded-lg font-bold text-xs md:text-sm transition-all flex items-center gap-2 ${fullWidth ? 'flex-1 justify-center' : 'flex-shrink-0'} ${activeTab === tab.id ? 'bg-jci-blue text-white shadow-sm border border-slate-200/20' : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'}`}
             >

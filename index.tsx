@@ -7,6 +7,7 @@ import { AuthProvider } from './hooks/useAuth';
 import { ToastProvider } from './components/ui/Common';
 import { errorLoggingService } from './services/errorLoggingService';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { HelmetProvider } from 'react-helmet-async';
 
 // TODO BUNDLE-004: @tanstack/react-query is loaded for all users but currently only used by
 // useGamification.ts. Either migrate the top 5 heaviest data hooks (useMembers, useEvents,
@@ -48,13 +49,15 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <AuthProvider>
-          <App />
-        </AuthProvider>
-      </ToastProvider>
-    </QueryClientProvider>
+    <HelmetProvider>
+      <QueryClientProvider client={queryClient}>
+        <ToastProvider>
+          <AuthProvider>
+            <App />
+          </AuthProvider>
+        </ToastProvider>
+      </QueryClientProvider>
+    </HelmetProvider>
   </React.StrictMode>
 );
 

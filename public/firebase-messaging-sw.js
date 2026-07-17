@@ -16,10 +16,28 @@ firebase.initializeApp({
 
 // Ensure the new SW takes control immediately on update
 self.addEventListener('install', event => {
-  event.waitUntil(self.skipWaiting());
+  // ERR-R-003: precache the app shell so navigation works offline.
+  event.waitUntil(
+    caches.open('app-shell-v1').then(cache => cache.add('/index.html')).then(() => self.skipWaiting())
+  );
 });
 self.addEventListener('activate', event => {
   event.waitUntil(self.clients.claim());
+});
+
+// ERR-R-003: intercept navigation requests and serve cached /index.html when offline.
+// This enables deep links (/members, /events, /finance, etc.) to work without a network connection.
+self.addEventListener('fetch', event => {
+  const req = event.request;
+  // Only handle same-origin navigation requests (page loads / history navigations).
+  if (req.mode === 'navigate' && new URL(req.url).origin === self.location.origin) {
+    event.respondWith(
+      fetch(req).catch(() =>
+        caches.match('/index.html').then(cached => cached || fetch('/index.html'))
+      )
+    );
+  }
+  // All other requests (API, Firestore, Firebase SDK scripts) fall through to the browser default.
 });
 
 const messaging = firebase.messaging();

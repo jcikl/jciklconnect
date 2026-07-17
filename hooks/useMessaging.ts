@@ -146,13 +146,6 @@ export const useMessaging = () => {
     }
   }, [loadMessages]);
 
-  // Initialize
-  useEffect(() => {
-    if (member) {
-      loadConversations();
-    }
-  }, [member, loadConversations]);
-
   // Subscribe to real-time updates
   useEffect(() => {
     if (!member || isDevMode() || !selectedConversation?.id) {
@@ -166,9 +159,10 @@ export const useMessaging = () => {
     return () => {
       unsubscribe();
     };
-  }, [member, selectedConversation?.id]);
+  }, [member?.id, selectedConversation?.id]);
 
-  // Subscribe to conversation updates
+  // Subscribe to conversation updates — delivers the initial snapshot as its first callback,
+  // so a separate loadConversations() GET is not needed and was removed (SUB-001).
   useEffect(() => {
     if (!member || isDevMode()) {
       return;
@@ -181,7 +175,7 @@ export const useMessaging = () => {
     return () => {
       unsubscribe();
     };
-  }, [member]);
+  }, [member?.id]);
 
   return {
     conversations,

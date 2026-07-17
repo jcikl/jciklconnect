@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { Users, Briefcase, Sparkles, Award, Clock, ChevronDown } from 'lucide-react';
 import { Button, Card } from '@/components/ui/Common';
 import { BoardManagementService } from '@/services/boardManagementService';
@@ -339,6 +340,17 @@ export const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <Helmet>
+        <title>About Us — JCI Kuala Lumpur</title>
+        <meta name="description" content="Learn about JCI Kuala Lumpur — Malaysia's first Junior Chamber chapter founded in 1954, developing young leaders through business, community, and international opportunities." />
+        <link rel="canonical" href="https://jcikl.cc/about" />
+        <meta property="og:title" content="About Us — JCI Kuala Lumpur" />
+        <meta property="og:description" content="Learn about JCI Kuala Lumpur — Malaysia's first Junior Chamber chapter founded in 1954." />
+        <meta property="og:image" content="/JCI%20Kuala%20Lumpur-transparent.png" />
+        <meta property="og:url" content="https://jcikl.cc/about" />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:card" content="summary_large_image" />
+      </Helmet>
       <GuestHeader currentPage="about" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
 
       <main id="main-content">
