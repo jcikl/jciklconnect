@@ -273,6 +273,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   }, []);
   const currentMonth = parseInt(mytTodayStr.slice(0, 2), 10) - 1; // 0-indexed for compat
   const currentDay = parseInt(mytTodayStr.slice(3), 10);
+  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }));
   const getDob = (m: any): string | undefined =>
     m.general?.dob || m.dob || m.dateOfBirth;
 
