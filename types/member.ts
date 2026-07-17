@@ -79,9 +79,11 @@ export interface CareerMilestone {
 
 export interface BoardPosition {
   year: number;
-  position: string;
-  startDate: string;
-  endDate: string;
+  role: string;
+  position?: string;
+  loId?: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface BoardTermSettings {
@@ -230,7 +232,7 @@ export interface Member {
     currentBoardYear?: number;
     currentBoardPosition?: string;
     isCurrentBoardMember: boolean;
-    boardHistory: { year: number; role: string; loId?: string }[];
+    boardHistory: BoardPosition[];
     points: number;
     /** @deprecated legacy hand-filled percentage */
     attendanceRate: number;
@@ -358,7 +360,7 @@ export interface Member {
   badges?: Badge[];
   mentorId?: string;
   menteeIds?: string[];
-  boardHistory?: { year: number; role: string; loId?: string }[];
+  boardHistory?: BoardPosition[];
   careerHistory?: CareerMilestone[];
   /** @deprecated use jciCareer.leaderboardVisibility */
   leaderboardVisibility?: boolean | string;

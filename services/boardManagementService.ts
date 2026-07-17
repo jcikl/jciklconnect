@@ -851,6 +851,7 @@ export class BoardManagementService {
               if (member.currentBoardYear && member.currentBoardPosition) {
                 const archivedPosition: BoardPosition = {
                   year: member.currentBoardYear,
+                  role: member.currentBoardPosition,
                   position: member.currentBoardPosition,
                   startDate: `${member.currentBoardYear}-01-01`,
                   endDate: `${member.currentBoardYear}-12-31`,
@@ -925,6 +926,7 @@ export class BoardManagementService {
             const boardHistory = member.boardHistory || [];
             const newPosition: BoardPosition = {
               year,
+              role: assignment.position,
               position: assignment.position,
               startDate: `${year}-01-01`,
               endDate: `${year}-12-31`,
