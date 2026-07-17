@@ -296,6 +296,18 @@ export class BoardManagementService {
         role: UserRole.MEMBER,
       });
       await this.clearMemberCurrentBoardStatus(boardMember.memberId);
+
+      // Best-effort notification — must not roll back the already-committed updates
+      try {
+        await CommunicationService.createNotification({
+          memberId: boardMember.memberId,
+          title: 'Board Term Ended',
+          message: `Your board term as ${boardMember.position} has ended. Thank you for your service!`,
+          type: 'info',
+        });
+      } catch (notifErr) {
+        console.warn('[BoardManagementService.archiveBoardMember] Notification failed:', notifErr);
+      }
     } catch (error) {
       logServiceError(
         error instanceof Error ? error : new Error(String(error)),
@@ -335,6 +347,18 @@ export class BoardManagementService {
       });
       await batch.commit();
       MembersService.invalidateMembersCache();
+
+      // Best-effort notification — must not roll back the committed batch
+      try {
+        await CommunicationService.createNotification({
+          memberId: boardMember.memberId,
+          title: 'Board Position Assigned',
+          message: `You have been assigned the board position of ${boardMember.position} for ${boardMember.term}.`,
+          type: 'success',
+        });
+      } catch (notifErr) {
+        console.warn('[BoardManagementService.activateBoardMember] Notification failed:', notifErr);
+      }
     } catch (error) {
       logServiceError(
         error instanceof Error ? error : new Error(String(error)),

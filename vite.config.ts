@@ -26,9 +26,8 @@ export default defineConfig(({ mode }) => {
         injectManifest: {
           injectionPoint: undefined,
         },
-        workbox: {
-          navigateFallback: '/index.html',
-        },
+        // Navigation fallback is handled manually in firebase-messaging-sw.js (lines 30-41).
+        // The workbox block only applies to generateSW strategy, not injectManifest.
         manifest: {
           name: 'JCI Kuala Lumpur',
           short_name: 'JCI KL',
@@ -41,7 +40,6 @@ export default defineConfig(({ mode }) => {
           start_url: '/',
           icons: [
             { src: '/favicon-128x128.png', sizes: '128x128', type: 'image/png' },
-            // TODO: generate favicon-192x192.png from favicon-256x256.png
             { src: '/favicon-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable any' },
             { src: '/favicon-256x256.png', sizes: '256x256', type: 'image/png' },
             { src: '/favicon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },

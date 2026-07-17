@@ -175,7 +175,8 @@ export const autoInitiateDuesRenewal = functions.pubsub
   .schedule('0 0 1 10 *')
   .timeZone('Asia/Kuala_Lumpur')
   .onRun(async () => {
-    const targetYear = new Date().getFullYear() + 1;
+    const nowMYT = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }));
+    const targetYear = nowMYT.getFullYear() + 1;
     const prevYear = targetYear - 1;
     console.log(`[autoInitiateDuesRenewal] Initiating dues renewal for ${targetYear}`);
 
@@ -317,7 +318,8 @@ export const sendAnnualDuesReminders = functions.pubsub
   .schedule('0 10 1 1 *')
   .timeZone('Asia/Kuala_Lumpur')
   .onRun(async () => {
-    const year = new Date().getFullYear();
+    const nowMYT = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }));
+    const year = nowMYT.getFullYear();
     console.log(`[sendAnnualDuesReminders] Sending dues reminders for ${year}`);
 
     const membersSnap = await db.collection('members')

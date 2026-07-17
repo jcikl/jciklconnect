@@ -20,6 +20,8 @@ import { MembersService } from './membersService';
 import { isMalaysianIC, getBirthPlaceFromIC, getDateOfBirthFromIC, getGenderFromIC } from '../utils/malaysianIdUtils';
 import { EventsService } from './eventsService';
 
+export type RawImportRow = Record<string, string>;
+
 export class DataImportExportService {
   private static validationRules: Record<string, DataValidationRule[]> = {
     members: [
@@ -57,7 +59,7 @@ export class DataImportExportService {
   /**
    * Parse uploaded file and extract data
    */
-  static async parseFile(file: File): Promise<any[]> {
+  static async parseFile(file: File): Promise<RawImportRow[]> {
     return new Promise((resolve, reject) => {
       const fileExtension = file.name.split('.').pop()?.toLowerCase();
 
@@ -71,7 +73,7 @@ export class DataImportExportService {
             if (results.errors.length > 0) {
               reject(new Error(`CSV parsing errors: ${results.errors.map(e => e.message).join(', ')}`));
             } else {
-              resolve(results.data as any[]);
+              resolve(results.data as RawImportRow[]);
             }
           },
           error: (error) => reject(error)
@@ -99,8 +101,8 @@ export class DataImportExportService {
             // Convert to objects with headers
             const headers = (jsonData[0] as string[]).map(h => String(h).trim());
             const rows = jsonData.slice(1) as any[][];
-            const objects = rows.map(row => {
-              const obj: any = {};
+            const objects: RawImportRow[] = rows.map(row => {
+              const obj: RawImportRow = {};
               headers.forEach((header, index) => {
                 obj[header] = row[index] ? String(row[index]).trim() : '';
               });
@@ -123,7 +125,7 @@ export class DataImportExportService {
   /**
    * Parse CSV content string
    */
-  static async parseCSVContent(content: string): Promise<any[]> {
+  static async parseCSVContent(content: string): Promise<RawImportRow[]> {
     return new Promise((resolve, reject) => {
       Papa.parse(content, {
         header: true,
@@ -134,7 +136,7 @@ export class DataImportExportService {
           if (results.errors.length > 0) {
             reject(new Error(`CSV parsing errors: ${results.errors.map(e => e.message).join(', ')}`));
           } else {
-            resolve(results.data as any[]);
+            resolve(results.data as RawImportRow[]);
           }
         },
         error: (error) => reject(error)

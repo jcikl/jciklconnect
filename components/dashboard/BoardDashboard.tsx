@@ -424,11 +424,11 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
   }, [members, duesStatusFilter, insightSearch]);
 
   const birthdaysToday = useMemo(() => {
-    const today = new Date();
+    const myt = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }));
+    const mmdd = `${String(myt.getMonth() + 1).padStart(2, '0')}-${String(myt.getDate()).padStart(2, '0')}`;
     return members.filter(m => {
       if (!m.dateOfBirth) return false;
-      const bday = new Date(m.dateOfBirth);
-      return bday.getDate() === today.getDate() && bday.getMonth() === today.getMonth();
+      return m.dateOfBirth.slice(5, 10) === mmdd;
     });
   }, [members]);
 

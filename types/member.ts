@@ -259,6 +259,10 @@ export interface Member {
   };
   createdAt?: string | Timestamp | Date;
   updatedAt?: string | Timestamp | Date;
+  /** UID of the admin who last changed this member's role */
+  roleChangedBy?: string;
+  /** ISO timestamp of the last role change */
+  roleChangedAt?: string | Timestamp;
   /** @deprecated use jciCareer.radarStats */
   radarStats?: RadarStats;
   /** @deprecated use jciCareer.radarStatsByYear */

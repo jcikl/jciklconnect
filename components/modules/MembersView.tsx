@@ -106,7 +106,6 @@ const DUES_STATUS_LABEL: Record<string, string> = { Paid: 'Paid', Pending: 'Pend
 export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMemberId?: string | null; onClearSelection?: () => void }> = ({ searchQuery, initialSelectedMemberId, onClearSelection }) => {
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(initialSelectedMemberId ?? null);
   const [isAddModalOpen, setAddModalOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [activeTab, setActiveTab] = useState<
@@ -252,7 +251,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
   // Reset to page 1 when search or column filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, searchQuery, roleFilters, membershipTypeFilters]);
+  }, [searchQuery, roleFilters, membershipTypeFilters]);
 
   // Handle Ctrl+A for Select All on current page
   useEffect(() => {
@@ -514,7 +513,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
 
           <div>
             {activeTab === 'directory' && (
-              <LoadingState loading={loading} error={error} empty={filteredMembers.length === 0 && roleFilters.length === 0 && membershipTypeFilters.length === 0 && !searchTerm && !searchQuery} emptyMessage="No members found">
+              <LoadingState loading={loading} error={error} empty={filteredMembers.length === 0 && roleFilters.length === 0 && membershipTypeFilters.length === 0 && !searchQuery} emptyMessage="No members found">
                 <MemberTable
                   members={paginatedMembers}
                   onSelect={setSelectedMemberId}
@@ -530,8 +529,13 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
                   membershipTypeCounts={membershipTypeCounts}
                   roleCounts={roleCounts}
                 />
-                {filteredMembers.length === 0 && (roleFilters.length > 0 || membershipTypeFilters.length > 0 || searchTerm || searchQuery) && (
-                  <div className="py-12 text-center text-slate-400 text-sm">No members match the current filters.</div>
+                {filteredMembers.length === 0 && (roleFilters.length > 0 || membershipTypeFilters.length > 0 || searchQuery) && (
+                  <div className="flex flex-col items-center gap-3 py-12 text-center text-slate-400 text-sm">
+                    <span>No members match the current filters.</span>
+                    <Button variant="outline" size="sm" onClick={() => { setRoleFilters([]); setMembershipTypeFilters([]); }}>
+                      Clear filters
+                    </Button>
+                  </div>
                 )}
                 {filteredMembers.length > 0 && (
                   <div className="mt-4">

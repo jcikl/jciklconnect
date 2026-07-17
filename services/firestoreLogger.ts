@@ -16,7 +16,7 @@
  */
 
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { db, auth } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { isDevMode } from '../utils/devMode';
 
@@ -78,6 +78,7 @@ async function flush() {
   try {
     await addDoc(collection(db, COLLECTIONS.SYSTEM_LOGS), {
       flushedAt: Timestamp.now(),
+      userId: auth?.currentUser?.uid ?? null,
       windowMs: batch.length > 0 ? batch[batch.length - 1].timestamp - batch[0].timestamp : 0,
       totalOps: batch.length,
       entries: entries.map(e => {

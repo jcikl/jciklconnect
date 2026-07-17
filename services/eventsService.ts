@@ -135,7 +135,7 @@ export class EventsService {
   }
 
   // Create new event
-  static async createEvent(eventData: Omit<Event, 'id'>): Promise<string> {
+  static async createEvent(eventData: Omit<Event, 'id'>, currentUserId?: string): Promise<string> {
     return withDevMode(
       () => {
         const newId = `mock-event-${Date.now()}`;
@@ -167,6 +167,7 @@ export class EventsService {
             status: 'Upcoming' as const,
             createdAt: Timestamp.now(),
             updatedAt: Timestamp.now(),
+            ...(currentUserId && { createdBy: currentUserId }),
           };
           if (eventData.maxAttendees != null) payload.maxAttendees = eventData.maxAttendees;
           if (eventData.endDate != null) payload.endDate = eventData.endDate;
@@ -188,7 +189,7 @@ export class EventsService {
   }
 
   // Update event
-  static async updateEvent(eventId: string, updates: Partial<Event>): Promise<void> {
+  static async updateEvent(eventId: string, updates: Partial<Event>, currentUserId?: string): Promise<void> {
     return withDevMode(
       () => {
         const index = this.mockEvents.findIndex(e => e.id === eventId);
@@ -199,7 +200,10 @@ export class EventsService {
       async () => {
         try {
           const eventRef = doc(db, COLLECTIONS.PROJECTS, eventId);
-          const updateData: Record<string, unknown> = { updatedAt: Timestamp.now() };
+          const updateData: Record<string, unknown> = {
+            updatedAt: Timestamp.now(),
+            ...(currentUserId && { updatedBy: currentUserId }),
+          };
           for (const [k, v] of Object.entries(updates)) {
             if (v !== undefined) {
               if (k === 'type') updateData.eventType = v;
@@ -559,6 +563,25 @@ export class EventsService {
           updatedAt: Timestamp.now(),
         });
         this.invalidateEventsCache();
+
+        // Best-effort notifications to all members whose registrations were cancelled
+        if (active.length > 0) {
+          try {
+            const { CommunicationService } = await import('./communicationService');
+            await Promise.allSettled(
+              active.map(reg =>
+                CommunicationService.createNotification({
+                  memberId: reg.memberId,
+                  title: 'Event Cancelled',
+                  message: `The event "${event.title || event.name || eventId}" has been cancelled. Any fees paid will be refunded.`,
+                  type: 'warning',
+                })
+              )
+            );
+          } catch (notifErr) {
+            console.warn('[EventsService.cancelEvent] Notifications failed (cancellation already committed):', notifErr);
+          }
+        }
       }
     );
   }

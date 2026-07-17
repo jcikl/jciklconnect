@@ -189,7 +189,10 @@ export class ProjectsService {
           }
 
           // Strip out undefined values to avoid Firestore errors
-          const updateData: Record<string, unknown> = { updatedAt: Timestamp.now() };
+          const updateData: Record<string, unknown> = {
+            updatedAt: Timestamp.now(),
+            ...(currentUserId && { updatedBy: currentUserId }),
+          };
           Object.entries(updates).forEach(([key, value]) => {
             if (value !== undefined) {
               updateData[key] = value;

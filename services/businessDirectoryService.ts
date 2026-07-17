@@ -9,6 +9,7 @@ import {
   query,
   where,
   orderBy,
+  limit,
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -143,11 +144,16 @@ export class BusinessDirectoryService {
           // Unauthenticated path: read from the public denormalised collection (cached).
           return apiCache.getOrSet(CACHE_KEY_ALL_PUBLIC, async () => {
             try {
-              const snapshot = await getDocs(collection(db, COLLECTIONS.PUBLIC_BUSINESS_LISTINGS));
+              const snapshot = await getDocs(
+                query(
+                  collection(db, COLLECTIONS.PUBLIC_BUSINESS_LISTINGS),
+                  orderBy('companyName'),
+                  limit(200)
+                )
+              );
               return snapshot.docs
                 .map((docSnap) => mapListingDoc(docSnap.id, docSnap.data() as Record<string, unknown>))
-                .filter((p) => p.companyName?.trim())
-                .sort((a, b) => a.companyName.localeCompare(b.companyName));
+                .filter((p) => p.companyName?.trim());
             } catch (error) {
               errorLoggingService.logError(error as Error, {
                 component: 'BusinessDirectoryService',

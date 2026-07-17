@@ -75,6 +75,7 @@ export interface Transaction {
   toyyibBillCode?: string;
   reversalOf?: string;
   reversalReason?: string;
+  reversedBy?: string;
 }
 
 export interface BankAccount {

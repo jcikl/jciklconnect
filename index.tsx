@@ -46,19 +46,21 @@ if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
 
+const appTree = (
+  <HelmetProvider>
+    <QueryClientProvider client={queryClient}>
+      <ToastProvider>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </ToastProvider>
+    </QueryClientProvider>
+  </HelmetProvider>
+);
+
 const root = ReactDOM.createRoot(rootElement);
 root.render(
-  <React.StrictMode>
-    <HelmetProvider>
-      <QueryClientProvider client={queryClient}>
-        <ToastProvider>
-          <AuthProvider>
-            <App />
-          </AuthProvider>
-        </ToastProvider>
-      </QueryClientProvider>
-    </HelmetProvider>
-  </React.StrictMode>
+  import.meta.env.DEV ? <React.StrictMode>{appTree}</React.StrictMode> : appTree
 );
 
 if ('serviceWorker' in navigator) {

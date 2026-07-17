@@ -180,7 +180,9 @@ class ErrorLoggingService {
 
   private getCurrentUserId(): string | undefined {
     try {
-      return localStorage.getItem('userId') || undefined;
+      // Dynamic import avoids a circular dependency at module-load time
+      const { auth } = require('../config/firebase');
+      return auth?.currentUser?.uid ?? undefined;
     } catch {
       return undefined;
     }

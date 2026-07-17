@@ -212,6 +212,19 @@ export class GamificationService {
                         }
                     }
 
+                    // Best-effort notification — must not roll back the committed badge
+                    try {
+                        const { CommunicationService } = await import('./communicationService');
+                        await CommunicationService.createNotification({
+                            memberId,
+                            title: 'Badge Awarded',
+                            message: `You have been awarded the "${award.name}" badge!`,
+                            type: 'success',
+                        });
+                    } catch (notifErr) {
+                        console.warn('[awardAward] Notification failed after badge committed:', notifErr);
+                    }
+
                     return badgeAwardRef.id;
                 } catch (error) {
                     console.error('Error awarding recognition:', error);
@@ -219,6 +232,69 @@ export class GamificationService {
                 }
             }
         );
+    }
+
+    /**
+     * For each active award definition, resolve the member's current progress value
+     * for that criteria type, then award any badge whose threshold is newly crossed
+     * and has not already been awarded to this member.
+     *
+     * Supported criteria types: points_threshold, event_count / event_attendance,
+     * project_count / project_completion.
+     * Unsupported types (consecutive_attendance, role_held, training_completed,
+     * recruitment_count) are silently skipped — they require richer data sources.
+     */
+    static async checkEligibleBadgesForMember(memberId: string): Promise<void> {
+        const [awards, existingAwardsSnap, memberDoc] = await Promise.all([
+            GamificationService.getAllAwards(),
+            getDocs(query(
+                collection(db, COLLECTIONS.BADGE_AWARDS),
+                where('memberId', '==', memberId)
+            )),
+            (async () => {
+                const { MembersService } = await import('./membersService');
+                return MembersService.getMemberById(memberId);
+            })(),
+        ]);
+
+        const alreadyAwardedIds = new Set(existingAwardsSnap.docs.map(d => d.data().awardId));
+        const memberPoints: number = (memberDoc as any)?.points || 0;
+
+        for (const award of awards) {
+            if (!award.id || alreadyAwardedIds.has(award.id)) continue;
+
+            const criteriaType = award.criteria?.type;
+            let progressValue = 0;
+
+            if (criteriaType === 'points_threshold') {
+                progressValue = memberPoints;
+            } else if (criteriaType === 'event_count' || criteriaType === 'event_attendance') {
+                const snap = await getDocs(query(
+                    collection(db, COLLECTIONS.POINTS),
+                    where('memberId', '==', memberId),
+                    where('category', '==', 'event_attendance')
+                ));
+                progressValue = snap.size;
+            } else if (criteriaType === 'project_count' || criteriaType === 'project_completion') {
+                const snap = await getDocs(query(
+                    collection(db, COLLECTIONS.POINTS),
+                    where('memberId', '==', memberId),
+                    where('category', '==', 'project_task')
+                ));
+                progressValue = snap.size;
+            } else {
+                // Criteria type not yet implemented — skip
+                continue;
+            }
+
+            if (progressValue >= award.criteria.value) {
+                try {
+                    await GamificationService.awardAward(award.id, memberId, 'system');
+                } catch (err) {
+                    console.error('[checkEligibleBadgesForMember] Failed to award badge', award.id, err);
+                }
+            }
+        }
     }
 
     static async getAwardById(awardId: string): Promise<AwardDefinition | null> {

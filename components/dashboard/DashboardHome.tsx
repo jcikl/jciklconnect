@@ -264,10 +264,15 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
 
-  // Birthday calculation
-  const now = new Date();
-  const currentMonth = now.getMonth();
-  const currentDay = now.getDate();
+  // Birthday calculation — all comparisons use MYT midnight to avoid UTC-offset misfires
+  const mytTodayStr = React.useMemo(() => {
+    const myt = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }));
+    const m = String(myt.getMonth() + 1).padStart(2, '0');
+    const d = String(myt.getDate()).padStart(2, '0');
+    return `${m}-${d}`; // "MM-DD"
+  }, []);
+  const currentMonth = parseInt(mytTodayStr.slice(0, 2), 10) - 1; // 0-indexed for compat
+  const currentDay = parseInt(mytTodayStr.slice(3), 10);
   const getDob = (m: any): string | undefined =>
     m.general?.dob || m.dob || m.dateOfBirth;
 
@@ -276,12 +281,13 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       .filter(m => {
         const dob = getDob(m);
         if (!dob) return false;
-        const d = new Date(dob);
-        return d.getMonth() === currentMonth;
+        // Compare only MM portion of the stored "YYYY-MM-DD" string
+        const dobMonth = parseInt(dob.slice(5, 7), 10) - 1; // 0-indexed
+        return dobMonth === currentMonth;
       })
       .sort((a, b) => {
-        const dayA = new Date(getDob(a)!).getDate();
-        const dayB = new Date(getDob(b)!).getDate();
+        const dayA = parseInt((getDob(a) || '').slice(8, 10), 10);
+        const dayB = parseInt((getDob(b) || '').slice(8, 10), 10);
         // Passed birthdays sink to the bottom; upcoming/today stay on top (both ascending)
         const passedA = dayA < currentDay ? 1 : 0;
         const passedB = dayB < currentDay ? 1 : 0;
@@ -294,17 +300,16 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     return birthdayMembers.filter(m => {
       const dob = getDob(m);
       if (!dob) return false;
-      const d = new Date(dob);
-      return d.getDate() === currentDay;
+      // Compare "MM-DD" slices directly — no Date parsing needed
+      return dob.slice(5, 10) === mytTodayStr;
     });
-  }, [birthdayMembers, currentDay]);
+  }, [birthdayMembers, mytTodayStr]);
 
   const nextBirthdayMember = React.useMemo(() => {
     const nextBirthdays = birthdayMembers.filter(m => {
       const dob = getDob(m);
       if (!dob) return false;
-      const d = new Date(dob);
-      return d.getDate() > currentDay;
+      return parseInt(dob.slice(8, 10), 10) > currentDay;
     });
     return nextBirthdays.length > 0 ? nextBirthdays[0] : null;
   }, [birthdayMembers, currentDay]);

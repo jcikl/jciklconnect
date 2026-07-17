@@ -3,7 +3,26 @@ import { getAuth } from 'firebase/auth';
 import { db } from '../config/firebase';
 import { COLLECTIONS, TOYYIB_CONFIG } from '../config/constants';
 import { errorLoggingService } from './errorLoggingService';
+import { apiCache } from './cacheService';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+
+export interface ToyyibApiCategoryRaw {
+  CategoryCode: string;
+  CategoryName: string;
+  categoryDescription?: string;
+  CategoryDescription?: string;
+  categoryStatus?: string;
+  CategoryStatus?: string;
+}
+
+export interface ToyyibApiSettlement {
+  billCode: string;
+  billpaymentSettlement?: string;
+  billpaymentStatus?: string;
+  billpaymentAmount?: number;
+  billPaymentDate?: string;
+  [key: string]: string | number | undefined;
+}
 
 export interface CreateBillParams {
   billName: string;
@@ -185,21 +204,27 @@ export class ToyyibService {
   // Category codes are stored in Firestore (toyyibCategories collection), seeded with CATEGORY_CODE.
 
   static async getCategories(): Promise<ToyyibCategory[]> {
-    // Load known category codes from Firestore, plus bill aggregates in parallel
-    const [snap, billsSnap] = await Promise.all([
+    // Load known category codes from Firestore, plus bill aggregates in parallel.
+    // Bills scan is cached for 5 min to avoid a full unbounded collection read on every call.
+    const BILLS_CACHE_KEY = 'toyyib:billStats';
+    const BILLS_CACHE_TTL = 5 * 60 * 1000;
+
+    const [snap, billStats] = await Promise.all([
       getDocs(collection(db, COLLECTIONS.TOYYIB_CATEGORIES)),
-      getDocs(collection(db, COLLECTIONS.TOYYIB_BILLS)),
+      apiCache.getOrSet(BILLS_CACHE_KEY, async () => {
+        const billsSnap = await getDocs(collection(db, COLLECTIONS.TOYYIB_BILLS));
+        const stats: Record<string, { count: number; total: number }> = {};
+        billsSnap.docs.forEach(d => {
+          const b = d.data() as ToyyibBillRecord;
+          if (!b.categoryCode) return;
+          if (!stats[b.categoryCode]) stats[b.categoryCode] = { count: 0, total: 0 };
+          stats[b.categoryCode].count += 1;
+          stats[b.categoryCode].total += b.billAmount || 0;
+        });
+        return stats;
+      }, BILLS_CACHE_TTL),
     ]);
 
-    // Aggregate bills by categoryCode
-    const billStats: Record<string, { count: number; total: number }> = {};
-    billsSnap.docs.forEach(d => {
-      const b = d.data() as ToyyibBillRecord;
-      if (!b.categoryCode) return;
-      if (!billStats[b.categoryCode]) billStats[b.categoryCode] = { count: 0, total: 0 };
-      billStats[b.categoryCode].count += 1;
-      billStats[b.categoryCode].total += b.billAmount || 0;
-    });
     // Build a map of Firestore metadata (linked fields, membershipType) keyed by code
     const firestoreMeta: Record<string, any> = {};
     snap.docs.forEach(d => { firestoreMeta[d.id] = d.data(); });
@@ -263,7 +288,7 @@ export class ToyyibService {
     await setDoc(doc(db, COLLECTIONS.TOYYIB_CATEGORIES, cat.categoryCode), payload, { merge: true });
   }
 
-  static async createCategory(catname: string, catdescription: string, currentUserId?: string): Promise<any[]> {
+  static async createCategory(catname: string, catdescription: string, currentUserId?: string): Promise<ToyyibApiCategoryRaw[]> {
     // TODO: Add 'description' field to the ToyyibCategory creation form in UI.
     const result = await proxyCall('createCategory', { catname, catdescription });
     // Save the new category code to Firestore so getCategories can find it
@@ -325,7 +350,7 @@ export class ToyyibService {
     return cat;
   }
 
-  static async getCategoryDetails(categoryCode: string): Promise<any[]> {
+  static async getCategoryDetails(categoryCode: string): Promise<ToyyibApiCategoryRaw[]> {
     const data = await proxyCall('getCategoryDetails', { categoryCode });
     return Array.isArray(data) ? data : [];
   }
@@ -487,7 +512,7 @@ export class ToyyibService {
     return categoryCode;
   }
 
-  static async getSettlements(): Promise<any[]> {
+  static async getSettlements(): Promise<ToyyibApiSettlement[]> {
     try {
       const data = await proxyCall('getSettlements');
       return Array.isArray(data) ? data : [];

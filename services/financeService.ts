@@ -19,10 +19,11 @@ import {
   documentId,
   DocumentSnapshot,
 } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { db, auth } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { Transaction, BankAccount, ReconciliationRecord, ReconciliationDiscrepancy, TransactionSplit, TransactionType, MembershipDues, MembershipRecord, MembershipStatus, MembershipType, FinanceAlert } from '../types';
 import { withDevMode } from '../utils/devMode';
+import { getMYTYear } from '../utils/dateUtils';
 import { MOCK_TRANSACTIONS, MOCK_ACCOUNTS, MOCK_MEMBERS } from './mockData';
 import { formatCurrency } from '../utils/formatUtils';
 import { removeUndefined } from '../utils/dataUtils';
@@ -246,7 +247,7 @@ export class FinanceService {
           .filter(t => t.bankAccountId === bankAccountId)
           .map(t => new Date(t.date).getFullYear())
         );
-        years.add(new Date().getFullYear());
+        years.add(getMYTYear());
         return Array.from(years).sort((a, b) => b - a);
       },
       async () => {
@@ -268,11 +269,11 @@ export class FinanceService {
               }
             }
           });
-          years.add(new Date().getFullYear());
+          years.add(getMYTYear());
           return Array.from(years).sort((a, b) => b - a);
         } catch (error) {
           console.error('Error fetching transaction years for account:', error);
-          return [new Date().getFullYear()];
+          return [getMYTYear()];
         }
       }
     );
@@ -283,7 +284,7 @@ export class FinanceService {
     return withDevMode(
       () => {
         const years = new Set(localMockTransactions.map(t => new Date(t.date).getFullYear()));
-        years.add(new Date().getFullYear());
+        years.add(getMYTYear());
         return Array.from(years).sort((a, b) => b - a);
       },
       async () => {
@@ -303,11 +304,11 @@ export class FinanceService {
               }
             }
           });
-          years.add(new Date().getFullYear());
+          years.add(getMYTYear());
           return Array.from(years).sort((a, b) => b - a);
         } catch (error) {
           console.error('Error fetching all transaction years:', error);
-          return [new Date().getFullYear()];
+          return [getMYTYear()];
         }
       }
     );
@@ -504,7 +505,7 @@ export class FinanceService {
           if (transactionData.category === 'Membership') {
             const year = transactionData.projectId ? parseInt(transactionData.projectId, 10) : new Date(transactionData.date).getFullYear();
             const rules = await MembershipConfigService.getRules();
-            purpose = resolveMembershipPurpose(transactionData.amount, isNaN(year) ? new Date().getFullYear() : year, rules);
+            purpose = resolveMembershipPurpose(transactionData.amount, isNaN(year) ? getMYTYear() : year, rules);
           }
 
           const newTransaction = {
@@ -1380,7 +1381,7 @@ export class FinanceService {
 
           if (finalCategory === 'Membership') {
             const yearVal = categoryUpdates.year || currentTransaction?.year ||
-              (currentTransaction?.date ? new Date(currentTransaction.date).getFullYear() : new Date().getFullYear());
+              (currentTransaction?.date ? new Date(currentTransaction.date).getFullYear() : getMYTYear());
             if (!categoryUpdates.projectId) {
               updateData.projectId = buildMembershipProjectId(yearVal);
             }
@@ -1447,7 +1448,7 @@ export class FinanceService {
           if (finalCategory === 'Membership') {
             const rawDate = currentTransaction?.date as (Timestamp & { toDate(): Date }) | string | undefined;
             const yearVal = categoryUpdates.year || currentTransaction?.year ||
-              (rawDate ? new Date(typeof rawDate === 'string' ? rawDate : rawDate.toDate()).getFullYear() : new Date().getFullYear());
+              (rawDate ? new Date(typeof rawDate === 'string' ? rawDate : rawDate.toDate()).getFullYear() : getMYTYear());
             if (!categoryUpdates.projectId) {
               updateData.projectId = buildMembershipProjectId(yearVal);
             }
@@ -1552,7 +1553,7 @@ export class FinanceService {
           } as Partial<TransactionSplit>;
 
           if (finalCategory === 'Membership' && !categoryUpdates.projectId) {
-            const yearVal = categoryUpdates.year || currentSplit?.year || new Date().getFullYear();
+            const yearVal = categoryUpdates.year || currentSplit?.year || getMYTYear();
             updateData.projectId = buildMembershipProjectId(yearVal);
           }
 
@@ -1614,7 +1615,7 @@ export class FinanceService {
           } as Partial<TransactionSplit>;
 
           if (finalCategory === 'Membership' && !categoryUpdates.projectId) {
-            const yearVal = categoryUpdates.year || currentSplit?.year || new Date().getFullYear();
+            const yearVal = categoryUpdates.year || currentSplit?.year || getMYTYear();
             updateData.projectId = buildMembershipProjectId(yearVal);
           }
 
@@ -1698,7 +1699,7 @@ export class FinanceService {
   }
 
   // Delete transaction
-  static async deleteTransaction(transactionId: string): Promise<void> {
+  static async deleteTransaction(transactionId: string, deletedBy?: string): Promise<void> {
     return withDevMode(
       () => {
         console.log(`[Dev Mode] Mocking deletion for transaction ${transactionId}`);
@@ -1795,6 +1796,17 @@ export class FinanceService {
 
           invalidateFinanceCache();
 
+          // Write an immutable tombstone so the deletion is auditable
+          const operatorId = deletedBy || auth?.currentUser?.uid || 'unknown';
+          addDoc(collection(db, 'auditLog'), {
+            action: 'deleteTransaction',
+            documentId: transactionId,
+            deletedBy: operatorId,
+            deletedAt: new Date().toISOString(),
+            snapshotAmount: transaction?.amount ?? null,
+            snapshotDescription: transaction?.description ?? null,
+          }).catch(err => console.error('[deleteTransaction] Failed to write audit tombstone:', err));
+
           // Sync with Member Membership if category is Membership
           if (transaction && transaction.category === 'Membership' && transaction.memberId) {
             await this.syncMemberMembership(transaction.memberId as string, transaction.projectId);
@@ -1808,7 +1820,7 @@ export class FinanceService {
   }
 
   // Reverse a transaction by creating a counter-entry and voiding the original
-  static async reverseTransaction(transactionId: string, reason: string): Promise<void> {
+  static async reverseTransaction(transactionId: string, reason: string, reversedBy?: string): Promise<void> {
     return withDevMode(
       () => {
         console.log(`[Dev Mode] Mocking reversal for transaction ${transactionId}`);
@@ -1818,6 +1830,8 @@ export class FinanceService {
           const original = await this.getTransactionById(transactionId);
           if (!original) throw new Error('Transaction not found');
           if (original.status === 'Voided') throw new Error('Transaction is already voided');
+
+          const operatorId = reversedBy || auth?.currentUser?.uid || 'unknown';
 
           const reversalData: Omit<Transaction, 'id'> = {
             date: new Date().toISOString().split('T')[0],
@@ -1834,6 +1848,7 @@ export class FinanceService {
             transactionType: original.transactionType,
             reversalOf: transactionId,
             reversalReason: reason,
+            reversedBy: operatorId,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           };
@@ -1844,6 +1859,7 @@ export class FinanceService {
           batch.update(doc(db, COLLECTIONS.TRANSACTIONS, transactionId), {
             status: 'Voided',
             reversalReason: reason,
+            reversedBy: operatorId,
             updatedAt: new Date().toISOString(),
           });
           await batch.commit();
@@ -2514,7 +2530,7 @@ export class FinanceService {
   }> {
     try {
       const transactions = await this.getAllTransactions(year);
-      const targetYear = year || new Date().getFullYear();
+      const targetYear = year || getMYTYear();
 
       // Flatten transactions: regular transactions (excluding isSplit) + split children
       const flattenedTransactions: Transaction[] = [];
@@ -2991,7 +3007,7 @@ export class FinanceService {
         const membershipType = member.membershipType || 'Official';
         // Guest pays a one-time entry fee only — no annual renewal dues to list.
         if (membershipType === 'Guest') continue;
-        const duesYear = filters?.duesYear ?? new Date().getFullYear();
+        const duesYear = filters?.duesYear ?? getMYTYear();
         const baseDues = configRules[membershipType as keyof typeof configRules]?.duesAmount ?? MembershipDues[membershipType as keyof typeof MembershipDues] ?? 0;
         const hasPaidFee = member.jciCareer?.hasPaidInitiationFee ?? member.hasPaidInitiationFee ?? false;
         const joinYear = member.joinDate ? new Date(member.joinDate).getFullYear() : null;
@@ -3751,7 +3767,11 @@ export class FinanceService {
   ): Promise<{
     reportType: string;
     period: string;
-    data: any;
+    data: {
+      transactions: Transaction[];
+      categoryBreakdown: Record<string, { income: number; expenses: number; count: number }>;
+      monthlyCashFlow: Record<number, { income: number; expenses: number; net: number }>;
+    };
     summary: {
       totalIncome: number;
       totalExpenses: number;

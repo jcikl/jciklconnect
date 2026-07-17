@@ -26,6 +26,7 @@ import { useCommunication } from './hooks/useCommunication';
 import { usePoints } from './hooks/usePoints';
 import { useBehavioralNudging } from './hooks/useBehavioralNudging';
 import { NudgeBanner } from './components/ui/NudgeBanner';
+import { useInstallPrompt } from './hooks/useInstallPrompt';
 
 // Error Boundary Components
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
@@ -138,6 +139,8 @@ export const JCIKLApp: React.FC = () => {
   const headerSearchRef = useRef<HTMLInputElement>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchInputValue, setSearchInputValue] = useState('');
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [initialSelectedMemberId, setInitialSelectedMemberId] = useState<string | null>(null);
   const [initialSelectedEventId, setInitialSelectedEventId] = useState<string | null>(null);
   const [initialSelectedProjectId, setInitialSelectedProjectId] = useState<string | null>(null);
@@ -145,6 +148,7 @@ export const JCIKLApp: React.FC = () => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const { isBatchMode } = useBatchMode();
+  const { showBanner: showInstallBanner, triggerInstall, dismiss: dismissInstall } = useInstallPrompt();
 
   // All hooks must be called before any conditional returns
   const navigate = useNavigate();
@@ -281,7 +285,7 @@ export const JCIKLApp: React.FC = () => {
       return joinDate.getMonth() === now.getMonth() && joinDate.getFullYear() === now.getFullYear();
     }).length;
 
-    const upcomingEvents = events.filter(e => new Date(e.date) >= new Date() && e.status === 'Upcoming').length;
+    const upcomingEvents = events.filter(e => new Date(e.date + 'T00:00:00+08:00') >= new Date() && e.status === 'Upcoming').length;
     const activeProjects = projects.filter(p => p.status === 'Active').length;
 
     return {
@@ -1099,6 +1103,15 @@ export const JCIKLApp: React.FC = () => {
               离线模式 — 显示缓存数据，操作将在恢复连接后同步
             </div>
           )}
+          {showInstallBanner && (
+            <div role="status" aria-live="polite" className="shrink-0 flex items-center justify-between bg-jci-blue text-white text-xs px-4 py-2 z-[100]">
+              <span>将 JCI KL 添加到主屏幕，随时快速访问</span>
+              <div className="flex items-center gap-2 ml-4">
+                <button onClick={triggerInstall} className="font-semibold underline whitespace-nowrap">安装</button>
+                <button onClick={dismissInstall} aria-label="关闭安装提示" className="opacity-70 hover:opacity-100">✕</button>
+              </div>
+            </div>
+          )}
           <h1 className="sr-only">
             {view === 'DASHBOARD' ? 'Dashboard' : view === 'MEMBERS' ? 'Members' : view === 'EVENTS' ? 'Event List' : view === 'PROJECTS' ? 'Events Management' : view === 'FINANCE' ? 'Finance' : view === 'PAYMENT_REQUESTS' ? 'Payment Requests' : view === 'GAMIFICATION' ? 'Gamification' : view === 'INVENTORY' ? 'Inventory' : view === 'DIRECTORY' ? 'Business Directory' : view === 'AUTOMATION' ? 'Automation Studio' : view === 'KNOWLEDGE' ? 'Knowledge' : view === 'COMMUNICATION' ? 'Communication' : view === 'CLUBS' ? 'Hobby Clubs' : view === 'SURVEYS' ? 'Surveys' : view === 'BENEFITS' ? 'Member Benefits' : view === 'DATA_IMPORT_EXPORT' ? 'Data Import/Export' : view === 'ADVERTISEMENTS' ? 'Partnership & Promotions' : view === 'AI_INSIGHTS' ? 'AI Insights' : view === 'TEMPLATES' ? 'Templates' : view === 'ACTIVITY_PLANS' ? 'Activity Plans' : view === 'REPORTS' ? 'Reports' : view === 'DEVELOPER' ? 'Developer Interface' : 'JCI LO Management'}
           </h1>
@@ -1121,12 +1134,12 @@ export const JCIKLApp: React.FC = () => {
                       title="Toggle Board Dashboard"
                       className="h-9 flex items-center justify-center shrink-0 transition-all duration-200 hover:opacity-80"
                     >
-                      <img src="/mascot/JCIKL-Mascot.png" alt="JCI KL" className="h-7 w-auto" />
+                      <picture><source type="image/webp" srcSet="/mascot/JCIKL-Mascot.webp" /><img src="/mascot/JCIKL-Mascot.png" alt="JCI KL" className="h-7 w-auto" /></picture>
                       <span className={`ml-1.5 h-7 flex items-center text-[20px] leading-7 font-black tracking-tight whitespace-nowrap ${showBoardDashboard ? 'text-amber-300' : 'text-white'}`}>JCI KL Connect</span>
                     </button>
                   ) : (
                     <div className="h-9 flex items-center justify-center shrink-0">
-                      <img src="/mascot/JCIKL-Mascot.png" alt="JCI KL" className="h-7 w-auto" />
+                      <picture><source type="image/webp" srcSet="/mascot/JCIKL-Mascot.webp" /><img src="/mascot/JCIKL-Mascot.png" alt="JCI KL" className="h-7 w-auto" /></picture>
                       <span className="ml-1.5 h-7 flex items-center text-[20px] leading-7 font-black tracking-tight whitespace-nowrap text-white">JCI KL Connect</span>
                     </div>
                   )}
@@ -1213,10 +1226,16 @@ export const JCIKLApp: React.FC = () => {
                       <input
                         ref={headerSearchRef}
                         type="text"
-                        value={searchQuery}
-                        onChange={e => { setSearchQuery(e.target.value); setSearchDrawerOpen(e.target.value.length > 0); }}
-                        onFocus={() => setSearchDrawerOpen(searchQuery.length > 0)}
-                        onKeyDown={e => { if (e.key === 'Escape') { setHeaderSearchActive(false); setSearchQuery(''); setSearchDrawerOpen(false); } }}
+                        value={searchInputValue}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setSearchInputValue(val);
+                          setSearchDrawerOpen(val.length > 0);
+                          if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+                          searchDebounceRef.current = setTimeout(() => setSearchQuery(val), 350);
+                        }}
+                        onFocus={() => setSearchDrawerOpen(searchInputValue.length > 0)}
+                        onKeyDown={e => { if (e.key === 'Escape') { setHeaderSearchActive(false); setSearchQuery(''); setSearchInputValue(''); setSearchDrawerOpen(false); } }}
                         placeholder="Search…"
                         className="flex-1 bg-transparent text-white placeholder-white/35 text-sm outline-none pl-3 py-1.5 min-w-0"
                         style={{ userSelect: 'text', WebkitUserSelect: 'text' }}
@@ -1227,10 +1246,12 @@ export const JCIKLApp: React.FC = () => {
                         if (headerSearchActive) {
                           setHeaderSearchActive(false);
                           setSearchQuery('');
+                          setSearchInputValue('');
                           setSearchDrawerOpen(false);
                         } else {
                           setHeaderSearchActive(true);
                           setSearchQuery('');
+                          setSearchInputValue('');
                           setSearchDrawerOpen(false);
                           setTimeout(() => headerSearchRef.current?.focus(), 50);
                         }
@@ -1320,7 +1341,7 @@ export const JCIKLApp: React.FC = () => {
             >
               <X size={18} />
             </button>
-            <img src="/mascot/logout.png" alt="" className="w-auto h-auto max-h-32 object-contain" />
+            <picture><source type="image/webp" srcSet="/mascot/logout.webp" /><img src="/mascot/logout.png" alt="" className="w-auto h-auto max-h-32 object-contain" loading="lazy" /></picture>
             <div className="space-y-1.5">
               <p className="font-semibold text-slate-800 text-base">Sign out?</p>
               <p className="text-sm text-slate-400">You'll need to log in again to access your account.</p>

@@ -37,6 +37,7 @@ import {
   Transaction,
 } from '../types';
 import { isDevMode } from '../utils/devMode';
+import { getMYTYear } from '../utils/dateUtils';
 import { apiCache } from './cacheService';
 import { MOCK_MEMBERS } from './mockData';
 
@@ -140,7 +141,7 @@ export class MembersService {
           q = query(collection(db, COLLECTIONS.MEMBERS));
         }
         const snapshot = await getDocs(q);
-        const docs = snapshot.docs.map(d => ({ ...(d.data() as any), id: d.id } as Member));
+        const docs = snapshot.docs.map(d => ({ ...(d.data() as Omit<Member, 'id'>), id: d.id } as Member));
 
         if (docs.length === 0 && isDevMode()) {
           const list = normalised
@@ -542,7 +543,7 @@ export class MembersService {
           // If moving from GUEST (or no role) to MEMBER
           if (currentData.role === UserRole.GUEST || !currentData.role) {
             const joinDate = updates.joinDate || currentData.joinDate;
-            const yearStr = joinDate ? String(new Date(joinDate).getFullYear()) : String(new Date().getFullYear());
+            const yearStr = joinDate ? String(new Date(joinDate).getFullYear()) : String(getMYTYear());
             
             const membership = currentData.membership || {};
             if (!membership[yearStr]) {
@@ -803,7 +804,7 @@ export class MembersService {
 
       // Read target member doc to enforce LO-level delete rule (matches Firestore rules)
       const targetDoc = await getDoc(doc(db, COLLECTIONS.MEMBERS, memberId));
-      const targetLoId = targetDoc.exists() ? (targetDoc.data() as any).loId ?? null : null;
+      const targetLoId = targetDoc.exists() ? (targetDoc.data() as Omit<Member, 'id'>).loId ?? null : null;
 
       // Firestore rule requires (resource == null || resourceInMyLo(resource.data)).
       // If target has an loId and current admin has a different loId, deny client-side to avoid permission error.
@@ -816,7 +817,7 @@ export class MembersService {
 
       // Soft-delete: mark INACTIVE + clean up mentor's menteeIds in one batch (E4 fix)
       const mentorId: string | undefined = targetDoc.exists()
-        ? (targetDoc.data() as any).mentorId
+        ? (targetDoc.data() as Omit<Member, 'id'>).mentorId
         : undefined;
       const deleteBatch = writeBatch(db);
       deleteBatch.update(doc(db, COLLECTIONS.MEMBERS, memberId), {
@@ -907,7 +908,7 @@ export class MembersService {
         console.warn('[membersService] Member query hit 500 cap — some members may be excluded');
       }
       const results = snapshot.docs.map(doc => ({
-        ...(doc.data() as any),
+        ...(doc.data() as Omit<Member, 'id'>),
         id: doc.id,
       } as Member));
       apiCache.set(cacheKey, results, 300000);
@@ -936,7 +937,7 @@ export class MembersService {
 
       // Return the first match
       const doc = snapshot.docs[0];
-      return { ...(doc.data() as any), id: doc.id } as Member;
+      return { ...(doc.data() as Omit<Member, 'id'>), id: doc.id } as Member;
     } catch (error) {
       console.error('Error fetching member by email:', error);
       throw error;
@@ -953,7 +954,7 @@ export class MembersService {
 
       const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => ({
-        ...(doc.data() as any),
+        ...(doc.data() as Omit<Member, 'id'>),
         id: doc.id,
       } as Member));
     } catch (error) {
@@ -1033,6 +1034,8 @@ export class MembersService {
       roleBatch.update(doc(db, COLLECTIONS.MEMBERS, memberId), {
         role: newRole,
         updatedAt: Timestamp.now(),
+        roleChangedBy: auth?.currentUser?.uid ?? null,
+        roleChangedAt: Timestamp.now(),
       });
       boardSnap.docs.forEach(d =>
         roleBatch.update(d.ref, { displayRole: newRole, updatedAt: Timestamp.now() })
@@ -1091,13 +1094,21 @@ export class MembersService {
       //   (b) introducer tracking for stats recalculation (M2 fix).
       const introducerChanging = 'introducer' in normalized;
       const oldIntroducerMap = new Map<string, string | undefined>();
-      const existingSnaps = await Promise.all(memberIds.map(id => getDoc(doc(db, COLLECTIONS.MEMBERS, id))));
+      // Chunk reads in batches of 30 to avoid excessive concurrent Firestore connections at scale.
+      const CHUNK = 30;
+      const existingSnaps: DocumentSnapshot[] = [];
+      for (let c = 0; c < memberIds.length; c += CHUNK) {
+        const chunkSnaps = await Promise.all(
+          memberIds.slice(c, c + CHUNK).map(id => getDoc(doc(db, COLLECTIONS.MEMBERS, id)))
+        );
+        existingSnaps.push(...chunkSnaps);
+      }
       const existingByIds = new Map<string, Member>();
       existingSnaps.forEach((snap, i) => {
         if (snap.exists()) {
           existingByIds.set(memberIds[i], { ...snap.data(), id: memberIds[i] } as Member);
           if (introducerChanging) {
-            oldIntroducerMap.set(memberIds[i], (snap.data() as any).introducer as string | undefined);
+            oldIntroducerMap.set(memberIds[i], (snap.data() as Omit<Member, 'id'> & { introducer?: string }).introducer);
           }
         }
       });
@@ -1167,17 +1178,22 @@ export class MembersService {
         const e: any = new Error('User lacks ADMIN / SUPER_ADMIN role for deletion'); e.code = 'permission-denied'; throw e;
       }
 
-      // Fetch all target docs to find mentorIds for menteeIds cleanup
-      const targetDocs = await Promise.all(
-        memberIds.map(id => getDoc(doc(db, COLLECTIONS.MEMBERS, id)))
-      );
+      // Fetch all target docs in chunks of 30 to avoid excessive concurrent Firestore connections.
+      const CHUNK = 30;
+      const targetDocs: DocumentSnapshot[] = [];
+      for (let c = 0; c < memberIds.length; c += CHUNK) {
+        const chunkSnaps = await Promise.all(
+          memberIds.slice(c, c + CHUNK).map(id => getDoc(doc(db, COLLECTIONS.MEMBERS, id)))
+        );
+        targetDocs.push(...chunkSnaps);
+      }
 
       // Group menteeIds to remove per mentor (skip mentors who are also being deleted)
       const mentorCleanup = new Map<string, string[]>();
       const deletingSet = new Set(memberIds);
       targetDocs.forEach((d, i) => {
         if (!d.exists()) return;
-        const mentorId = (d.data() as any).mentorId as string | undefined;
+        const mentorId = (d.data() as Omit<Member, 'id'>).mentorId;
         if (mentorId && !deletingSet.has(mentorId)) {
           if (!mentorCleanup.has(mentorId)) mentorCleanup.set(mentorId, []);
           mentorCleanup.get(mentorId)!.push(memberIds[i]);

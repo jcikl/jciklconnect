@@ -474,6 +474,11 @@ service cloud.firestore {
                     (resource.data.memberId == request.auth.uid ||
                      (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN']));
+      // INTENTIONAL DESIGN: resource.data is unavailable in list queries, so ownership cannot be
+      // enforced at the Firestore-rules layer for list. The service layer MUST always include
+      // where('memberId', '==', uid) in every list query — this prevents unfiltered reads from
+      // returning useful data even if rules pass. A compound index on (memberId ASC, timestamp DESC)
+      // must exist so Firestore rejects queries that omit the memberId equality filter.
       allow list: if isAuthenticated() &&
                      (isMember() ||
                       (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&

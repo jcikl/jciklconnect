@@ -11,6 +11,7 @@ import {
   where,
   orderBy,
   Timestamp,
+  writeBatch,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
@@ -181,6 +182,34 @@ export class CommunicationService {
           await deleteDoc(notifRef);
         } catch (error) {
           console.error('Error deleting notification:', error);
+          throw error;
+        }
+      }
+    );
+  }
+
+  // Mark all notifications as read for a member
+  static async markAllAsRead(memberId: string): Promise<void> {
+    return withDevMode(
+      () => { console.log(`[DEV MODE] markAllAsRead for member ${memberId}`); },
+      async () => {
+        try {
+          const q = query(
+            collection(db, COLLECTIONS.NOTIFICATIONS),
+            where('memberId', '==', memberId),
+            where('read', '==', false)
+          );
+          const snapshot = await getDocs(q);
+          if (snapshot.empty) return;
+
+          const now = Timestamp.now();
+          const batch = writeBatch(db);
+          snapshot.docs.forEach(d => {
+            batch.update(d.ref, { read: true, readAt: now });
+          });
+          await batch.commit();
+        } catch (error) {
+          console.error('Error marking all notifications as read:', error);
           throw error;
         }
       }

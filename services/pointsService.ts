@@ -44,6 +44,7 @@ export interface PointTransaction {
   createdAt: string | Date | Timestamp;
   expiresAt?: Date | Timestamp;
   metadata?: Record<string, any>;
+  awardedBy?: string;
 }
 
 export interface PointRule {
@@ -68,7 +69,8 @@ export class PointsService {
     description?: string,
     sourceIdOrRelatedEntityId?: string,
     sourceTypeOrRelatedEntityType?: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
+    awardedBy?: string
   ): Promise<string> {
     // Support both old and new signatures for backward compatibility
     let points: number;
@@ -100,6 +102,7 @@ export class PointsService {
     return withDevMode(
       () => {
         console.log(`[DEV MODE] Awarding ${points} points to member ${memberId} for ${category}`);
+        console.log(`[DEV MODE] createNotification: Points Awarded — ${points} pts for ${desc || category}`);
         return `mock-point-transaction-${Date.now()}`;
       },
       async () => {
@@ -121,6 +124,7 @@ export class PointsService {
               relatedEntityType
             }),
             ...(metadata && { metadata }),
+            ...(awardedBy && { awardedBy }),
             createdAt: Timestamp.now(),
           };
 
@@ -138,6 +142,8 @@ export class PointsService {
           const currentPoints = memberSnap.data().points || 0;
           const newPoints = currentPoints + points;
           const tier = PointsService.calculateTier(newPoints);
+          const awardYear = new Date().getFullYear();
+          const yearlyField = `yearlyPoints.${awardYear}`;
 
           // Atomic batch: create points record + update member totals in one commit
           const batch = writeBatch(db);
@@ -145,6 +151,7 @@ export class PointsService {
           batch.update(memberRef, {
             points: newPoints,
             tier,
+            [yearlyField]: (memberSnap.data()[`yearlyPoints`]?.[awardYear] || 0) + points,
             updatedAt: Timestamp.now(),
           });
           await batch.commit();
@@ -152,6 +159,19 @@ export class PointsService {
           // Invalidate caches after write
           PointsService.invalidatePointsCache();
           MembersService.invalidateMembersCache();
+
+          // Best-effort in-app notification — must not roll back the committed points
+          try {
+            const { CommunicationService } = await import('./communicationService');
+            await CommunicationService.createNotification({
+              memberId,
+              title: 'Points Awarded',
+              message: `You received ${points} points for ${desc || category}.`,
+              type: 'info',
+            });
+          } catch (notifErr) {
+            console.warn('[pointsService] Notification after awardPoints failed:', notifErr);
+          }
 
           return pointsDocRef.id;
         } catch (error) {
@@ -211,6 +231,17 @@ export class PointsService {
       points = Math.round(points * Math.max(1, hours));
     }
 
+    if (!isDevMode()) {
+      const existing = await getDocs(query(
+        collection(db, COLLECTIONS.POINTS),
+        where('memberId', '==', memberId),
+        where('relatedEntityId', '==', eventId),
+        where('category', '==', POINT_CATEGORIES.EVENT_ATTENDANCE),
+        limit(1)
+      ));
+      if (!existing.empty) return existing.docs[0].id;
+    }
+
     return this.awardPoints(
       memberId,
       points,
@@ -262,6 +293,17 @@ export class PointsService {
           points = 10;
           break;
       }
+    }
+
+    if (!isDevMode()) {
+      const existing = await getDocs(query(
+        collection(db, COLLECTIONS.POINTS),
+        where('memberId', '==', memberId),
+        where('relatedEntityId', '==', taskId),
+        where('category', '==', POINT_CATEGORIES.PROJECT_TASK),
+        limit(1)
+      ));
+      if (!existing.empty) return existing.docs[0].id;
     }
 
     return this.awardPoints(
@@ -329,7 +371,7 @@ export class PointsService {
 
           const snapshot = await getDocs(q);
           return snapshot.docs.map(doc => {
-            const data = doc.data() as any;
+            const data = doc.data() as Record<string, any>;
             const createdAt = data.createdAt?.toDate?.() || data.createdAt;
             const expiresAt = data.expiresAt?.toDate?.();
 
@@ -404,30 +446,6 @@ export class PointsService {
     }
 
     try {
-      const memberPointsMap: Record<string, number> = {};
-      if (year) {
-        const startDate = new Date(year, 0, 1);
-        const endDate = new Date(year, 11, 31, 23, 59, 59);
-        // TODO PERF12: Replace with query on members collection sorted by member.points aggregate field.
-        // Current approach scans points collection which is unbounded — rankings become wrong above 500 records.
-        const q = query(
-          collection(db, COLLECTIONS.POINTS),
-          where('createdAt', '>=', Timestamp.fromDate(startDate)),
-          where('createdAt', '<=', Timestamp.fromDate(endDate)),
-          limit(500)
-        );
-        const snapshot = await getDocs(q);
-        if (snapshot.docs.length >= 500) {
-          console.warn('[pointsService] Leaderboard query hit 500 cap — rankings may be incomplete. TODO: use member.points aggregate field instead.');
-        }
-        snapshot.forEach(doc => {
-          const data = doc.data();
-          const memberId = data.memberId;
-          const pts = data.points || data.amount || 0;
-          memberPointsMap[memberId] = (memberPointsMap[memberId] || 0) + pts;
-        });
-      }
-
       const members = await MembersService.getAllMembers();
       return members
         .filter(m => {
@@ -443,10 +461,9 @@ export class PointsService {
         })
         .map(m => {
           if (year) {
-            return {
-              ...m,
-              points: memberPointsMap[m.id] || 0
-            };
+            // Use the yearlyPoints aggregate field written atomically in awardPoints
+            const yearlyPts = (m as any).yearlyPoints?.[year] ?? 0;
+            return { ...m, points: yearlyPts };
           }
           return m;
         })
@@ -660,7 +677,7 @@ export class PointsService {
 
               const snapshot = await getDocs(q);
               return snapshot.docs.map(doc => {
-                const data = doc.data() as any;
+                const data = doc.data() as Record<string, any>;
                 return {
                   id: doc.id,
                   category: data.category,
@@ -814,13 +831,17 @@ export class PointsService {
               throw new Error('Insufficient points for transfer');
             }
 
-            // Update balances
+            // Update balances, including recomputed tier for both parties
+            const newSenderPoints = senderPoints - amount;
+            const newReceiverPoints = (receiverDoc.data().points || 0) + amount;
             transaction.update(senderRef, {
-              points: senderPoints - amount,
+              points: newSenderPoints,
+              tier: PointsService.calculateTier(newSenderPoints),
               updatedAt: Timestamp.now()
             });
             transaction.update(receiverRef, {
-              points: (receiverDoc.data().points || 0) + amount,
+              points: newReceiverPoints,
+              tier: PointsService.calculateTier(newReceiverPoints),
               updatedAt: Timestamp.now()
             });
 
@@ -880,14 +901,18 @@ export class PointsService {
             const currentPoints = memberDoc.data().points || 0;
             if (currentPoints < amount) throw new Error('Insufficient points to lock for escrow');
 
-            // Deduct from member
+            // Deduct from member, recompute tier after deduction
+            const newPointsAfterLock = currentPoints - amount;
             transaction.update(memberRef, {
-              points: currentPoints - amount,
+              points: newPointsAfterLock,
+              tier: PointsService.calculateTier(newPointsAfterLock),
               updatedAt: Timestamp.now()
             });
 
             // Create Escrow Record
             const escrowRef = doc(collection(db, COLLECTIONS.POINT_ESCROW));
+            const escrowExpiresAt = new Date();
+            escrowExpiresAt.setDate(escrowExpiresAt.getDate() + 90);
             transaction.set(escrowRef, {
               memberId,
               amount,
@@ -895,7 +920,8 @@ export class PointsService {
               relatedEntityId,
               status: 'Locked',
               description,
-              createdAt: Timestamp.now()
+              createdAt: Timestamp.now(),
+              expiresAt: Timestamp.fromDate(escrowExpiresAt),
             });
 
             // Record the transaction as 'Escrow_Locked'
@@ -945,9 +971,11 @@ export class PointsService {
 
             if (!targetDoc.exists()) throw new Error('Target member not found');
 
-            // Add to target
+            // Add to target, recompute tier after receiving released escrow
+            const newTargetPoints = (targetDoc.data().points || 0) + amount;
             transaction.update(targetRef, {
-              points: (targetDoc.data().points || 0) + amount,
+              points: newTargetPoints,
+              tier: PointsService.calculateTier(newTargetPoints),
               updatedAt: Timestamp.now()
             });
 
@@ -980,6 +1008,56 @@ export class PointsService {
         }
       }
     );
+  }
+
+  /**
+   * Return points from escrow records that have passed their 90-day expiry without being released.
+   * Safe to call repeatedly — each record is processed in its own runTransaction so partial
+   * failures do not block other expirations. Intended to be called from an admin panel action
+   * or a Netlify scheduled function.
+   */
+  static async cleanupExpiredEscrow(): Promise<{ expired: number; errors: number }> {
+    if (isDevMode()) {
+      console.log('[DEV MODE] cleanupExpiredEscrow — no-op');
+      return { expired: 0, errors: 0 };
+    }
+    let expired = 0;
+    let errors = 0;
+    try {
+      const q = query(
+        collection(db, COLLECTIONS.POINT_ESCROW),
+        where('status', '==', 'Locked'),
+        where('expiresAt', '<', Timestamp.now())
+      );
+      const snapshot = await getDocs(q);
+      for (const escrowDoc of snapshot.docs) {
+        try {
+          await runTransaction(db, async (t) => {
+            const freshSnap = await t.get(escrowDoc.ref);
+            if (!freshSnap.exists() || freshSnap.data().status !== 'Locked') return;
+            const { memberId, amount } = freshSnap.data();
+            const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
+            const memberSnap = await t.get(memberRef);
+            if (!memberSnap.exists()) return;
+            const restored = (memberSnap.data().points || 0) + amount;
+            t.update(memberRef, {
+              points: restored,
+              tier: PointsService.calculateTier(restored),
+              updatedAt: Timestamp.now(),
+            });
+            t.update(escrowDoc.ref, { status: 'Expired', expiredAt: Timestamp.now() });
+          });
+          expired++;
+        } catch (err) {
+          console.error('[cleanupExpiredEscrow] Failed to expire escrow', escrowDoc.id, err);
+          errors++;
+        }
+      }
+    } catch (error) {
+      console.error('[cleanupExpiredEscrow] Query failed:', error);
+      throw error;
+    }
+    return { expired, errors };
   }
 
   // --- End of Competitive Engine Methods ---
@@ -1459,13 +1537,8 @@ export class PointsService {
       //       methods are implemented.
       if (submission.memberId) {
         try {
-          // Dynamic import prevents circular-dep at module load time.
           const { GamificationService } = await import('./gamificationService');
-          // Fetch all defined awards and let the service evaluate eligibility.
-          // This is a lightweight read; no write happens unless a badge is earned.
-          await GamificationService.getAllAwards();
-          // Actual per-member eligibility check is a TODO — the call above is a
-          // deliberate placeholder so the try/catch infrastructure is in place.
+          await GamificationService.checkEligibleBadgesForMember(submission.memberId);
         } catch (err) {
           console.warn('[approveClaim] Badge/achievement check failed (non-critical):', err);
         }

@@ -236,7 +236,7 @@ export const sendEventReminders = functions.pubsub
             memberId: attendeeId,
             type: 'event_reminder',
             title: 'Event Reminder',
-            message: `Don't forget about "${event.title}" tomorrow at ${event.startDate.toDate().toLocaleTimeString()}.`,
+            message: `Don't forget about "${event.title}" tomorrow at ${event.startDate.toDate().toLocaleTimeString('en-MY', { timeZone: 'Asia/Kuala_Lumpur', hour: '2-digit', minute: '2-digit' })}.`,
             data: {
               eventId: eventDoc.id,
               eventTitle: event.title,
@@ -311,9 +311,9 @@ export const sendBirthdayNotifications = functions.pubsub
   .schedule('0 0 * * *')
   .timeZone('Asia/Kuala_Lumpur')
   .onRun(async (_context) => {
-    const now = new Date();
-    const todayMonth = now.getMonth() + 1; // 1-12
-    const todayDay = now.getDate();
+    const nowMYT = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }));
+    const todayMonth = nowMYT.getMonth() + 1; // 1-12
+    const todayDay = nowMYT.getDate();
 
     // Fetch all active members
     const membersSnap = await db.collection('members')

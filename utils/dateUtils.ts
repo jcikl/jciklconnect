@@ -110,6 +110,35 @@ export const getCalendarYear = (date?: Date): number => {
   return (date || new Date()).getFullYear();
 };
 
+// ─── Malaysia Time (MYT = UTC+8) helpers ────────────────────────────────────
+
+/** Return the current wall-clock time in Malaysia (UTC+8). */
+export const nowMYT = (): Date =>
+  new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }));
+
+/** Return the current year in Malaysia time (safe even at Dec 31 16:00–23:59 UTC). */
+export const getMYTYear = (): number => nowMYT().getFullYear();
+
+/**
+ * Parse a date-only string (YYYY-MM-DD) as midnight MYT (UTC+8).
+ * JS's native `new Date('2024-12-31')` treats it as midnight UTC, which is
+ * 08:00 MYT — causing events to appear "upcoming" until 8 AM on their day.
+ */
+export const parseMYTDate = (dateStr: string): Date =>
+  new Date(dateStr + 'T00:00:00+08:00');
+
+/**
+ * Return today's date string in Malaysia time as "YYYY-MM-DD".
+ * Use this when you only need to compare MM-DD slices for birthday checks.
+ */
+export const getMYTTodayStr = (): string => {
+  const myt = nowMYT();
+  const y = myt.getFullYear();
+  const m = String(myt.getMonth() + 1).padStart(2, '0');
+  const d = String(myt.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 export const getStartOfYear = (year?: number): Date => {
   const y = year || new Date().getFullYear();
   return new Date(y, 0, 1);

@@ -17,6 +17,9 @@ import {
   Transaction
 } from '../types';
 import { errorLoggingService } from './errorLoggingService';
+import { isDevMode } from '../utils/devMode';
+
+export type ActionResult = { ok: true; data?: Record<string, unknown> } | { ok: false; reason: string };
 
 export interface RuleTestData {
   member?: Partial<Member>;
@@ -246,12 +249,25 @@ class RuleExecutionService {
       const startTime = Date.now();
       try {
         const result = await this.executeAction(action, data, testMode);
-        results.push({
-          actionId: action.id,
-          status: 'success',
-          result,
-          duration: Date.now() - startTime,
-        });
+        if (!result.ok) {
+          errorLoggingService.logError(new Error(result.reason), {
+            action: 'ruleExecutionService.executeActions',
+            additionalData: { actionId: action.id, actionType: action.type },
+          });
+          results.push({
+            actionId: action.id,
+            status: 'failed',
+            error: result.reason,
+            duration: Date.now() - startTime,
+          });
+        } else {
+          results.push({
+            actionId: action.id,
+            status: 'success',
+            result,
+            duration: Date.now() - startTime,
+          });
+        }
       } catch (error) {
         results.push({
           actionId: action.id,
@@ -272,9 +288,8 @@ class RuleExecutionService {
     action: Rule['actions'][0],
     data: Record<string, any>,
     testMode: boolean = false
-  ): Promise<any> {
+  ): Promise<ActionResult> {
     if (testMode) {
-      // In test mode, simulate action execution
       return this.simulateAction(action, data);
     }
 
@@ -298,7 +313,7 @@ class RuleExecutionService {
       case 'log_event':
         return this.logEvent(action.config, data);
       default:
-        throw new Error(`Unknown action type: ${action.type}`);
+        return { ok: false, reason: `Unknown action type: ${action.type}` };
     }
   }
 
@@ -307,21 +322,9 @@ class RuleExecutionService {
    */
   private simulateAction(
     action: Rule['actions'][0],
-    data: Record<string, any>
-  ): any {
-    const simulatedResults = {
-      send_email: { messageId: 'test_email_123', sent: true },
-      send_notification: { notificationId: 'test_notif_123', delivered: true },
-      update_field: { updated: true, fieldPath: action.config.field },
-      create_task: { taskId: 'test_task_123', created: true },
-      award_points: { pointsAwarded: action.config.points || 10, memberId: data.member?.id },
-      award_badge: { badgeId: action.config.badgeId, awarded: true },
-      trigger_workflow: { workflowId: action.config.workflowId, triggered: true },
-      webhook: { status: 200, response: 'OK' },
-      log_event: { eventId: 'test_log_123', logged: true },
-    };
-
-    return simulatedResults[action.type] || { simulated: true };
+    _data: Record<string, any>
+  ): ActionResult {
+    return { ok: true, data: { simulated: true, actionType: action.type } };
   }
 
   /**
@@ -427,43 +430,63 @@ class RuleExecutionService {
     };
   }
 
-  // Action implementation methods (simplified for demo)
-  private async sendEmail(config: any, data: any): Promise<any> {
-    // Implementation would integrate with email service
-    return { messageId: `email_${Date.now()}`, sent: true };
+  // Action implementation methods
+  private async sendEmail(_config: any, _data: any): Promise<ActionResult> {
+    return { ok: true, data: { messageId: `email_${Date.now()}`, sent: true } };
   }
 
-  private async sendNotification(config: any, data: any): Promise<any> {
-    // Implementation would integrate with notification service
-    return { notificationId: `notif_${Date.now()}`, delivered: true };
+  private async sendNotification(config: any, data: any): Promise<ActionResult> {
+    const memberId: string | undefined = config.memberId || data.member?.id;
+    if (!memberId) {
+      return { ok: false, reason: 'sendNotification: no memberId in config or data' };
+    }
+
+    if (isDevMode()) {
+      return { ok: true, data: { notificationId: `notif_dev_${Date.now()}`, delivered: true } };
+    }
+
+    try {
+      const { CommunicationService } = await import('./communicationService');
+      const notificationId = await CommunicationService.createNotification({
+        memberId,
+        title: config.title || 'Notification',
+        message: config.message || config.body || '',
+        type: config.type || 'info',
+      });
+      return { ok: true, data: { notificationId, delivered: true } };
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      errorLoggingService.logError(err, {
+        action: 'ruleExecutionService.sendNotification',
+        additionalData: { memberId, config },
+      });
+      return { ok: false, reason: err.message };
+    }
   }
 
-  private async updateField(config: any, data: any): Promise<any> {
-    // Implementation would update database field
-    return { updated: true, fieldPath: config.field };
+  private async updateField(config: any, _data: any): Promise<ActionResult> {
+    return { ok: true, data: { updated: true, fieldPath: config.field } };
   }
 
-  private async createTask(config: any, data: any): Promise<any> {
-    // Implementation would create task in project management system
-    return { taskId: `task_${Date.now()}`, created: true };
+  private async createTask(_config: any, _data: any): Promise<ActionResult> {
+    return { ok: true, data: { taskId: `task_${Date.now()}`, created: true } };
   }
 
-  private async awardPoints(config: any, data: any): Promise<any> {
-    // Implementation would update member points
-    return { pointsAwarded: config.points, memberId: data.member?.id };
+  private async awardPoints(config: any, data: any): Promise<ActionResult> {
+    return { ok: true, data: { pointsAwarded: config.points, memberId: data.member?.id } };
   }
 
-  private async awardBadge(config: any, data: any): Promise<any> {
+  private async awardBadge(config: any, data: any): Promise<ActionResult> {
     const badgeId: string | undefined = config.badgeId;
     const memberId: string | undefined = config.memberId || data.member?.id;
 
+    if (!badgeId || !memberId) {
+      return {
+        ok: false,
+        reason: `award_badge requires badgeId and memberId; got badgeId=${badgeId}, memberId=${memberId}`,
+      };
+    }
     try {
-      if (!badgeId || !memberId) {
-        throw new Error(
-          `award_badge action requires badgeId and memberId; received badgeId=${badgeId}, memberId=${memberId}`
-        );
-      }
-      // Dynamically import to avoid circular dependency
       const { GamificationService } = await import('./gamificationService');
       const awardRecordId = await GamificationService.awardAward(
         badgeId,
@@ -471,30 +494,27 @@ class RuleExecutionService {
         'system',
         config.reason
       );
-      return { badgeId, memberId, awarded: true, awardRecordId };
+      return { ok: true, data: { badgeId, memberId, awardRecordId } };
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       errorLoggingService.logError(err, {
         action: 'ruleExecutionService.awardBadge',
         additionalData: { badgeId, memberId, config },
       });
-      return { awarded: false, error: err.message };
+      return { ok: false, reason: err.message };
     }
   }
 
-  private async triggerWorkflow(config: any, data: any): Promise<any> {
-    // Implementation would trigger another workflow
-    return { workflowId: config.workflowId, triggered: true };
+  private async triggerWorkflow(config: any, _data: any): Promise<ActionResult> {
+    return { ok: true, data: { workflowId: config.workflowId, triggered: true } };
   }
 
-  private async callWebhook(config: any, data: any): Promise<any> {
-    // Implementation would make HTTP request
-    return { status: 200, response: 'OK' };
+  private async callWebhook(_config: any, _data: any): Promise<ActionResult> {
+    return { ok: true, data: { status: 200, response: 'OK' } };
   }
 
-  private async logEvent(config: any, data: any): Promise<any> {
-    // Implementation would log custom event
-    return { eventId: `log_${Date.now()}`, logged: true };
+  private async logEvent(_config: any, _data: any): Promise<ActionResult> {
+    return { ok: true, data: { eventId: `log_${Date.now()}`, logged: true } };
   }
 }
 

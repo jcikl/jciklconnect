@@ -223,7 +223,7 @@ export class PromotionService {
     requirementType: PromotionRequirement['type']
   ): {
     completedAt: Date;
-    details: any;
+    details: Record<string, string | number | boolean | string[]>;
     evidence?: string[];
   } | null {
     const progress = member.promotionProgress ?? member.jciCareer?.promotionProgress;
@@ -446,7 +446,7 @@ export class PromotionService {
     requirementType: PromotionRequirement['type']
   ): Promise<{
     completedAt: Date;
-    details: any;
+    details: Record<string, string | number | boolean | string[]>;
     evidence?: string[];
   } | null> {
     const member = await this.getMemberById(memberId);
@@ -606,7 +606,7 @@ export class PromotionService {
   static async updateMemberActivity(
     memberId: string,
     activityType: 'bod_meeting' | 'event_organizing' | 'event_participation' | 'course_completion',
-    activityData: any
+    activityData: Record<string, string | number | boolean>
   ): Promise<void> {
     const member = await this.getMemberById(memberId);
     if (!member || (await this.getComputedMembershipType(member)) !== 'Probation') {
@@ -913,32 +913,19 @@ export class PromotionService {
   }
 
   private static async sendPromotionNotification(promotion: PromotionHistory): Promise<void> {
-    // Simulate sending notification
-    const notification: PromotionNotification = {
-      id: `notification_${promotion.id}`,
+    const { CommunicationService } = await import('./communicationService');
+    await CommunicationService.createNotification({
       memberId: promotion.memberId,
-      memberName: promotion.memberName,
-      memberEmail: 'member@example.com', // Would get from member record
-      promotionDate: promotion.promotionDate,
-      fromMembershipType: promotion.fromMembershipType,
-      toMembershipType: promotion.toMembershipType,
-      newDuesAmount: promotion.newDuesAmount,
+      title: 'Membership Promotion',
       message: `Congratulations! You have been promoted to ${promotion.toMembershipType} Member. Your new dues amount is RM${promotion.newDuesAmount}.`,
-      status: 'sent',
-      sentAt: new Date(),
-      retryCount: 0
-    };
-
-    // SEC-A-006: Do not log email addresses in production (PII).
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`Sent promotion notification id=${notification.id ?? '?'}`);
-    }
+      type: 'success',
+    });
   }
 
   private static async recordMemberActivity(
     memberId: string,
     activityType: string,
-    activityData: any
+    activityData: Record<string, string | number | boolean>
   ): Promise<void> {
     // Simulate recording activity
     console.log(`Recorded ${activityType} activity for member ${memberId}`, activityData);
