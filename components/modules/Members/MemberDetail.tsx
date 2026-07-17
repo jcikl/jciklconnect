@@ -44,7 +44,7 @@ import { MemberDetailActivitiesTab } from './MemberDetailActivitiesTab';
 import { AsyncErrorBoundary } from '../../ui/AsyncErrorBoundary';
 export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: boolean }> = ({ member: memberProp, onBack, isSelfView = false }) => {
   const { members, updateMember, deleteMember } = useMembers();
-  const { resetPassword, member: currentAuthMember, simulatedRole } = useAuth();
+  const { resetPassword, member: currentAuthMember, simulatedRole, user } = useAuth();
   // Always derive the latest member data from the live members array so the UI
   // updates automatically after every save (without a page reload).
   const member = useMemo(
@@ -609,9 +609,14 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
     const email = member.contact?.email || member.email;
     if (!email) { showToast('No email address found for this member', 'error'); return; }
     try {
+      const idToken = await user?.getIdToken();
+      if (!idToken) throw new Error('Not authenticated');
       const res = await fetch('/.netlify/functions/send-invite', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
         body: JSON.stringify({ email }),
       });
       if (!res.ok) {
