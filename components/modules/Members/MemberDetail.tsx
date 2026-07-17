@@ -768,7 +768,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
 
         {/* â”€â”€ MOBILE hero â”€â”€ */}
         <div className="md:hidden bg-gradient-to-br from-jci-blue via-jci-blue to-jci-navy px-4 pt-4 pb-3 relative overflow-hidden">
-          <div className="absolute inset-0 opacity-10 mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+          <div className="absolute inset-0 opacity-10 mix-blend-overlay bg-[url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cpath d='M0 20 L20 0 L40 20 L20 40 Z' fill='none' stroke='white' stroke-width='0.5' opacity='0.4'/%3E%3Cpath d='M20 0 L20 40 M0 20 L40 20' fill='none' stroke='white' stroke-width='0.3' opacity='0.2'/%3E%3C/svg%3E")]"></div>
           {!isSelfView && (
             <button
               onClick={onBack}
@@ -885,7 +885,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
         <div className="hidden md:block relative">
           {/* åŒºå—ä¸€: banner */}
           <div className="h-40 bg-gradient-to-br from-jci-blue via-jci-blue to-jci-navy relative overflow-hidden">
-            <div className="absolute inset-0 opacity-20 mix-blend-overlay bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+            <div className="absolute inset-0 opacity-20 mix-blend-overlay bg-[url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cpath d='M0 20 L20 0 L40 20 L20 40 Z' fill='none' stroke='white' stroke-width='0.5' opacity='0.4'/%3E%3Cpath d='M20 0 L20 40 M0 20 L40 20' fill='none' stroke='white' stroke-width='0.3' opacity='0.2'/%3E%3C/svg%3E")]"></div>
             <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-700"></div>
             {!isSelfView && (
               <button
