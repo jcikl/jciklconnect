@@ -86,24 +86,47 @@ export class DocumentsService {
             query(collection(db, COLLECTIONS.DOCUMENTS), orderBy('uploadedDate', 'desc'))
           );
 
-          const documents = await Promise.all(
-            snapshot.docs.map(async (docSnap) => {
-              const docData = docSnap.data();
-              const versions = await this.getDocumentVersions(docSnap.id);
-              const currentVersion = versions.find(v => v.isCurrent) || versions[0];
+          if (snapshot.empty) return [];
 
-              return {
-                id: docSnap.id,
-                ...docData,
-                uploadedDate: docData.uploadedDate?.toDate?.()?.toISOString() || docData.uploadedDate,
-                versions,
-                currentVersion,
-                versionCount: versions.length,
-              } as DocumentWithVersions;
-            })
+          // Batch-fetch all versions in chunks of 10 to avoid N+1 round-trips
+          const chunkArray = <T>(arr: T[], size: number): T[][] =>
+            Array.from({ length: Math.ceil(arr.length / size) }, (_, i) => arr.slice(i * size, (i + 1) * size));
+
+          const docIds = snapshot.docs.map(d => d.id);
+          const versionChunks = chunkArray(docIds, 10);
+          const versionResults = await Promise.all(
+            versionChunks.map(chunk =>
+              getDocs(query(
+                collection(db, COLLECTIONS.DOCUMENT_VERSIONS),
+                where('documentId', 'in', chunk)
+              ))
+            )
           );
 
-          return documents;
+          // Build Map<docId, DocumentVersion[]> from batch results
+          const versionsByDocId = new Map<string, DocumentVersion[]>();
+          for (const result of versionResults) {
+            for (const d of result.docs) {
+              const v = { id: d.id, ...d.data(), uploadedAt: d.data().uploadedAt?.toDate() || new Date() } as DocumentVersion;
+              const list = versionsByDocId.get(v.documentId) || [];
+              list.push(v);
+              versionsByDocId.set(v.documentId, list);
+            }
+          }
+
+          return snapshot.docs.map(docSnap => {
+            const docData = docSnap.data();
+            const versions = (versionsByDocId.get(docSnap.id) || []).sort((a, b) => b.version - a.version);
+            const currentVersion = versions.find(v => v.isCurrent) || versions[0];
+            return {
+              id: docSnap.id,
+              ...docData,
+              uploadedDate: docData.uploadedDate?.toDate?.()?.toISOString() || docData.uploadedDate,
+              versions,
+              currentVersion,
+              versionCount: versions.length,
+            } as DocumentWithVersions;
+          });
         }, 3 * 60 * 1000);
       }
     );

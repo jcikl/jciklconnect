@@ -442,6 +442,7 @@ export interface BusinessProfile {
   internationalPartnershipTypes?: string[];
 }
 
+/** @deprecated Use getTargetDuesForMembershipType() from membershipConfigService instead */
 export const MembershipDues: Record<MembershipType, number> = {
   Guest: 350,
   Probation: 300,

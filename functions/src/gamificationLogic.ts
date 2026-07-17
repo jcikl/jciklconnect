@@ -131,24 +131,62 @@ export const onEventRegistrationUpdate = functions.firestore
         const { memberId, eventId, loId } = after;
         if (!memberId || !loId) return null;
 
-        // A real implementation would query `incentiveStandards` for the right standardId 
-        // linked to event attendance, perhaps `2026_NETWORK_01` (Attending an Event).
-        // Let's assume a hardcoded generic ID or find one with "verificationType: 'AUTO_SYSTEM'".
-
         try {
+            // 1. Find the active incentive program
+            const activeProgramSnap = await db.collection('incentivePrograms')
+                .where('isActive', '==', true)
+                .limit(1)
+                .get();
+
+            if (activeProgramSnap.empty) {
+                console.warn(`onEventRegistrationUpdate: No active incentive program found. Skipping auto-submission for ${memberId} / ${eventId}.`);
+                return null;
+            }
+
+            const activeProgramDoc = activeProgramSnap.docs[0];
+            const activeProgramId = activeProgramDoc.id;
+
+            // 2. Find the incentive standard with autoLogicId === 'NETWORK_EVENT_ATTENDANCE'
+            //    that belongs to the active program
+            const standardSnap = await db.collection('incentiveStandards')
+                .where('programId', '==', activeProgramId)
+                .where('autoLogicId', '==', 'NETWORK_EVENT_ATTENDANCE')
+                .limit(1)
+                .get();
+
+            if (standardSnap.empty) {
+                console.warn(
+                    `onEventRegistrationUpdate: No incentiveStandard with autoLogicId='NETWORK_EVENT_ATTENDANCE' ` +
+                    `found for program '${activeProgramId}'. Skipping auto-submission for ${memberId} / ${eventId}.`
+                );
+                return null;
+            }
+
+            const standardDoc = standardSnap.docs[0];
+            const standardId = standardDoc.id;
+            const standard = standardDoc.data();
+
+            // Derive score: use first milestone's points if available, otherwise pointCap, otherwise 10
+            const milestones: any[] = standard.milestones || [];
+            const scoreAwarded: number =
+                milestones.length > 0 && milestones[0].points
+                    ? milestones[0].points
+                    : standard.pointCap || 10;
+
+            // 3. Create the submission using the real standardId
             await db.collection('incentiveSubmissions').add({
                 loId: loId,
                 memberId: memberId,
-                standardId: 'AUTO_EVENT_ATTENDANCE', // This should be queried
+                standardId: standardId,
                 quantity: 1,
                 status: 'APPROVED',
-                scoreAwarded: 10,
+                scoreAwarded: scoreAwarded,
                 evidenceText: `System auto-verified: Event check-in for ${eventId}`,
                 evidenceFiles: [],
                 submittedAt: admin.firestore.FieldValue.serverTimestamp(),
                 approvedBy: 'SYSTEM'
             });
-            console.log(`Auto assigned points to Member ${memberId} of LO ${loId} for checking in to ${eventId}`);
+            console.log(`Auto assigned ${scoreAwarded} points (standard: ${standardId}) to Member ${memberId} of LO ${loId} for checking in to ${eventId}`);
             return null;
         } catch (err) {
             console.error('Error auto assigning points on check-in', err);

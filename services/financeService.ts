@@ -32,11 +32,24 @@ import {
   roleForMembershipType,
 } from './membershipConfigService';
 import { MembersService } from './membersService';
+
+function chunkArray<T>(arr: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size));
+  return chunks;
+}
 import {
   buildMembershipProjectId,
   buildCategoryCleanupUpdates,
 } from '../utils/transactionCategoryUtils';
 import { apiCache } from './cacheService';
+
+// PERF6: helper used by reconcileBankAccount to batch-fetch splits
+function chunkArray<T>(arr: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size));
+  return chunks;
+}
 import { SponsorshipsService } from './sponsorshipService';
 
 /** Typed shape for raw Firestore transaction/split documents (avoids `as any` escapes). */
@@ -273,8 +286,8 @@ export class FinanceService {
       },
       async () => {
         try {
-          /* TODO: replace with aggregation doc read — see CLAUDE.md fix roadmap */
-          // TODO: replace with a dedicated 'transactionYears' summary document for O(1) lookup
+          // TODO PERF7: Replace with a dedicated 'transactionYears' summary document updated atomically on tx create.
+          // Current approach reads up to 1000 docs just to get year integers.
           const q = query(collection(db, COLLECTIONS.TRANSACTIONS), limit(1000));
           const snapshot = await getDocs(q);
           const years = new Set<number>();
@@ -1377,12 +1390,21 @@ export class FinanceService {
       nextTransaction: Transaction;
     };
     const plans: TxPlan[] = [];
+    // Batch-fetch all transactions upfront using documentId() to avoid N+1
+    const idChunks = chunkArray(transactionIds, 10);
+    const fetchedSnaps = await Promise.all(
+      idChunks.map(chunk =>
+        getDocs(query(collection(db, COLLECTIONS.TRANSACTIONS), where(documentId(), 'in', chunk)))
+      )
+    );
+    const txMap = new Map<string, DocumentSnapshot>();
+    fetchedSnaps.forEach(snap => snap.docs.forEach(d => txMap.set(d.id, d)));
+
     await Promise.all(
       transactionIds.map(async (txId) => {
         try {
-          const transactionRef = doc(db, COLLECTIONS.TRANSACTIONS, txId);
-          const currentDoc = await getDoc(transactionRef);
-          const currentTransaction = currentDoc.exists()
+          const currentDoc = txMap.get(txId);
+          const currentTransaction = currentDoc?.exists()
             ? ({ id: currentDoc.id, ...currentDoc.data() } as Transaction)
             : null;
 
@@ -2289,7 +2311,10 @@ export class FinanceService {
               getDocs(collection(db, COLLECTIONS.BANK_ACCOUNTS)),
               getDocs(query(collection(db, COLLECTIONS.TRANSACTIONS), limit(1000)))
             ]);
-            if (transactionsSnapshot.size >= 1000) console.warn('getAllBankAccounts: hit 1000-transaction cap, balances may be incomplete');
+            // TODO PERF8: Store running balance on bankAccount document, updated atomically on tx create/update/delete.
+            if (transactionsSnapshot.size >= 1000) {
+              console.error('[financeService] PERF8: Transaction count hit 1000 cap — bank balances will be understated. Migrate to running balance on bankAccount documents.');
+            }
 
             const accounts = accountsSnapshot.docs.map(doc => ({
               id: doc.id,
@@ -2572,9 +2597,13 @@ export class FinanceService {
         txData: Record<string, unknown>;
       }> = [];
 
+      // PERF5: Batch-fetch all members via cached getAllMembers() instead of sequential getMemberById() calls
+      const allMembersArr = await MembersService.getAllMembers();
+      const memberMap = new Map(allMembersArr.map(m => [m.id, m]));
+
       for (const memberId of memberIds) {
         try {
-          const member = await MembersService.getMemberById(memberId);
+          const member = memberMap.get(memberId);
           if (!member) continue;
 
           // Skip inactive members — they retain historical records but do not renew
@@ -3312,6 +3341,26 @@ export class FinanceService {
               new Date(t.date) <= new Date(reconciliationDate)
           );
 
+          // PERF6: Batch-fetch all splits upfront instead of one Firestore read per split transaction
+          const splitParentIds = accountTransactions.filter(t => t.isSplit).map(t => t.id!).filter(Boolean);
+          const splitsMap = new Map<string, TransactionSplit[]>();
+          if (splitParentIds.length > 0) {
+            const chunks = chunkArray(splitParentIds, 10);
+            const splitSnapshots = await Promise.all(
+              chunks.map(chunk =>
+                getDocs(query(collection(db, COLLECTIONS.TRANSACTION_SPLITS), where('parentTransactionId', 'in', chunk)))
+              )
+            );
+            splitSnapshots.forEach(snap =>
+              snap.docs.forEach(d => {
+                const data = { id: d.id, ...d.data() } as TransactionSplit;
+                const pid = (d.data() as any).parentTransactionId as string;
+                if (!splitsMap.has(pid)) splitsMap.set(pid, []);
+                splitsMap.get(pid)!.push(data);
+              })
+            );
+          }
+
           // Batch all status updates so they succeed or fail together
           const BATCH_LIMIT = 500;
           let markBatch = writeBatch(db);
@@ -3337,7 +3386,7 @@ export class FinanceService {
             if (batchCount >= BATCH_LIMIT) await flushBatch();
 
             if (transaction.isSplit && transaction.splitIds && transaction.splitIds.length > 0) {
-              const splits = await this.getTransactionSplits(transaction.id);
+              const splits = splitsMap.get(transaction.id!) ?? [];
               for (const split of splits) {
                 markBatch.update(doc(db, COLLECTIONS.TRANSACTION_SPLITS, split.id), {
                   // E4: persist prevStatus so deleteReconciliation can restore the correct status

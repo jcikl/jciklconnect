@@ -106,7 +106,7 @@ export const CreateBillForm: React.FC<CreateBillFormProps> = ({
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Button size="sm" variant="success" className="flex items-center gap-1.5 h-8 text-xs"
-            onClick={() => window.open(lastBill.paymentUrl, '_blank')}>
+            onClick={() => window.open(lastBill.paymentUrl, '_blank', 'noopener,noreferrer')}>
             <ExternalLink size={12} /> Open Payment Page
           </Button>
           <button

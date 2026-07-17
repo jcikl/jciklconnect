@@ -70,6 +70,8 @@ export default defineConfig(({ mode }) => {
             // pdf libs: dynamically imported in PaymentRequestsView, named here for readability
             'vendor-pdf':      ['jspdf', 'pdf-lib'],
             // xlsx removed: now dynamically imported, will be split automatically
+            // PERF10: Keep AI SDK out of main bundle — it is dynamically imported inside aiPredictionService methods
+            'vendor-ai': ['@google/generative-ai'],
           },
         },
       },

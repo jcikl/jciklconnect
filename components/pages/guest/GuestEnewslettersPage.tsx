@@ -145,7 +145,7 @@ export const GuestEnewslettersPage = ({ onLogin, onRegister, onPageChange }: {
       try {
         iframeRef.current.contentWindow?.print();
       } catch (e) {
-        window.open(activeUrl, '_blank');
+        window.open(activeUrl, '_blank', 'noopener,noreferrer');
         showToast('Opening PDF in new tab to print due to browser cross-origin policy.', 'info');
       }
     } else {

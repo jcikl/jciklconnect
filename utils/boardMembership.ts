@@ -5,6 +5,23 @@ export function getCurrentBoardCalendarYear(): number {
   return new Date().getFullYear();
 }
 
+/**
+ * Like getCurrentBoardCalendarYear() but accounts for the January transition window:
+ * a new board's roster may not yet be configured in early January, so callers that
+ * look up board records should fall back to the previous year when month === 0 (January).
+ *
+ * Usage: prefer this over getCurrentBoardCalendarYear() when querying boardMembers records
+ * and the caller should gracefully handle the year-start transition.
+ */
+export function getBoardCalendarYearWithGrace(): number {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  // January grace period: new board may not yet be configured for the current year
+  if (month === 0) return year - 1;
+  return year;
+}
+
 export function isActiveBoardRecordForYear(record: BoardMember, year: number): boolean {
   return record.isActive !== false && parseInt(record.term, 10) === year;
 }

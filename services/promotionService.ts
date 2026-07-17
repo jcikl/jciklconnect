@@ -20,6 +20,7 @@ import {
 } from './membershipConfigService';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { COLLECTIONS } from '../config/constants';
 
 export type EngagementYear = 'firstYear' | 'secondYear';
 
@@ -893,7 +894,7 @@ export class PromotionService {
   }
 
   private static async savePromotionHistory(promotion: PromotionHistory): Promise<void> {
-    await addDoc(collection(db, 'promotionHistory'), {
+    await addDoc(collection(db, COLLECTIONS.PROMOTION_HISTORY), {
       ...promotion,
       promotionDate: serverTimestamp()
     });
@@ -901,7 +902,7 @@ export class PromotionService {
   }
 
   private static async saveManualPromotionRequest(request: ManualPromotionRequest): Promise<void> {
-    await addDoc(collection(db, 'manualPromotionRequests'), {
+    await addDoc(collection(db, COLLECTIONS.MANUAL_PROMOTION_REQUESTS), {
       ...request,
       requestedAt: serverTimestamp()
     });

@@ -838,7 +838,7 @@ export const FlagshipProjectsManagementView: React.FC<{ searchQuery?: string }> 
                           {photos.map((url, index) => {
                             const isSelected = selectedPhotos.some(p => p.folder === folder && p.url === url);
                             return (
-                              <div key={index} draggable onDragStart={(e) => handleDragStart(e, folder, url)} onClick={(e) => { e.stopPropagation(); togglePhotoSelection(folder, url); }}
+                              <div key={url} draggable onDragStart={(e) => handleDragStart(e, folder, url)} onClick={(e) => { e.stopPropagation(); togglePhotoSelection(folder, url); }}
                                 className={`relative group border rounded-lg overflow-hidden aspect-video bg-slate-50 cursor-grab active:cursor-grabbing select-none transition-all ${isSelected ? 'ring-2 ring-jci-blue border-jci-blue scale-[0.96]' : 'border-slate-200 hover:scale-[1.02]'}`}>
                                 <img src={url} alt="" className="w-full h-full object-cover pointer-events-none" />
                                 <div className={`absolute top-1 left-1 w-3.5 h-3.5 rounded-full border flex items-center justify-center ${isSelected ? 'bg-jci-blue border-jci-blue text-white' : 'bg-white/90 border-slate-300 opacity-0 group-hover:opacity-100'}`}>
@@ -1030,7 +1030,7 @@ export const FlagshipProjectsManagementView: React.FC<{ searchQuery?: string }> 
                             {photos.map((url, index) => {
                               const isSelected = selectedPhotos.some(p => p.folder === folder && p.url === url);
                               return (
-                                <div key={index} draggable onDragStart={(e) => handleDragStart(e, folder, url)} onClick={(e) => { e.stopPropagation(); togglePhotoSelection(folder, url); }}
+                                <div key={url} draggable onDragStart={(e) => handleDragStart(e, folder, url)} onClick={(e) => { e.stopPropagation(); togglePhotoSelection(folder, url); }}
                                   className={`relative group border rounded-lg overflow-hidden aspect-video bg-slate-50 cursor-grab active:cursor-grabbing select-none transition-all ${isSelected ? 'ring-2 ring-jci-blue border-jci-blue scale-[0.96]' : 'border-slate-200 hover:scale-[1.02]'}`}>
                                   <img src={url} alt="" className="w-full h-full object-cover pointer-events-none" />
                                   <div className={`absolute top-1 left-1 w-3.5 h-3.5 rounded-full border flex items-center justify-center ${isSelected ? 'bg-jci-blue border-jci-blue text-white' : 'bg-white/90 border-slate-300 opacity-0 group-hover:opacity-100'}`}>

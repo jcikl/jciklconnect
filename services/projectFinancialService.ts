@@ -21,8 +21,15 @@ import {
   collection,
   getDocs,
   query,
+  where,
   orderBy
 } from 'firebase/firestore';
+
+function chunkArray<T>(arr: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size));
+  return chunks;
+}
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { FinanceService } from './financeService';
@@ -750,9 +757,27 @@ class ProjectFinancialService {
         });
       }
 
+      // Batch-fetch all transactions for all projects in chunks of 10 (avoids N+1)
+      const projectIds = projects.map(p => p.id);
+      const txChunks = chunkArray(projectIds, 10);
+      const txSnapshots = await Promise.all(
+        txChunks.map(chunk =>
+          getDocs(query(collection(db, COLLECTIONS.TRANSACTIONS), where('projectId', 'in', chunk)))
+        )
+      );
+      const txByProject = new Map<string, { type?: string; amount?: number }[]>();
+      txSnapshots.forEach(snap =>
+        snap.docs.forEach(d => {
+          const data = d.data();
+          const pid: string = data.projectId;
+          if (!txByProject.has(pid)) txByProject.set(pid, []);
+          txByProject.get(pid)!.push(data);
+        })
+      );
+
       const accounts: ProjectFinancialAccount[] = await Promise.all(
         projects.map(async (project) => {
-          const projectTransactions = await FinanceService.getBankTransactionsByProject(project.id);
+          const projectTransactions = txByProject.get(project.id) ?? [];
 
           const totalIncome = projectTransactions
             .filter(t => t.type === 'Income')

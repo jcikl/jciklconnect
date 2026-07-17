@@ -79,7 +79,7 @@ export const PaymentButton: React.FC<PaymentButtonProps> = ({
       setPaymentUrl(result.paymentUrl);
       setIsExisting(result.isExisting);
       onSuccess?.(result);
-      if (!result.isExisting) window.open(result.paymentUrl, '_blank');
+      if (!result.isExisting) window.open(result.paymentUrl, '_blank', 'noopener,noreferrer');
     } catch {
       // error shown via hook state
     }
@@ -107,7 +107,7 @@ export const PaymentButton: React.FC<PaymentButtonProps> = ({
           <span className="hidden sm:inline text-[10px] text-amber-600 font-medium">Existing link</span>
         )}
         <button
-          onClick={() => window.open(paymentUrl, '_blank')}
+          onClick={() => window.open(paymentUrl, '_blank', 'noopener,noreferrer')}
           className={`inline-flex items-center font-semibold bg-jci-blue text-white hover:bg-jci-blue/90 transition-colors ${btnCls}`}
         >
           <ExternalLink size={size === 'sm' ? 11 : 13} />

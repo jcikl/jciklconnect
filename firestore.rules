@@ -34,8 +34,13 @@ service cloud.firestore {
              memberData().get('isCurrentBoardMember', false) == true;
     }
 
+    // isBoard() intentionally includes ADMIN as a superset of BOARD for Firestore collection access.
+    // Note: usePermissions.ts board-elevation block explicitly excludes ADMIN (ADMIN gets permissions from
+    // ROLE_PERMISSIONS[ADMIN] directly, not from the board elevation path). These are intentionally different.
+    // Honorary and Senator membershipType members are assigned role=BOARD via roleForMembershipType().
+    // They therefore pass isBoard() checks and can access board-level collections as designed.
     function isBoard() {
-      return isAuthenticated() && 
+      return isAuthenticated() &&
              exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
              (
                (getUserRole() != null && getUserRole() in ['BOARD', 'ADMIN']) ||
@@ -542,15 +547,18 @@ service cloud.firestore {
       allow list: if isMember();
       allow create: if isMember() && request.resource.data.voterId == request.auth.uid;
       allow update, delete: if false;  // votes are immutable once cast
-    }
-    match /voteCasts/{castId} {
-      // FIX 4: cast-level ballot detail is admin-only to prevent voter identification
-      allow read: if isAdmin();
-      allow create: if isMember() && request.resource.data.voterId == request.auth.uid;
-      allow update, delete: if false;
+
+      // voteCasts is a subcollection of /votes/{voteId} — written by votesService.ts
+      // NOTE: VotesService has no UI entry point as of 2026-07 — this rule is here for when the feature is wired up
+      match /voteCasts/{castId} {
+        // FIX 4: cast-level ballot detail is admin-only to prevent voter identification
+        allow read: if isAdmin();
+        allow create: if isMember() && request.resource.data.voterId == request.auth.uid;
+        allow update, delete: if false;
+      }
     }
     
-    // Proposals collection
+    // /proposals collection — no service implementation as of 2026-07. Rule kept as placeholder.
     match /proposals/{proposalId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
@@ -1114,6 +1122,12 @@ service cloud.firestore {
       allow create: if isAdmin();
       allow update: if false;
       allow delete: if isAdmin();
+    }
+
+    // Email delivery log — written by email-sending service functions, read by admins for debugging
+    match /emailLogs/{docId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin() || isBoard();
     }
 
     // Points Rules collection (server-side automation rules — different from pointRules UI config)

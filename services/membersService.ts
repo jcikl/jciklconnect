@@ -879,10 +879,14 @@ export class MembersService {
       const q = query(
         collection(db, COLLECTIONS.MEMBERS),
         where('role', '==', role),
-        limit(200)
+        // PERF11: Increased from 200 to 500 to match getAllMembers cap. TODO: implement pagination for very large chapters.
+        limit(500)
       );
 
       const snapshot = await getDocs(q);
+      if (snapshot.docs.length >= 500) {
+        console.warn('[membersService] Member query hit 500 cap — some members may be excluded');
+      }
       const results = snapshot.docs.map(doc => ({
         ...(doc.data() as any),
         id: doc.id,

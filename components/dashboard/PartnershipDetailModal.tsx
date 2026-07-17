@@ -214,7 +214,7 @@ export const PartnershipDetailModal: React.FC<PartnershipDetailModalProps> = ({ 
               className="flex-1 max-w-[200px] h-12 rounded-2xl font-black uppercase tracking-widest text-sm shadow-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
               onClick={() => {
                 if (ad.id) AdvertisementService.recordClick(ad.id).catch(console.error);
-                window.open(ad.linkUrl, '_blank');
+                window.open(ad.linkUrl, '_blank', 'noopener,noreferrer');
               }}
             >
               <span>Learn More</span>

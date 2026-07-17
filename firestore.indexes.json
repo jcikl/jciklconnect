@@ -1271,6 +1271,22 @@
       ]
     },
     {
+      "collectionGroup": "activityPlans",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "activityPlans",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "parentProjectId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "memberBenefits",
       "queryScope": "COLLECTION",
       "fields": [

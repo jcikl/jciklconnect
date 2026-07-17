@@ -269,7 +269,11 @@ exports.handler = async (event) => {
         }
 
         const txDescription = `Membership dues ${billYear} — ${billData?.billName || billCode}`;
-        const newTxRef = await db.collection('transactions').add({
+        const elsePaymentDate = billPaymentDate || new Date().toISOString();
+        const newTxRef = db.collection('transactions').doc();
+        const memberRef = db.collection('members').doc(billMemberId);
+        const membershipBatch = db.batch();
+        membershipBatch.set(newTxRef, {
           type: 'Income',
           category: 'Membership',
           status: 'Cleared',
@@ -287,9 +291,7 @@ exports.handler = async (event) => {
           updatedAt: Timestamp.now(),
           source: 'manual',
         });
-        // Sync membership status for the newly created transaction
-        const elsePaymentDate = billPaymentDate || new Date().toISOString();
-        await db.collection('members').doc(billMemberId).update({
+        membershipBatch.update(memberRef, {
           [`membership.${billYear}.status`]: 'paid',
           [`membership.${billYear}.amount`]: duesAmount,
           [`membership.${billYear}.dues`]: duesAmount,
@@ -297,7 +299,9 @@ exports.handler = async (event) => {
           [`membership.${billYear}.paymentDate`]: elsePaymentDate,
           [`membership.${billYear}.purpose`]: txDescription,
           updatedAt: Timestamp.now(),
-        }).catch(err => console.warn('[toyyibpay-callback] Could not sync membership status (fallback tx):', err));
+        });
+        // Sync membership status atomically with the new transaction — both succeed or both fail.
+        await membershipBatch.commit();
       }
     }
 
@@ -340,7 +344,7 @@ exports.handler = async (event) => {
         const txData = {
           type: 'Income',
           category: 'Projects & Activities',
-          status: 'Pending',
+          status: 'Cleared',
           paymentMethod: 'toyyib',
           projectId: billProjectId || eventId || null,
           memberId: billMemberId || evtRegData.memberId || null,

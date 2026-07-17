@@ -170,14 +170,15 @@ export class KnowledgeService {
       return Object.fromEntries(moduleIds.map(id => [id, 'Not Started']));
     }
     try {
+      const docRefs = moduleIds.map(moduleId =>
+        doc(db, COLLECTIONS.LEARNING_PROGRESS, `${memberId}_modules_${moduleId}`)
+      );
+      const snapshots = await Promise.all(docRefs.map(ref => getDoc(ref)));
       const result: Record<string, 'Not Started' | 'In Progress' | 'Completed'> = {};
-      for (const moduleId of moduleIds) {
-        const snap = await getDoc(
-          doc(db, COLLECTIONS.LEARNING_PROGRESS, `${memberId}_modules_${moduleId}`)
-        );
-        result[moduleId] = (snap.exists() ? snap.data().completionStatus : 'Not Started') as
+      snapshots.forEach((snap, i) => {
+        result[moduleIds[i]] = (snap.exists() ? snap.data().completionStatus : 'Not Started') as
           'Not Started' | 'In Progress' | 'Completed';
-      }
+      });
       return result;
     } catch (error) {
       errorLoggingService.logError(error as Error, { action: 'KnowledgeService.getMemberModuleCompletions', additionalData: { memberId } });

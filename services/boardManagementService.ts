@@ -242,25 +242,31 @@ export class BoardManagementService {
             updatedAt: now,
           });
 
-          await batch.commit();
+          // --- Phase 3: member role updates — added to the same batch so boardMembers and members stay in sync ---
+          for (const m of transition.outgoingBoard) {
+            batch.update(doc(db, COLLECTIONS.MEMBERS, m.memberId), {
+              role: UserRole.MEMBER,
+              currentBoardYear: deleteField(),
+              currentBoardPosition: deleteField(),
+              isCurrentBoardMember: false,
+              isCurrentCommissionDirector: false,
+              updatedAt: now,
+            });
+          }
+          for (const m of transition.incomingBoard) {
+            const termYear = parseInt(m.term, 10);
+            const isCurrentTerm = termYear === getCurrentBoardCalendarYear();
+            batch.update(doc(db, COLLECTIONS.MEMBERS, m.memberId), {
+              role: UserRole.BOARD,
+              currentBoardYear: termYear,
+              currentBoardPosition: m.position,
+              updatedAt: now,
+              ...(isCurrentTerm ? { isCurrentBoardMember: true } : {}),
+            });
+          }
 
-          // --- Phase 3: propagate role changes to members collection (outside batch — reads required) ---
-          await Promise.all([
-            ...transition.outgoingBoard.map((m) =>
-              MembersService.updateMember(m.memberId, { role: UserRole.MEMBER })
-                .then(() => this.clearMemberCurrentBoardStatus(m.memberId))
-            ),
-            ...transition.incomingBoard.map((m) => {
-              const termYear = parseInt(m.term, 10);
-              const isCurrentTerm = termYear === getCurrentBoardCalendarYear();
-              return MembersService.updateMember(m.memberId, {
-                role: UserRole.BOARD,
-                currentBoardYear: termYear,
-                currentBoardPosition: m.position,
-                ...(isCurrentTerm ? { isCurrentBoardMember: true } : {}),
-              });
-            }),
-          ]);
+          await batch.commit();
+          MembersService.invalidateMembersCache();
 
           // --- Phase 4: notifications (best-effort, non-atomic) ---
           await this.sendTransitionNotifications(transition);
@@ -303,26 +309,32 @@ export class BoardManagementService {
   private static async activateBoardMember(boardMember: BoardMember): Promise<void> {
     try {
       const display = await this.getMemberDisplayFields(boardMember.memberId);
+      const now = new Date().toISOString();
       const boardMemberData = {
         ...boardMember,
         ...display,
         isActive: true,
-        startDate: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        startDate: now,
+        createdAt: now,
+        updatedAt: now,
       };
-
-      const boardMembersRef = collection(db, 'boardMembers');
-      await addDoc(boardMembersRef, boardMemberData);
 
       const termYear = parseInt(boardMember.term, 10);
       const isCurrentTerm = termYear === getCurrentBoardCalendarYear();
-      await MembersService.updateMember(boardMember.memberId, {
+
+      // Atomic: boardMembers record + member role update in a single batch
+      const batch = writeBatch(db);
+      const newBoardMemberRef = doc(collection(db, 'boardMembers'));
+      batch.set(newBoardMemberRef, boardMemberData);
+      batch.update(doc(db, COLLECTIONS.MEMBERS, boardMember.memberId), {
         role: UserRole.BOARD,
         currentBoardYear: termYear,
         currentBoardPosition: boardMember.position,
+        updatedAt: now,
         ...(isCurrentTerm ? { isCurrentBoardMember: true } : {}),
       });
+      await batch.commit();
+      MembersService.invalidateMembersCache();
     } catch (error) {
       logServiceError(
         error instanceof Error ? error : new Error(String(error)),

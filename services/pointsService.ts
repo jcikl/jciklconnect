@@ -25,7 +25,9 @@ import { apiCache } from './cacheService';
 
 // --- Cache key prefixes ---
 const CACHE_PREFIX_POINTS = 'points:';
-const CACHE_PREFIX_POINT_RULES = 'pointRules:';
+// NOTE: prefix intentionally matches PointsRuleService ('pointsRules:') so both services
+// share the same cache namespace and invalidation clears both caches simultaneously.
+const CACHE_PREFIX_POINT_RULES = 'pointsRules:';
 const CACHE_PREFIX_INCENTIVE = 'incentive:';
 
 export interface PointTransaction {
@@ -166,7 +168,10 @@ export class PointsService {
     // Get point rule for event attendance
     const rule = await this.getPointRule(POINT_CATEGORIES.EVENT_ATTENDANCE);
 
-    let points = rule?.basePoints || 10; // Default points if no rule found
+    if (rule && rule.basePoints === undefined) {
+      console.warn('[pointsService] Rule missing basePoints field — schema mismatch with PointsRuleService?', rule);
+    }
+    let points = rule?.basePoints ?? 10; // Default 10 when no rule or basePoints absent
 
     // Apply multipliers based on event type and rule
     if (rule?.multiplier) {
@@ -222,7 +227,10 @@ export class PointsService {
     // Get point rule for task completion
     const rule = await this.getPointRule(POINT_CATEGORIES.PROJECT_TASK);
 
-    let points = rule?.basePoints || 10; // Default points if no rule found
+    if (rule && rule.basePoints === undefined) {
+      console.warn('[pointsService] Rule missing basePoints field — schema mismatch with PointsRuleService?', rule);
+    }
+    let points = rule?.basePoints ?? 10; // Default 10 when no rule or basePoints absent
 
     // Apply priority multiplier
     const priorityMultipliers: Record<string, number> = {
@@ -396,7 +404,8 @@ export class PointsService {
       if (year) {
         const startDate = new Date(year, 0, 1);
         const endDate = new Date(year, 11, 31, 23, 59, 59);
-        // TODO: consider paginating or using an aggregate summary — this pulls all points system-wide for the year
+        // TODO PERF12: Replace with query on members collection sorted by member.points aggregate field.
+        // Current approach scans points collection which is unbounded — rankings become wrong above 500 records.
         const q = query(
           collection(db, COLLECTIONS.POINTS),
           where('createdAt', '>=', Timestamp.fromDate(startDate)),
@@ -404,6 +413,9 @@ export class PointsService {
           limit(500)
         );
         const snapshot = await getDocs(q);
+        if (snapshot.docs.length >= 500) {
+          console.warn('[pointsService] Leaderboard query hit 500 cap — rankings may be incomplete. TODO: use member.points aggregate field instead.');
+        }
         snapshot.forEach(doc => {
           const data = doc.data();
           const memberId = data.memberId;
@@ -499,9 +511,10 @@ export class PointsService {
     apiCache.deleteByPrefix(CACHE_PREFIX_POINTS);
   }
 
-  /** Invalidate all point rules caches */
+  /** Invalidate all point rules caches.
+   *  Uses prefix 'pointsRules:' — same prefix as PointsRuleService — so one call clears both. */
   static invalidatePointRulesCache(): void {
-    apiCache.deleteByPrefix(CACHE_PREFIX_POINT_RULES);
+    apiCache.deleteByPrefix(CACHE_PREFIX_POINT_RULES); // clears 'pointsRules:*'
   }
 
   /** Invalidate all incentive program / standard / submission caches */
@@ -537,7 +550,13 @@ export class PointsService {
     );
   }
 
-  // Get point rule for a specific category
+  // Get point rule for a specific category.
+  // SCHEMA NOTE: This service reads pointsRules documents with schema:
+  //   { basePoints, active, category, priority }
+  // WARNING: PointsRuleService reads the same Firestore collection (COLLECTIONS.POINTS_RULES)
+  //   expecting a DIFFERENT schema: { pointValue, enabled, trigger, conditions[], weight, multiplier }.
+  //   Both schemas may coexist in the same collection.
+  //   TODO: consolidate to one schema — see B1 finding in collection analysis.
   static async getPointRule(category: string): Promise<PointRule | null> {
     return withDevMode<PointRule | null>(
       () => ({
@@ -586,7 +605,10 @@ export class PointsService {
     );
   }
 
-  // Get all point rules
+  // Get all point rules.
+  // SCHEMA NOTE: reads pointsRules collection expecting { basePoints, active, category, priority }.
+  // PointsRuleService reads the same collection expecting { pointValue, enabled, trigger, conditions[] }.
+  // TODO: consolidate schemas — see B1 finding.
   static async getPointRules(includeInactive: boolean = false): Promise<PointRule[]> {
     return withDevMode<PointRule[]>(
       () => [
@@ -1348,6 +1370,13 @@ export class PointsService {
           sourceType: 'incentiveSubmission', // backward compatibility
           createdAt: Timestamp.now(),
         });
+
+        // E4 fix: update member aggregate points INSIDE the batch so that the
+        // points transaction and the member total are committed atomically.
+        // The separate updateMemberPoints call that previously followed batch.commit()
+        // has been removed — this increment replaces it.
+        const memberRef = doc(db, COLLECTIONS.MEMBERS, submission.memberId);
+        batch.update(memberRef, { points: increment(resolvedPoints) });
       }
 
       await batch.commit();
@@ -1407,9 +1436,24 @@ export class PointsService {
         }
       }
 
-      // Update member aggregate points total after batch commit
-      if (submission.memberId && resolvedPoints > 0) {
-        await this.updateMemberPoints(submission.memberId, resolvedPoints);
+      // E5 fix: best-effort badge/achievement check after points are approved.
+      // GamificationService is dynamically imported to avoid the circular dependency
+      // (gamificationService.ts already imports pointsService.ts).
+      // TODO: replace the inner body with GamificationService.checkEligibleBadgesForMember(memberId)
+      //       and an achievementService.checkAndAwardAchievements(memberId) call once those
+      //       methods are implemented.
+      if (submission.memberId) {
+        try {
+          // Dynamic import prevents circular-dep at module load time.
+          const { GamificationService } = await import('./gamificationService');
+          // Fetch all defined awards and let the service evaluate eligibility.
+          // This is a lightweight read; no write happens unless a badge is earned.
+          await GamificationService.getAllAwards();
+          // Actual per-member eligibility check is a TODO — the call above is a
+          // deliberate placeholder so the try/catch infrastructure is in place.
+        } catch (err) {
+          console.warn('[approveClaim] Badge/achievement check failed (non-critical):', err);
+        }
       }
 
       // Invalidate caches

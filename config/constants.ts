@@ -85,6 +85,10 @@ export const COLLECTIONS = {
   TASKS: 'tasks',
   /** Mentor–mentee pairings */
   MENTOR_MATCHES: 'mentorMatches',
+  /** Member promotion history log — written by promotionService */
+  PROMOTION_HISTORY: 'promotionHistory',
+  /** Manual promotion requests awaiting board review */
+  MANUAL_PROMOTION_REQUESTS: 'manualPromotionRequests',
 } as const;
 
 /** 付款申请参考编号前缀：PR-{loId}-{YYYYMMDD}-{序号}，与银行备注约定一致（Story 2.1） */

@@ -16,7 +16,6 @@ import * as Forms from './components/ui/Form';
 import { LoginModal } from './components/auth/LoginModal';
 import { RegisterModal } from './components/auth/RegisterModal';
 import { UserRole, Notification, Event, Project } from './types';
-const EventCalendarView = lazy(() => import('./components/modules/EventCalendarView').then(m => ({ default: m.EventCalendarView })));
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { usePermissions } from './hooks/usePermissions';
 import { useMembers } from './hooks/useMembers';
@@ -64,7 +63,6 @@ const AIInsightsView = lazy(() => import('./components/modules/AIInsightsView').
 const TemplatesView = lazy(() => import('./components/modules/TemplatesView').then(m => ({ default: m.TemplatesView })));
 const ActivityPlansView = lazy(() => import('./components/modules/ActivityPlansView').then(m => ({ default: m.ActivityPlansView })));
 const ReportsView = lazy(() => import('./components/modules/ReportsView').then(m => ({ default: m.ReportsView })));
-const RoleSimulator = lazy(() => import('./components/dev/RoleSimulator').then(m => ({ default: m.RoleSimulator })));
 const BoardDashboard = lazy(() => import('./components/dashboard/BoardDashboard').then(m => ({ default: m.BoardDashboard })));
 const DashboardHome = lazy(() => import('./components/dashboard/DashboardHome').then(m => ({ default: m.DashboardHome })));
 const DeveloperInterface = lazy(() => import('./components/modules/DeveloperInterface').then(m => ({ default: m.DeveloperInterface })));
@@ -388,7 +386,6 @@ export const JCIKLApp: React.FC = () => {
       MEMBERS: 'Members',
       EVENTS: 'Events',
       PROJECTS: 'Projects',
-      ACTIVITIES: 'Activity Plans',
       FINANCE: 'Finance',
       PAYMENT_REQUESTS: 'Payment Requests',
       GAMIFICATION: 'Gamification',
@@ -678,7 +675,6 @@ export const JCIKLApp: React.FC = () => {
   const renderCurrentView = (scrollRef?: React.RefObject<HTMLDivElement>) => {
     switch (view) {
       case 'MEMBERS': if (!canAccessWorkspaceModules) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <MembersView searchQuery={searchQuery} initialSelectedMemberId={initialSelectedMemberId} onClearSelection={() => setInitialSelectedMemberId(null)} />;
-      case 'ACTIVITIES': if (!canAccessWorkspaceModules && !isBoard && !isAdmin) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <ActivityPlansView searchQuery={searchQuery} />;
       case 'PROJECTS':
         if (!canViewEventsManagement) {
           return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
@@ -698,13 +694,13 @@ export const JCIKLApp: React.FC = () => {
       case 'AUTOMATION': if (!isAdmin && !isBoard) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <AutomationStudio />;
       case 'KNOWLEDGE': return <KnowledgeView searchQuery={searchQuery} />;
       case 'COMMUNICATION': if (!canAccessWorkspaceModules) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <CommunicationView searchQuery={searchQuery} />;
-      case 'CLUBS': return <HobbyClubsView searchQuery={searchQuery} />;
-      case 'SURVEYS': return <SurveysView searchQuery={searchQuery} />;
-      case 'BENEFITS': return <MemberBenefitsView searchQuery={searchQuery} />;
+      case 'CLUBS': if (member?.role === UserRole.INACTIVE) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <HobbyClubsView searchQuery={searchQuery} />;
+      case 'SURVEYS': if (member?.role === UserRole.INACTIVE) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <SurveysView searchQuery={searchQuery} />;
+      case 'BENEFITS': if (member?.role === UserRole.GUEST || member?.role === UserRole.INACTIVE) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <MemberBenefitsView searchQuery={searchQuery} />;
       case 'DATA_IMPORT_EXPORT': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <DataImportExportView />;
       case 'RADAR_IMPORTER': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <RadarDataImporter />;
       case 'ADVERTISEMENTS': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <AdvertisementsView searchQuery={searchQuery} />;
-      case 'AI_INSIGHTS': if (member?.role === UserRole.GUEST) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <AIInsightsView onNavigate={handleViewChange} searchQuery={searchQuery} />;
+      case 'AI_INSIGHTS': if (!isDeveloper && !isAdmin && !isBoard) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <AIInsightsView onNavigate={handleViewChange} searchQuery={searchQuery} />;
       case 'TEMPLATES': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <TemplatesView searchQuery={searchQuery} />;
       case 'ACTIVITY_PLANS': if (!canAccessWorkspaceModules && !isBoard && !isAdmin) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <ActivityPlansView searchQuery={searchQuery} />;
       case 'REPORTS': if (member?.role === UserRole.GUEST || isPlainMember) return <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />; return <ReportsView />;
@@ -1026,7 +1022,7 @@ export const JCIKLApp: React.FC = () => {
             </div>
           )}
           <h1 className="sr-only">
-            {view === 'DASHBOARD' ? 'Dashboard' : view === 'MEMBERS' ? 'Members' : view === 'EVENTS' ? 'Event List' : view === 'PROJECTS' ? 'Events Management' : view === 'ACTIVITIES' ? 'Activity Plans' : view === 'FINANCE' ? 'Finance' : view === 'PAYMENT_REQUESTS' ? 'Payment Requests' : view === 'GAMIFICATION' ? 'Gamification' : view === 'INVENTORY' ? 'Inventory' : view === 'DIRECTORY' ? 'Business Directory' : view === 'AUTOMATION' ? 'Automation Studio' : view === 'KNOWLEDGE' ? 'Knowledge' : view === 'COMMUNICATION' ? 'Communication' : view === 'CLUBS' ? 'Hobby Clubs' : view === 'SURVEYS' ? 'Surveys' : view === 'BENEFITS' ? 'Member Benefits' : view === 'DATA_IMPORT_EXPORT' ? 'Data Import/Export' : view === 'ADVERTISEMENTS' ? 'Partnership & Promotions' : view === 'AI_INSIGHTS' ? 'AI Insights' : view === 'TEMPLATES' ? 'Templates' : view === 'ACTIVITY_PLANS' ? 'Activity Plans' : view === 'REPORTS' ? 'Reports' : view === 'DEVELOPER' ? 'Developer Interface' : 'JCI LO Management'}
+            {view === 'DASHBOARD' ? 'Dashboard' : view === 'MEMBERS' ? 'Members' : view === 'EVENTS' ? 'Event List' : view === 'PROJECTS' ? 'Events Management' : view === 'FINANCE' ? 'Finance' : view === 'PAYMENT_REQUESTS' ? 'Payment Requests' : view === 'GAMIFICATION' ? 'Gamification' : view === 'INVENTORY' ? 'Inventory' : view === 'DIRECTORY' ? 'Business Directory' : view === 'AUTOMATION' ? 'Automation Studio' : view === 'KNOWLEDGE' ? 'Knowledge' : view === 'COMMUNICATION' ? 'Communication' : view === 'CLUBS' ? 'Hobby Clubs' : view === 'SURVEYS' ? 'Surveys' : view === 'BENEFITS' ? 'Member Benefits' : view === 'DATA_IMPORT_EXPORT' ? 'Data Import/Export' : view === 'ADVERTISEMENTS' ? 'Partnership & Promotions' : view === 'AI_INSIGHTS' ? 'AI Insights' : view === 'TEMPLATES' ? 'Templates' : view === 'ACTIVITY_PLANS' ? 'Activity Plans' : view === 'REPORTS' ? 'Reports' : view === 'DEVELOPER' ? 'Developer Interface' : 'JCI LO Management'}
           </h1>
           {/* Topbar removed for premium gradient header replacement */}
 

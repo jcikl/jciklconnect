@@ -1137,7 +1137,8 @@ export function useFinanceData(searchQuery?: string) {
 
     loadPurposesForProject();
     return () => { ignore = true; };
-  }, [isEditModalOpen, editingTransaction?.projectId, editingTransaction?.category, editingProjectPurposesByProject, showToast]);
+  // editingProjectPurposesByProject intentionally excluded — fetchedProjectPurposesRef guards re-fetch
+  }, [isEditModalOpen, editingTransaction?.projectId, editingTransaction?.category, showToast]);
 
   useEffect(() => {
     let ignore = false;

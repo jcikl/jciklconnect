@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  addDoc,
   getDoc,
   getDocs,
   updateDoc,
@@ -219,10 +220,34 @@ export class ContractService {
       await PointsService.awardPoints(data.memberId, bonus, 'ROLE_FULFILLMENT', `Commitment Bonus: ${data.goalTitle}`);
     }
 
-    // 3. Update status
-    await updateDoc(contractRef, {
-       status: CONTRACT_STATUS.FULFILLED,
-       updatedAt: serverTimestamp()
-    });
+    // 3. Update status — wrapped in try/catch (E3 safety net):
+    // Steps 1+2 cannot be atomically rolled back if this write fails, so log a
+    // finance_alert so an admin can detect and manually mark the contract Fulfilled.
+    try {
+      await updateDoc(contractRef, {
+        status: CONTRACT_STATUS.FULFILLED,
+        updatedAt: serverTimestamp()
+      });
+    } catch (fulfillErr) {
+      console.error(
+        `ContractService.fulfillContract: step 3 (status=FULFILLED) failed for contract ${contractId}. ` +
+        'Escrow released and bonus awarded but contract remains in Verifying. Admin action required.',
+        fulfillErr
+      );
+      try {
+        await addDoc(collection(db, 'finance_alerts'), {
+          type: 'CONTRACT_FULFILL_STUCK',
+          contractId,
+          memberId: data.memberId,
+          message:
+            `Contract ${contractId} escrow was released and bonus awarded but status was not updated to FULFILLED. ` +
+            'Manual admin fix required.',
+          createdAt: serverTimestamp(),
+        });
+      } catch (alertErr) {
+        console.error('ContractService.fulfillContract: failed to write finance_alert', alertErr);
+      }
+      throw fulfillErr;
+    }
   }
 }

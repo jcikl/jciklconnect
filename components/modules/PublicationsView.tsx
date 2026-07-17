@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Plus, Edit2, Trash2, FileText, Eye, EyeOff,
   ExternalLink, AlertCircle, CheckCircle, Loader, Search,
@@ -93,7 +93,7 @@ export const PublicationsView: React.FC = () => {
 
   // ── Load data ────────────────────────────────────────────────────────────────
 
-  const loadPublications = async () => {
+  const loadPublications = useCallback(async () => {
     setLoading(true);
     try {
       const data = await PublicationService.getAll();
@@ -103,9 +103,9 @@ export const PublicationsView: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
-  useEffect(() => { loadPublications(); }, []);
+  useEffect(() => { loadPublications(); }, [loadPublications]);
 
   // ── Derived data ─────────────────────────────────────────────────────────────
 

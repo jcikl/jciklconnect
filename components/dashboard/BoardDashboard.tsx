@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, TrendingUp, Users, DollarSign, Calendar, Briefcase, Award, AlertTriangle, CheckCircle, BarChart3, FileText, Download, PieChart, Activity, Package, Building2, Heart, CreditCard, RefreshCw, Clock, Sparkles, AlertCircle, Lightbulb, Cake, Gift, Zap, Eye, LayoutDashboard, CheckSquare, BookOpen, Target, Smartphone, FileCheck, Edit3, MessageCircle, Phone, XCircle } from 'lucide-react';
 import { Card, StatCard, Badge, Button, Tabs, Modal, useToast } from '../ui/Common';
 import { Select, Input } from '../ui/Form';
@@ -211,7 +211,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
 
-  const loadFinancialData = async () => {
+  const loadFinancialData = useCallback(async () => {
     try {
       setLoadingFinance(true);
       const [summary, accounts] = await Promise.all([
@@ -226,9 +226,9 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
     } finally {
       setLoadingFinance(false);
     }
-  };
+  }, []);
 
-  const loadAIInsights = async () => {
+  const loadAIInsights = useCallback(async () => {
     try {
       setLoadingAI(true);
       const [churnRisk, recommendations, eventPreds, projectPreds] = await Promise.all([
@@ -249,7 +249,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
     } finally {
       setLoadingAI(false);
     }
-  };
+  }, [members, events, projects]);
 
   useEffect(() => {
     loadFinancialData();
@@ -262,13 +262,13 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
 
       return () => clearInterval(interval);
     }
-  }, [autoRefreshEnabled]);
+  }, [autoRefreshEnabled, loadFinancialData]);
 
   useEffect(() => {
     if (members.length > 0 && events.length > 0 && projects.length > 0) {
       loadAIInsights();
     }
-  }, [members.length, events.length, projects.length]);
+  }, [loadAIInsights]);
 
   // Calculate key metrics
   const metrics = useMemo(() => {

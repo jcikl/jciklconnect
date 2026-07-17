@@ -37,6 +37,8 @@ export const usePermissions = () => {
     const effectiveRoleInner = simulatedRole ?? (member.role as UserRole) ?? UserRole.GUEST;
     const isLegacyBoardRoleInner = effectiveRoleInner === UserRole.BOARD;
 
+    // ADMIN and SUPER_ADMIN are excluded here because they receive permissions from ROLE_PERMISSIONS[ADMIN/SUPER_ADMIN].
+    // Firestore rules (isBoard()) does include ADMIN for collection access — the two systems have different semantics by design.
     if ((isCurrentBoardMember || isLegacyBoardRoleInner) && member.role !== UserRole.ADMIN && member.role !== UserRole.SUPER_ADMIN && member.role !== UserRole.INACTIVE) {
       basePermissions = {
         ...basePermissions,
@@ -106,6 +108,8 @@ export const usePermissions = () => {
   /** Workspace modules (Members, Communication, Gamification etc.) — board, admin only; not plain members/guests */
   // B-7: Honorary and Senator members also get workspace access (they hold special JCI status)
   // T-2: during simulateRole the real membershipType must not bleed into workspace access
+  // Honorary and Senator receive role=BOARD at sign-up, so Firestore rules already allow access.
+  // canAccessWorkspaceModules is set here for UI-layer consistency.
   const isHonoraryOrSenator =
     !simulatedRole &&
     (member?.membershipType === 'Honorary' || member?.membershipType === 'Senator');
@@ -152,7 +156,7 @@ export const usePermissions = () => {
     isPresident,
     isOrganizationFinance,
     isActivityFinance,
-    isDeveloper: devMode || !!simulatedRole,
+    isDeveloper: isDevMode() && !simulatedRole,
     effectiveRole,
   };
 };

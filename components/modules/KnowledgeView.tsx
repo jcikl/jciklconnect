@@ -658,7 +658,7 @@ const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({ document, onC
 
     const handleDownloadVersion = (version: DocumentVersion) => {
         if (version.fileUrl) {
-            window.open(version.fileUrl, '_blank');
+            window.open(version.fileUrl, '_blank', 'noopener,noreferrer');
         } else {
             showToast('File URL not available', 'error');
         }

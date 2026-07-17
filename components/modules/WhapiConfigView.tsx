@@ -34,7 +34,8 @@ export const WhapiConfigView: React.FC<{ embedded?: boolean }> = ({ embedded }) 
 
   useEffect(() => {
     // Load existing config from local storage or mock backend
-    const savedConfig = localStorage.getItem('whapi_config_key');
+    // TODO: move to server-side storage — see S1 security finding
+    const savedConfig = sessionStorage.getItem('whapi_config_key');
     if (savedConfig) {
       setApiKey(savedConfig);
       setStatus('connected');
@@ -113,7 +114,7 @@ export const WhapiConfigView: React.FC<{ embedded?: boolean }> = ({ embedded }) 
   const handleSave = () => {
     setLoading(true);
     setTimeout(() => {
-      localStorage.setItem('whapi_config_key', apiKey);
+      sessionStorage.setItem('whapi_config_key', apiKey);
       showToast('Whapi configuration saved successfully', 'success');
       setStatus('connected');
       setLoading(false);

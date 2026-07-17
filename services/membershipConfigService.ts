@@ -28,7 +28,12 @@ export function getMemberAge(
 }
 
 export function isMalaysianNationality(nationality?: string): boolean {
-  return !nationality || nationality === 'Malaysia';
+  // TODO: Fix callers to handle null (unknown nationality) so this can return boolean | null
+  if (!nationality) {
+    console.warn('[isMalaysianNationality] nationality is null/undefined — defaulting to Malaysian, may be incorrect');
+    return true;
+  }
+  return nationality === 'Malaysia';
 }
 
 /** Validate membershipType against Config nationality / age / senatorship rules. */
@@ -131,6 +136,9 @@ export function roleForMembershipType(
 ): UserRole {
   if (membershipType === 'Guest') return UserRole.GUEST;
   if (membershipType === 'Probation') return UserRole.MEMBER;
+  // Honorary and Senator are special statuses granted by the board — they receive board-level access
+  if (membershipType === 'Honorary') return UserRole.BOARD;
+  if (membershipType === 'Senator') return UserRole.BOARD;
   // Preserve admin-set roles that are never derived from membershipType
   if (
     currentRole === UserRole.BOARD ||
@@ -251,8 +259,11 @@ export function resolveMembershipTypeFromDues(
   return fallback;
 }
 
+/** Guest entry fee (RM350 one-time) is handled separately via GuestManagementView — not annual dues */
+export const GUEST_ENTRY_FEE = 350;
+
 export const DEFAULT_MEMBERSHIP_RULES: Record<MembershipType, MembershipRuleConfig> | any = {
-  Guest: { type: 'Guest', duesAmount: 350, nationalityLimit: 'Malaysian', ageLimit: { min: 18, max: 40 }, requiresSenatorship: false },
+  Guest: { type: 'Guest', duesAmount: 0, nationalityLimit: 'Malaysian', ageLimit: { min: 18, max: 40 }, requiresSenatorship: false },
   Probation: { type: 'Probation', duesAmount: 300, nationalityLimit: 'Malaysian', ageLimit: { min: 18, max: 40 }, requiresSenatorship: false },
   Official: { type: 'Official', duesAmount: 300, nationalityLimit: 'Malaysian', ageLimit: { min: 18, max: 40 }, requiresSenatorship: false },
   Honorary: { type: 'Honorary', duesAmount: 0, nationalityLimit: 'Malaysian', ageLimit: {}, requiresSenatorship: false },
