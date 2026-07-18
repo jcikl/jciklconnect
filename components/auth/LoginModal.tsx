@@ -126,6 +126,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
         <Input
           label="Email Address"
           type="email"
+          autoComplete="username"
           placeholder="your.email@example.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -136,6 +137,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
         <Input
           label="Password"
           type="password"
+          autoComplete="current-password"
           placeholder="Enter your password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}

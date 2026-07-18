@@ -676,12 +676,18 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
     if (!email) { setAuthEmailExists(false); return; }
     let cancelled = false;
     setAuthEmailExists(null);
-    fetch('/.netlify/functions/check-auth-email', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
+    user?.getIdToken().then(idToken => {
+      if (cancelled) return;
+      return fetch('/.netlify/functions/check-auth-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ email }),
+      });
     })
-      .then(res => (res.ok ? res.json() : null))
+      .then(res => (res?.ok ? res.json() : null))
       .then(data => { if (!cancelled && data) setAuthEmailExists(!!data.exists); })
       .catch(() => { /* keep null — fall back to Send Invite */ });
     return () => { cancelled = true; };
