@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Briefcase, CheckCircle, AlertCircle, Edit, Trash2, Settings } from 'lucide-react';
-import { Button, Badge, Card, Tabs } from '../../ui/Common';
+import { Button, Badge, Card, Tabs, ConfirmDialog } from '../../ui/Common';
 import { LoadingState } from '../../ui/Loading';
 import { formatCurrency } from '../../../utils/formatUtils';
 import { formatDate } from '../../../utils/dateUtils';
@@ -53,6 +53,7 @@ const ProjectAccountTabBase: React.FC<ProjectAccountTabProps> = ({
   projects,
 }) => {
   const [mobileTab, setMobileTab] = useState<'projects' | 'stats'>('projects');
+  const [confirmDelete, setConfirmDelete] = useState<{ transactionId: string } | null>(null);
 
   const cardList = [
     ...(uncategorizedProjectTxCount > 0 ? [{
@@ -304,7 +305,7 @@ const ProjectAccountTabBase: React.FC<ProjectAccountTabProps> = ({
                             <td className="py-2.5 px-3 text-center">
                               <div className="flex justify-center gap-0.5">
                                 <button aria-label={`Edit transaction: ${tx.description}`} onClick={() => handleEditTransaction(tx)} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"><Edit size={13} /></button>
-                                <button aria-label={`Delete transaction: ${tx.description}`} onClick={() => handleDeleteTransaction(tx.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 size={13} /></button>
+                                <button aria-label={`Delete transaction: ${tx.description}`} onClick={() => setConfirmDelete({ transactionId: tx.id })} className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 size={13} /></button>
                               </div>
                             </td>
                           )}
@@ -351,7 +352,7 @@ const ProjectAccountTabBase: React.FC<ProjectAccountTabProps> = ({
                           {hasPermission('canEditFinance') && (
                             <div className="flex items-center gap-0.5 shrink-0">
                               <button aria-label={`Edit transaction: ${tx.description}`} onClick={() => handleEditTransaction(tx)} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"><Edit size={13} /></button>
-                              <button aria-label={`Delete transaction: ${tx.description}`} onClick={() => handleDeleteTransaction(tx.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 size={13} /></button>
+                              <button aria-label={`Delete transaction: ${tx.description}`} onClick={() => setConfirmDelete({ transactionId: tx.id })} className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 size={13} /></button>
                             </div>
                           )}
                         </div>
@@ -363,6 +364,15 @@ const ProjectAccountTabBase: React.FC<ProjectAccountTabProps> = ({
           </LoadingState>
         </div>
       </div>
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Delete Transaction"
+        message="Are you sure you want to delete this transaction? This action cannot be undone."
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={() => { if (confirmDelete) { handleDeleteTransaction(confirmDelete.transactionId); setConfirmDelete(null); } }}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 };

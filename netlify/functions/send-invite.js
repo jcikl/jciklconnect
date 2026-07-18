@@ -111,8 +111,9 @@ exports.handler = async (event) => {
       }
     );
     if (!resetRes.ok) {
-      const errBody = await resetRes.text();
-      console.error('[send-invite] sendOobCode failed:', resetRes.status, errBody);
+      // P2 Fix: do not log errBody — it may contain member email address in Firebase error responses.
+      await resetRes.text(); // consume body to avoid connection leaks
+      console.error('[send-invite] sendOobCode failed, status:', resetRes.status);
       const sendError = new Error('Failed to send password reset email');
       // Log failed send
       try {

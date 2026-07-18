@@ -242,15 +242,20 @@ export class EventBudgetService {
         .filter(t => t.type === 'Income')
         .reduce((sum, t) => sum + t.amount, 0);
 
-      // Update budget with actual amounts
-      const budget = await this.getEventBudget(eventId);
-      if (budget) {
-        await this.saveEventBudget({
-          ...budget,
+      // P2-fix: wrap budget read + update in a runTransaction to prevent a concurrent
+      // reconcileEventBudget call from producing a last-write-wins overwrite.
+      // The totals are computed outside the transaction (from event transactions) and then
+      // applied atomically to the budget document.
+      const budgetRef = doc(db, COLLECTIONS.EVENT_BUDGETS, eventId);
+      await runTransaction(db, async (txn) => {
+        const budgetSnap = await txn.get(budgetRef);
+        if (!budgetSnap.exists()) return; // no budget document to update
+        txn.update(budgetRef, {
           spent: totalSpent,
           income: totalIncome,
+          updatedAt: Timestamp.now(),
         });
-      }
+      });
 
       return {
         totalSpent,

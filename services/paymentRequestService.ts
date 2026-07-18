@@ -400,7 +400,7 @@ export class PaymentRequestService {
                 { component: 'paymentRequestService', action: 'approveRequest.projectSync' }
               );
               // Mark the PR so the UI can surface a retry banner.
-              await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id), { projectBudgetSyncFailed: true }).catch(() => {});
+              await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id), { projectBudgetSyncFailed: true }).catch((err) => errorLoggingService.logError(err, { action: 'paymentRequestService.approve.projectBudgetSyncFlag' }));
             }
           }
         } else {
@@ -805,8 +805,18 @@ export class PaymentRequestService {
             updatedAt: Timestamp.now(),
             updatedBy: userId,
           });
-          // Delete all non-reconciled expense txs atomically with the status update.
+          // Re-read each expense tx inside the transaction to guard against concurrent reconciliation
+          // that may have occurred between the pre-read and now.
           for (const expenseRef of nonReconciledRefs) {
+            const freshExpenseSnap = await txn.get(expenseRef);
+            if (!freshExpenseSnap.exists()) continue;
+            const freshTx = freshExpenseSnap.data() as Transaction;
+            if (freshTx.status === 'Reconciled' || freshTx.status === 'Partially Reconciled') {
+              throw new Error(
+                `Cannot cancel: expense transaction ${expenseRef.id} was reconciled after the cancel was initiated. ` +
+                'Please reverse the reconciliation first.'
+              );
+            }
             txn.delete(expenseRef);
           }
         });

@@ -14,6 +14,8 @@ export const useSurveys = () => {
   });
 
   const createSurvey = async (surveyData: Omit<Survey, 'id' | 'responsesCount' | 'createdAt'>) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       if (!member) throw new Error('You must be logged in to create a survey');
       const id = await SurveysService.createSurvey({ ...surveyData, createdBy: member.id });
@@ -24,10 +26,14 @@ export const useSurveys = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create survey';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
   const updateSurvey = async (surveyId: string, updates: Partial<Survey>) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await SurveysService.updateSurvey(surveyId, updates);
       await loadSurveys();
@@ -36,10 +42,14 @@ export const useSurveys = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update survey';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
   const deleteSurvey = async (surveyId: string) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await SurveysService.deleteSurvey(surveyId);
       await loadSurveys();
@@ -48,6 +58,8 @@ export const useSurveys = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete survey';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 

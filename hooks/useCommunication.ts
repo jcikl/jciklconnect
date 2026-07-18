@@ -15,6 +15,7 @@ export const useCommunication = () => {
   const { member, loading: authLoading, isDevMode: isDevModeFromAuth } = useAuth();
   const { showToast } = useToast();
   const isSubmittingRef = useRef(false);
+  const isLikingRef = useRef(false);
 
   // Only fetch when auth has resolved, member is logged in, and not in dev mode
   const enabled = !authLoading && !!member && !isDevMode() && !isDevModeFromAuth;
@@ -61,6 +62,8 @@ export const useCommunication = () => {
       showToast('Please login to like posts', 'error');
       return;
     }
+    if (isLikingRef.current) return;
+    isLikingRef.current = true;
     try {
       await CommunicationService.likePost(postId, member.id);
       await loadData();
@@ -68,6 +71,8 @@ export const useCommunication = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to like post';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isLikingRef.current = false;
     }
   };
 

@@ -490,9 +490,28 @@ export class EventsService {
         if (idx !== -1) this.mockEvents[idx] = { ...this.mockEvents[idx], status: 'Cancelled' };
       },
       async () => {
-        const event = await this.getEventById(eventId);
-        if (!event) throw new Error('Event not found');
-        if (event.status === 'Cancelled') return;
+        // P1 fix: atomically claim the cancellation via runTransaction so two concurrent
+        // cancelEvent calls cannot both proceed past the status check and double-reverse
+        // attendance points.
+        const eventDocRef = doc(db, COLLECTIONS.PROJECTS, eventId);
+        let eventTitle = '';
+        let shouldProceed = false;
+        await runTransaction(db, async (txn) => {
+          const freshSnap = await txn.get(eventDocRef);
+          if (!freshSnap.exists()) throw new Error('Event not found');
+          const freshData = freshSnap.data() as Record<string, unknown>;
+          if (freshData.status === 'Cancelled') {
+            return; // Already cancelled — idempotent exit
+          }
+          eventTitle = (freshData.title ?? freshData.name ?? '') as string;
+          txn.update(eventDocRef, { status: 'Cancelled', updatedAt: Timestamp.now() });
+          shouldProceed = true;
+        });
+        if (!shouldProceed) return;
+
+        // getEventById checks banned statuses (including 'Cancelled'), so fetch a fallback title
+        // from the Firestore doc if needed; eventTitle already captured above.
+        const event = { title: eventTitle } as import('../types').Event;
 
         const registrations = await EventRegistrationService.listByEvent(eventId);
         const active = registrations.filter(r => r.status !== 'cancelled');
@@ -589,11 +608,10 @@ export class EventsService {
           }
         }
 
-        // Event status is now set inside the first batch chunk above (when active.length > 0).
-        // When there are no active registrations, we still need to mark the event Cancelled.
+        // Event status is already set atomically in the runTransaction guard above.
+        // When there are no active registrations, reset the attendees counter.
         if (active.length === 0) {
           await updateDoc(doc(db, COLLECTIONS.PROJECTS, eventId), {
-            status: 'Cancelled',
             attendees: 0,
             registeredMembers: [],
             updatedAt: Timestamp.now(),
@@ -708,41 +726,49 @@ export class EventsService {
           }
 
           // E7 fix: attempt to reverse attendance points that were awarded at check-in.
-          // The Cloud Function awards points on checked_in; we query and negate them here.
-          // TODO: wrap points reversal in runTransaction with pointsReversed flag to prevent double-reversal
-          // For now, check pointsReversed flag on the attendance record before reversing.
+          // P1 fix: use runTransaction to atomically set pointsReversed=true so two
+          // concurrent undoAttendance calls cannot both proceed past the flag check
+          // and double-reverse the member's points.
           try {
             const { PointsService } = await import('./pointsService');
-            // Check if points were already reversed to prevent double-reversal on concurrent calls
             const regDocId = `${eventId}_${memberId}`;
             const regRef2 = doc(db, COLLECTIONS.EVENT_REGISTRATIONS, regDocId);
-            const regSnap2 = await getDoc(regRef2);
-            if (regSnap2.exists() && regSnap2.data().pointsReversed === true) {
-              // Points already reversed — skip to avoid double-reversal
-            } else {
-              const pointSnap = await getDocs(
-                query(
-                  collection(db, COLLECTIONS.POINTS),
-                  where('memberId', '==', memberId),
-                  where('relatedEntityId', '==', eventId)
-                )
+
+            // Query total points for this event (cannot run inside a transaction)
+            const pointSnap = await getDocs(
+              query(
+                collection(db, COLLECTIONS.POINTS),
+                where('memberId', '==', memberId),
+                where('relatedEntityId', '==', eventId)
+              )
+            );
+            const total = pointSnap.docs.reduce(
+              (sum, d) => sum + (d.data().amount ?? d.data().points ?? 0),
+              0
+            );
+
+            // Atomically claim the reversal slot — prevents double-reversal on concurrent calls
+            let shouldReverse = false;
+            if (total > 0) {
+              await runTransaction(db, async (txn) => {
+                const regSnap2 = await txn.get(regRef2);
+                if (regSnap2.exists() && regSnap2.data()?.pointsReversed === true) {
+                  return; // Already reversed — idempotent exit
+                }
+                txn.update(regRef2, { pointsReversed: true });
+                shouldReverse = true;
+              });
+            }
+
+            if (shouldReverse && total > 0) {
+              await PointsService.awardPoints(
+                memberId,
+                -total,
+                'EVENT_ATTENDANCE',
+                'Reversed: attendance undone',
+                eventId,
+                'event'
               );
-              const total = pointSnap.docs.reduce(
-                (sum, d) => sum + (d.data().amount ?? d.data().points ?? 0),
-                0
-              );
-              if (total > 0) {
-                await PointsService.awardPoints(
-                  memberId,
-                  -total,
-                  'EVENT_ATTENDANCE',
-                  'Reversed: attendance undone',
-                  eventId,
-                  'event'
-                );
-                // Mark pointsReversed so a second concurrent call skips reversal
-                await updateDoc(regRef2, { pointsReversed: true });
-              }
             }
           } catch (pointsErr) {
             console.warn(

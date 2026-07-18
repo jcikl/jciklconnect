@@ -191,7 +191,8 @@ const MobileMemberRow = React.memo(function MobileMemberRow({
         {/* Avatar */}
         {member.avatar ? (
           <img src={member.avatar} alt={member.name}
-            className="w-10 h-10 rounded-2xl object-cover bg-slate-200 shrink-0 border border-slate-100" />
+            className="w-10 h-10 rounded-2xl object-cover bg-slate-200 shrink-0 border border-slate-100"
+            onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = getInitialsSvg(member.name, 40); }} />
         ) : (
           <div className={`w-10 h-10 rounded-2xl shrink-0 flex items-center justify-center text-white font-black text-sm ${tierColor}`}>
             {member.name.charAt(0)}

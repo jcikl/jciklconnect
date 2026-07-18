@@ -412,9 +412,10 @@ service cloud.firestore {
     // FIX 15: allow create: if true had no field validation — bots/spammers could write arbitrary content
     match /nonMemberLeads/{leadId} {
       allow read: if isAuthenticated() && canReadOrgMembers();
-      allow create: if isAuthenticated() &&
-                      request.resource.data.keys().hasAll(['name', 'email', 'source', 'createdAt']) &&
-                      request.resource.data.keys().hasOnly(['name', 'email', 'phone', 'source', 'message', 'createdAt', 'eventId']);
+      // P0 Fix: removed isAuthenticated() requirement — public form submissions come from unauthenticated users.
+      // Field validation prevents arbitrary writes: required fields enforced via hasAll, allowlist via hasOnly.
+      allow create: if request.resource.data.keys().hasAll(['name', 'email', 'source', 'createdAt']) &&
+                      request.resource.data.keys().hasOnly(['name', 'email', 'phone', 'source', 'message', 'createdAt', 'eventId', 'loId']);
       allow update, delete: if isAuthenticated() && canReadOrgMembers();
     }
 
@@ -568,7 +569,11 @@ service cloud.firestore {
       // FIX 4: split read — resource.data is null in list queries; protect ballot privacy
       allow get: if isAdmin() || (isMember() && resource.data.voterId == request.auth.uid);
       allow list: if isAdmin();
-      allow create: if isMember() && request.resource.data.voterId == request.auth.uid;
+      // P1 Fix: require deterministic document ID = uid + '_' + electionId to prevent duplicate votes.
+      // The service must use this compound key when writing vote documents.
+      allow create: if isMember() &&
+                      request.resource.data.voterId == request.auth.uid &&
+                      voteId == request.auth.uid + '_' + request.resource.data.electionId;
       allow update, delete: if false;  // votes are immutable once cast
 
       // voteCasts is a subcollection of /votes/{voteId} — written by votesService.ts
@@ -651,7 +656,8 @@ service cloud.firestore {
     // FIX 12: any authenticated user (including GUEST) could create/update/delete any club
     match /hobbyClubs/{clubId} {
       allow read: if isAuthenticated();
-      allow create: if isMember() || isBoard() || isAdmin();
+      // P2 Fix: exclude GUEST role from creating clubs — only MEMBER and above.
+      allow create: if (isMember() && getUserRole() != 'GUEST') || isBoard() || isAdmin();
       // Club lead can update descriptive fields only — leadId and memberIds are admin-managed
       allow update: if isBoard() || isAdmin() ||
                       (isMember() && resource.data.leadId == request.auth.uid
@@ -1191,7 +1197,9 @@ service cloud.firestore {
     // Members can read their own slot (to check status); only the service layer (Admin-level) writes
     match /memberEmails/{email} {
       allow read: if isAuthenticated() && canReadOrgMembers();
-      allow create: if isAdmin() || (isAuthenticated() && request.resource.data.memberId == request.auth.uid);
+      // P1 Fix: require document ID to match the authenticated user's own email so no user can
+      // claim another person's email slot. Bulk import uses admin context (isAdmin()) which bypasses this.
+      allow create: if isAdmin() || (isAuthenticated() && request.resource.data.memberId == request.auth.uid && email == request.auth.token.email);
       allow update, delete: if isAdmin();
     }
 

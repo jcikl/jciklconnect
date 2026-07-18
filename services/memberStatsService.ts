@@ -69,7 +69,7 @@ export class MemberStatsService {
       const totalMembers = membersInPeriod.length;
       const currentYearStr = String(currentYear);
       const activeMembers = membersInPeriod.filter(
-        m => m.membership?.[currentYearStr]?.status === 'paid' && (m.attendanceCheckins ?? 0) > 0
+        m => m.membership?.[currentYearStr]?.status === 'paid'
       ).length;
 
       // New members

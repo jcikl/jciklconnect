@@ -8,10 +8,14 @@ import { useFirestoreCollection } from './useFirestoreCollection';
 export const useInventory = () => {
   const { showToast } = useToast();
   const isCreatingRef = useRef(false);
+  const isUpdatingRef = useRef(false);
+  const isDeletingRef = useRef(false);
   const isCheckingOutRef = useRef(false);
   const isCheckingInRef = useRef(false);
   const isSchedulingRef = useRef(false);
   const isCompletingRef = useRef(false);
+  const isAcknowledgingRef = useRef(false);
+  const isUpdatingScheduleRef = useRef(false);
 
   const { data: items, loading, error, reload: loadItems } = useFirestoreCollection<InventoryItem>({
     loader: () => InventoryService.getAllItems(),
@@ -35,6 +39,8 @@ export const useInventory = () => {
   };
 
   const updateItem = async (itemId: string, updates: Partial<InventoryItem>) => {
+    if (isUpdatingRef.current) return;
+    isUpdatingRef.current = true;
     try {
       await InventoryService.updateItem(itemId, updates);
       await loadItems();
@@ -43,10 +49,14 @@ export const useInventory = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update inventory item';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isUpdatingRef.current = false;
     }
   };
 
   const deleteItem = async (itemId: string) => {
+    if (isDeletingRef.current) return;
+    isDeletingRef.current = true;
     try {
       await InventoryService.deleteItem(itemId);
       await loadItems();
@@ -55,6 +65,8 @@ export const useInventory = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete inventory item';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isDeletingRef.current = false;
     }
   };
 
@@ -133,6 +145,8 @@ export const useInventory = () => {
   };
 
   const updateMaintenanceSchedule = async (scheduleId: string, updates: Partial<MaintenanceSchedule>) => {
+    if (isUpdatingScheduleRef.current) return;
+    isUpdatingScheduleRef.current = true;
     try {
       await InventoryService.updateMaintenanceSchedule(scheduleId, updates);
       await loadMaintenanceSchedules();
@@ -141,6 +155,8 @@ export const useInventory = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update maintenance schedule';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isUpdatingScheduleRef.current = false;
     }
   };
 
@@ -161,6 +177,8 @@ export const useInventory = () => {
   };
 
   const acknowledgeAlert = async (alertId: string, acknowledgedBy: string) => {
+    if (isAcknowledgingRef.current) return;
+    isAcknowledgingRef.current = true;
     try {
       await InventoryService.acknowledgeAlert(alertId, acknowledgedBy);
       await loadAlerts();
@@ -169,6 +187,8 @@ export const useInventory = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to acknowledge alert';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isAcknowledgingRef.current = false;
     }
   };
 

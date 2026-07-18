@@ -1,5 +1,5 @@
 // useAutomation Hook - Manage automation workflows and rules
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { AutomationService, Workflow } from '../services/automationService';
 import { AutomationRule } from '../types';
 import { useToast } from '../components/ui/Common';
@@ -7,6 +7,8 @@ import { useFirestoreCollection } from './useFirestoreCollection';
 
 export const useAutomation = () => {
   const { showToast } = useToast();
+  const isSubmittingRef = useRef(false);
+  const isExecutingRef = useRef(false);
 
   const { data: workflows, loading: loading1, error: error1, reload: loadWorkflows } = useFirestoreCollection<Workflow>({
     loader: () => AutomationService.getAllWorkflows(),
@@ -21,6 +23,8 @@ export const useAutomation = () => {
 
   // Create workflow
   const createWorkflow = useCallback(async (workflowData: Omit<Workflow, 'id' | 'executions' | 'createdAt' | 'updatedAt'>) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await AutomationService.createWorkflow(workflowData);
       showToast('Workflow created successfully', 'success');
@@ -29,11 +33,15 @@ export const useAutomation = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create workflow';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   }, [loadWorkflows, showToast]);
 
   // Update workflow
   const updateWorkflow = useCallback(async (workflowId: string, updates: Partial<Workflow>) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await AutomationService.updateWorkflow(workflowId, updates);
       showToast('Workflow updated successfully', 'success');
@@ -42,11 +50,15 @@ export const useAutomation = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update workflow';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   }, [loadWorkflows, showToast]);
 
   // Delete workflow
   const deleteWorkflow = useCallback(async (workflowId: string) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await AutomationService.deleteWorkflow(workflowId);
       showToast('Workflow deleted successfully', 'success');
@@ -55,11 +67,15 @@ export const useAutomation = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete workflow';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   }, [loadWorkflows, showToast]);
 
   // Create rule
   const createRule = useCallback(async (ruleData: Omit<AutomationRule, 'id' | 'executions'>) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await AutomationService.createRule(ruleData);
       showToast('Rule created successfully', 'success');
@@ -68,11 +84,15 @@ export const useAutomation = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create rule';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   }, [loadRules, showToast]);
 
   // Update rule
   const updateRule = useCallback(async (ruleId: string, updates: Partial<AutomationRule>) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await AutomationService.updateRule(ruleId, updates);
       showToast('Rule updated successfully', 'success');
@@ -81,6 +101,8 @@ export const useAutomation = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update rule';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   }, [loadRules, showToast]);
 
@@ -90,6 +112,8 @@ export const useAutomation = () => {
     context: Record<string, any> = {},
     triggeredBy: 'manual' | 'event' | 'schedule' | 'webhook' | 'condition' = 'manual'
   ) => {
+    if (isExecutingRef.current) return;
+    isExecutingRef.current = true;
     try {
       const execution = await AutomationService.executeWorkflow(workflowId, context, triggeredBy);
       showToast(
@@ -102,6 +126,8 @@ export const useAutomation = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to execute workflow';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isExecutingRef.current = false;
     }
   }, [loadWorkflows, showToast]);
 

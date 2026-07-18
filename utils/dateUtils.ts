@@ -106,11 +106,14 @@ export const formatRelativeTime = getRelativeTime;
 
 export const isToday = (date: string | Date): boolean => {
   const d = typeof date === 'string' ? new Date(date) : date;
-  const today = nowMYT();
+  // P2 Fix: convert d to MYT wall-clock before comparing so dates straddling UTC midnight
+  // (e.g. 00:30 MYT = yesterday 16:30 UTC) are evaluated correctly in Malaysia timezone.
+  const dMYT = new Date(d.toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }));
+  const nowMYTDate = nowMYT();
   return (
-    d.getDate() === today.getDate() &&
-    d.getMonth() === today.getMonth() &&
-    d.getFullYear() === today.getFullYear()
+    dMYT.getFullYear() === nowMYTDate.getFullYear() &&
+    dMYT.getMonth() === nowMYTDate.getMonth() &&
+    dMYT.getDate() === nowMYTDate.getDate()
   );
 };
 

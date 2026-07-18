@@ -191,7 +191,31 @@ export class ToyyibService {
           updatedAt: serverTimestamp(),
         }, { merge: true });
       }
-      await billBatch.commit();
+      // P1-fix: retry the Firestore write once after a 1-second delay so a transient network
+      // error doesn't leave a bill created in ToyyibPay but not recorded in Firestore.
+      try {
+        await billBatch.commit();
+      } catch (firstCommitErr) {
+        await new Promise(r => setTimeout(r, 1000));
+        // writeBatch instances are single-use; create a fresh batch with the same operations.
+        const retryBatch = writeBatch(db);
+        retryBatch.set(billRef, billRecord);
+        if (usedCategoryCode) {
+          retryBatch.set(doc(db, COLLECTIONS.TOYYIB_CATEGORIES, usedCategoryCode), {
+            billCount: increment(1),
+            updatedAt: serverTimestamp(),
+          }, { merge: true });
+        }
+        try {
+          await retryBatch.commit();
+        } catch (retryErr) {
+          errorLoggingService.logError(
+            retryErr instanceof Error ? retryErr : new Error(`[billCode=${billCode}] ${String(retryErr)}`),
+            { component: 'toyyibService', action: 'createBill.firestorePersist' }
+          );
+          throw retryErr;
+        }
+      }
       return {
         billCode,
         paymentUrl: `https://${TOYYIB_CONFIG.IS_SANDBOX ? 'dev.' : ''}toyyibpay.com/${billCode}`
@@ -420,7 +444,13 @@ export class ToyyibService {
     // Priority: 1 (paid) > 4 (settling) > 2 (pending) > 3 (failed)
     const STATUS_PRIORITY: Record<string, number> = { '1': 4, '4': 3, '2': 2, '3': 1 };
     const snap = await getDocs(query(collection(db, COLLECTIONS.TOYYIB_BILLS), where('billCode', '==', billCode), limit(1)));
-    const match = snap.docs[0];
+    let match = snap.docs[0];
+    if (!match) {
+      // P2-fix: webhook may fire before Firestore replication completes — retry once after 500ms.
+      await new Promise(r => setTimeout(r, 500));
+      const retrySnap = await getDocs(query(collection(db, COLLECTIONS.TOYYIB_BILLS), where('billCode', '==', billCode), limit(1)));
+      match = retrySnap.docs[0];
+    }
     if (match) {
       const billRef = doc(db, COLLECTIONS.TOYYIB_BILLS, match.id);
       await runTransaction(db, async (txn) => {
@@ -547,7 +577,9 @@ export class ToyyibService {
         if (attempt < 2) await new Promise(r => setTimeout(r, 1000));
       }
     }
-    // All retries failed — log with the categoryCode so it can be recovered manually
+    // All retries failed — clear the placeholder so a future attempt can try again,
+    // then log and rethrow so the caller knows the categoryCode was not persisted.
+    await setDoc(categoryDocRef, { categoryCode: null, isActive: false, updatedAt: serverTimestamp() }, { merge: true }).catch(() => {});
     errorLoggingService.logError(
       membershipSetErr instanceof Error ? membershipSetErr : new Error(`[categoryCode=${categoryCode}] ${String(membershipSetErr)}`),
       { component: 'toyyibService', action: 'getOrCreateMembershipCategory' }

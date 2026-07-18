@@ -1,5 +1,5 @@
 // Webhook Management Hook
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { WebhookService, Webhook, WebhookLog } from '../services/webhookService';
 import { useToast } from '../components/ui/Common';
 import { isDevMode } from '../utils/devMode';
@@ -7,6 +7,8 @@ import { useFirestoreCollection } from './useFirestoreCollection';
 
 export const useWebhooks = () => {
   const { showToast } = useToast();
+  const isSubmittingRef = useRef(false);
+  const isTestingRef = useRef(false);
 
   const { data: webhooks, loading, error, reload: loadWebhooks } = useFirestoreCollection<Webhook>({
     loader: () => WebhookService.getAllWebhooks(),
@@ -27,6 +29,8 @@ export const useWebhooks = () => {
   }, [showToast]);
 
   const createWebhook = useCallback(async (webhook: Omit<Webhook, 'id' | 'createdAt' | 'updatedAt' | 'successCount' | 'failureCount'>) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await WebhookService.createWebhook(webhook);
       showToast('Webhook created successfully', 'success');
@@ -35,10 +39,14 @@ export const useWebhooks = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create webhook';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   }, [loadWebhooks, showToast]);
 
   const updateWebhook = useCallback(async (webhookId: string, updates: Partial<Webhook>) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await WebhookService.updateWebhook(webhookId, updates);
       showToast('Webhook updated successfully', 'success');
@@ -47,10 +55,14 @@ export const useWebhooks = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update webhook';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   }, [loadWebhooks, showToast]);
 
   const deleteWebhook = useCallback(async (webhookId: string) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await WebhookService.deleteWebhook(webhookId);
       showToast('Webhook deleted successfully', 'success');
@@ -59,10 +71,14 @@ export const useWebhooks = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete webhook';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   }, [loadWebhooks, showToast]);
 
   const testWebhook = useCallback(async (webhookId: string) => {
+    if (isTestingRef.current) return;
+    isTestingRef.current = true;
     try {
       const result = await WebhookService.testWebhook(webhookId);
       if (result.success) {
@@ -76,6 +92,8 @@ export const useWebhooks = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to test webhook';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isTestingRef.current = false;
     }
   }, [loadWebhooks, showToast]);
 

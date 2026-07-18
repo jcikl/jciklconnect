@@ -375,19 +375,21 @@ export class AutomationService {
         context,
       };
 
-      // Update the pre-created execution doc with workflow name + full context
-      await updateDoc(executionRef, {
-        workflowName: workflow.name,
-        triggeredBy,
-        executedSteps: [],
-        nodeExecutions: [],
-        context,
-      });
-
       const executedSteps: WorkflowExecutionStep[] = [];
       let executionError: WorkflowExecution['error'] | undefined;
 
       try {
+        // P2 fix: moved updateDoc inside inner try so that if it throws, the outer
+        // catch at the bottom can mark the execution as failed rather than leaving
+        // it permanently in 'running' state.
+        await updateDoc(executionRef, {
+          workflowName: workflow.name,
+          triggeredBy,
+          executedSteps: [],
+          nodeExecutions: [],
+          context,
+        });
+
         // Execute steps in order
         for (const step of workflow.steps.sort((a, b) => a.order - b.order)) {
           const stepStartTime = Date.now();

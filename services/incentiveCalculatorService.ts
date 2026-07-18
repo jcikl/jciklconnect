@@ -329,30 +329,12 @@ export class IncentiveCalculatorService {
             if (subData.status === 'APPROVED' && subData.evidenceText?.includes('Auto-calculated')) {
                 const submissionRef = doc(db, COLLECTIONS.INCENTIVE_SUBMISSIONS, sub.id);
 
-                // P1 Fix: Wrap in runTransaction so that two concurrent calls both re-read
-                // the current scoreAwarded inside the transaction. Only the winning commit
-                // computes a non-zero delta; the losing call's transaction aborts and retries,
-                // sees score === scoreAwarded, and delta becomes 0 — preventing double-award.
-                let delta = 0;
-                await runTransaction(db, async (txn) => {
-                    const freshSnap = await txn.get(submissionRef);
-                    if (!freshSnap.exists()) return;
-                    const freshData = freshSnap.data();
-                    // Guard: abort if the submission is no longer an auto-approved record
-                    if (freshData.status !== 'APPROVED' || !freshData.evidenceText?.includes('Auto-calculated')) return;
-                    delta = score - (freshData.scoreAwarded || 0);
-                    txn.update(submissionRef, {
-                        quantity,
-                        scoreAwarded: score,
-                        updatedAt: Timestamp.now()
-                    });
-                });
+                    // P1 fix: call awardPoints FIRST, then update scoreAwarded only if it
+                // succeeds. This ensures that if awardPoints throws, scoreAwarded is
+                // unchanged and the next calculateAll retries with the same delta.
+                const delta = score - (subData.scoreAwarded || 0);
 
-                // Fix 7 (P2): invalidate incentive cache after updating submission score.
-                PointsService.invalidateIncentiveCache();
-
-                // Fix 6 (P1): handle both positive and negative deltas — score reductions
-                // (negative delta) must also deduct points to prevent phantom accumulation.
+                // Fix 6 (P1): handle both positive and negative deltas.
                 if (delta !== 0 && subData.memberId) {
                     try {
                         await PointsService.awardPoints(
@@ -364,18 +346,35 @@ export class IncentiveCalculatorService {
                             'incentive'
                         );
                     } catch (deltaErr) {
-                        // IMPORTANT: submissionRef was already updated but points were not awarded/deducted.
-                        // Log for manual reconciliation.
+                        // awardPoints failed — do NOT update scoreAwarded so the next
+                        // calculateAll call retries with the same delta.
                         const { errorLoggingService } = await import('./errorLoggingService');
                         errorLoggingService.logError(
                             deltaErr instanceof Error ? deltaErr : new Error(String(deltaErr)),
                             { component: 'IncentiveCalculatorService', action: 'syncSubmission.awardPoints', additionalData: { memberId: subData.memberId, delta, submissionId: sub.id } }
                         );
                         throw new Error(
-                            `Score updated but points adjustment failed. Manual reconciliation needed. ${deltaErr instanceof Error ? deltaErr.message : String(deltaErr)}`
+                            `Score update deferred: points adjustment failed. Manual reconciliation needed. ${deltaErr instanceof Error ? deltaErr.message : String(deltaErr)}`
                         );
                     }
                 }
+
+                // awardPoints succeeded — now update scoreAwarded atomically.
+                await runTransaction(db, async (txn) => {
+                    const freshSnap = await txn.get(submissionRef);
+                    if (!freshSnap.exists()) return;
+                    const freshData = freshSnap.data();
+                    // Guard: abort if the submission is no longer an auto-approved record
+                    if (freshData.status !== 'APPROVED' || !freshData.evidenceText?.includes('Auto-calculated')) return;
+                    txn.update(submissionRef, {
+                        quantity,
+                        scoreAwarded: score,
+                        updatedAt: Timestamp.now()
+                    });
+                });
+
+                // Fix 7 (P2): invalidate incentive cache after updating submission score.
+                PointsService.invalidateIncentiveCache();
             }
         }
     }

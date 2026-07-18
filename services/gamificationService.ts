@@ -157,12 +157,6 @@ export class GamificationService {
                     const award = await this.getAwardById(awardId);
                     if (!award) throw new Error('Award definition not found');
 
-                    // Read member data before the transaction (needed to build userBadge
-                    // object and compute points tier; member doc is not read inside the
-                    // transaction to keep the critical section small).
-                    const { MembersService } = await import('./membersService');
-                    const member = await MembersService.getMemberById(memberId);
-
                     const awardData: Omit<MemberAward, 'id'> = {
                         awardId,
                         memberId,
@@ -199,29 +193,32 @@ export class GamificationService {
                         txn.update(memberRef, { badges: arrayUnion(userBadge), updatedAt: Timestamp.now() });
                     });
 
-                    // Points reward is written after the transaction — non-atomic relative to
-                    // the badge but kept outside due to its own internal complexity.
-                    if (isNewAward && award.pointsReward > 0 && member) {
-                        const currentPoints: number = (member as any).points || 0;
-                        const newPoints = currentPoints + award.pointsReward;
-                        const newTier = PointsService.calculateTier(newPoints);
-                        const pointsBatch = writeBatch(db);
-                        pointsBatch.update(memberRef, {
-                            points: increment(award.pointsReward),
-                            tier: newTier,
+                    // Points reward: use runTransaction so tier is computed from a fresh
+                    // member read AFTER the badge transaction commits, preventing stale-tier
+                    // from a concurrent awardPoints call. (P1 fix)
+                    if (isNewAward && award.pointsReward > 0) {
+                        await runTransaction(db, async (txn) => {
+                            const freshMemberSnap = await txn.get(memberRef);
+                            const currentPoints = freshMemberSnap.exists()
+                                ? (freshMemberSnap.data()?.points || 0)
+                                : 0;
+                            const newTier = PointsService.calculateTier(currentPoints + award.pointsReward);
+                            txn.update(memberRef, {
+                                points: increment(award.pointsReward),
+                                tier: newTier,
+                            });
+                            const pointsTxRef = doc(collection(db, COLLECTIONS.POINTS));
+                            txn.set(pointsTxRef, {
+                                memberId,
+                                points: award.pointsReward,
+                                amount: award.pointsReward,
+                                category: 'achievement',
+                                description: `Award unlocked: ${award.name}`,
+                                relatedEntityId: awardId,
+                                relatedEntityType: 'award',
+                                createdAt: Timestamp.now(),
+                            });
                         });
-                        const pointsTxRef = doc(collection(db, COLLECTIONS.POINTS));
-                        pointsBatch.set(pointsTxRef, {
-                            memberId,
-                            points: award.pointsReward,
-                            amount: award.pointsReward,
-                            category: 'achievement',
-                            description: `Award unlocked: ${award.name}`,
-                            relatedEntityId: awardId,
-                            relatedEntityType: 'award',
-                            createdAt: Timestamp.now(),
-                        });
-                        await pointsBatch.commit();
                     }
 
                     // Best-effort notification — must not roll back the committed badge

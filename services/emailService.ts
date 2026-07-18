@@ -2,7 +2,7 @@
 import { Timestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
-import { withDevMode } from '../utils/devMode';
+import { withDevMode, isDevMode } from '../utils/devMode';
 import { addDoc, collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import { errorLoggingService } from './errorLoggingService';
 import { getAuth } from 'firebase/auth';
@@ -84,14 +84,17 @@ export class EmailService {
           provider: this.config?.provider || 'none',
         });
 
-        // Log email in dev mode
-        await this.logEmail({
-          to: message.to,
-          subject: message.subject,
-          status: 'sent',
-          provider: this.config?.provider || 'dev',
-          metadata: { devMode: true },
-        });
+        // P2 Fix: skip real Firestore addDoc in dev mode — logEmail performs a live write
+        // that fails when Firebase is not configured for offline use.
+        if (!isDevMode()) {
+          await this.logEmail({
+            to: message.to,
+            subject: message.subject,
+            status: 'sent',
+            provider: this.config?.provider || 'dev',
+            metadata: { devMode: true },
+          });
+        }
 
         return `dev-email-${Date.now()}`;
       },
@@ -248,6 +251,7 @@ export class EmailService {
   }
 
   // Get email logs
+  // TODO: requires composite indexes in firestore.indexes.json: (to, createdAt desc) and (status, createdAt desc)
   static async getEmailLogs(
     filters?: {
       to?: string;

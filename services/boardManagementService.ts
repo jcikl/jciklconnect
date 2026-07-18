@@ -14,6 +14,7 @@ import {
   orderBy,
   deleteField,
   writeBatch,
+  runTransaction,
 } from 'firebase/firestore';
 import {
   getCurrentBoardCalendarYear,
@@ -187,8 +188,25 @@ export class BoardManagementService {
       () => { console.log(`[Dev Mode] Would execute board transition ${transitionId}`); },
       async () => {
         try {
-          // Get the transition record
           const transitionRef = doc(db, 'boardTransitions', transitionId);
+
+          // P1 fix: idempotency guard — atomically claim this execution by setting
+          // status='completed' inside a runTransaction. A second concurrent call will
+          // see status='completed' and exit early, preventing duplicate boardMember records.
+          let shouldProceed = false;
+          const nowForGuard = new Date().toISOString();
+          await runTransaction(db, async (txn) => {
+            const freshSnap = await txn.get(transitionRef);
+            if (!freshSnap.exists()) throw new Error('Board transition not found');
+            if (freshSnap.data()?.status === 'completed') {
+              return; // Already completed — idempotent exit
+            }
+            txn.update(transitionRef, { status: 'completed', completedAt: nowForGuard });
+            shouldProceed = true;
+          });
+          if (!shouldProceed) return;
+
+          // Get the transition record (re-read for full data after guard)
           const transitionDoc = await getDoc(transitionRef);
 
           if (!transitionDoc.exists()) {

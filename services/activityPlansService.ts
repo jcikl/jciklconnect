@@ -486,49 +486,55 @@ export class ActivityPlansService {
       () => 'mock-new-version-id',
       async () => {
         try {
-          const existingPlan = await this.getActivityPlanById(planId);
-          if (!existingPlan) throw new Error('Activity plan not found');
-
-          const newVersionData: Record<string, unknown> = {
-            version: existingPlan.version + 1,
-            previousVersionId: planId,
-            status: 'Draft' as const,
-            submittedBy,
-            createdAt: Timestamp.now(),
-            updatedAt: Timestamp.now(),
-          };
-
-          // Copy existing plan fields (excluding versioning / review fields)
+          // P2 fix: use runTransaction with a fresh getDoc so that concurrent
+          // createNewVersion calls cannot both read the same cached version number
+          // and produce duplicate version numbers.
           const skipKeys = new Set([
             'id', 'version', 'previousVersionId',
             'submittedDate', 'reviewedBy', 'reviewedDate',
             'reviewComments', 'createdAt', 'updatedAt',
           ]);
-          Object.keys(existingPlan).forEach(key => {
-            if (!skipKeys.has(key)) {
-              const value = existingPlan[key as keyof ActivityPlan];
+
+          let newDocId = '';
+          await runTransaction(db, async (txn) => {
+            const freshSnap = await txn.get(doc(db, COLLECTIONS.ACTIVITY_PLANS, planId));
+            if (!freshSnap.exists()) throw new Error('Activity plan not found');
+            const freshPlan = mapDoc({ id: freshSnap.id, data: () => freshSnap.data() as Record<string, any> });
+
+            const newVersionData: Record<string, unknown> = {
+              version: freshPlan.version + 1,
+              previousVersionId: planId,
+              status: 'Draft' as const,
+              submittedBy,
+              createdAt: Timestamp.now(),
+              updatedAt: Timestamp.now(),
+            };
+
+            // Copy existing plan fields (excluding versioning / review fields)
+            Object.keys(freshPlan).forEach(key => {
+              if (!skipKeys.has(key)) {
+                const value = freshPlan[key as keyof ActivityPlan];
+                if (value !== undefined) newVersionData[key] = value;
+              }
+            });
+
+            // Apply caller-provided overrides
+            Object.keys(updates).forEach(key => {
+              const value = updates[key as keyof typeof updates];
               if (value !== undefined) newVersionData[key] = value;
-            }
+            });
+
+            const newDocRef = doc(collection(db, COLLECTIONS.ACTIVITY_PLANS));
+            newDocId = newDocRef.id;
+            txn.set(newDocRef, newVersionData);
+            txn.update(doc(db, COLLECTIONS.ACTIVITY_PLANS, planId), {
+              previousVersionId: newDocRef.id,
+              updatedAt: Timestamp.now(),
+            });
           });
 
-          // Apply caller-provided overrides
-          Object.keys(updates).forEach(key => {
-            const value = updates[key as keyof typeof updates];
-            if (value !== undefined) newVersionData[key] = value;
-          });
-
-          // FIX P1: use writeBatch — create new doc + stamp previousVersionId on original atomically
-          const batch = writeBatch(db);
-          const newDocRef = doc(collection(db, COLLECTIONS.ACTIVITY_PLANS)); // FIX P0
-          batch.set(newDocRef, newVersionData);
-          batch.update(doc(db, COLLECTIONS.ACTIVITY_PLANS, planId), { // FIX P0
-            previousVersionId: newDocRef.id,
-            updatedAt: Timestamp.now(),
-          });
-          await batch.commit();
-
-          this.invalidateActivityPlansCache(); // FIX P1
-          return newDocRef.id;
+          this.invalidateActivityPlansCache();
+          return newDocId;
         } catch (error) {
           errorLoggingService.logError(error as Error, {
             component: 'ActivityPlansService',

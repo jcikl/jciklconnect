@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { 
   Play, 
   Square, 
@@ -55,12 +55,15 @@ const MOCK_TEST_DATA = {
 
 const WorkflowTestPanel: React.FC<WorkflowTestPanelProps> = ({ workflow, onClose }) => {
   const [isRunning, setIsRunning] = useState(false);
+  const abortRef = useRef(false);
   const [testDataJson, setTestDataJson] = useState(JSON.stringify(MOCK_TEST_DATA, null, 2));
   const [currentExecution, setCurrentExecution] = useState<WorkflowExecution | null>(null);
   const [executionHistory, setExecutionHistory] = useState<WorkflowExecution[]>([]);
   const [selectedHistoryExecution, setSelectedHistoryExecution] = useState<WorkflowExecution | null>(null);
 
   const handleRunTest = useCallback(async () => {
+    if (isRunning) return;
+    abortRef.current = false;
     setIsRunning(true);
     
     try {
@@ -85,8 +88,11 @@ const WorkflowTestPanel: React.FC<WorkflowTestPanelProps> = ({ workflow, onClose
       // Simulate workflow execution
       const nodeExecutions: WorkflowNodeExecution[] = [];
       
-      for (let i = 0; i < workflow.nodes.length; i++) {
-        const node = workflow.nodes[i];
+      const nodeCount = workflow.nodes?.length ?? (workflow as any).steps?.length ?? 0;
+      const nodeList = workflow.nodes ?? (workflow as any).steps ?? [];
+      for (let i = 0; i < nodeCount; i++) {
+        if (abortRef.current) { abortRef.current = false; break; }
+        const node = nodeList[i];
         
         // Simulate processing delay
         await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
@@ -178,6 +184,7 @@ const WorkflowTestPanel: React.FC<WorkflowTestPanelProps> = ({ workflow, onClose
   }, [workflow, testDataJson]);
 
   const handleStopTest = useCallback(() => {
+    abortRef.current = true;
     setIsRunning(false);
     if (currentExecution && currentExecution.status === 'running') {
       const stoppedExecution: WorkflowExecution = {

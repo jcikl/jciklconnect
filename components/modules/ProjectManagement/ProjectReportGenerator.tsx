@@ -43,6 +43,7 @@ export const ProjectReportGenerator: React.FC<ProjectReportGeneratorProps> = ({
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
   const [generatedReport, setGeneratedReport] = useState<ProjectReport | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
   const { showToast } = useToast();
   const { user } = useAuth();
@@ -76,6 +77,8 @@ export const ProjectReportGenerator: React.FC<ProjectReportGeneratorProps> = ({
   };
 
   const handleGenerateReport = async () => {
+    if (isGenerating) return;
+    setIsGenerating(true);
     setLoading(true);
     try {
       const report = await ProjectReportService.generateReport(project.id, reportType);
@@ -84,6 +87,7 @@ export const ProjectReportGenerator: React.FC<ProjectReportGeneratorProps> = ({
       console.error('Error generating report:', error);
       showToast('Failed to generate report', 'error');
     } finally {
+      setIsGenerating(false);
       setLoading(false);
     }
   };
@@ -277,11 +281,11 @@ export const ProjectReportGenerator: React.FC<ProjectReportGeneratorProps> = ({
             <div className="flex gap-3">
               <button
                 onClick={handleGenerateReport}
-                disabled={loading}
+                disabled={isGenerating || loading}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
               >
                 <BarChart3 size={16} />
-                {loading ? 'Generating...' : 'Generate Report'}
+                {isGenerating ? 'Generating...' : 'Generate Report'}
               </button>
 
               {generatedReport && (

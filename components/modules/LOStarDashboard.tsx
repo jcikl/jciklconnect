@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { errorLoggingService } from '../../services/errorLoggingService';
 import { Card, ProgressBar, Badge, Button, useToast } from '../ui/Common';
 import { Star, RefreshCw, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { PointsService } from '../../services/pointsService';
@@ -24,7 +25,7 @@ export const LOStarDashboard: React.FC = () => {
             const data = await PointsService.getLOStarProgress(loId, currentYear);
             setProgress(data);
         } catch (err) {
-            console.error('Failed to load LO Star progress:', err);
+            errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { action: 'LOStarDashboard.load' });
             setError('Failed to calculate progress. Please try again.');
             showToast('Failed to load LO Star progress', 'error');
         } finally {

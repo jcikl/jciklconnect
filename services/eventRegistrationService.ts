@@ -153,6 +153,9 @@ export const EventRegistrationService = {
         // P0 FIX: use deterministic doc ID and runTransaction so dedup check + write are atomic.
         const deterministicId = `${eventId}_${memberId}`;
         const regRef = doc(db, COLLECTIONS.EVENT_REGISTRATIONS, deterministicId);
+        // P1 fix: also update event attendees counter inside the same transaction so the
+        // counter stays in sync with the registration document at all times.
+        const eventRef = doc(db, COLLECTIONS.PROJECTS, eventId);
 
         await runTransaction(db, async (txn) => {
           const snap = await txn.get(regRef);
@@ -177,6 +180,11 @@ export const EventRegistrationService = {
           if (extraFields?.registeredBy) payload.registeredBy = extraFields.registeredBy;
           if (extraFields?.registeredByName) payload.registeredByName = extraFields.registeredByName;
           txn.set(regRef, payload);
+          // Increment event attendees counter atomically with the registration write
+          txn.update(eventRef, {
+            attendees: increment(1),
+            registeredMembers: arrayUnion(memberId),
+          });
         });
 
         return deterministicId;
@@ -260,12 +268,22 @@ export const EventRegistrationService = {
         const memberId: string | null = data.memberId ?? null;
         const eventId: string | null = data.eventId ?? null;
         const wasCheckedIn = data.status === 'checked_in';
+        // Cancelled registrations already had their counter decremented on cancel;
+        // only non-cancelled registrations still hold a slot in the attendees count.
+        const wasCancelled = data.status === 'cancelled';
 
         const batch = writeBatch(db);
         batch.delete(regRef);
         if (eventId && memberId) {
           const eventRef = doc(db, COLLECTIONS.PROJECTS, eventId);
-          batch.update(eventRef, { attendanceList: arrayRemove(memberId) });
+          const eventUpdate: Record<string, unknown> = { attendanceList: arrayRemove(memberId) };
+          // P1 fix: also decrement attendees and remove from registeredMembers
+          // so the event counter stays accurate after a hard delete.
+          if (!wasCancelled) {
+            eventUpdate.attendees = increment(-1);
+            eventUpdate.registeredMembers = arrayRemove(memberId);
+          }
+          batch.update(eventRef, eventUpdate);
         }
         await batch.commit();
 

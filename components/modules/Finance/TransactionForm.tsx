@@ -183,7 +183,7 @@ export const TransactionForm: React.FC<Props> = ({
         )}
 
         {isEdit ? (
-          <Input name="date" label="Date" type="date" defaultValue={((getVal('date') as string) || '').split('T')[0]} required max={new Date().toISOString().split('T')[0]} />
+          <Input name="date" label="Date" type="date" value={((getVal('date') as string) || '').split('T')[0]} required max={new Date().toISOString().split('T')[0]} onChange={(e) => handleEditChange('date', e.target.value)} />
         ) : (
           <Input name="date" label="Date" type="date" defaultValue={new Date().toISOString().split('T')[0]} required max={new Date().toISOString().split('T')[0]} />
         )}

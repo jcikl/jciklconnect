@@ -103,6 +103,10 @@ class RuleExecutionService {
     } catch (error) {
       execution.status = 'failed';
       execution.error = error instanceof Error ? error.message : 'Unknown error';
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), {
+        action: 'ruleExecutionService.executeRule',
+        additionalData: { ruleId: rule.id },
+      });
     }
 
     execution.duration = Date.now() - startTime;
@@ -506,8 +510,8 @@ class RuleExecutionService {
       const { PointsService } = await import('./pointsService');
       const txId = await PointsService.awardPoints(
         memberId,
-        points,
         config.category || 'automation',
+        points,
         config.description || 'Awarded by automation rule',
         config.relatedEntityId,
         config.relatedEntityType

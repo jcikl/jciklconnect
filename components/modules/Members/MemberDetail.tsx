@@ -42,6 +42,13 @@ import { MemberDetailProfessionalTab } from './MemberDetailProfessionalTab';
 import { MemberDetailCareerTab } from './MemberDetailCareerTab';
 import { MemberDetailActivitiesTab } from './MemberDetailActivitiesTab';
 import { AsyncErrorBoundary } from '../../ui/AsyncErrorBoundary';
+// Generate an inline SVG data URI with initials — avoids external requests blocked by CSP
+const getInitialsSvg = (name: string, size = 48): string => {
+  const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><rect width="${size}" height="${size}" fill="#0097D7" rx="${size / 2}"/><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" fill="white" font-family="sans-serif" font-size="${Math.round(size * 0.4)}px">${initials}</text></svg>`;
+  return `data:image/svg+xml;base64,${btoa(svg)}`;
+};
+
 export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: boolean }> = ({ member: memberProp, onBack, isSelfView = false }) => {
   const { members, updateMember, deleteMember } = useMembers();
   const { resetPassword, member: currentAuthMember, simulatedRole, user } = useAuth();
@@ -81,6 +88,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
   const [showPaymentHistoryModal, setShowPaymentHistoryModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const isSavingRef = useRef(false);
+  const isInlineSavingRef = useRef(false);
   const [isStatusUpdating, setIsStatusUpdating] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarUploadProgress, setAvatarUploadProgress] = useState(0);
@@ -248,6 +256,8 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
   }, [inlineValues, member, showToast]);
 
   const handleInlineSave = async (card: 'basic' | 'professional' | 'contact' | 'apparel' | 'career', updates: Partial<Member>) => {
+    if (isInlineSavingRef.current) return false;
+    isInlineSavingRef.current = true;
     try {
       await updateMember(member.id, updates);
       setActiveInlineEditCard(null);
@@ -256,6 +266,8 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
     } catch (err) {
       showToast('Failed to update profile', 'error');
       return false;
+    } finally {
+      isInlineSavingRef.current = false;
     }
   };
 
@@ -811,6 +823,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
                   src={member.avatar || undefined}
                   className="w-16 h-16 rounded-full border-2 border-white/50 bg-slate-200 object-cover"
                   alt={member.name}
+                  onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = getInitialsSvg(member.name, 64); }}
                 />
               </div>
               <div className={`absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-jci-navy shadow ${(member.role === UserRole.MEMBER || member.role === UserRole.BOARD || member.role === UserRole.ADMIN) ? 'bg-green-400' : 'bg-slate-400'}`} title={member.role} />
@@ -936,6 +949,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
                   src={member.avatar || undefined}
                   className="w-32 h-32 rounded-full border-4 border-slate-50 bg-slate-100 object-cover"
                   alt={member.name}
+                  onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = getInitialsSvg(member.name, 128); }}
                 />
               </div>
               <div className={`absolute bottom-2 right-2 w-8 h-8 rounded-full border-4 border-white shadow-sm ${(member.role === UserRole.MEMBER || member.role === UserRole.BOARD || member.role === UserRole.ADMIN) ? 'bg-green-500' : 'bg-slate-500'}`} title={member.role} />

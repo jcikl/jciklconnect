@@ -28,7 +28,7 @@ export const CreateRuleModal: React.FC<CreateRuleModalProps> = ({ onClose, onSuc
       await createRule({ name: ruleName, trigger, action, active });
       onSuccess();
     } catch (err) {
-      // Error handled by hook
+      showToast('Failed to create rule — please try again', 'error');
     } finally {
       setIsSaving(false);
     }

@@ -209,6 +209,7 @@ export const MessagingView: React.FC = () => {
                             src={getConversationAvatar(conv) || getInitialsSvg(getConversationDisplayName(conv), 48)}
                             alt={getConversationDisplayName(conv)}
                             className="w-12 h-12 rounded-full bg-slate-200 flex-shrink-0"
+                            onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = getInitialsSvg(getConversationDisplayName(conv), 48); }}
                           />
                         ) : conv.type === 'project' ? (
                           <div className="w-12 h-12 rounded-full bg-jci-blue/10 flex items-center justify-center flex-shrink-0">
@@ -267,6 +268,7 @@ export const MessagingView: React.FC = () => {
                       src={getConversationAvatar(selectedConversation) || getInitialsSvg(getConversationDisplayName(selectedConversation), 40)}
                       alt={getConversationDisplayName(selectedConversation)}
                       className="w-10 h-10 rounded-full bg-slate-200"
+                      onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = getInitialsSvg(getConversationDisplayName(selectedConversation), 40); }}
                     />
                   ) : selectedConversation.type === 'project' ? (
                     <div className="w-10 h-10 rounded-full bg-jci-blue/10 flex items-center justify-center">
@@ -308,6 +310,7 @@ export const MessagingView: React.FC = () => {
                             src={message.senderAvatar || getInitialsSvg(message.senderName, 32)}
                             alt={message.senderName}
                             className="w-8 h-8 rounded-full bg-slate-200 flex-shrink-0"
+                            onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = getInitialsSvg(message.senderName, 32); }}
                           />
                         )}
                         {showAvatar && isOwnMessage && <div className="w-8 flex-shrink-0" />}
@@ -454,7 +457,7 @@ export const MessagingView: React.FC = () => {
                         }}
                         className="rounded border-slate-300"
                       />
-                      <img src={m.avatar || getInitialsSvg(m.name, 32)} alt={m.name} className="w-8 h-8 rounded-full" />
+                      <img src={m.avatar || getInitialsSvg(m.name, 32)} alt={m.name} className="w-8 h-8 rounded-full" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = getInitialsSvg(m.name, 32); }} />
                       <span className="text-sm text-slate-900">{m.name}</span>
                     </label>
                   ))}

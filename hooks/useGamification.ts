@@ -1,5 +1,5 @@
 // useGamification.ts - Unified Hook for Awards (Achievements + Badges)
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -25,6 +25,7 @@ export interface EnrichedAward extends AwardDefinition {
 export const useGamification = (memberId?: string) => {
     const { showToast } = useToast();
     const queryClient = useQueryClient();
+    const isSubmittingRef = useRef(false);
 
     const { data: awards = [], isLoading: awardsLoading } = useQuery({
         queryKey: ['awards'],
@@ -73,6 +74,8 @@ export const useGamification = (memberId?: string) => {
     const loadAllAwards = useCallback(() => queryClient.invalidateQueries({ queryKey: ['awards'] }), [queryClient]);
 
     const awardAward = useCallback(async (awardId: string, targetMemberId: string, reason?: string) => {
+        if (isSubmittingRef.current) return;
+        isSubmittingRef.current = true;
         try {
             await GamificationService.awardAward(awardId, targetMemberId, memberId, reason);
             showToast('Recognition awarded successfully!', 'success');
@@ -80,10 +83,14 @@ export const useGamification = (memberId?: string) => {
         } catch (err) {
             showToast('Failed to award recognition', 'error');
             throw err;
+        } finally {
+            isSubmittingRef.current = false;
         }
     }, [memberId, showToast, loadAllAwards]);
 
     const createAward = useCallback(async (awardData: Omit<AwardDefinition, 'id'>) => {
+        if (isSubmittingRef.current) return;
+        isSubmittingRef.current = true;
         try {
             await GamificationService.createAward(awardData);
             showToast('Award definition created!', 'success');
@@ -91,10 +98,14 @@ export const useGamification = (memberId?: string) => {
         } catch (err) {
             showToast('Failed to create award definition', 'error');
             throw err;
+        } finally {
+            isSubmittingRef.current = false;
         }
     }, [showToast, loadAllAwards]);
 
     const updateAward = useCallback(async (awardId: string, awardData: Partial<AwardDefinition>) => {
+        if (isSubmittingRef.current) return;
+        isSubmittingRef.current = true;
         try {
             await GamificationService.updateAward(awardId, awardData);
             showToast('Award definition updated!', 'success');
@@ -102,10 +113,14 @@ export const useGamification = (memberId?: string) => {
         } catch (err) {
             showToast('Failed to update award definition', 'error');
             throw err;
+        } finally {
+            isSubmittingRef.current = false;
         }
     }, [showToast, loadAllAwards]);
 
     const deleteAward = useCallback(async (awardId: string) => {
+        if (isSubmittingRef.current) return;
+        isSubmittingRef.current = true;
         try {
             await GamificationService.deleteAward(awardId);
             showToast('Award definition deleted!', 'success');
@@ -113,6 +128,8 @@ export const useGamification = (memberId?: string) => {
         } catch (err) {
             showToast('Failed to delete award definition', 'error');
             throw err;
+        } finally {
+            isSubmittingRef.current = false;
         }
     }, [showToast, loadAllAwards]);
 

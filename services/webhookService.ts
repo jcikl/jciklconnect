@@ -128,8 +128,25 @@ export class WebhookService {
       },
       async () => {
         try {
+          // TODO: secret should be generated server-side and stored in Secret Manager, not in Firestore.
+          // For now: hash the secret (SHA-256) before storing so plaintext never lands in Firestore.
+          let webhookToStore: typeof webhook = { ...webhook };
+          if (webhook.secret) {
+            errorLoggingService.logError(
+              new Error('[WebhookService] Storing webhook secret in Firestore is insecure — secret will be hashed. Move secret generation to a Netlify Function and use Secret Manager.'),
+              { component: 'WebhookService', action: 'createWebhook' }
+            );
+            // Hash the secret with SHA-256 before storing
+            const encoder = new TextEncoder();
+            const data = encoder.encode(webhook.secret);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            webhookToStore = { ...webhook, secret: `sha256:${hashHex}` };
+          }
+
           const docRef = await addDoc(collection(db, COLLECTIONS.WEBHOOKS || 'webhooks'), {
-            ...webhook,
+            ...webhookToStore,
             successCount: 0,
             failureCount: 0,
             createdAt: Timestamp.now(),
@@ -198,12 +215,16 @@ export class WebhookService {
   }
 
   // Trigger webhook
-  // IMPORTANT: This method sends HTTP requests from the browser, which are blocked by CORS
-  // for most webhook endpoints. This should be moved to a Netlify Function.
-  // TODO: Create netlify/functions/trigger-webhook.js that accepts {webhookId, event, data}
-  // and performs the outbound HTTP call server-side where CORS does not apply.
+  // TODO: this must be moved to netlify/functions/trigger-webhook.js — client-side HTTP requests
+  // are blocked by CORS on virtually all webhook receivers. This browser-side implementation will
+  // silently fail for any endpoint that does not explicitly allow cross-origin requests.
   static async triggerWebhook(webhookId: string, event: string, data: any): Promise<boolean> {
     if (isDevMode()) { console.log('[WebhookService] dev mode — skipping real HTTP request'); return true; }
+    // Warn in production that browser-side outbound HTTP is blocked by CORS on most endpoints.
+    errorLoggingService.logError(
+      new Error('[WebhookService] triggerWebhook called from browser — CORS will block most real webhook endpoints. Move this to a Netlify Function.'),
+      { component: 'WebhookService', action: 'triggerWebhook', additionalData: { webhookId, event } }
+    );
     const webhook = await this.getWebhookById(webhookId);
     if (!webhook || !webhook.active) {
       return false;

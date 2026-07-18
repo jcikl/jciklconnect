@@ -28,6 +28,7 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
     const [postContent, setPostContent] = useState('');
     const [isPosting, setIsPosting] = useState(false);
     const [isAnnouncementModalOpen, setIsAnnouncementModalOpen] = useState(false);
+    const [likingPostIds, setLikingPostIds] = useState<Set<string>>(new Set());
     const [selectedAnnouncement, setSelectedAnnouncement] = useState<NewsPost | null>(null);
     const [announcementData, setAnnouncementData] = useState({
         title: '',
@@ -184,7 +185,7 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
                             <div className="p-4 sm:p-6 bg-slate-50/50">
                                 <div className="flex gap-3 sm:gap-4">
                                     {member && (
-                                        <img src={member.avatar || getInitialsSvg(member.name, 40)} alt={member.name} className="w-10 h-10 rounded-full bg-slate-200 flex-shrink-0" />
+                                        <img src={member.avatar || getInitialsSvg(member.name, 40)} alt={member.name} className="w-10 h-10 rounded-full bg-slate-200 flex-shrink-0" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = getInitialsSvg(member.name, 40); }} />
                                     )}
                                     {!member && (
                                         <div className="w-10 h-10 rounded-full bg-slate-200 flex-shrink-0"></div>
@@ -270,7 +271,7 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
                                             <div className="flex items-start justify-between mb-3">
                                                 <div className="flex items-center gap-3">
                                                     {post.author.avatar ? (
-                                                        <img src={post.author.avatar} alt={post.author.name} className="w-10 h-10 rounded-full" />
+                                                        <img src={post.author.avatar} alt={post.author.name} className="w-10 h-10 rounded-full" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = getInitialsSvg(post.author.name, 40); }} />
                                                     ) : (
                                                         <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs">BOT</div>
                                                     )}
@@ -333,8 +334,14 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
                                             <div className="flex items-center gap-6 text-slate-500 text-sm">
                                                 <button
                                                     className="flex items-center gap-2 hover:text-jci-blue"
-                                                    onClick={() => likePost(post.id)}
-                                                    disabled={!member}
+                                                    onClick={async () => {
+                                                        if (likingPostIds.has(post.id)) return;
+                                                        setLikingPostIds(prev => new Set(prev).add(post.id));
+                                                        try { await likePost(post.id); } finally {
+                                                            setLikingPostIds(prev => { const n = new Set(prev); n.delete(post.id); return n; });
+                                                        }
+                                                    }}
+                                                    disabled={!member || likingPostIds.has(post.id)}
                                                 >
                                                     <ThumbsUp size={16} /> {post.likes || 0} Likes
                                                 </button>
@@ -677,10 +684,11 @@ interface AnnouncementModalProps {
     onClose: () => void;
     announcement: NewsPost | null;
     members: any[];
-    onSave: (data: any) => void;
+    onSave: (data: any) => void | Promise<void>;
 }
 
 const AnnouncementModal: React.FC<AnnouncementModalProps> = ({ isOpen, onClose, announcement, members, onSave }) => {
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [formData, setFormData] = useState({
         title: '',
         content: '',
@@ -724,10 +732,15 @@ const AnnouncementModal: React.FC<AnnouncementModalProps> = ({ isOpen, onClose, 
         }
     }, [announcement, isOpen]);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formData.content.trim()) return;
-        onSave(formData);
+        if (!formData.content.trim() || isSubmitting) return;
+        setIsSubmitting(true);
+        try {
+            await onSave(formData);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -869,9 +882,9 @@ const AnnouncementModal: React.FC<AnnouncementModalProps> = ({ isOpen, onClose, 
                 </div>
 
                 <div className="flex gap-3 pt-4">
-                    <Button type="submit" className="flex-1">
+                    <Button type="submit" className="flex-1" disabled={isSubmitting}>
                         <Send size={16} className="mr-2" />
-                        {announcement ? 'Update Announcement' : 'Publish Announcement'}
+                        {isSubmitting ? 'Saving...' : (announcement ? 'Update Announcement' : 'Publish Announcement')}
                     </Button>
                     <Button type="button" variant="ghost" onClick={onClose}>
                         Cancel

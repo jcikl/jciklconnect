@@ -15,6 +15,7 @@ export const useMessaging = () => {
   const { showToast } = useToast();
   const isSendingRef = useRef(false);
   const isCreatingRef = useRef(false);
+  const hasActiveSubscriptionRef = useRef(false);
 
   // Load conversations
   const loadConversations = useCallback(async () => {
@@ -49,6 +50,11 @@ export const useMessaging = () => {
     }
 
     conversationIdRef.current = conversationId;
+
+    // Skip the one-shot getDocs if a live subscription is already providing data
+    // for this conversation — issuing both simultaneously causes a race where the
+    // slower getDocs response can overwrite the fresher subscription snapshot.
+    if (hasActiveSubscriptionRef.current) return;
 
     try {
       setLoading(true);
@@ -164,12 +170,14 @@ export const useMessaging = () => {
       return;
     }
 
+    hasActiveSubscriptionRef.current = true;
     const unsubscribe = MessagingService.subscribeToMessages(selectedConversation.id, (newMessages) => {
       setMessages(newMessages);
       setLoading(false);
     });
 
     return () => {
+      hasActiveSubscriptionRef.current = false;
       unsubscribe();
     };
   }, [member?.id, selectedConversation?.id]);

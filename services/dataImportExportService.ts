@@ -516,12 +516,14 @@ export class DataImportExportService {
           // TODO: wire up createRecord/updateRecord — bulk-imported members skip memberEmails dedup slots
           if ((entityType === 'members' || entityType === COLLECTIONS.MEMBERS) && normalizedRow.email) {
             const sanitized = String(normalizedRow.email).toLowerCase().replace(/[^a-z0-9@.]/g, '_');
-            // 'memberEmails' collection — no COLLECTIONS constant yet; add one when available
-            currentBatch.set(doc(db, 'memberEmails', sanitized), {
+            currentBatch.set(doc(db, COLLECTIONS.MEMBER_EMAILS, sanitized), {
               email: normalizedRow.email,
               memberId: newDocRef.id,
               createdAt: Timestamp.now(),
             });
+            // P2 Fix: each memberEmails set is a separate Firestore op — count it to avoid
+            // exceeding the 500-op batch limit.
+            opsInCurrentBatch++;
           }
           summary.created++;
         }

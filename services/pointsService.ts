@@ -109,7 +109,7 @@ export class PointsService {
         try {
           // Create point transaction - filter out undefined values
           // Note: expiresAt is defined in types but not enforced; metadata is stored but not read.
-          const transaction: Omit<PointTransaction, 'id'> = {
+          const transactionData: Omit<PointTransaction, 'id'> = {
             memberId,
             points, // For backward compatibility
             amount: points, // Preferred field
@@ -128,34 +128,29 @@ export class PointsService {
             createdAt: Timestamp.now(),
           };
 
-          // Generate a new document ID so we can use writeBatch (setDoc requires an ID)
+          // Generate a new document ID so we can use runTransaction (txn.set requires an ID)
           const pointsDocRef = doc(collection(db, COLLECTIONS.POINTS));
           const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
-
-          // Verify member exists before committing
-          const memberSnap = await getDoc(memberRef);
-          if (!memberSnap.exists()) {
-            throw new Error('Member not found');
-          }
-
-          // Derive new tier from the current points + delta
-          const currentPoints = memberSnap.data().points || 0;
-          const newPoints = currentPoints + points;
-          const tier = PointsService.calculateTier(newPoints);
           const awardYear = new Date().getFullYear();
           const yearlyField = `yearlyPoints.${awardYear}`;
 
-          // Atomic batch: create points record + update member totals in one commit
-          // Use increment() for points and yearlyField to avoid read-then-write race conditions.
-          const batch = writeBatch(db);
-          batch.set(pointsDocRef, transaction);
-          batch.update(memberRef, {
-            points: increment(points),
-            tier,
-            [yearlyField]: increment(points),
-            updatedAt: Timestamp.now(),
+          // P1 fix: use runTransaction so the tier is computed from a fresh member read
+          // inside the transaction, preventing stale-tier from a concurrent awardPoints call.
+          await runTransaction(db, async (txn) => {
+            const memberSnap = await txn.get(memberRef);
+            if (!memberSnap.exists()) throw new Error('Member not found');
+
+            const currentPoints = memberSnap.data().points || 0;
+            const tier = PointsService.calculateTier(currentPoints + points);
+
+            txn.set(pointsDocRef, transactionData);
+            txn.update(memberRef, {
+              points: increment(points),
+              tier,
+              [yearlyField]: increment(points),
+              updatedAt: Timestamp.now(),
+            });
           });
-          await batch.commit();
 
           // Invalidate caches after write
           PointsService.invalidatePointsCache();
@@ -1412,6 +1407,25 @@ export class PointsService {
         approvedBy: claim.approvedBy,
       };
 
+      // P1 fix: use deterministic doc ID + runTransaction to atomically enforce the
+      // one-submission-per-member-per-standard constraint, preventing concurrent submits
+      // from both reading "no existing claim" and both creating a duplicate document.
+      if (claim.memberId) {
+        const submissionId = `${claim.memberId}_${claim.standardId}`;
+        const submissionRef = doc(db, COLLECTIONS.INCENTIVE_SUBMISSIONS, submissionId);
+        await runTransaction(db, async (txn) => {
+          const existing = await txn.get(submissionRef);
+          if (existing.exists() &&
+              existing.data().status !== 'REJECTED' &&
+              existing.data().status !== 'CANCELLED') {
+            throw new Error('Already submitted — a PENDING or APPROVED claim exists for this standard.');
+          }
+          txn.set(submissionRef, submission);
+        });
+        return submissionRef.id;
+      }
+
+      // Fallback for anonymous submissions (no memberId) — addDoc is acceptable here
       const docRef = await addDoc(collection(db, COLLECTIONS.INCENTIVE_SUBMISSIONS), submission);
       return docRef.id;
     } catch (error) {
@@ -1996,11 +2010,16 @@ export class PointsService {
       // Cloud Function incremental updates and LOStarDashboard reads. Using merge:true
       // so we never overwrite incremental updates written by the Cloud Function with
       // stale on-the-fly aggregated values — only missing fields are initialised.
+      // P2 fix: persist full computed object (categories, totalPoints, starsUnlocked)
+      // not just the skeleton stub — otherwise the dashboard never sees the computed values.
       try {
         const progressRef = doc(db, COLLECTIONS.LO_STAR_PROGRESS, `${loId}_${year}`);
         await setDoc(progressRef, {
           loId,
           year,
+          categories,
+          totalPoints,
+          starsUnlocked,
           lastUpdated: progress.lastUpdated,
         }, { merge: true });
       } catch (persistErr) {

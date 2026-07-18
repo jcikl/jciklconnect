@@ -29,6 +29,8 @@ export const useActivityPlans = () => {
   };
 
   const updatePlan = async (planId: string, updates: Partial<ActivityPlan>) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await ActivityPlansService.updateActivityPlan(planId, updates);
       await loadPlans();
@@ -37,6 +39,8 @@ export const useActivityPlans = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update activity plan';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 

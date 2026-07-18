@@ -810,31 +810,6 @@ export class FinanceService {
         );
       }
 
-      // Get existing splits to track which ones were removed
-      const existingSplits = await this.getTransactionSplits(parentTransactionId);
-      const existingSplitIds = new Set(existingSplits.map(s => s.id));
-      const newSplitIds = splits.filter(s => s.id).map(s => s.id);
-      const membershipSyncTargets = new Map<string, string>();
-      const addMembershipSyncTarget = (split?: Partial<TransactionSplit> | Partial<typeof splits[number]>) => {
-        if (split?.category !== 'Membership' || !split.memberId) return;
-        const year = split.year || this.getMembershipYearFromProjectId((split as any).projectId);
-        if (!year) return;
-        membershipSyncTargets.set(`${split.memberId}:${year}`, `${year} membership`);
-      };
-      existingSplits.forEach(addMembershipSyncTarget);
-      splits.forEach(addMembershipSyncTarget);
-
-      // Build all split IDs up front so parent update is in the same batch
-      const splitIds: string[] = [];
-      const batch = writeBatch(db);
-
-      // Delete splits that were removed
-      for (const split of existingSplits) {
-        if (!newSplitIds.includes(split.id)) {
-          batch.delete(doc(db, COLLECTIONS.TRANSACTION_SPLITS, split.id));
-        }
-      }
-
       // T5: validate that Membership splits always carry a year before any write.
       for (const split of splits) {
         if (split.category === 'Membership') {
@@ -845,66 +820,139 @@ export class FinanceService {
         }
       }
 
-      // Upsert split records
-      for (const split of splits) {
-        if (split.id && existingSplitIds.has(split.id)) {
-          // Update existing split
-          const updateData: Partial<TransactionSplit> = {
-            category: split.category,
-            type: parentTransaction.type,
-            projectId: split.projectId,
-            memberId: split.memberId,
-            purpose: split.purpose,
-            paymentRequestId: split.paymentRequestId,
-            amount: split.amount,
-            description: split.description,
-          };
-          if (split.year) updateData.year = split.year;
-          batch.update(doc(db, COLLECTIONS.TRANSACTION_SPLITS, split.id), updateData);
-          splitIds.push(split.id);
-        } else {
-          // Create new split — pre-allocate a doc ID so it can go into the batch
-          const newRef = doc(collection(db, COLLECTIONS.TRANSACTION_SPLITS));
-          const splitData = removeUndefined({
-            parentTransactionId,
-            loId: parentTransaction.loId ?? null,
-            category: split.category,
-            type: parentTransaction.type,
-            projectId: split.projectId,
-            memberId: split.memberId,
-            purpose: split.purpose,
-            paymentRequestId: split.paymentRequestId,
-            amount: split.amount,
-            description: split.description,
-            createdAt: Timestamp.now(),
-            createdBy,
-          });
-          if (split.year) splitData.year = split.year;
-          batch.set(newRef, splitData);
-          splitIds.push(newRef.id);
+      const newSplitIds = splits.filter(s => s.id).map(s => s.id);
+
+      // Pre-allocate new doc refs BEFORE the transaction so they are stable across retries.
+      const preAllocatedRefs = new Map<number, import('firebase/firestore').DocumentReference>();
+      splits.forEach((split, idx) => {
+        if (!split.id) {
+          preAllocatedRefs.set(idx, doc(collection(db, COLLECTIONS.TRANSACTION_SPLITS)));
         }
-      }
+      });
 
-      // Update parent transaction in the same batch
-      const parentBatchUpdate: Record<string, unknown> = {
-        isSplit: true,
-        splitIds,
-        originalCategory: parentTransaction.category,
-        category: '',
-        projectId: '',
-        purpose: '',
-        projectTransactionIds: [],
-        projectTransactionId: null,
-        updatedAt: Timestamp.now(),
+      // Build membership sync targets from the caller-supplied split list (existing splits
+      // are re-read inside the transaction; we collect from both for completeness).
+      const membershipSyncTargets = new Map<string, string>();
+      const addMembershipSyncTarget = (split?: Partial<TransactionSplit> | Partial<typeof splits[number]>) => {
+        if (split?.category !== 'Membership' || !split.memberId) return;
+        const year = split.year || this.getMembershipYearFromProjectId((split as any).projectId);
+        if (!year) return;
+        membershipSyncTargets.set(`${split.memberId}:${year}`, `${year} membership`);
       };
-      // P1-fix: include caller-supplied status override so the reconciliation status lands
-      // in the SAME writeBatch as the splits — no separate updateDoc call needed.
-      if (opts?.parentStatusOverride) {
-        parentBatchUpdate.status = opts.parentStatusOverride;
-      }
-      batch.update(doc(db, COLLECTIONS.TRANSACTIONS, parentTransactionId), parentBatchUpdate);
+      splits.forEach(addMembershipSyncTarget);
 
-      await batch.commit();
+      // P1-fix: replace writeBatch with runTransaction so the read of existing splits (needed
+      // to determine which ones to delete) is included in Firestore's atomic read set.
+      // Firestore transactions don't support getDocs queries — we use the parent's splitIds
+      // array to identify existing split refs and txn.get() each one individually.
+      // Trade-off: if a split ID is present in the collection but NOT in parent.splitIds
+      // (orphan), it won't be deleted; this is acceptable as orphan cleanup is a separate job.
+      let splitIds: string[] = [];
+      const parentDocRef = doc(db, COLLECTIONS.TRANSACTIONS, parentTransactionId);
+
+      await runTransaction(db, async (txn) => {
+        // Re-read parent inside transaction for a consistent view
+        const freshParentSnap = await txn.get(parentDocRef);
+        if (!freshParentSnap.exists()) {
+          throw new Error(`Parent transaction not found: ${parentTransactionId}`);
+        }
+        const freshParent = { id: freshParentSnap.id, ...freshParentSnap.data() } as Transaction;
+
+        if (freshParent.status === 'Reconciled') {
+          throw new Error('Cannot split a reconciled transaction');
+        }
+
+        // Validate split amounts sum to parent amount
+        const totalSplitAmount = splits.reduce((sum, split) => sum + split.amount, 0);
+        if (Math.abs(totalSplitAmount - freshParent.amount) > 0.01) {
+          throw new Error(
+            `Split amounts (${totalSplitAmount}) must equal parent transaction amount (${freshParent.amount})`
+          );
+        }
+
+        // Fetch existing splits via txn.get() using the parent's splitIds field
+        const existingIds: string[] = (freshParent.splitIds as string[]) ?? [];
+        const existingSplitSnaps = await Promise.all(
+          existingIds.map(id => txn.get(doc(db, COLLECTIONS.TRANSACTION_SPLITS, id)))
+        );
+        const existingSplits = existingSplitSnaps
+          .filter(s => s.exists())
+          .map(s => ({ id: s.id, ...s.data() } as TransactionSplit));
+        const existingSplitIds = new Set(existingSplits.map(s => s.id));
+
+        // Collect existing membership splits for sync
+        existingSplits.forEach(addMembershipSyncTarget);
+
+        // Reset splitIds for each transaction attempt (runTransaction may retry)
+        splitIds = [];
+
+        // Delete splits that were removed
+        for (const split of existingSplits) {
+          if (!newSplitIds.includes(split.id)) {
+            txn.delete(doc(db, COLLECTIONS.TRANSACTION_SPLITS, split.id));
+          }
+        }
+
+        // Upsert split records
+        for (let idx = 0; idx < splits.length; idx++) {
+          const split = splits[idx];
+          if (split.id && existingSplitIds.has(split.id)) {
+            // Update existing split
+            const updateData: Partial<TransactionSplit> = {
+              category: split.category,
+              type: freshParent.type,
+              projectId: split.projectId,
+              memberId: split.memberId,
+              purpose: split.purpose,
+              paymentRequestId: split.paymentRequestId,
+              amount: split.amount,
+              description: split.description,
+            };
+            if (split.year) updateData.year = split.year;
+            txn.update(doc(db, COLLECTIONS.TRANSACTION_SPLITS, split.id), updateData);
+            splitIds.push(split.id);
+          } else {
+            // Use the pre-allocated ref for this index
+            const newRef = preAllocatedRefs.get(idx) ?? doc(collection(db, COLLECTIONS.TRANSACTION_SPLITS));
+            const splitData = removeUndefined({
+              parentTransactionId,
+              loId: freshParent.loId ?? null,
+              category: split.category,
+              type: freshParent.type,
+              projectId: split.projectId,
+              memberId: split.memberId,
+              purpose: split.purpose,
+              paymentRequestId: split.paymentRequestId,
+              amount: split.amount,
+              description: split.description,
+              createdAt: Timestamp.now(),
+              createdBy,
+            });
+            if (split.year) splitData.year = split.year;
+            txn.set(newRef, splitData);
+            splitIds.push(newRef.id);
+          }
+        }
+
+        // Update parent transaction in the same transaction
+        const parentTxnUpdate: Record<string, unknown> = {
+          isSplit: true,
+          splitIds,
+          originalCategory: freshParent.category,
+          category: '',
+          projectId: '',
+          purpose: '',
+          projectTransactionIds: [],
+          projectTransactionId: null,
+          updatedAt: Timestamp.now(),
+        };
+        // P1-fix: include caller-supplied status override so the reconciliation status lands
+        // in the SAME transaction as the splits — no separate updateDoc call needed.
+        if (opts?.parentStatusOverride) {
+          parentTxnUpdate.status = opts.parentStatusOverride;
+        }
+        txn.update(parentDocRef, parentTxnUpdate);
+      });
 
       // T6: invalidate cache after successful split write
       invalidateFinanceCache();
@@ -1142,44 +1190,50 @@ export class FinanceService {
       },
       async () => {
         try {
-          const splitDoc = await getDoc(doc(db, COLLECTIONS.TRANSACTION_SPLITS, splitId));
-          if (!splitDoc.exists()) {
-            throw new Error('Split not found');
-          }
+          // P1-fix: replace separate getDoc/getDocs reads + writeBatch with a runTransaction
+          // so the parent's splitIds array and the split delete are read and written atomically.
+          // Firestore transactions don't support getDocs queries — we use the parent's splitIds
+          // field (read fresh inside the transaction) to derive remainingIds without a collection scan.
+          let capturedSplit: TransactionSplit | null = null;
 
-          const split = splitDoc.data() as TransactionSplit;
+          await runTransaction(db, async (txn) => {
+            const splitRef = doc(db, COLLECTIONS.TRANSACTION_SPLITS, splitId);
+            const freshSplitSnap = await txn.get(splitRef);
+            if (!freshSplitSnap.exists()) throw new Error('Split not found');
+            capturedSplit = freshSplitSnap.data() as TransactionSplit;
 
-          // Update parent transaction splitIds array
-          const remainingSplits = await this.getTransactionSplits(split.parentTransactionId);
-          const remainingIds = remainingSplits.filter(s => s.id !== splitId).map(s => s.id);
+            const parentRef = doc(db, COLLECTIONS.TRANSACTIONS, capturedSplit.parentTransactionId);
+            const freshParentSnap = await txn.get(parentRef);
+            const parentTx = freshParentSnap.exists() ? freshParentSnap.data() as Transaction : null;
 
-          // Get parent transaction to restore category
-          const parentDoc = await getDoc(doc(db, COLLECTIONS.TRANSACTIONS, split.parentTransactionId));
-          const parentTx = parentDoc.exists() ? parentDoc.data() as Transaction : null;
-          const originalCategory = (parentTx as any)?.originalCategory || parentTx?.category || '';
+            // Derive remainingIds from parent's splitIds (avoids getDocs inside transaction)
+            const currentSplitIds: string[] = (parentTx?.splitIds as string[]) ?? [];
+            const remainingIds = currentSplitIds.filter(id => id !== splitId);
 
-          const updateData: Record<string, unknown> = {
-            splitIds: remainingIds,
-            isSplit: remainingIds.length > 0,
-            category: remainingIds.length === 0 ? originalCategory : '',
-            updatedAt: Timestamp.now(),
-          };
+            const originalCategory = (parentTx as any)?.originalCategory || parentTx?.category || '';
+            const updateData: Record<string, unknown> = {
+              splitIds: remainingIds,
+              isSplit: remainingIds.length > 0,
+              category: remainingIds.length === 0 ? originalCategory : '',
+              updatedAt: Timestamp.now(),
+            };
 
-          if (remainingIds.length === 0) {
-            updateData.projectTransactionIds = [];
-            updateData.projectTransactionId = null;
-            updateData.status = parentTx?.prevStatus ?? 'Pending';
-            updateData.purpose = '';
-          }
+            if (remainingIds.length === 0) {
+              updateData.projectTransactionIds = [];
+              updateData.projectTransactionId = null;
+              updateData.status = parentTx?.prevStatus ?? 'Pending';
+              updateData.purpose = '';
+            }
 
-          // Commit split delete + parent update atomically
-          const splitDelBatch = writeBatch(db);
-          splitDelBatch.delete(doc(db, COLLECTIONS.TRANSACTION_SPLITS, splitId));
-          splitDelBatch.update(doc(db, COLLECTIONS.TRANSACTIONS, split.parentTransactionId), updateData);
-          await splitDelBatch.commit();
+            txn.delete(splitRef);
+            txn.update(parentRef, updateData);
+          });
+
           invalidateFinanceCache();
 
-          // Inventory cleanup runs after the Firestore batch succeeds
+          const split = capturedSplit!;
+
+          // Inventory cleanup runs after the Firestore transaction succeeds
           if (split.inventoryLinkId && split.inventoryQuantity) {
             const { InventoryService } = await import('./inventoryService');
             await InventoryService.deleteStockMovementForRef(splitId);
@@ -1937,53 +1991,62 @@ export class FinanceService {
       },
       async () => {
         try {
-          const original = await this.getTransactionById(transactionId);
-          if (!original) throw new Error('Transaction not found');
-          if (original.status === 'Voided') throw new Error('Transaction is already voided');
-
           const operatorId = reversedBy || auth?.currentUser?.uid || 'unknown';
-
-          const reversalData: Omit<Transaction, 'id'> = {
-            date: new Date().toISOString().split('T')[0],
-            description: `REVERSAL: ${original.description}`,
-            purpose: original.purpose,
-            amount: original.amount,
-            type: original.type === 'Income' ? 'Expense' : 'Income',
-            category: original.category,
-            status: 'Voided' as const,
-            bankAccountId: original.bankAccountId,
-            memberId: original.memberId,
-            projectId: original.projectId,
-            year: original.year,
-            transactionType: original.transactionType,
-            reversalOf: transactionId,
-            reversalReason: reason,
-            reversedBy: operatorId,
-            createdAt: new Date().toISOString(),
-            // Store as Firestore Timestamp so server-side ordering is accurate (cast bypasses
-            // the string alias in the TS interface — Firestore handles the conversion on read).
-            updatedAt: Timestamp.now() as unknown as string,
-          };
-
-          const batch = writeBatch(db);
+          const originalRef = doc(db, COLLECTIONS.TRANSACTIONS, transactionId);
           const reversalRef = doc(collection(db, COLLECTIONS.TRANSACTIONS));
-          batch.set(reversalRef, removeUndefined(reversalData));
-          batch.update(doc(db, COLLECTIONS.TRANSACTIONS, transactionId), {
-            status: 'Voided',
-            reversalReason: reason,
-            reversedBy: operatorId,
-            updatedAt: Timestamp.now(),
+
+          // P1-fix: wrap status check + reversal writes inside runTransaction so a concurrent
+          // void call can't race — only one caller can read 'not Voided' and commit the patch.
+          await runTransaction(db, async (txn) => {
+            const originalSnap = await txn.get(originalRef);
+            if (!originalSnap.exists()) throw new Error('Transaction not found');
+            const original = { id: originalSnap.id, ...originalSnap.data() } as Transaction & { date: any };
+
+            // Normalise Firestore Timestamp → ISO string for date comparisons
+            const dateStr: string = original.date?.toDate
+              ? original.date.toDate().toISOString().split('T')[0]
+              : (original.date as string) ?? new Date().toISOString().split('T')[0];
+
+            if (original.status === 'Voided') throw new Error('Transaction is already voided');
+
+            const reversalData = removeUndefined({
+              date: new Date().toISOString().split('T')[0],
+              description: `REVERSAL: ${original.description}`,
+              purpose: original.purpose,
+              amount: original.amount,
+              type: original.type === 'Income' ? 'Expense' : 'Income',
+              category: original.category,
+              status: 'Voided' as const,
+              bankAccountId: original.bankAccountId,
+              memberId: original.memberId,
+              projectId: original.projectId,
+              year: original.year,
+              transactionType: original.transactionType,
+              reversalOf: transactionId,
+              reversalReason: reason,
+              reversedBy: operatorId,
+              createdAt: Timestamp.now(),
+              updatedAt: Timestamp.now(),
+            });
+
+            txn.set(reversalRef, reversalData);
+            txn.update(originalRef, {
+              status: 'Voided',
+              reversalReason: reason,
+              reversedBy: operatorId,
+              updatedAt: Timestamp.now(),
+            });
+
+            // SYNC-003: reverse the original transaction's balance impact atomically.
+            // The reversal entry is Voided so it does not affect currentBalance itself.
+            if (original.bankAccountId && original.amount && original.type) {
+              const amountDelta = original.type === 'Income'
+                ? original.amount
+                : -Math.abs(original.amount);
+              const bankAccountRef = doc(db, COLLECTIONS.BANK_ACCOUNTS, original.bankAccountId);
+              txn.update(bankAccountRef, { currentBalance: increment(-amountDelta) });
+            }
           });
-          // SYNC-003: reverse the original transaction's balance impact atomically.
-          // The reversal entry is Voided so it does not affect currentBalance itself.
-          if (original.bankAccountId && original.amount && original.type) {
-            const amountDelta = original.type === 'Income'
-              ? original.amount
-              : -Math.abs(original.amount);
-            const bankAccountRef = doc(db, COLLECTIONS.BANK_ACCOUNTS, original.bankAccountId);
-            batch.update(bankAccountRef, { currentBalance: increment(-amountDelta) });
-          }
-          await batch.commit();
 
           invalidateFinanceCache();
         } catch (error) {
@@ -2306,102 +2369,109 @@ export class FinanceService {
         : undefined;
       const paymentDate = latestTx ? latestTx.date : undefined;
 
-      // 4. Fetch the member to get current membershipType and existing membership data
+      // 4-7. Fetch member + compute updates + write — wrapped in runTransaction so two
+      // concurrent syncMemberMembership calls for the same member cannot clobber each other
+      // with a last-write-wins overwrite of the membership[year] sub-object.
       const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
-      const memberDoc = await getFirestoreDoc(memberRef);
-      if (!memberDoc.exists()) return;
-      const member = memberDoc.data() as any;
-      const currentMembership = member.membership || {};
-      const yearStr = year;
-
-      const type = member.membershipType || 'Probation';
       const configRules = await MembershipConfigService.getRules();
-      const duesAmount = currentMembership[yearStr]?.dues ?? configRules[type]?.duesAmount ?? MembershipDues[type as keyof typeof MembershipDues] ?? 0;
 
-      // No linked membership transactions for this member/year:
-      // rollback linkage-derived fields and reset to pending summary.
-      // Exception: Inactive members retain their historical dues record (情景 L).
-      if (allMembershipTransactions.length === 0 && member.role === 'INACTIVE') {
-        return;
-      }
-      if (allMembershipTransactions.length === 0) {
+      let memberUpdated = false;
+      await runTransaction(db, async (memberTxn) => {
+        const memberDoc = await memberTxn.get(memberRef);
+        if (!memberDoc.exists()) return;
+        const member = memberDoc.data() as any;
+        const currentMembership = member.membership || {};
+        const yearStr = year;
+
+        const type = member.membershipType || 'Probation';
+        const duesAmount = currentMembership[yearStr]?.dues ?? configRules[type]?.duesAmount ?? MembershipDues[type as keyof typeof MembershipDues] ?? 0;
+
+        // No linked membership transactions for this member/year:
+        // rollback linkage-derived fields and reset to pending summary.
+        // Exception: Inactive members retain their historical dues record (情景 L).
+        if (allMembershipTransactions.length === 0 && member.role === 'INACTIVE') {
+          return;
+        }
+        if (allMembershipTransactions.length === 0) {
+          currentMembership[yearStr] = {
+            year: yearNum,
+            dues: duesAmount,
+            amount: 0,
+            status: 'pending',
+            transactionId: [],
+          };
+
+          const zeroTxUpdates: Record<string, unknown> = {
+            membership: currentMembership,
+            updatedAt: Timestamp.now(),
+          };
+
+          // Revert to Guest only when: promoted via approval flow AND entry fee not yet confirmed paid.
+          // If hasPaidInitiationFee=true the RM350 was already collected — deleting a renewal tx
+          // must never strip their Probation status.
+          const hasPaidFee = member.jciCareer?.hasPaidInitiationFee ?? member.hasPaidInitiationFee ?? false;
+          if (member.membershipType === 'Probation'
+              && member.role === 'MEMBER'
+              && member.probationApprovedAt
+              && !hasPaidFee) {
+            zeroTxUpdates.role = 'GUEST';
+            zeroTxUpdates.membershipType = 'Guest';
+            zeroTxUpdates.probationApprovedBy = null;
+            zeroTxUpdates.probationApprovedAt = null;
+            zeroTxUpdates.probationTasks = null;
+          }
+
+          memberTxn.update(memberRef, zeroTxUpdates);
+          memberUpdated = true;
+          return;
+        }
+
+        // 5. Determine status based on amount - dues
+        let status: MembershipStatus = 'pending';
+        const balance = totalAmount - duesAmount;
+
+        if (totalAmount === 0) {
+          status = 'pending';
+        } else if (balance === 0) {
+          status = 'paid';
+        } else if (balance > 0) {
+          status = 'over paid';
+        } else {
+          status = 'partial';
+        }
+
+        // 6. Update member.membership[year]
         currentMembership[yearStr] = {
           year: yearNum,
           dues: duesAmount,
-          amount: 0,
-          status: 'pending',
-          transactionId: [],
+          amount: totalAmount,
+          status: status,
+          transactionId: transactionIds,
+          purpose: membershipPurpose,
+          paymentDate: paymentDate ?? null,
         };
 
-        const zeroTxUpdates: Record<string, unknown> = {
+        const updates: Record<string, unknown> = {
           membership: currentMembership,
-          updatedAt: Timestamp.now(),
+          updatedAt: Timestamp.now()
         };
 
-        // Revert to Guest only when: promoted via approval flow AND entry fee not yet confirmed paid.
-        // If hasPaidInitiationFee=true the RM350 was already collected — deleting a renewal tx
-        // must never strip their Probation status.
-        const hasPaidFee = member.jciCareer?.hasPaidInitiationFee ?? member.hasPaidInitiationFee ?? false;
-        if (member.membershipType === 'Probation'
-            && member.role === 'MEMBER'
-            && member.probationApprovedAt
-            && !hasPaidFee) {
-          zeroTxUpdates.role = 'GUEST';
-          zeroTxUpdates.membershipType = 'Guest';
-          zeroTxUpdates.probationApprovedBy = null;
-          zeroTxUpdates.probationApprovedAt = null;
-          zeroTxUpdates.probationTasks = null;
+        // 7. Mark entry fee paid when Guest's payment clears — promotion to Probation
+        //    requires explicit board approval (President / Secretary / Honorary Treasurer)
+        //    via GuestManagementView. Do NOT auto-promote here.
+        if (status === 'paid' || status === 'over paid') {
+          if (!(member.jciCareer?.hasPaidInitiationFee ?? member.hasPaidInitiationFee)) {
+            updates['jciCareer.hasPaidInitiationFee'] = true;
+            updates.hasPaidInitiationFee = true;
+          }
         }
 
-        await updateDoc(memberRef, zeroTxUpdates);
-        // E4: invalidate members cache after zero-transaction reset
-        MembersService.invalidateMembersCache();
-        return;
-      }
+        memberTxn.update(memberRef, updates);
+        memberUpdated = true;
+      });
 
-      // 5. Determine status based on amount - dues
-      let status: MembershipStatus = 'pending';
-      const balance = totalAmount - duesAmount;
-
-      if (totalAmount === 0) {
-        status = 'pending';
-      } else if (balance === 0) {
-        status = 'paid';
-      } else if (balance > 0) {
-        status = 'over paid';
-      } else {
-        status = 'partial';
-      }
-
-      // 6. Update member.membership[year]
-      currentMembership[yearStr] = {
-        year: yearNum,
-        dues: duesAmount,
-        amount: totalAmount,
-        status: status,
-        transactionId: transactionIds,
-        purpose: membershipPurpose,
-        paymentDate: paymentDate ?? null,
-      };
-
-      const updates: Record<string, unknown> = {
-        membership: currentMembership,
-        updatedAt: Timestamp.now()
-      };
-
-      // 7. Mark entry fee paid when Guest's payment clears — promotion to Probation
-      //    requires explicit board approval (President / Secretary / Honorary Treasurer)
-      //    via GuestManagementView. Do NOT auto-promote here.
-      if (status === 'paid' || status === 'over paid') {
-        if (!(member.jciCareer?.hasPaidInitiationFee ?? member.hasPaidInitiationFee)) {
-          updates['jciCareer.hasPaidInitiationFee'] = true;
-          updates.hasPaidInitiationFee = true;
-        }
-      }
-
-      await updateDoc(memberRef, updates);
       // E4: invalidate members cache so UI reflects the updated dues status immediately
-      MembersService.invalidateMembersCache();
+      if (memberUpdated) MembersService.invalidateMembersCache();
 
       // SEC-A-007: Gate financial PII log to dev only.
       if (process.env.NODE_ENV === 'development') {

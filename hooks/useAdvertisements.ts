@@ -1,4 +1,5 @@
 // Advertisements Data Hook
+import { useRef } from 'react';
 import { useFirestoreCollection } from './useFirestoreCollection';
 import { AdvertisementService, Advertisement, PromotionPackage } from '../services/advertisementService';
 import { useToast } from '../components/ui/Common';
@@ -6,6 +7,7 @@ import { errorLoggingService } from '../services/errorLoggingService';
 
 export const useAdvertisements = () => {
   const { showToast } = useToast();
+  const isSubmittingRef = useRef(false);
 
   const { data: advertisements, loading: adsLoading, error: adsError, reload: reloadAds } =
     useFirestoreCollection<Advertisement>({ loader: () => AdvertisementService.getAllAdvertisements() });
@@ -21,6 +23,8 @@ export const useAdvertisements = () => {
   };
 
   const createAdvertisement = async (adData: Omit<Advertisement, 'id' | 'createdAt' | 'updatedAt' | 'impressions' | 'clicks'>) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       const id = await AdvertisementService.createAdvertisement(adData);
       await reloadAds();
@@ -30,10 +34,14 @@ export const useAdvertisements = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create advertisement';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
   const updateAdvertisement = async (adId: string, updates: Partial<Advertisement>) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await AdvertisementService.updateAdvertisement(adId, updates);
       await reloadAds();
@@ -42,10 +50,14 @@ export const useAdvertisements = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update advertisement';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
   const deleteAdvertisement = async (adId: string) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await AdvertisementService.deleteAdvertisement(adId);
       await reloadAds();
@@ -54,6 +66,8 @@ export const useAdvertisements = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete advertisement';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 

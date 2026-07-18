@@ -231,10 +231,14 @@ export const EventsView: React.FC<{ searchQuery?: string; initialSelectedEventId
               }
             }
           }}
-          onCheckIn={() => {
+          onCheckIn={async () => {
             if (member) {
-              markAttendance(selectedEvent.id, member.id);
-              setSelectedEvent(null);
+              try {
+                await markAttendance(selectedEvent.id, member.id);
+                setSelectedEvent(null);
+              } catch (err) {
+                showToast('Failed to check in', 'error');
+              }
             }
           }}
           onCancelRegistration={async (memberId, cancelledBy, cancelledByName, cancelledByRole) => {
@@ -766,7 +770,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
           <div className="relative h-56 md:h-72 w-full overflow-hidden">
             <img
               src={event.imageUrl || undefined}
-              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.style.display = 'none'; (e.currentTarget.parentElement as HTMLElement | null)?.classList.add('!h-0'); }}
               alt={event.title}
               className="w-full h-full object-cover"
             />
@@ -951,7 +955,8 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                             <div key={m.id} className="px-3 py-2.5 bg-white">
                               <div className="flex items-start gap-2.5">
                                 {memberAvatar(m) ? (
-                                  <img src={memberAvatar(m)} alt={m.name ?? ''} className="w-7 h-7 rounded-full object-cover shrink-0 mt-0.5" />
+                                  <img src={memberAvatar(m)} alt={m.name ?? ''} className="w-7 h-7 rounded-full object-cover shrink-0 mt-0.5"
+                                    onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.style.display = 'none'; }} />
                                 ) : (
                                   <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-bold ${initialsColor(m.id)}`}>
                                     {nameInitials(m.name ?? '')}

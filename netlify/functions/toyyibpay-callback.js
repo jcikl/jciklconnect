@@ -471,25 +471,48 @@ exports.handler = async (event) => {
               resolved: false,
             });
           } else {
-            await duesTxDoc.ref.update({
-              status: 'Pending',
-              updatedAt: Timestamp.now(),
-            });
-            // P1-C: Write refundTransactionId back to the bill so finance views can link the reversal.
-            if (!billsQuery.empty) {
-              await billsQuery.docs[0].ref.update({
-                refundTransactionId: duesTxDoc.id,
+            // P1 Fix: combine dues tx revert and member status revert in a single batch so they
+            // are atomic — a partial failure no longer leaves dues as Pending while membership
+            // still shows Paid (or vice versa).
+            try {
+              const refundBatch = db.batch();
+              refundBatch.update(duesTxDoc.ref, {
+                status: 'Pending',
+                updatedAt: Timestamp.now(),
               });
+              // P1-C: Write refundTransactionId back to the bill so finance views can link the reversal.
+              if (!billsQuery.empty) {
+                refundBatch.update(billsQuery.docs[0].ref, {
+                  refundTransactionId: duesTxDoc.id,
+                });
+              }
+              // Sync membership status back to pending after refund — reset all payment fields
+              refundBatch.update(db.collection('members').doc(billMemberId), {
+                [`membership.${billYear}.status`]: 'pending',
+                [`membership.${billYear}.amount`]: 0,
+                [`membership.${billYear}.transactionId`]: [],
+                [`membership.${billYear}.paymentDate`]: null,
+                [`membership.${billYear}.purpose`]: null,
+                updatedAt: Timestamp.now(),
+              });
+              await refundBatch.commit();
+            } catch (batchErr) {
+              console.error('[toyyibpay-callback] Refund batch failed — dues tx and/or member status may be inconsistent:', batchErr);
+              try {
+                await db.collection('finance_alerts').add({
+                  type: 'toyyibpay_refund_batch_failed',
+                  billCode,
+                  memberId: billMemberId,
+                  year: billYear,
+                  message: `ToyyibPay refund batch write failed for member ${billMemberId} year ${billYear} — dues tx and membership status may be out of sync. Manual fix required.`,
+                  error: batchErr instanceof Error ? batchErr.message : String(batchErr),
+                  createdAt: Timestamp.now(),
+                  resolved: false,
+                });
+              } catch (alertErr) {
+                console.error('[toyyibpay-callback] Could not write finance_alert for refund batch failure:', alertErr);
+              }
             }
-            // Sync membership status back to pending after refund — reset all payment fields
-            await db.collection('members').doc(billMemberId).update({
-              [`membership.${billYear}.status`]: 'pending',
-              [`membership.${billYear}.amount`]: 0,
-              [`membership.${billYear}.transactionId`]: [],
-              [`membership.${billYear}.paymentDate`]: null,
-              [`membership.${billYear}.purpose`]: null,
-              updatedAt: Timestamp.now(),
-            }).catch(err => console.warn('[toyyibpay-callback] Could not revert membership status:', err));
           }
         }
       }

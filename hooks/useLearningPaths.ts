@@ -1,4 +1,5 @@
 // Learning Paths Data Hook
+import { useRef } from 'react';
 import { LearningPathsService, LearningPath } from '../services/learningPathsService';
 import { useToast } from '../components/ui/Common';
 import { useAuth } from './useAuth';
@@ -8,6 +9,7 @@ import { useFirestoreCollection } from './useFirestoreCollection';
 export const useLearningPaths = () => {
   const { showToast } = useToast();
   const { user } = useAuth();
+  const isSubmittingRef = useRef(false);
 
   const { data: paths, loading, error, reload: loadPaths } = useFirestoreCollection<LearningPath>({
     loader: () =>
@@ -20,6 +22,8 @@ export const useLearningPaths = () => {
   });
 
   const createPath = async (pathData: Omit<LearningPath, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       const id = await LearningPathsService.createLearningPath(pathData);
       await loadPaths();
@@ -29,10 +33,14 @@ export const useLearningPaths = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create learning path';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
   const updatePath = async (pathId: string, updates: Partial<LearningPath>) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await LearningPathsService.updateLearningPath(pathId, updates);
       await loadPaths();
@@ -41,10 +49,14 @@ export const useLearningPaths = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update learning path';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
   const deletePath = async (pathId: string) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await LearningPathsService.deleteLearningPath(pathId);
       await loadPaths();
@@ -53,6 +65,8 @@ export const useLearningPaths = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete learning path';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 

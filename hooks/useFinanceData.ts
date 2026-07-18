@@ -1245,6 +1245,8 @@ export function useFinanceData(searchQuery?: string) {
   const isLinkingRef = useRef(false);
   const isReconcilingRef = useRef(false);
   const isVoidingRef = useRef(false);
+  const isDeletingTransactionRef = useRef(false);
+  const isUnmatchingRef = useRef(false);
 
   const handleAddTransaction = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -1357,7 +1359,10 @@ export function useFinanceData(searchQuery?: string) {
   }, [members.length, loadMembers]);
 
   const handleDeleteTransaction = useCallback(async (transactionId: string) => {
+    if (isDeletingTransactionRef.current) return;
+    isDeletingTransactionRef.current = true;
     if (!confirm('Are you sure you want to delete this transaction? This action cannot be undone.')) {
+      isDeletingTransactionRef.current = false;
       return;
     }
 
@@ -1379,6 +1384,8 @@ export function useFinanceData(searchQuery?: string) {
       await loadData();
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to delete transaction', 'error');
+    } finally {
+      isDeletingTransactionRef.current = false;
     }
   }, [transactions, showToast, loadData]);
 
@@ -1688,15 +1695,22 @@ export function useFinanceData(searchQuery?: string) {
   }, [user, showToast, loadData]);
 
   const handleUnmatchTransaction = useCallback(async (tx: Transaction) => {
+    if (isUnmatchingRef.current) return;
+    isUnmatchingRef.current = true;
     const partnerId = tx.matchedBankTxIds?.[0];
-    if (!partnerId) return;
-    if (!confirm('Unmatch this transaction? Both sides will revert to their previous status.')) return;
+    if (!partnerId) { isUnmatchingRef.current = false; return; }
+    if (!confirm('Unmatch this transaction? Both sides will revert to their previous status.')) {
+      isUnmatchingRef.current = false;
+      return;
+    }
     try {
       await FinanceService.unmatchTransactions(tx.id, partnerId);
       showToast('Transaction unmatched', 'success');
       await loadData();
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to unmatch', 'error');
+    } finally {
+      isUnmatchingRef.current = false;
     }
   }, [showToast, loadData]);
 

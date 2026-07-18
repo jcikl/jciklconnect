@@ -4,7 +4,7 @@ import { X, Plus, Trash2, Lightbulb, Edit, Check } from 'lucide-react';
 import { Transaction, TransactionSplit } from '../../../types';
 import { db } from '../../../config/firebase';
 import { writeBatch, doc } from 'firebase/firestore';
-import { FinanceService } from '../../../services/financeService';
+import { FinanceService, invalidateFinanceCache } from '../../../services/financeService';
 import { projectFinancialService } from '../../../services/projectFinancialService';
 import { MembershipConfigService, DEFAULT_MEMBERSHIP_RULES } from '../../../services/membershipConfigService';
 import { buildCategoryFields, buildCategoryCleanupUpdates } from '../../../utils/transactionCategoryUtils';
@@ -456,12 +456,14 @@ export function TransactionSplitModal({
       try {
         const batch = writeBatch(db);
         splitIds.forEach(id => batch.delete(doc(db, 'transactionSplits', id)));
+        batch.update(doc(db, 'transactions', transaction.id), { isSplit: false, splitIds: [] });
         await batch.commit();
       } catch (err) {
         showToast('Failed to cancel splits — please retry', 'error');
         await errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { component: 'TransactionSplitModal', action: 'handleCancelSplit', additionalData: { splitIds } });
         throw err;
       }
+      invalidateFinanceCache();
       onSuccess();
       onClose();
     } catch (err) {

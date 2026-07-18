@@ -94,6 +94,12 @@ export const COLLECTIONS = {
   AUDIT_LOG: 'auditLog',
   /** Elections and ballot subcollections */
   ELECTIONS: 'elections',
+  /** Member email dedup slots — one doc per sanitised email, enforces uniqueness across import paths */
+  MEMBER_EMAILS: 'memberEmails',
+  /** ToyyibPay outbound webhook records */
+  TOYYIBPAY_WEBHOOKS: 'toyyibpay_webhooks',
+  /** Tracks which members have already received birthday notification emails on a given date */
+  BIRTHDAY_NOTIFICATIONS_SENT: 'birthdayNotificationsSent',
 } as const;
 
 /** 付款申请参考编号前缀：PR-{loId}-{YYYYMMDD}-{序号}，与银行备注约定一致（Story 2.1） */

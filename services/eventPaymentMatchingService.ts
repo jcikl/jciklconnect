@@ -41,6 +41,8 @@ export interface EventMatchSummary {
   matched: EventMatchResult[];
   unmatched: string[];
   errors: string[];
+  /** True when either the income or bank-tx query hit the 500-document cap and results may be incomplete. */
+  truncated?: boolean;
 }
 
 const DATE_TOLERANCE_DAYS = 7;
@@ -95,6 +97,15 @@ export class EventPaymentMatchingService {
     );
 
     const [incomeSnap, bankSnap] = await Promise.all([getDocs(incomeQuery), getDocs(bankQuery)]);
+
+    // P1-fix: surface truncation so callers know the results may be incomplete.
+    if (incomeSnap.docs.length === 500 || bankSnap.docs.length === 500) {
+      console.warn(
+        '[EventPaymentMatchingService] runAutoMatch: at least one query hit the 500-document cap. ' +
+        'Some transactions may have been skipped. Consider implementing pagination.'
+      );
+      summary.truncated = true;
+    }
 
     const incomeTxs = incomeSnap.docs
       .map((d) => ({ id: d.id, ...(d.data() as Omit<Transaction, 'id'>) }))
@@ -264,8 +275,11 @@ export class EventPaymentMatchingService {
       }
     }
 
-    // Path B — Bank transfer / cash fuzzy: same amount, date within 7 days, same projectId (if set)
-    if (income.paymentMethod === 'bank_transfer' || income.paymentMethod === 'cash') {
+    // Path B — Bank transfer fuzzy: same amount, date within 7 days, same projectId (if set).
+    // Cash is intentionally excluded — cash deposits are merged into a bank tx and must be
+    // reconciled manually by finance splitting the bank tx; auto-matching cash would produce
+    // false positives when multiple members pay the same amount in cash on the same day.
+    if (income.paymentMethod === 'bank_transfer') {
       const candidates = bankTxs
         .filter((b) => {
           const remaining = Math.abs(b.amount) - (bankAllocated.get(b.id) ?? 0);

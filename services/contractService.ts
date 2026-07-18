@@ -110,7 +110,9 @@ export class ContractService {
             memberId,
             createdAt: serverTimestamp(),
           });
-        } catch {}
+        } catch (alertErr) {
+          console.error('[contractService] Failed to write finance_alert for stuck escrow:', alertErr);
+        }
       }
       throw err;
     }

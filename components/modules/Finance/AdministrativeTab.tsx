@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Briefcase, FileText, ChevronDown } from 'lucide-react';
+import { Plus, Edit, Trash2, Briefcase, FileText, ChevronDown, RefreshCw } from 'lucide-react';
 import { Button, Badge, ConfirmDialog, CONFIRM_CLOSED, useToast } from '../../ui/Common';
 import type { ConfirmState } from '../../ui/Common';
 import { LoadingState } from '../../ui/Loading';
@@ -69,15 +69,20 @@ const AdministrativeTabBase: React.FC<AdministrativeTabProps> = ({
 
   const [adminPRs, setAdminPRs] = React.useState<PaymentRequest[]>([]);
   const [prStatusFilter, setPrStatusFilter] = React.useState<PaymentRequestStatus | 'all'>('all');
+  const [prRefreshKey, setPrRefreshKey] = React.useState(0);
 
-  React.useEffect(() => {
+  const loadPaymentRequests = React.useCallback(() => {
     PaymentRequestService.list({ pageSize: 500 }).then(({ items }) => {
       setAdminPRs(items.filter(pr => pr.category === 'administrative'));
     }).catch((err) => {
       showToast('Failed to load payment requests', 'error');
       console.error('[AdministrativeTab] loadPaymentRequests failed:', err);
     });
-  }, []);
+  }, [showToast]);
+
+  React.useEffect(() => {
+    loadPaymentRequests();
+  }, [loadPaymentRequests, prRefreshKey]);
 
   const activeYear = adminAccountYearFilter;
   const adminTransactions = transactions.filter(t => isTransactionInCategory(t, 'Administrative'));
@@ -194,6 +199,7 @@ const AdministrativeTabBase: React.FC<AdministrativeTabProps> = ({
                     <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5"><FileText size={13} className="text-jci-blue" />Payment Requests</h3>
                     <p className="text-[11px] text-slate-400">{activeYear === 0 ? 'All time' : activeYear} · Administrative</p>
                   </div>
+                  <button onClick={() => setPrRefreshKey(k => k + 1)} className="p-1 rounded-lg text-slate-400 hover:text-jci-blue hover:bg-slate-50 transition-colors" title="Refresh payment requests"><RefreshCw size={13} /></button>
                 </div>
                 <div className="px-3 py-2 border-b border-slate-100">
                   <div className="flex gap-1 flex-wrap">

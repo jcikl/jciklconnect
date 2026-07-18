@@ -15,6 +15,8 @@ export const useHobbyClubs = () => {
   });
 
   const createClub = async (clubData: Omit<HobbyClub, 'id' | 'membersCount'>) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       if (!member) throw new Error('You must be logged in to create a club');
       const id = await HobbyClubsService.createClub({ ...clubData, lead: member.name });
@@ -25,10 +27,14 @@ export const useHobbyClubs = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create club';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
   const updateClub = async (clubId: string, updates: Partial<HobbyClub>) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await HobbyClubsService.updateClub(clubId, updates);
       await loadClubs();
@@ -37,10 +43,14 @@ export const useHobbyClubs = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update club';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
   const deleteClub = async (clubId: string) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await HobbyClubsService.deleteClub(clubId);
       await loadClubs();
@@ -49,6 +59,8 @@ export const useHobbyClubs = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete club';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
@@ -87,6 +99,8 @@ export const useHobbyClubs = () => {
   };
 
   const scheduleActivity = async (clubId: string, activityDate: string, description: string) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await HobbyClubsService.addActivity(clubId, activityDate, description);
       await loadClubs();
@@ -95,10 +109,14 @@ export const useHobbyClubs = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to schedule activity';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
   const updateActivity = async (clubId: string, activityId: string, updates: { date?: string; description?: string }) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await HobbyClubsService.updateActivity(clubId, activityId, updates);
       await loadClubs();
@@ -107,10 +125,14 @@ export const useHobbyClubs = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update activity';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
   const deleteActivity = async (clubId: string, activityId: string) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await HobbyClubsService.deleteActivity(clubId, activityId);
       await loadClubs();
@@ -119,6 +141,8 @@ export const useHobbyClubs = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete activity';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
