@@ -374,25 +374,22 @@ export class ActivityPlansService {
       () => {},
       async () => {
         try {
-          // FIX P1: status guard (cache read for quick reject)
-          const plan = await this.getActivityPlanById(planId);
-          if (!plan) throw new Error('Activity plan not found');
-          if (plan.status !== 'Draft') {
-            throw new Error(`Cannot submit plan in status "${plan.status}" — only Draft plans can be submitted`);
-          }
-
-          // P2 Fix 10: verify live status from Firestore to prevent double-submit
-          // when the cached copy is within the 3-min TTL window.
-          const liveSnap = await getDoc(doc(db, COLLECTIONS.ACTIVITY_PLANS, planId));
-          if (liveSnap.exists() && liveSnap.data()?.status !== 'Draft') {
-            throw new Error(`Activity plan is already in status '${liveSnap.data()?.status}', cannot submit`);
-          }
-
-          await this.updateActivityPlan(planId, {
-            status: 'Submitted',
-            submittedBy,
-            submittedDate: new Date(),
+          // P2 Fix: wrap live read + updateDoc in runTransaction to close the concurrent submit window.
+          const planRef = doc(db, COLLECTIONS.ACTIVITY_PLANS, planId);
+          await runTransaction(db, async (txn) => {
+            const freshSnap = await txn.get(planRef);
+            if (!freshSnap.exists()) throw new Error('Activity plan not found');
+            if (freshSnap.data()?.status !== 'Draft') {
+              throw new Error(`Cannot submit plan in status "${freshSnap.data()?.status}" — only Draft plans can be submitted`);
+            }
+            txn.update(planRef, {
+              status: 'Submitted',
+              submittedBy,
+              submittedDate: Timestamp.now(),
+              updatedAt: Timestamp.now(),
+            });
           });
+          this.invalidateActivityPlansCache();
         } catch (error) {
           errorLoggingService.logError(error as Error, {
             component: 'ActivityPlansService',
@@ -419,20 +416,30 @@ export class ActivityPlansService {
       () => {},
       async () => {
         try {
-          const plan = await this.getActivityPlanById(planId);
-          if (!plan) throw new Error('Activity plan not found');
-
-          // FIX P1: status guard
-          if (plan.status !== 'Submitted') {
-            throw new Error(`Cannot review plan in status "${plan.status}" — only Submitted plans can be reviewed`);
-          }
-
-          await this.updateActivityPlan(planId, {
-            status: decision,
-            reviewedBy,
-            reviewedDate: new Date(),
-            reviewComments: comments,
+          // P1 Fix: wrap status check + update in runTransaction to prevent stale-cache race.
+          const planRef = doc(db, COLLECTIONS.ACTIVITY_PLANS, planId);
+          let planTitle = '';
+          let planSubmittedBy = '';
+          await runTransaction(db, async (txn) => {
+            const freshSnap = await txn.get(planRef);
+            if (!freshSnap.exists()) throw new Error('Activity plan not found');
+            const freshData = freshSnap.data() as ActivityPlan;
+            if (freshData.status !== 'Submitted') {
+              throw new Error(`Cannot review plan in status "${freshData.status}" — only Submitted plans can be reviewed`);
+            }
+            planTitle = freshData.title;
+            planSubmittedBy = freshData.submittedBy;
+            txn.update(planRef, {
+              status: decision,
+              reviewedBy,
+              reviewedAt: Timestamp.now(),
+              reviewComments: comments ?? null,
+              updatedAt: Timestamp.now(),
+            });
           });
+          this.invalidateActivityPlansCache();
+          // Reconstruct plan-like object for notification below
+          const plan = { title: planTitle, submittedBy: planSubmittedBy };
 
           // Send notification to plan submitter (non-blocking)
           try {

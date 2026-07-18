@@ -1,8 +1,16 @@
 import * as React from 'react';
+import { useState } from 'react';
 import { Users, Zap } from 'lucide-react';
 import { Modal, Card, Badge, Button } from '../../ui/Common';
 import type { Member } from '../../../types';
 import type { MentorMatchSuggestion } from '../../../services/mentorshipService';
+
+// Generate an inline SVG data URI with initials — avoids external requests blocked by CSP
+const getInitialsSvg = (name: string, size = 48): string => {
+  const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><rect width="${size}" height="${size}" fill="#0097D7" rx="${size / 2}"/><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" fill="white" font-family="sans-serif" font-size="${Math.round(size * 0.4)}px">${initials}</text></svg>`;
+  return `data:image/svg+xml;base64,${btoa(svg)}`;
+};
 
 interface MentorMatchingModalProps {
   mentee: Member;
@@ -12,6 +20,18 @@ interface MentorMatchingModalProps {
 }
 
 export const MentorMatchingModal: React.FC<MentorMatchingModalProps> = ({ mentee, potentialMentors, onSelect, onClose }) => {
+  const [submittingId, setSubmittingId] = useState<string | null>(null);
+
+  const handleSelect = async (mentorId: string) => {
+    if (submittingId !== null) return;
+    setSubmittingId(mentorId);
+    try {
+      await onSelect(mentorId);
+    } finally {
+      setSubmittingId(null);
+    }
+  };
+
   return (
     <Modal isOpen={true} onClose={onClose} title={`Find Mentor for ${mentee.name}`} size="lg">
       <div className="space-y-4">
@@ -30,7 +50,7 @@ export const MentorMatchingModal: React.FC<MentorMatchingModalProps> = ({ mentee
               <Card key={match.mentor.id} className="hover:shadow-md transition-shadow">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-4 flex-1">
-                    <img src={match.mentor.avatar || undefined} className="w-12 h-12 rounded-full border border-slate-100" alt="" />
+                    <img src={match.mentor.avatar || undefined} className="w-12 h-12 rounded-full border border-slate-100" alt="" onError={(e) => { e.currentTarget.src = getInitialsSvg(match.mentor.name, 48); }} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <h4 className="font-semibold text-slate-900 truncate">{match.mentor.name}</h4>
@@ -60,7 +80,7 @@ export const MentorMatchingModal: React.FC<MentorMatchingModalProps> = ({ mentee
                       </div>
                     </div>
                   </div>
-                  <Button size="sm" onClick={() => onSelect(match.mentor.id)}>Select</Button>
+                  <Button size="sm" onClick={() => handleSelect(match.mentor.id)} disabled={submittingId !== null}>{submittingId === match.mentor.id ? 'Selecting…' : 'Select'}</Button>
                 </div>
               </Card>
             ))}

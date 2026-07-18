@@ -81,6 +81,7 @@ export const GuestApprovalModal: React.FC<GuestApprovalModalProps> = ({
   }, [guest.id]);
 
   const handleApprove = async () => {
+    if (approving) return;
     if (!matchedTx || txLoading) return;
     setApproving(true);
     try {

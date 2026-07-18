@@ -85,7 +85,7 @@ export class EventsService {
           const snapshot = await getDocs(
             query(
               collection(db, COLLECTIONS.PROJECTS),
-              where('status', '==', 'Active')
+              where('status', 'in', ['Active', 'Upcoming', 'Approved'])
             )
           );
 
@@ -709,28 +709,40 @@ export class EventsService {
 
           // E7 fix: attempt to reverse attendance points that were awarded at check-in.
           // The Cloud Function awards points on checked_in; we query and negate them here.
+          // TODO: wrap points reversal in runTransaction with pointsReversed flag to prevent double-reversal
+          // For now, check pointsReversed flag on the attendance record before reversing.
           try {
             const { PointsService } = await import('./pointsService');
-            const pointSnap = await getDocs(
-              query(
-                collection(db, COLLECTIONS.POINTS),
-                where('memberId', '==', memberId),
-                where('relatedEntityId', '==', eventId)
-              )
-            );
-            const total = pointSnap.docs.reduce(
-              (sum, d) => sum + (d.data().amount ?? d.data().points ?? 0),
-              0
-            );
-            if (total > 0) {
-              await PointsService.awardPoints(
-                memberId,
-                -total,
-                'EVENT_ATTENDANCE',
-                'Reversed: attendance undone',
-                eventId,
-                'event'
+            // Check if points were already reversed to prevent double-reversal on concurrent calls
+            const regDocId = `${eventId}_${memberId}`;
+            const regRef2 = doc(db, COLLECTIONS.EVENT_REGISTRATIONS, regDocId);
+            const regSnap2 = await getDoc(regRef2);
+            if (regSnap2.exists() && regSnap2.data().pointsReversed === true) {
+              // Points already reversed — skip to avoid double-reversal
+            } else {
+              const pointSnap = await getDocs(
+                query(
+                  collection(db, COLLECTIONS.POINTS),
+                  where('memberId', '==', memberId),
+                  where('relatedEntityId', '==', eventId)
+                )
               );
+              const total = pointSnap.docs.reduce(
+                (sum, d) => sum + (d.data().amount ?? d.data().points ?? 0),
+                0
+              );
+              if (total > 0) {
+                await PointsService.awardPoints(
+                  memberId,
+                  -total,
+                  'EVENT_ATTENDANCE',
+                  'Reversed: attendance undone',
+                  eventId,
+                  'event'
+                );
+                // Mark pointsReversed so a second concurrent call skips reversal
+                await updateDoc(regRef2, { pointsReversed: true });
+              }
             }
           } catch (pointsErr) {
             console.warn(

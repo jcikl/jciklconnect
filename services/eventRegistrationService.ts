@@ -300,31 +300,36 @@ export const EventRegistrationService = {
       },
       async () => {
         const ref = doc(db, COLLECTIONS.EVENT_REGISTRATIONS, registrationId);
-        const snap = await getDoc(ref);
-        const financeTransactionId: string | undefined = snap.exists() ? snap.data().financeTransactionId : undefined;
-        const regEventId: string | undefined = snap.exists() ? snap.data().eventId : undefined;
-        const regMemberId: string | undefined = snap.exists() ? snap.data().memberId : undefined;
+        let financeTransactionId: string | undefined;
 
-        // P1 FIX: use writeBatch to atomically cancel the registration AND decrement the
-        // event's attendees counter / remove memberId from registeredMembers in one commit.
-        const batch = writeBatch(db);
-        batch.update(ref, {
-          status: 'cancelled',
-          cancelledAt: Timestamp.now(),
-          cancelledBy,
-          cancelledByName,
-          cancelledByRole,
-          financeTransactionId: null,
-          updatedAt: Timestamp.now(),
-        });
-        if (regEventId && regMemberId && snap.exists() && snap.data().status !== 'cancelled') {
-          const eventRef = doc(db, COLLECTIONS.PROJECTS, regEventId);
-          batch.update(eventRef, {
-            attendees: increment(-1),
-            registeredMembers: arrayRemove(regMemberId),
+        // P1 FIX: wrap in runTransaction so concurrent cancels both read the fresh status
+        // before decrementing — preventing double-decrement of the event attendees counter.
+        await runTransaction(db, async (txn) => {
+          const snap = await txn.get(ref);
+          if (!snap.exists() || snap.data().status === 'cancelled') {
+            return; // already cancelled or never existed — idempotent
+          }
+          financeTransactionId = snap.data().financeTransactionId ?? undefined;
+          const regEventId: string | undefined = snap.data().eventId;
+          const regMemberId: string | undefined = snap.data().memberId;
+
+          txn.update(ref, {
+            status: 'cancelled',
+            cancelledAt: Timestamp.now(),
+            cancelledBy,
+            cancelledByName,
+            cancelledByRole,
+            financeTransactionId: null,
+            updatedAt: Timestamp.now(),
           });
-        }
-        await batch.commit();
+          if (regEventId && regMemberId) {
+            const eventRef = doc(db, COLLECTIONS.PROJECTS, regEventId);
+            txn.update(eventRef, {
+              attendees: increment(-1),
+              registeredMembers: arrayRemove(regMemberId),
+            });
+          }
+        });
 
         if (financeTransactionId) {
           try {

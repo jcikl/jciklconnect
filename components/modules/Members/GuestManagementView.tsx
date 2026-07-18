@@ -57,6 +57,7 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
   // Batch approval states
   const [selectedGuestIds, setSelectedGuestIds] = useState<Set<string>>(new Set());
   const [showBatchApprovalModal, setShowBatchApprovalModal] = useState(false);
+  const [isBatchApproving, setIsBatchApproving] = useState(false);
 
   const GUEST_APPROVER_TITLES = ['President', 'Secretary', 'Honorary Treasurer'];
   const canApprove = isAdmin || (
@@ -100,6 +101,8 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
       showToast('Only President, Secretary or Honorary Treasurer may approve guests', 'error');
       return;
     }
+    if (isBatchApproving) return;
+    setIsBatchApproving(true);
 
     try {
       // Fetch unlinked membership transactions once for batch auto-matching
@@ -193,6 +196,8 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
       setSelectedGuestIds(new Set());
     } catch (err) {
       showToast('Failed to approve guests', 'error');
+    } finally {
+      setIsBatchApproving(false);
     }
   };
 
@@ -346,9 +351,9 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
             </div>
             <div className="flex gap-2 justify-end">
               <Button variant="outline" onClick={() => setShowBatchApprovalModal(false)}>Cancel</Button>
-              <Button onClick={handleBatchApproveGuests}>
+              <Button onClick={handleBatchApproveGuests} disabled={isBatchApproving}>
                 <UserCheck size={16} className="mr-2" />
-                Batch Approve
+                {isBatchApproving ? 'Approving…' : 'Batch Approve'}
               </Button>
             </div>
           </div>

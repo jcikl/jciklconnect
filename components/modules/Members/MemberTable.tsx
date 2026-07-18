@@ -6,6 +6,13 @@ import { ColumnFilterHeader } from '../../ui/ColumnFilterHeader';
 import type { Member, UserRole, MembershipType } from '../../../types';
 import { MembersService } from '../../../services/membersService';
 
+// Generate an inline SVG data URI with initials — avoids external requests blocked by CSP
+const getInitialsSvg = (name: string, size = 48): string => {
+  const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><rect width="${size}" height="${size}" fill="#0097D7" rx="${size / 2}"/><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" fill="white" font-family="sans-serif" font-size="${Math.round(size * 0.4)}px">${initials}</text></svg>`;
+  return `data:image/svg+xml;base64,${btoa(svg)}`;
+};
+
 const getMemberAge = (member: Member): number | null => {
   const dob = member.dateOfBirth || member.general?.dob;
   if (!dob) return null;
@@ -87,7 +94,7 @@ const DesktopMemberRow = React.memo(function DesktopMemberRow({
       {/* Member */}
       <div className="px-6 flex-1 min-w-0">
         <div className="flex items-center space-x-3">
-          <img src={member.avatar || undefined} alt={member.name} className="w-10 h-10 rounded-full bg-slate-200 shrink-0" />
+          <img src={member.avatar || undefined} alt={member.name} className="w-10 h-10 rounded-full bg-slate-200 shrink-0" onError={(e) => { e.currentTarget.src = getInitialsSvg(member.name, 40); }} />
           <div className="min-w-0">
             <div className="font-medium text-slate-900 truncate">{member.name}</div>
             <div className="text-xs text-slate-500 truncate">{member.email}</div>

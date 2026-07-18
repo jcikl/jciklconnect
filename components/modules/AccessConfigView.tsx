@@ -92,6 +92,7 @@ export const AccessConfigView: React.FC = () => {
         }
       } catch (err) {
         console.error('[AccessConfigView] Failed to load saved config:', err);
+        showToast('Failed to load access configuration', 'error');
       }
     };
     loadSavedConfig();

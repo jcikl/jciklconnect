@@ -40,6 +40,7 @@ export const MemberCreateModal: React.FC<MemberCreateModalProps> = ({
   const [hobbies, setHobbies] = useState<string[]>([]);
   const [interestedIndustries, setInterestedIndustries] = useState<string[]>([]);
   const [introducer, setIntroducer] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   // FORM-009: per-field error state for custom validation (e.g. duplicate email)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -53,6 +54,8 @@ export const MemberCreateModal: React.FC<MemberCreateModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     const formData = new FormData(e.currentTarget);
     const firstName = formData.get('firstName') as string;
     const lastName = formData.get('lastName') as string;
@@ -99,7 +102,6 @@ export const MemberCreateModal: React.FC<MemberCreateModalProps> = ({
     try {
       await onCreateMember(newMember);
       handleClose();
-      e.currentTarget.reset();
     } catch (err: any) {
       // Surface duplicate-email errors next to the field instead of a generic toast
       if (err?.message?.toLowerCase().includes('email')) {
@@ -107,6 +109,8 @@ export const MemberCreateModal: React.FC<MemberCreateModalProps> = ({
       } else {
         throw err;
       }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -126,7 +130,7 @@ export const MemberCreateModal: React.FC<MemberCreateModalProps> = ({
       footer={
         <div className="flex gap-3 w-full">
           <Button variant="outline" className="flex-1" type="button" onClick={handleClose}>Cancel</Button>
-          <Button className="flex-1" type="submit" form="add-member-form">Register Member</Button>
+          <Button className="flex-1" type="submit" form="add-member-form" disabled={isSubmitting}>{isSubmitting ? 'Registering…' : 'Register Member'}</Button>
         </div>
       }
     >

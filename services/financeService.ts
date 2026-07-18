@@ -692,7 +692,8 @@ export class FinanceService {
   static async createTransactionSplit(
     parentTransactionId: string,
     splits: Array<{ id?: string; category: 'Projects & Activities' | 'Membership' | 'Administrative' | ''; year?: number; projectId?: string; memberId?: string; purpose?: string; paymentRequestId?: string; amount: number; description: string }>,
-    createdBy: string
+    createdBy: string,
+    opts?: { parentStatusOverride?: 'Reconciled' | 'Partially Reconciled' }
   ): Promise<string[]> {
     return withDevMode(
       async () => {
@@ -885,7 +886,7 @@ export class FinanceService {
       }
 
       // Update parent transaction in the same batch
-      batch.update(doc(db, COLLECTIONS.TRANSACTIONS, parentTransactionId), {
+      const parentBatchUpdate: Record<string, unknown> = {
         isSplit: true,
         splitIds,
         originalCategory: parentTransaction.category,
@@ -895,7 +896,13 @@ export class FinanceService {
         projectTransactionIds: [],
         projectTransactionId: null,
         updatedAt: Timestamp.now(),
-      });
+      };
+      // P1-fix: include caller-supplied status override so the reconciliation status lands
+      // in the SAME writeBatch as the splits — no separate updateDoc call needed.
+      if (opts?.parentStatusOverride) {
+        parentBatchUpdate.status = opts.parentStatusOverride;
+      }
+      batch.update(doc(db, COLLECTIONS.TRANSACTIONS, parentTransactionId), parentBatchUpdate);
 
       await batch.commit();
 
@@ -1299,22 +1306,22 @@ export class FinanceService {
         }
 
         txn.update(transactionRef, updateData as Partial<Transaction>);
-      });
 
-      // Propagate type change to all splits outside the transaction (acceptable; status is already guarded above)
-      if (updates.type) {
-        const splits = await this.getTransactionSplits(transactionId);
-        if (splits.length > 0) {
-          const typeBatch = writeBatch(db);
-          for (const split of splits) {
-            typeBatch.update(doc(db, COLLECTIONS.TRANSACTION_SPLITS, split.id), {
-              type: updates.type,
-              updatedAt: Timestamp.now(),
-            });
+        // P1-fix: propagate type change to child splits INSIDE the same runTransaction so
+        // the parent type and all split types are updated atomically. We use the splitIds
+        // already available on currentTransaction (read above) to get document refs;
+        // each split is re-read with txn.get() to include it in the atomic read set.
+        if (updates.type) {
+          const splitIds: string[] = (currentTransaction.splitIds as string[]) ?? [];
+          for (const splitId of splitIds) {
+            const splitRef = doc(db, COLLECTIONS.TRANSACTION_SPLITS, splitId);
+            const splitSnap = await txn.get(splitRef);
+            if (splitSnap.exists()) {
+              txn.update(splitRef, { type: updates.type, updatedAt: Timestamp.now() });
+            }
           }
-          await typeBatch.commit();
         }
-      }
+      });
 
       invalidateFinanceCache();
 

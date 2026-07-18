@@ -327,21 +327,32 @@ export class IncentiveCalculatorService {
             const sub = snapshot.docs[0];
             const subData = sub.data();
             if (subData.status === 'APPROVED' && subData.evidenceText?.includes('Auto-calculated')) {
-                const { doc: firestoreDoc, updateDoc } = await import('firebase/firestore');
-                const submissionRef = firestoreDoc(db, COLLECTIONS.INCENTIVE_SUBMISSIONS, sub.id);
-                await updateDoc(submissionRef, {
-                    quantity,
-                    scoreAwarded: score,
-                    updatedAt: Timestamp.now()
+                const submissionRef = doc(db, COLLECTIONS.INCENTIVE_SUBMISSIONS, sub.id);
+
+                // P1 Fix: Wrap in runTransaction so that two concurrent calls both re-read
+                // the current scoreAwarded inside the transaction. Only the winning commit
+                // computes a non-zero delta; the losing call's transaction aborts and retries,
+                // sees score === scoreAwarded, and delta becomes 0 — preventing double-award.
+                let delta = 0;
+                await runTransaction(db, async (txn) => {
+                    const freshSnap = await txn.get(submissionRef);
+                    if (!freshSnap.exists()) return;
+                    const freshData = freshSnap.data();
+                    // Guard: abort if the submission is no longer an auto-approved record
+                    if (freshData.status !== 'APPROVED' || !freshData.evidenceText?.includes('Auto-calculated')) return;
+                    delta = score - (freshData.scoreAwarded || 0);
+                    txn.update(submissionRef, {
+                        quantity,
+                        scoreAwarded: score,
+                        updatedAt: Timestamp.now()
+                    });
                 });
+
                 // Fix 7 (P2): invalidate incentive cache after updating submission score.
                 PointsService.invalidateIncentiveCache();
 
                 // Fix 6 (P1): handle both positive and negative deltas — score reductions
                 // (negative delta) must also deduct points to prevent phantom accumulation.
-                // Fix 5 (P1): wrap awardPoints in try/catch that rethrows with context so
-                // callers know the submission was updated but points are inconsistent.
-                const delta = score - (subData.scoreAwarded || 0);
                 if (delta !== 0 && subData.memberId) {
                     try {
                         await PointsService.awardPoints(

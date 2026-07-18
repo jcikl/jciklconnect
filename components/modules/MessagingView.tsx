@@ -24,6 +24,7 @@ import { formatDate, formatTime, formatRelativeTime } from '../../utils/dateUtil
 export const MessagingView: React.FC = () => {
   const [messageContent, setMessageContent] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const isSendingRef = useRef(false);
   const [isNewConversationModalOpen, setNewConversationModalOpen] = useState(false);
   const [conversationType, setConversationType] = useState<'direct' | 'group' | 'project'>('direct');
@@ -87,6 +88,8 @@ export const MessagingView: React.FC = () => {
       return;
     }
 
+    if (isCreating) return;
+    setIsCreating(true);
     try {
       const participants = conversationType === 'project' && selectedProjectId
         ? (() => {
@@ -113,7 +116,9 @@ export const MessagingView: React.FC = () => {
       setSelectedProjectId('');
       setConversationType('direct');
     } catch (err) {
-      // Error handled in hook
+      showToast('Failed to create conversation', 'error');
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -470,8 +475,8 @@ export const MessagingView: React.FC = () => {
             >
               Cancel
             </Button>
-            <Button onClick={handleCreateConversation} className="flex-1">
-              Create Conversation
+            <Button onClick={handleCreateConversation} className="flex-1" disabled={isCreating}>
+              {isCreating ? 'Creating…' : 'Create Conversation'}
             </Button>
           </div>
         </div>

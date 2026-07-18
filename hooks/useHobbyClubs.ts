@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { useFirestoreCollection } from './useFirestoreCollection';
 import { HobbyClubsService } from '../services/hobbyClubsService';
 import { HobbyClub } from '../types';
@@ -7,6 +8,7 @@ import { useAuth } from './useAuth';
 export const useHobbyClubs = () => {
   const { member } = useAuth();
   const { showToast } = useToast();
+  const isSubmittingRef = useRef(false);
 
   const { data: clubs, loading, error, reload: loadClubs } = useFirestoreCollection<HobbyClub>({
     loader: () => HobbyClubsService.getAllClubs(),
@@ -52,6 +54,8 @@ export const useHobbyClubs = () => {
 
   const joinClub = async (clubId: string) => {
     if (!member) { showToast('Please login to join clubs', 'error'); return; }
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await HobbyClubsService.joinClub(clubId, member.id);
       await loadClubs();
@@ -60,11 +64,15 @@ export const useHobbyClubs = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to join club';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
   const leaveClub = async (clubId: string) => {
     if (!member) { showToast('Please login to leave clubs', 'error'); return; }
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await HobbyClubsService.leaveClub(clubId, member.id);
       await loadClubs();
@@ -73,6 +81,8 @@ export const useHobbyClubs = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to leave club';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 

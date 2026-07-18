@@ -652,8 +652,10 @@ service cloud.firestore {
     match /hobbyClubs/{clubId} {
       allow read: if isAuthenticated();
       allow create: if isMember() || isBoard() || isAdmin();
+      // Club lead can update descriptive fields only — leadId and memberIds are admin-managed
       allow update: if isBoard() || isAdmin() ||
-                      (isMember() && resource.data.leadId == request.auth.uid);
+                      (isMember() && resource.data.leadId == request.auth.uid
+                        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['leadId', 'memberIds']));
       allow delete: if isAdmin();
     }
     
@@ -663,7 +665,9 @@ service cloud.firestore {
     match /businessProfiles/{profileId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && request.resource.data.memberId == request.auth.uid;
-      allow update: if isAdmin() || (isAuthenticated() && resource.data.memberId == request.auth.uid);
+      // Owner can update non-identity fields only — memberId must not change
+      allow update: if isAdmin() || (isAuthenticated() && resource.data.memberId == request.auth.uid
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['memberId']));
       allow delete: if isAdmin() || isBoard();
     }
     
@@ -1176,10 +1180,19 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Email delivery log — written by email-sending service functions, read by admins for debugging
+    // Email delivery log — written by email-sending service functions only (via Admin SDK / service layer)
+    // Board can read logs for debugging; write is Admin-only to prevent tampering
     match /emailLogs/{docId} {
-      allow read: if isAdmin();
-      allow write: if isAdmin() || isBoard();
+      allow read: if isAdmin() || isBoard();
+      allow write: if isAdmin();
+    }
+
+    // Member email dedup slots — one document per sanitised email address to enforce uniqueness
+    // Members can read their own slot (to check status); only the service layer (Admin-level) writes
+    match /memberEmails/{email} {
+      allow read: if isAuthenticated() && canReadOrgMembers();
+      allow create: if isAdmin() || (isAuthenticated() && request.resource.data.memberId == request.auth.uid);
+      allow update, delete: if isAdmin();
     }
 
     // Points Rules collection (server-side automation rules — different from pointRules UI config)

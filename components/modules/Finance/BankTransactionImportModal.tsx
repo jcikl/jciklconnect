@@ -40,6 +40,9 @@ export const BankTransactionImportModal: React.FC<Props> = ({
       ]).then(([accounts, projects]) => {
         setBankAccounts(accounts);
         setProjects(projects);
+      }).catch((err) => {
+        console.error('[BankTransactionImportModal] Failed to load accounts/projects:', err);
+        showToast('Failed to load bank accounts or projects', 'error');
       });
     }
   }, [isOpen]);

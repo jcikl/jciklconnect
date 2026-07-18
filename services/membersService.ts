@@ -18,6 +18,7 @@ import {
   runTransaction,
   deleteField,
   arrayRemove,
+  arrayUnion,
   DocumentSnapshot,
   WriteBatch,
 } from 'firebase/firestore';
@@ -449,21 +450,12 @@ export class MembersService {
       if (!EMAIL_RE.test(memberData.email)) throw new Error('Invalid email format');
       if (memberData.idNumber && !/^\d{12}$/.test(memberData.idNumber)) throw new Error('IC number must be 12 digits');
 
-      // P0 Fix 11: claim email slot atomically via runTransaction on a deterministic
-      // secondary-index document. Two concurrent createMember calls with the same email
-      // both attempt to set the same emailSlot doc — only the first succeeds.
-      const emailSlotRef = doc(
-        db,
-        'memberEmails',
-        memberData.email.toLowerCase().replace(/[^a-z0-9@.]/g, '_')
-      );
-      await runTransaction(db, async (txn) => {
-        const existing = await txn.get(emailSlotRef);
-        if (existing.exists()) {
-          throw new Error('A member with this email already exists');
-        }
-        txn.set(emailSlotRef, { email: memberData.email, createdAt: Timestamp.now() });
-      });
+      // P0 Fix: Claim email slot AND create the member document inside the same
+      // runTransaction so there is no window where the email slot exists but the
+      // member document does not (or vice-versa). Two concurrent calls with the
+      // same email both attempt to set the same emailSlot doc — only the first wins.
+      const sanitizedEmail = memberData.email.toLowerCase().replace(/[^a-z0-9@.]/g, '_');
+      const emailSlotRef = doc(db, 'memberEmails', sanitizedEmail);
 
       const payload = {
         ...memberData,
@@ -486,9 +478,17 @@ export class MembersService {
 
       const normalizedData = this.normalizeMemberData(cleanMemberData);
 
-      const docRef = await addDoc(collection(db, COLLECTIONS.MEMBERS), normalizedData);
-      // Stamp the email slot with the new member ID so it can be looked up later
-      await updateDoc(emailSlotRef, { memberId: docRef.id });
+      // Pre-generate a member doc ref so we can use txn.set inside the transaction
+      const memberRef = doc(collection(db, COLLECTIONS.MEMBERS));
+      await runTransaction(db, async (txn) => {
+        const existing = await txn.get(emailSlotRef);
+        if (existing.exists()) {
+          throw new Error('A member with this email already exists');
+        }
+        txn.set(emailSlotRef, { email: memberData.email, memberId: memberRef.id, createdAt: Timestamp.now() });
+        txn.set(memberRef, normalizedData);
+      });
+      const docRef = memberRef;
       logWrite(CACHE_KEY_ALL_MEMBERS, 'membersService.createMember');
       this.invalidateMembersCache();
 
@@ -963,11 +963,25 @@ export class MembersService {
       );
 
       const snapshot = await getDocs(q);
-      if (snapshot.empty) return null;
+      if (!snapshot.empty) {
+        const d = snapshot.docs[0];
+        return { ...(d.data() as Omit<Member, 'id'>), id: d.id } as Member;
+      }
 
-      // Return the first match
-      const doc = snapshot.docs[0];
-      return { ...(doc.data() as Omit<Member, 'id'>), id: doc.id } as Member;
+      // P2 Fix: Also try the nested contact.email field — some members store email
+      // only under contact.email and the flat field may not be populated.
+      const q2 = query(
+        collection(db, COLLECTIONS.MEMBERS),
+        where('contact.email', '==', email),
+        limit(1)
+      );
+      const snapshot2 = await getDocs(q2);
+      if (!snapshot2.empty) {
+        const d = snapshot2.docs[0];
+        return { ...(d.data() as Omit<Member, 'id'>), id: d.id } as Member;
+      }
+
+      return null;
     } catch (error) {
       console.error('Error fetching member by email:', error);
       throw error;
@@ -1081,21 +1095,18 @@ export class MembersService {
   // Assign mentor
   static async assignMentor(memberId: string, mentorId: string): Promise<void> {
     try {
-      const mentor = await this.getMemberById(mentorId);
-      const menteeIds = mentor?.menteeIds || [];
-
-      // Both sides of the relationship written atomically (E03)
+      // P1 Fix: Use arrayUnion instead of read-then-spread so concurrent assignMentor
+      // calls cannot overwrite each other's writes. arrayUnion is idempotent — calling
+      // it twice with the same memberId is safe.
       const batch = writeBatch(db);
       batch.update(doc(db, COLLECTIONS.MEMBERS, memberId), {
         mentorId,
         updatedAt: Timestamp.now(),
       });
-      if (!menteeIds.includes(memberId)) {
-        batch.update(doc(db, COLLECTIONS.MEMBERS, mentorId), {
-          menteeIds: [...menteeIds, memberId],
-          updatedAt: Timestamp.now(),
-        });
-      }
+      batch.update(doc(db, COLLECTIONS.MEMBERS, mentorId), {
+        menteeIds: arrayUnion(memberId),
+        updatedAt: Timestamp.now(),
+      });
       await this.commitWithRetry(batch);
       this.invalidateMembersCache();
     } catch (error) {

@@ -28,6 +28,7 @@ import {
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import type { Transaction } from '../types';
+import { invalidateFinanceCache } from './financeService';
 
 export interface EventMatchResult {
   incomeTxId: string;
@@ -188,6 +189,7 @@ export class EventPaymentMatchingService {
         updatedAt: Timestamp.now(),
       });
     });
+    invalidateFinanceCache();
   }
 
   /**
@@ -235,6 +237,7 @@ export class EventPaymentMatchingService {
         updatedAt: Timestamp.now(),
       });
     });
+    invalidateFinanceCache();
   }
 
   private static _findBestBankTx(

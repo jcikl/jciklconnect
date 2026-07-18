@@ -472,13 +472,13 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     setShowRegForm(true);
   };
 
-  const handleRegFormSubmit = () => {
+  const handleRegFormSubmit = async () => {
     if (isRegSubmitting) return;
     setIsRegSubmitting(true);
     try {
       setShowRegForm(false);
       setLocalRegistered(true);
-      onRegister(regForm);
+      await onRegister(regForm);
     } finally {
       setIsRegSubmitting(false);
     }
@@ -765,7 +765,8 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
           {/* Hero Image */}
           <div className="relative h-56 md:h-72 w-full overflow-hidden">
             <img
-              src={event.imageUrl || "https://images.unsplash.com/photo-1540575861501-7cf05a4b125a?auto=format&fit=crop&q=80"}
+              src={event.imageUrl || undefined}
+              onError={(e) => { e.currentTarget.style.display = 'none'; }}
               alt={event.title}
               className="w-full h-full object-cover"
             />
@@ -987,13 +988,14 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                                         <Button size="sm" variant="secondary" className="h-5 px-1 text-red-500 border-red-200 hover:bg-red-50" title="Cancel registration" disabled={updatingRegId !== null} onClick={() => handleAdminCancel(reg)}><Trash2 size={12} /></Button>
                                       )}
                                       {!reg && (
-                                        <Button size="sm" variant="outline" className="h-5 px-1" title="Register" onClick={async () => {
+                                        <Button size="sm" variant="outline" className="h-5 px-1" title="Register" disabled={updatingRegId !== null} onClick={async () => {
+                                          setUpdatingRegId(m.id);
                                           try {
                                             await EventsService.registerForEvent(event.id, m.id, { memberName: m.name, registeredBy: member?.id, registeredByName: member?.name ?? member?.id });
                                             const newReg: EventRegistration = { id: `manual-${Date.now()}`, eventId: event.id, memberId: m.id, status: 'registered', createdAt: new Date().toISOString(), loId: null, memberName: m.name, registeredBy: member?.id, registeredByName: member?.name ?? member?.id };
                                             setParticipations(prev => [newReg, ...prev]);
                                             showToast(`${m.name} added`, 'success');
-                                          } catch (err) { showToast(err instanceof Error ? err.message : 'Failed', 'error'); }
+                                          } catch (err) { showToast(err instanceof Error ? err.message : 'Failed', 'error'); } finally { setUpdatingRegId(null); }
                                         }}><Plus size={14} /></Button>
                                       )}
                                     </div>

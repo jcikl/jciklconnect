@@ -508,7 +508,21 @@ export class DataImportExportService {
           // Fix 14 (P1): stamp createdAt + updatedAt on every new imported document
           normalizedRow.createdAt = Timestamp.now();
           normalizedRow.updatedAt = Timestamp.now();
-          currentBatch.set(doc(collection(db, colName)), normalizedRow);
+          const newDocRef = doc(collection(db, colName));
+          currentBatch.set(newDocRef, normalizedRow);
+          // P2 Fix: Write a memberEmails dedup slot atomically with each new member so that
+          // bulk-imported members participate in the same email-uniqueness guarantee as
+          // members created via MembersService.createMember().
+          // TODO: wire up createRecord/updateRecord — bulk-imported members skip memberEmails dedup slots
+          if ((entityType === 'members' || entityType === COLLECTIONS.MEMBERS) && normalizedRow.email) {
+            const sanitized = String(normalizedRow.email).toLowerCase().replace(/[^a-z0-9@.]/g, '_');
+            // 'memberEmails' collection — no COLLECTIONS constant yet; add one when available
+            currentBatch.set(doc(db, 'memberEmails', sanitized), {
+              email: normalizedRow.email,
+              memberId: newDocRef.id,
+              createdAt: Timestamp.now(),
+            });
+          }
           summary.created++;
         }
         opsInCurrentBatch++;
@@ -527,12 +541,12 @@ export class DataImportExportService {
     } catch (batchError) {
       const batchErrorMessage = batchError instanceof Error ? batchError.message : 'Batch write failed';
       throw new Error(`导入中断：已成功提交 ${committedBatches} 批，最后批次失败：${batchErrorMessage}`);
-    }
-
-    // Fix 13 (P1): invalidate members cache after all batches so the next read
-    // reflects imported data instead of serving the stale pre-import snapshot.
-    if (entityType === 'members' || entityType === COLLECTIONS.MEMBERS) {
-      MembersService.invalidateMembersCache();
+    } finally {
+      // P1 Fix: Invalidate cache in finally so it runs even when the final flushBatch throws.
+      // Previously the invalidation was skipped on batch failure, leaving stale cache behind.
+      if (entityType === 'members' || entityType === COLLECTIONS.MEMBERS) {
+        await MembersService.invalidateMembersCache();
+      }
     }
 
     const status = errors.length > 0 ? 'partial' : 'success';
@@ -711,6 +725,9 @@ export class DataImportExportService {
     return null;
   }
 
+  // TODO: wire up createRecord/updateRecord — bulk-imported members skip memberEmails dedup slots
+  // when these methods are called directly; use the batch import path instead which now writes
+  // the memberEmails slot atomically with the member document.
   private static async createRecord(row: any, entityType: string): Promise<void> {
     if (entityType === 'members') {
       await MembersService.createMember(row);

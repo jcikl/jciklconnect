@@ -1240,6 +1240,11 @@ export function useFinanceData(searchQuery?: string) {
   // synchronous and cannot lose a race inside an async handler.
   const isAddingTransactionRef = useRef(false);
   const isUpdatingTransactionRef = useRef(false);
+  const isBatchDeletingRef = useRef(false);
+  const isBatchApprovingRef = useRef(false);
+  const isLinkingRef = useRef(false);
+  const isReconcilingRef = useRef(false);
+  const isVoidingRef = useRef(false);
 
   const handleAddTransaction = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -1380,8 +1385,11 @@ export function useFinanceData(searchQuery?: string) {
   const handleBatchDelete = useCallback(async () => {
     const totalCount = selectedTxIds.size + selectedSplitIds.size;
     if (totalCount === 0) return;
+    if (isBatchDeletingRef.current) return;
+    isBatchDeletingRef.current = true;
 
     if (!confirm(`Are you sure you want to delete ${totalCount} selected item(s)? This action cannot be undone.`)) {
+      isBatchDeletingRef.current = false;
       return;
     }
 
@@ -1467,14 +1475,18 @@ export function useFinanceData(searchQuery?: string) {
     } finally {
       setLoading(false);
       setBatchOperationProgress(null);
+      isBatchDeletingRef.current = false;
     }
   }, [selectedTxIds, selectedSplitIds, transactions, showToast, loadData]);
 
   const handleBatchApprove = useCallback(async () => {
     const totalCount = selectedTxIds.size + selectedSplitIds.size;
     if (totalCount === 0) return;
+    if (isBatchApprovingRef.current) return;
+    isBatchApprovingRef.current = true;
 
     if (!confirm(`Are you sure you want to approve ${totalCount} selected item(s)? Status will be set to 'Cleared'.`)) {
+      isBatchApprovingRef.current = false;
       return;
     }
 
@@ -1536,6 +1548,7 @@ export function useFinanceData(searchQuery?: string) {
     } finally {
       setLoading(false);
       setBatchOperationProgress(null);
+      isBatchApprovingRef.current = false;
     }
   }, [selectedTxIds, selectedSplitIds, transactions, showToast, loadData]);
 
@@ -1543,6 +1556,8 @@ export function useFinanceData(searchQuery?: string) {
   const handleLinkPrToBankTx = useCallback(async (prId: string) => {
     const bankTxId = prSelectedBankTx[prId];
     if (!bankTxId || !user?.uid) return;
+    if (isLinkingRef.current) return;
+    isLinkingRef.current = true;
     setPrLinkingId(prId);
     try {
       const bankTx = transactions.find(t => t.id === bankTxId);
@@ -1591,6 +1606,7 @@ export function useFinanceData(searchQuery?: string) {
       showToast('Failed to link', 'error');
     } finally {
       setPrLinkingId(null);
+      isLinkingRef.current = false;
     }
   }, [prSelectedBankTx, user, transactions, showToast, loadData, loadPrPendingReconciliation]);
 
@@ -1633,6 +1649,8 @@ export function useFinanceData(searchQuery?: string) {
 
   const handleMarkReconciled = useCallback(async (transactionId: string) => {
     if (!user?.uid) return;
+    if (isReconcilingRef.current) return;
+    isReconcilingRef.current = true;
     setReconcilingId(transactionId);
     try {
       await FinanceService.updateTransaction(transactionId, {
@@ -1647,20 +1665,25 @@ export function useFinanceData(searchQuery?: string) {
       showToast(e instanceof Error ? e.message : 'Operation failed', 'error');
     } finally {
       setReconcilingId(null);
+      isReconcilingRef.current = false;
     }
   }, [user, showToast, loadData]);
 
   const handleVoidTransaction = useCallback(async (tx: Transaction) => {
+    if (isVoidingRef.current) return;
+    isVoidingRef.current = true;
     const reason = window.prompt(`Void reason for "${tx.description}"?\n(Required — this will be recorded on the transaction.)`);
-    if (reason === null) return; // cancelled
-    if (!reason.trim()) { showToast('Void reason is required', 'error'); return; }
-    if (!user?.uid) return;
+    if (reason === null) { isVoidingRef.current = false; return; } // cancelled
+    if (!reason.trim()) { showToast('Void reason is required', 'error'); isVoidingRef.current = false; return; }
+    if (!user?.uid) { isVoidingRef.current = false; return; }
     try {
       await FinanceService.voidTransaction(tx.id, reason.trim(), user.uid);
       showToast('Transaction voided', 'success');
       await loadData();
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to void', 'error');
+    } finally {
+      isVoidingRef.current = false;
     }
   }, [user, showToast, loadData]);
 

@@ -594,26 +594,54 @@ export class BoardManagementService {
           updatedAt: now,
         });
       }
-      await boardBatch.commit();
-      // Fix 11 (P1): bust member and boardMembers caches immediately after role changes land
-      // so that any read between now and syncMemberDocumentsForTerm sees fresh data.
-      MembersService.invalidateMembersCache();
-      // Fix 12 (P2): invalidate getAllBoardMembers cache so stale board lists are not served.
-      apiCache.deleteByPrefix('boardMembers:');
 
-          // Fix 9 (P1): boardBatch is already committed. If syncMemberDocumentsForTerm fails,
-          // boardMembers are set but member role fields may be stale. Log with enough context
-          // for manual remediation rather than letting the error surface silently.
-          try {
-            await this.syncMemberDocumentsForTerm(year, assignments, existing);
-          } catch (syncErr) {
-            logServiceError(
-              syncErr instanceof Error ? syncErr : new Error(String(syncErr)),
-              { component: 'BoardManagementService', action: 'setBoardForTerm.syncMemberDocumentsForTerm', additionalData: { year } }
-            );
-            // Re-throw so the caller knows the secondary sync failed and can retry or alert.
-            throw syncErr;
+      // P1 Fix: Inline the syncMemberDocumentsForTerm current-term field updates directly
+      // into the boardBatch so that boardMembers creation and member.currentBoard* fields
+      // land atomically — no window between two separate commits where reads see stale data.
+      const yearNum = parseInt(year, 10);
+      const isCurrentTerm = yearNum === getCurrentBoardCalendarYear();
+      if (isCurrentTerm) {
+        const newMemberIds = new Set<string>(
+          assignments.map(a => a.memberId).filter((id): id is string => Boolean(id))
+        );
+        for (const { memberId, position } of assignments) {
+          if (!memberId) continue;
+          boardBatch.update(doc(db, COLLECTIONS.MEMBERS, memberId), {
+            currentBoardYear: yearNum,
+            currentBoardPosition: position,
+            isCurrentBoardMember: true,
+            isCurrentCommissionDirector: false,
+            updatedAt: now,
+          });
+        }
+        // Clear currentBoard* fields on members removed from this term
+        for (const bm of existing) {
+          if (bm.memberId && !newMemberIds.has(bm.memberId)) {
+            boardBatch.update(doc(db, COLLECTIONS.MEMBERS, bm.memberId), {
+              currentBoardYear: deleteField(),
+              currentBoardPosition: deleteField(),
+              isCurrentBoardMember: false,
+              isCurrentCommissionDirector: false,
+              updatedAt: now,
+            });
           }
+        }
+        // Sync commission director flags
+        const newCommDirIds = new Set<string>(
+          (assignments.flatMap(a => a.commissionDirectorIds ?? []).filter(Boolean)) as string[]
+        );
+        for (const id of newMemberIds) newCommDirIds.delete(id);
+        for (const id of newCommDirIds) {
+          boardBatch.update(doc(db, COLLECTIONS.MEMBERS, id), {
+            isCurrentCommissionDirector: true,
+            updatedAt: now,
+          });
+        }
+      }
+
+      await boardBatch.commit();
+      MembersService.invalidateMembersCache();
+      apiCache.deleteByPrefix('boardMembers:');
         } catch (error) {
           logServiceError(
             error instanceof Error ? error : new Error(String(error)),

@@ -3,6 +3,13 @@ import {
   Zap, Clock, Briefcase, GraduationCap, UserPlus, UserCheck,
   Award, Shield, UserCog
 } from 'lucide-react';
+
+// Generate an inline SVG data URI with initials — avoids external requests blocked by CSP
+const getInitialsSvg = (name: string, size = 48): string => {
+  const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><rect width="${size}" height="${size}" fill="#0097D7" rx="${size / 2}"/><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" fill="white" font-family="sans-serif" font-size="${Math.round(size * 0.4)}px">${initials}</text></svg>`;
+  return `data:image/svg+xml;base64,${btoa(svg)}`;
+};
 import { Button, Card, Badge } from '../../ui/Common';
 import { Input } from '../../ui/Form';
 import type { Member, BoardMember } from '../../../types';
@@ -14,8 +21,8 @@ import { PaymentButton } from '../../shared/toyyib/PaymentButton';
 interface MemberDetailCareerTabProps {
   member: Member;
   isEditMode: boolean;
-  inlineValues: any;
-  setInlineValues: React.Dispatch<React.SetStateAction<any>>;
+  inlineValues: any; // TODO: type InlineCareerValues
+  setInlineValues: React.Dispatch<React.SetStateAction<any>>; // TODO: type InlineCareerValues
   boardPositions: BoardMember[];
   commissionDirectorPositions: BoardMember[];
   mentor: Member | undefined;
@@ -44,7 +51,7 @@ const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) 
               <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Current Mentor</h4>
               {mentor ? (
                 <div className="flex items-center gap-3 p-3 border border-slate-100 rounded-lg hover:bg-slate-50 cursor-pointer">
-                  <img src={mentor.avatar || undefined} className="w-10 h-10 rounded-full" alt="" />
+                  <img src={mentor.avatar || undefined} className="w-10 h-10 rounded-full" alt="" onError={(e) => { e.currentTarget.src = getInitialsSvg(mentor.name, 40); }} />
                   <div>
                     <p className="text-sm font-semibold text-slate-900">{mentor.name}</p>
                     <p className="text-xs text-slate-500">{mentor.role}</p>
@@ -66,7 +73,7 @@ const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) 
                 <div className="space-y-2">
                   {mentees.map(m => (
                     <div key={m.id} className="flex items-center gap-3 p-2 bg-slate-50 rounded-lg">
-                      <img src={m.avatar || undefined} className="w-8 h-8 rounded-full" alt="" />
+                      <img src={m.avatar || undefined} className="w-8 h-8 rounded-full" alt="" onError={(e) => { e.currentTarget.src = getInitialsSvg(m.name, 32); }} />
                       <span className="text-sm font-medium">{m.name}</span>
                     </div>
                   ))}

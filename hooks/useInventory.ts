@@ -1,5 +1,5 @@
 // Inventory Data Hook
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { InventoryService } from '../services/inventoryService';
 import { InventoryItem, MaintenanceSchedule, InventoryAlert } from '../types';
 import { useToast } from '../components/ui/Common';
@@ -7,12 +7,19 @@ import { useFirestoreCollection } from './useFirestoreCollection';
 
 export const useInventory = () => {
   const { showToast } = useToast();
+  const isCreatingRef = useRef(false);
+  const isCheckingOutRef = useRef(false);
+  const isCheckingInRef = useRef(false);
+  const isSchedulingRef = useRef(false);
+  const isCompletingRef = useRef(false);
 
   const { data: items, loading, error, reload: loadItems } = useFirestoreCollection<InventoryItem>({
     loader: () => InventoryService.getAllItems(),
   });
 
   const createItem = async (itemData: Omit<InventoryItem, 'id'>) => {
+    if (isCreatingRef.current) return;
+    isCreatingRef.current = true;
     try {
       const id = await InventoryService.createItem(itemData);
       await loadItems();
@@ -22,6 +29,8 @@ export const useInventory = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create inventory item';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isCreatingRef.current = false;
     }
   };
 
@@ -50,6 +59,8 @@ export const useInventory = () => {
   };
 
   const checkOutItem = async (itemId: string, memberId: string, expectedReturnDate?: string) => {
+    if (isCheckingOutRef.current) return;
+    isCheckingOutRef.current = true;
     try {
       await InventoryService.checkOutItem(itemId, memberId, expectedReturnDate ? new Date(expectedReturnDate) : undefined);
       await loadItems();
@@ -58,10 +69,14 @@ export const useInventory = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to check out item';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isCheckingOutRef.current = false;
     }
   };
 
   const checkInItem = async (itemId: string) => {
+    if (isCheckingInRef.current) return;
+    isCheckingInRef.current = true;
     try {
       await InventoryService.checkInItem(itemId);
       await loadItems();
@@ -70,6 +85,8 @@ export const useInventory = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to check in item';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isCheckingInRef.current = false;
     }
   };
 
@@ -100,6 +117,8 @@ export const useInventory = () => {
   };
 
   const createMaintenanceSchedule = async (schedule: Omit<MaintenanceSchedule, 'id'>) => {
+    if (isSchedulingRef.current) return;
+    isSchedulingRef.current = true;
     try {
       await InventoryService.createMaintenanceSchedule(schedule);
       await loadMaintenanceSchedules();
@@ -108,6 +127,8 @@ export const useInventory = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create maintenance schedule';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSchedulingRef.current = false;
     }
   };
 
@@ -124,6 +145,8 @@ export const useInventory = () => {
   };
 
   const completeMaintenance = async (scheduleId: string, notes?: string) => {
+    if (isCompletingRef.current) return;
+    isCompletingRef.current = true;
     try {
       await InventoryService.completeMaintenance(scheduleId, notes);
       await loadMaintenanceSchedules();
@@ -132,6 +155,8 @@ export const useInventory = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to complete maintenance';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isCompletingRef.current = false;
     }
   };
 

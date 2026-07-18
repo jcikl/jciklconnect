@@ -81,8 +81,13 @@ export const TransactionForm: React.FC<Props> = ({
 }) => {
   const isEdit = mode === 'edit' && !!editingTransaction;
 
-  const getVal = (name: keyof Transaction) => {
-    if (isEdit && editingTransaction) return (editingTransaction as any)[name] ?? '';
+  const getVal = (name: keyof Transaction): string | number => {
+    if (isEdit && editingTransaction) {
+      const val = (editingTransaction as unknown as Record<string, unknown>)[name];
+      if (val == null) return '';
+      if (typeof val === 'boolean') return val ? 'true' : 'false';
+      return val as string | number;
+    }
     return '';
   };
 

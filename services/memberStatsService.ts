@@ -105,7 +105,7 @@ export class MemberStatsService {
       });
 
       // Averages
-      const totalPoints = membersInPeriod.reduce((sum, m) => sum + m.points, 0);
+      const totalPoints = membersInPeriod.reduce((sum, m) => sum + (m.jciCareer?.points ?? (m as any).points ?? 0), 0);
       const averagePoints = totalMembers > 0 ? totalPoints / totalMembers : 0;
 
       const totalAttendance = membersInPeriod.reduce((sum, m) => {

@@ -205,13 +205,6 @@ exports.handler = async (event) => {
         });
       }
       await headerBatch.commit();
-    } else if (billMemberId && billYear && billExternalReferenceNo) {
-      // No toyyibBills doc found — still sync member field if we have the info
-      await db.collection('members').doc(billMemberId).update({
-        [`membership.${billYear}.billExternalReferenceNo`]: billExternalReferenceNo,
-        [`membership.${billYear}.toyyibPaymentStatus`]: billpaymentStatus,
-        updatedAt: Timestamp.now(),
-      });
     }
 
     // ── Membership dues paid via ToyyibPay: clear/create the Income transaction ──

@@ -1,15 +1,19 @@
+import { useRef } from 'react';
 import { useFirestoreCollection } from './useFirestoreCollection';
 import { ActivityPlansService, ActivityPlan } from '../services/activityPlansService';
 import { useToast } from '../components/ui/Common';
 
 export const useActivityPlans = () => {
   const { showToast } = useToast();
+  const isSubmittingRef = useRef(false);
 
   const { data: plans, loading, error, reload: loadPlans } = useFirestoreCollection<ActivityPlan>({
     loader: () => ActivityPlansService.getAllActivityPlans(),
   });
 
   const createPlan = async (planData: Omit<ActivityPlan, 'id' | 'createdAt' | 'updatedAt' | 'version'>) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       const id = await ActivityPlansService.createActivityPlan(planData);
       await loadPlans();
@@ -19,6 +23,8 @@ export const useActivityPlans = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create activity plan';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
@@ -35,6 +41,8 @@ export const useActivityPlans = () => {
   };
 
   const submitPlan = async (planId: string, submittedBy: string) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await ActivityPlansService.submitActivityPlan(planId, submittedBy);
       await loadPlans();
@@ -43,6 +51,8 @@ export const useActivityPlans = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to submit activity plan';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
@@ -52,6 +62,8 @@ export const useActivityPlans = () => {
     reviewedBy: string,
     comments?: string
   ) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await ActivityPlansService.reviewActivityPlan(planId, decision, reviewedBy, comments);
       await loadPlans();
@@ -60,10 +72,14 @@ export const useActivityPlans = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to review activity plan';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
   const createNewVersion = async (planId: string, updates: Partial<ActivityPlan>, submittedBy: string) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       const id = await ActivityPlansService.createNewVersion(planId, updates, submittedBy);
       await loadPlans();
@@ -73,10 +89,14 @@ export const useActivityPlans = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create new version';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
   const deletePlan = async (planId: string) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await ActivityPlansService.deleteActivityPlan(planId);
       await loadPlans();
@@ -85,6 +105,8 @@ export const useActivityPlans = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete activity plan';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 

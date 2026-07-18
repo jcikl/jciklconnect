@@ -441,6 +441,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
         setMemberClubs(clubs);
       } catch (err) {
         console.error('Failed to load member clubs:', err);
+        showToast('Failed to load hobby clubs', 'error');
       } finally {
         setLoadingClubs(false);
       }

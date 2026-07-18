@@ -26,6 +26,7 @@ import {
 import { Project } from '../../../types';
 import * as Forms from '../../ui/Form';
 import { Badge, useToast } from '../../ui/Common';
+import { useAuth } from '../../../hooks/useAuth';
 
 interface ProjectReportGeneratorProps {
   project: Project;
@@ -42,7 +43,9 @@ export const ProjectReportGenerator: React.FC<ProjectReportGeneratorProps> = ({
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
   const [generatedReport, setGeneratedReport] = useState<ProjectReport | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
   const { showToast } = useToast();
+  const { user } = useAuth();
   const [exportFormat, setExportFormat] = useState<'pdf' | 'excel' | 'json' | 'text'>('pdf');
 
   // Template creation state
@@ -120,6 +123,8 @@ export const ProjectReportGenerator: React.FC<ProjectReportGeneratorProps> = ({
   };
 
   const handleCreateTemplate = async () => {
+    if (isCreatingTemplate) return;
+    setIsCreatingTemplate(true);
     try {
       const templateData = {
         name: newTemplate.name,
@@ -140,7 +145,7 @@ export const ProjectReportGenerator: React.FC<ProjectReportGeneratorProps> = ({
         },
       };
 
-      await ProjectReportService.createReportTemplate(templateData, 'current-user');
+      await ProjectReportService.createReportTemplate(templateData, user?.uid ?? '');
       await loadTemplates();
       setShowCreateTemplate(false);
       setNewTemplate({
@@ -155,6 +160,8 @@ export const ProjectReportGenerator: React.FC<ProjectReportGeneratorProps> = ({
     } catch (error) {
       console.error('Error creating template:', error);
       showToast('Failed to create template', 'error');
+    } finally {
+      setIsCreatingTemplate(false);
     }
   };
 
@@ -636,7 +643,8 @@ export const ProjectReportGenerator: React.FC<ProjectReportGeneratorProps> = ({
                   </button>
                   <button
                     onClick={handleCreateTemplate}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                    disabled={isCreatingTemplate}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
                   >
                     <Save size={16} />
                     Create Template

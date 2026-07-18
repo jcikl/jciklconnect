@@ -1,4 +1,5 @@
 // Projects Data Hook
+import { useRef } from 'react';
 import { ProjectsService } from '../services/projectsService';
 import { Project, Task } from '../types';
 import { useToast } from '../components/ui/Common';
@@ -9,6 +10,7 @@ import { useFirestoreCollection } from './useFirestoreCollection';
 export const useProjects = () => {
   const { showToast } = useToast();
   const { member, loading: authLoading, isDevMode: isDevModeFromAuth } = useAuth();
+  const isSubmittingRef = useRef(false);
 
   const inDevMode = isDevMode() || isDevModeFromAuth;
   const enabled = !authLoading && (!!member || inDevMode);
@@ -23,6 +25,8 @@ export const useProjects = () => {
   const loading = authLoading || loading1;
 
   const createProject = async (projectData: Omit<Project, 'id'>) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       const id = await ProjectsService.createProject(projectData);
       await loadProjects();
@@ -32,10 +36,14 @@ export const useProjects = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create project';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
   const updateProject = async (projectId: string, updates: Partial<Project>) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await ProjectsService.updateProject(projectId, updates);
       await loadProjects();
@@ -44,10 +52,14 @@ export const useProjects = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update project';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
   const deleteProject = async (projectId: string) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await ProjectsService.deleteProject(projectId);
       await loadProjects();
@@ -56,6 +68,8 @@ export const useProjects = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete project';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
@@ -70,6 +84,8 @@ export const useProjects = () => {
   };
 
   const createTask = async (taskData: Omit<Task, 'id'>, taskId?: string) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       const id = await ProjectsService.createTask(taskData, taskId);
       await loadProjects();
@@ -79,6 +95,8 @@ export const useProjects = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create task';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
@@ -93,6 +111,8 @@ export const useProjects = () => {
   };
 
   const updateTask = async (taskId: string, updates: Partial<Task>) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await ProjectsService.updateTask(taskId, updates);
       await loadProjects();
@@ -101,6 +121,8 @@ export const useProjects = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update task';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 

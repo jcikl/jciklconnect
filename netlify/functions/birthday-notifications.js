@@ -4,13 +4,18 @@ const { getMessaging } = require('firebase-admin/messaging');
 
 // SEC-CF05: Use FIREBASE_ADMIN_* names (no VITE_ prefix) so Vite never injects
 // the private key into the browser bundle. Align Netlify dashboard env var names.
+const _fbProjectId = process.env.FIREBASE_ADMIN_PROJECT_ID;
+const _fbClientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
+const _fbPrivateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
-if (!getApps().length) {
+if (!_fbProjectId || !_fbClientEmail || !_fbPrivateKey) {
+  console.error('[birthday-notifications] Missing Firebase Admin credentials — function will not initialise');
+} else if (!getApps().length) {
   initializeApp({
     credential: cert({
-      projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      projectId: _fbProjectId,
+      clientEmail: _fbClientEmail,
+      privateKey: _fbPrivateKey,
     }),
   });
 }
@@ -45,6 +50,9 @@ async function sendFcmPush(memberId, title, body, type, extraData = {}) {
 }
 
 exports.handler = async (event) => {
+  if (!_fbProjectId || !_fbClientEmail || !_fbPrivateKey) {
+    return { statusCode: 500, body: JSON.stringify({ error: 'Missing Firebase Admin credentials' }) };
+  }
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
   }

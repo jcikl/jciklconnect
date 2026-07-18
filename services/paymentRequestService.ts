@@ -405,8 +405,17 @@ export class PaymentRequestService {
           }
         } else {
           // Rejection path.
-          // Step 1: Mark PR as rejected first (always safe, no expense-tx dependency).
-          await updateDoc(ref, prUpdatePayload);
+          // P1-fix: wrap status check + rejection update in runTransaction so two concurrent
+          // reject calls (or an approve racing with a reject) cannot both commit.
+          await runTransaction(db, async (txn) => {
+            const freshSnap = await txn.get(ref);
+            if (!freshSnap.exists()) throw new Error('Payment request not found');
+            const currentStatus = (freshSnap.data() as PaymentRequest).status;
+            if (currentStatus !== 'submitted') {
+              throw new Error(`Cannot reject a payment request with status "${currentStatus}" — only submitted requests can be rejected.`);
+            }
+            txn.update(ref, prUpdatePayload);
+          });
           invalidateFinanceCache();
 
           // Step 2: Try to delete linked expense txs.
@@ -642,26 +651,41 @@ export class PaymentRequestService {
     return withDevMode(
       async () => { console.log(`[Dev Mode] Retrying expense tx creation for PR ${prId}`); },
       async () => {
-        const snap = await getDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, prId));
-        if (!snap.exists()) throw new Error('Payment request not found');
-        const pr = { id: snap.id, ...snap.data() } as PaymentRequest;
-        if (pr.status !== 'approved') throw new Error('PR is not in approved status');
+        const prRef = doc(db, COLLECTIONS.PAYMENT_REQUESTS, prId);
+        let pr: PaymentRequest | null = null;
 
-        // Idempotency: skip if a non-reconciled expense tx already exists for this PR.
-        // Without this check a double-click creates two expense txs and doubles the outgoing amount.
-        const existingQ = query(
-          collection(db, COLLECTIONS.TRANSACTIONS),
-          where('paymentRequestId', '==', prId),
-          where('type', '==', 'Expense'),
-          limit(1)
-        );
-        const existingSnap = await getDocs(existingQ);
-        if (!existingSnap.empty) {
-          await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, prId), { expenseTxFailed: false });
+        // P1-fix: atomically acquire a creation lock so concurrent retry clicks cannot both
+        // pass the idempotency check and proceed to create two expense transactions.
+        // The runTransaction sets expenseTxCreating:true — only one caller wins; all others
+        // see the field set and return early.
+        let lockAcquired = false;
+        await runTransaction(db, async (txn) => {
+          const freshSnap = await txn.get(prRef);
+          if (!freshSnap.exists()) throw new Error('Payment request not found');
+          const freshPr = { id: freshSnap.id, ...freshSnap.data() } as PaymentRequest;
+          if (freshPr.status !== 'approved') throw new Error('PR is not in approved status');
+
+          // If another call already created the tx or is in progress, skip
+          if ((freshPr as any).expenseTxId || (freshPr as any).expenseTxCreating) return;
+
+          pr = freshPr;
+          lockAcquired = true;
+          txn.update(prRef, { expenseTxCreating: true });
+        });
+
+        if (!lockAcquired) {
+          // expenseTxId already set (success) or expenseTxCreating:true (another call in progress)
           return;
         }
 
-        await this._createExpenseTransaction(pr, retriedBy);
+        try {
+          await this._createExpenseTransaction(pr!, retriedBy);
+          await updateDoc(prRef, { expenseTxCreating: false, expenseTxFailed: false });
+        } catch (err) {
+          await updateDoc(prRef, { expenseTxCreating: false, expenseTxFailed: true }).catch(() => {});
+          errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { component: 'paymentRequestService', action: 'retryCreateExpenseTransaction' });
+          throw err;
+        }
       }
     );
   }

@@ -583,13 +583,21 @@ export class WorkflowService {
         const url = step.config.url || step.config.webhookUrl;
         if (url) {
           try {
-            const response = await fetch(url, {
-              method: step.config.method || 'POST',
-              headers: step.config.headers || { 'Content-Type': 'application/json' },
-              body: JSON.stringify(step.config.body || context),
-            });
-            if (!response.ok) {
-              throw new Error(`Webhook ${url} returned ${response.status} ${response.statusText}`);
+            // P1 Fix: add 15-second timeout to prevent workflow from hanging indefinitely.
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
+            try {
+              const response = await fetch(url, {
+                method: step.config.method || 'POST',
+                headers: step.config.headers || { 'Content-Type': 'application/json' },
+                body: JSON.stringify(step.config.body || context),
+                signal: controller.signal,
+              });
+              if (!response.ok) {
+                throw new Error(`Webhook ${url} returned ${response.status} ${response.statusText}`);
+              }
+            } finally {
+              clearTimeout(timeoutId);
             }
           } catch (error) {
             console.error('WorkflowService: call_webhook step failed:', error);

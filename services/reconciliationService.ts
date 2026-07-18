@@ -1,5 +1,5 @@
 // Reconciliation Service - Auto-matching & splitting bank transactions with project transactions
-import { increment, doc, updateDoc, runTransaction, Timestamp } from 'firebase/firestore';
+import { doc, runTransaction, Timestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { Transaction, TransactionSplit } from '../types';
@@ -600,26 +600,10 @@ export class ReconciliationService {
         allSplits = newSplits;
       }
 
-      // createTransactionSplit now includes projectTransactionIds — no post-creation updates needed
-      await FinanceService.createTransactionSplit(parentTxId, allSplits, userId);
-
-      // Update parent bank tx status: Partially Reconciled if unlinked remainder exists, else Reconciled (情景 HH)
-      // Fix 8 (P1): createTransactionSplit commits its own batch; this status update is a separate write.
-      // Wrap in try/catch so a failure here does not bubble up and confuse callers — splits are already
-      // committed and the parent status is a derived field that can be corrected on next reconcile.
+      // P1-fix: pass parentStatusOverride so the reconciliation status is committed atomically
+      // in the SAME writeBatch as the splits — no separate updateDoc call needed.
       const parentStatus: 'Reconciled' | 'Partially Reconciled' = remainder > 0.01 ? 'Partially Reconciled' : 'Reconciled';
-      try {
-        await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, parentTxId), {
-          status: parentStatus,
-          updatedAt: Timestamp.now(),
-        });
-      } catch (statusErr) {
-        errorLoggingService.logError(
-          statusErr instanceof Error ? statusErr : new Error(String(statusErr)),
-          { component: 'reconciliationService', action: 'manualMatch.updateParentStatus' }
-        );
-        // Do not rethrow — splits are already committed; parent status can be corrected manually.
-      }
+      await FinanceService.createTransactionSplit(parentTxId, allSplits, userId, { parentStatusOverride: parentStatus });
     } else if (!needsSplit) {
       // Simple 1:1 link
       const pTxId = projectTxIds[0];
@@ -762,11 +746,16 @@ export class ReconciliationService {
       const freshData = freshSnap.data() as Transaction;
 
       const currentMatchedIds: string[] = freshData.matchedBankTxIds || [];
-      const newMatchedIds = currentMatchedIds.includes(bankTxId)
+      const alreadyMatched = currentMatchedIds.includes(bankTxId);
+      const newMatchedIds = alreadyMatched
         ? currentMatchedIds
         : [...currentMatchedIds, bankTxId];
 
-      const newMatchedAmount = (freshData.matchedBankAmount || 0) + allocatedAmount;
+      // Guard: if bankTxId is already in matchedBankTxIds, do not add to matchedBankAmount again
+      // (prevents double-counting on retry calls that find the ID already recorded)
+      const newMatchedAmount = alreadyMatched
+        ? (freshData.matchedBankAmount || 0)
+        : (freshData.matchedBankAmount || 0) + allocatedAmount;
       const total = Math.abs(freshData.amount);
       const status = computeMatchStatus(total - newMatchedAmount, total);
 

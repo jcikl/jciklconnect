@@ -2,6 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
 import { X, Plus, Trash2, Lightbulb, Edit, Check } from 'lucide-react';
 import { Transaction, TransactionSplit } from '../../../types';
+import { db } from '../../../config/firebase';
+import { writeBatch, doc } from 'firebase/firestore';
 import { FinanceService } from '../../../services/financeService';
 import { projectFinancialService } from '../../../services/projectFinancialService';
 import { MembershipConfigService, DEFAULT_MEMBERSHIP_RULES } from '../../../services/membershipConfigService';
@@ -452,9 +454,11 @@ export function TransactionSplitModal({
     try {
       const splitIds = existingSplits.map((split) => split.id);
       try {
-        await Promise.all(splitIds.map(id => FinanceService.deleteTransactionSplit(id)));
+        const batch = writeBatch(db);
+        splitIds.forEach(id => batch.delete(doc(db, 'transactionSplits', id)));
+        await batch.commit();
       } catch (err) {
-        showToast('Partial cancel failed — please retry to clean up remaining splits', 'error');
+        showToast('Failed to cancel splits — please retry', 'error');
         await errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { component: 'TransactionSplitModal', action: 'handleCancelSplit', additionalData: { splitIds } });
         throw err;
       }

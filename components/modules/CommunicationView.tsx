@@ -26,6 +26,7 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
     const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
     const [activeTab, setActiveTab] = useState('Newsfeed');
     const [postContent, setPostContent] = useState('');
+    const [isPosting, setIsPosting] = useState(false);
     const [isAnnouncementModalOpen, setIsAnnouncementModalOpen] = useState(false);
     const [selectedAnnouncement, setSelectedAnnouncement] = useState<NewsPost | null>(null);
     const [announcementData, setAnnouncementData] = useState({
@@ -203,7 +204,8 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
                                             <Button
                                                 size="sm"
                                                 onClick={async () => {
-                                                    if (!member || !postContent.trim()) return;
+                                                    if (!member || !postContent.trim() || isPosting) return;
+                                                    setIsPosting(true);
                                                     try {
                                                         const newPostId = await createPost({
                                                             author: { name: member.name, avatar: member.avatar, role: member.role },
@@ -218,10 +220,12 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
                                                             analyzePostSentiment(newPostId, postContent);
                                                         }
                                                     } catch (err) {
-                                                        // Error handled in hook
+                                                        showToast('Failed to post update', 'error');
+                                                    } finally {
+                                                        setIsPosting(false);
                                                     }
                                                 }}
-                                                disabled={!member || !postContent.trim()}
+                                                disabled={!member || !postContent.trim() || isPosting}
                                             >
                                                 Post
                                             </Button>
@@ -820,7 +824,7 @@ const AnnouncementModal: React.FC<AnnouncementModalProps> = ({ isOpen, onClose, 
                                         }}
                                         className="rounded border-slate-300"
                                     />
-                                    <img src={m.avatar} alt={m.name} className="w-6 h-6 rounded-full" />
+                                    <img src={m.avatar || getInitialsSvg(m.name, 24)} alt={m.name} className="w-6 h-6 rounded-full" onError={(e) => { e.currentTarget.src = getInitialsSvg(m.name, 24); }} />
                                     <span className="text-sm text-slate-700">{m.name}</span>
                                 </label>
                             ))}

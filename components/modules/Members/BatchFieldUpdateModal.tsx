@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Modal, Button } from '../../ui/Common';
+import { Modal, Button, useToast } from '../../ui/Common';
 import { Select, Input } from '../../ui/Form';
 import { UserRole } from '../../../types';
 import type { Member } from '../../../types';
@@ -35,6 +35,7 @@ export const BatchFieldUpdateModal: React.FC<BatchFieldUpdateModalProps> = ({
   const [field, setField] = useState('');
   const [value, setValue] = useState<string>('');
   const [applying, setApplying] = useState(false);
+  const { showToast } = useToast();
 
   const handleClose = () => {
     setField('');
@@ -48,6 +49,8 @@ export const BatchFieldUpdateModal: React.FC<BatchFieldUpdateModalProps> = ({
     try {
       await onApply({ [field]: value } as Partial<Member>);
       handleClose();
+    } catch (err) {
+      showToast('Batch update failed — please try again', 'error');
     } finally {
       setApplying(false);
     }

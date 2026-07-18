@@ -14,6 +14,7 @@ export const useMessaging = () => {
   const { member } = useAuth();
   const { showToast } = useToast();
   const isSendingRef = useRef(false);
+  const isCreatingRef = useRef(false);
 
   // Load conversations
   const loadConversations = useCallback(async () => {
@@ -124,6 +125,8 @@ export const useMessaging = () => {
       showToast('Please login to create conversations', 'error');
       return;
     }
+    if (isCreatingRef.current) return;
+    isCreatingRef.current = true;
 
     try {
       setError(null);
@@ -142,6 +145,8 @@ export const useMessaging = () => {
       setError(errorMessage);
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isCreatingRef.current = false;
     }
   }, [member, showToast, loadConversations]);
 

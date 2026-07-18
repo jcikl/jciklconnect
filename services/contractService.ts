@@ -232,8 +232,26 @@ export class ContractService {
       try {
         await PointsService.awardPoints(data.memberId, 'ROLE_FULFILLMENT', bonus, `Commitment Bonus: ${data.goalTitle}`, contractId, 'contract');
       } catch (bonusErr) {
-        await errorLoggingService.logError(bonusErr instanceof Error ? bonusErr : new Error(String(bonusErr)), { component: 'ContractService', action: 'fulfillContract.awardBonus', additionalData: { contractId, memberId: data.memberId } });
-        throw new Error(`Contract fulfilled but bonus award failed: ${bonusErr instanceof Error ? bonusErr.message : String(bonusErr)}. Please contact admin.`);
+        // P1 Fix: Do NOT rethrow — rethrowing here prevents step 3 from running, leaving
+        // the contract permanently stuck in "Verifying" with no admin alert. Instead, log the
+        // error and write a financeAlert so an admin can manually award the bonus; the contract
+        // status update (step 3) is allowed to proceed so it moves to FULFILLED.
+        await errorLoggingService.logError(bonusErr instanceof Error ? bonusErr : new Error(String(bonusErr)), { component: 'ContractService', action: 'fulfillContract.awardBonus', additionalData: { contractId, memberId: data.memberId, bonus } });
+        try {
+          await addDoc(collection(db, 'finance_alerts'), {
+            type: 'CONTRACT_BONUS_FAILED',
+            contractId,
+            memberId: data.memberId,
+            escrowAmount: data.stakedPoints,
+            bonusAmount: bonus,
+            message:
+              `Contract ${contractId}: escrow was released but bonus of ${bonus} points could not be awarded. ` +
+              'Escrow released OK. Manual admin action needed to award bonus.',
+            error: bonusErr instanceof Error ? bonusErr.message : String(bonusErr),
+            createdAt: serverTimestamp(),
+          });
+        } catch (_alertErr) { /* best-effort alert write */ }
+        // Do NOT rethrow — fall through to step 3 so contract reaches FULFILLED state.
       }
     }
 

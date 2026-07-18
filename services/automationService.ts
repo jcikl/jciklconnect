@@ -289,16 +289,23 @@ export class AutomationService {
       }
 
       // ── Fix P1: Build idempotency key to match workflowService schema ────────
-      const triggerId: string =
-        context.triggerId ?? context.entityId ?? triggeredBy ?? 'manual';
-      // P1 — exclude timestamp so the same trigger never spawns a second execution
+      // P2 Fix: when triggered manually (no real triggerId), append a timestamp so each
+      // manual run gets a unique docId and can be executed multiple times.
+      const rawTriggerId: string =
+        context.triggerId ?? context.entityId ?? null;
+      const triggerId: string = rawTriggerId
+        ? rawTriggerId
+        : triggeredBy === 'manual'
+          ? `manual_${Date.now()}`
+          : triggeredBy;
+      // idempotencyKey is the canonical format: workflowId_triggerId
       const idempotencyKey = `${workflowId}_${triggerId}`;
 
       // ── P0-Fix 1: Atomic idempotency guard via runTransaction ────────────────
-      // Use a deterministic execution doc ID so concurrent triggers both attempt
-      // to create the same document — only the first succeeds; the second gets
-      // DUPLICATE_EXECUTION and returns the existing record (no double points/emails).
-      const executionDocId = `${workflowId}_${idempotencyKey}`;
+      // Use the idempotencyKey directly as the executionDocId (format: workflowId_triggerId).
+      // Previously wrapping idempotencyKey (which already contains workflowId) inside
+      // another ${workflowId}_ prefix produced workflowId_workflowId_triggerId — fixed here.
+      const executionDocId = idempotencyKey;
       const executionRef = doc(db, COLLECTIONS.WORKFLOW_EXECUTIONS, executionDocId);
 
       let isDuplicate = false;
@@ -622,11 +629,19 @@ export class AutomationService {
           const body = step.config.body || context;
 
           if (url) {
-            const response = await fetch(url, {
-              method,
-              headers,
-              body: JSON.stringify(body),
-            });
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
+            let response: Response;
+            try {
+              response = await fetch(url, {
+                method,
+                headers,
+                body: JSON.stringify(body),
+                signal: controller.signal,
+              });
+            } finally {
+              clearTimeout(timeoutId);
+            }
 
             if (!response.ok) {
               throw new Error(`Webhook call failed: ${response.statusText}`);

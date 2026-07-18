@@ -99,9 +99,14 @@ export class WebhookService {
           }
 
           const data = docSnap.data();
+          // P0 Fix: Strip the secret before returning to the browser — the secret is used
+          // for HMAC signing and must never be exposed to client-side code.
+          // TODO: webhook triggering (including HMAC signing) must be moved to a
+          // Netlify Function so the secret stays server-side only.
+          const { secret: _secret, ...safeData } = data;
           return {
             id: docSnap.id,
-            ...data,
+            ...safeData,
             createdAt: (data.createdAt as Timestamp)?.toDate() || new Date(),
             updatedAt: (data.updatedAt as Timestamp)?.toDate() || new Date(),
             lastTriggered: data.lastTriggered ? (data.lastTriggered as Timestamp)?.toDate() : undefined,
@@ -220,22 +225,15 @@ export class WebhookService {
         })
       : undefined;
 
-    // P1: Real HMAC-SHA256 signature instead of placeholder string.
-    if (webhook.secret && bodyString) {
-      const encoder = new TextEncoder();
-      const keyMaterial = await crypto.subtle.importKey(
-        'raw',
-        encoder.encode(webhook.secret),
-        { name: 'HMAC', hash: 'SHA-256' },
-        false,
-        ['sign']
-      );
-      const sig = await crypto.subtle.sign('HMAC', keyMaterial, encoder.encode(bodyString));
-      const hexSig = Array.from(new Uint8Array(sig))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
-      headers['X-Webhook-Signature'] = 'sha256=' + hexSig;
-    }
+    // P0 Fix: HMAC signing removed from client-side — the secret is no longer returned
+    // by getWebhookById so webhook.secret is always undefined here.
+    // TODO: Move triggerWebhook entirely to a Netlify Function (netlify/functions/trigger-webhook.js)
+    // that accepts {webhookId, event, data}, fetches the secret server-side, signs the payload,
+    // and sends the outbound HTTP request — secret never touches the browser.
+    // WARNING: Previously this code fetched the secret to the browser and performed HMAC signing
+    // client-side; that exposed the secret in network responses. Fixed by stripping secret in
+    // getWebhookById. The signature header is omitted until server-side signing is implemented.
+    void bodyString; // suppress unused-variable warning until server-side signing is wired up
 
     // P1: retry with retryPolicy.
     const maxRetries = webhook.retryPolicy?.maxRetries ?? 0;

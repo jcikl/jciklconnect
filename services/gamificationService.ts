@@ -8,6 +8,7 @@ import {
     updateDoc,
     deleteDoc,
     writeBatch,
+    runTransaction,
     arrayUnion,
     query,
     where,
@@ -156,17 +157,12 @@ export class GamificationService {
                     const award = await this.getAwardById(awardId);
                     if (!award) throw new Error('Award definition not found');
 
-                    // Read member data before opening the batch (needed to build the
-                    // UserBadge object and check for duplicates)
+                    // Read member data before the transaction (needed to build userBadge
+                    // object and compute points tier; member doc is not read inside the
+                    // transaction to keep the critical section small).
                     const { MembersService } = await import('./membersService');
                     const member = await MembersService.getMemberById(memberId);
-                    const currentBadges = member?.badges || [];
-                    const alreadyAwarded = currentBadges.some(b => b.id === awardId);
 
-                    // --- Atomic batch: write 1 (badge award record) + write 3 (member badges) ---
-                    const batch = writeBatch(db);
-
-                    // Write 1: Create the badge award record
                     const awardData: Omit<MemberAward, 'id'> = {
                         awardId,
                         memberId,
@@ -176,56 +172,57 @@ export class GamificationService {
                         metadata,
                         progress: 100, // Fully earned
                     };
-                    // Fix 2 (P1): deterministic doc ID prevents concurrent checkEligibleBadgesForMember
-                    // calls from both awarding the same badge — last-write-wins on the same doc ID.
+                    // Deterministic doc ID — used inside the transaction as the existence check.
                     const badgeAwardRef = doc(db, COLLECTIONS.BADGE_AWARDS, `${memberId}_${awardId}`);
-                    batch.set(badgeAwardRef, awardData);
+                    const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
+                    const userBadge: UserBadge = {
+                        id: awardId,
+                        name: award.name,
+                        icon: award.icon,
+                        description: award.description,
+                        earnedDate: new Date().toISOString()
+                    };
 
-                    // Fix 1 (P0): badges arrayUnion always runs when !alreadyAwarded, regardless of pointsReward.
-                    // Points and tier increment are gated on pointsReward > 0 separately.
-                    if (!alreadyAwarded) {
-                        const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
-                        const userBadge: UserBadge = {
-                            id: awardId,
-                            name: award.name,
-                            icon: award.icon,
-                            description: award.description,
-                            earnedDate: new Date().toISOString()
-                        };
-                        // Always append badge
-                        batch.update(memberRef, { badges: arrayUnion(userBadge), updatedAt: Timestamp.now() });
-
-                        if (award.pointsReward > 0 && member) {
-                            const currentPoints: number = (member as any).points || 0;
-                            const newPoints = currentPoints + award.pointsReward;
-                            // TODO: Tier computed from pre-batch member snapshot may be stale if concurrent
-                            // awardPoints commits between this read and batch.commit(). Refactor to runTransaction
-                            // for fully atomic tier computation (see approveClaim TODO for the pattern).
-                            const newTier = PointsService.calculateTier(newPoints);
-
-                            // Merge points increment + tier into a second update on the same doc (Firestore merges within batch)
-                            batch.update(memberRef, {
-                                points: increment(award.pointsReward),
-                                tier: newTier,
-                            });
-
-                            // Fix 1 (P1): points TX record only written when this is a genuinely new award.
-                            // Moving this inside !alreadyAwarded prevents ghost TX records when alreadyAwarded=true.
-                            const pointsTxRef = doc(collection(db, COLLECTIONS.POINTS));
-                            batch.set(pointsTxRef, {
-                                memberId,
-                                points: award.pointsReward,
-                                amount: award.pointsReward,
-                                category: 'achievement',
-                                description: `Award unlocked: ${award.name}`,
-                                relatedEntityId: awardId,
-                                relatedEntityType: 'award',
-                                createdAt: Timestamp.now(),
-                            });
+                    // P1 Fix: Move the alreadyAwarded check inside a runTransaction so that
+                    // two concurrent calls cannot both see alreadyAwarded=false, build separate
+                    // userBadge objects with different earnedDate values, and both arrayUnion
+                    // them into member.badges — producing duplicate badge entries.
+                    let isNewAward = false;
+                    await runTransaction(db, async (txn) => {
+                        const existing = await txn.get(badgeAwardRef);
+                        if (existing.exists()) {
+                            // Already awarded — idempotent no-op.
+                            return;
                         }
-                    }
+                        isNewAward = true;
+                        txn.set(badgeAwardRef, awardData);
+                        txn.update(memberRef, { badges: arrayUnion(userBadge), updatedAt: Timestamp.now() });
+                    });
 
-                    await batch.commit();
+                    // Points reward is written after the transaction — non-atomic relative to
+                    // the badge but kept outside due to its own internal complexity.
+                    if (isNewAward && award.pointsReward > 0 && member) {
+                        const currentPoints: number = (member as any).points || 0;
+                        const newPoints = currentPoints + award.pointsReward;
+                        const newTier = PointsService.calculateTier(newPoints);
+                        const pointsBatch = writeBatch(db);
+                        pointsBatch.update(memberRef, {
+                            points: increment(award.pointsReward),
+                            tier: newTier,
+                        });
+                        const pointsTxRef = doc(collection(db, COLLECTIONS.POINTS));
+                        pointsBatch.set(pointsTxRef, {
+                            memberId,
+                            points: award.pointsReward,
+                            amount: award.pointsReward,
+                            category: 'achievement',
+                            description: `Award unlocked: ${award.name}`,
+                            relatedEntityId: awardId,
+                            relatedEntityType: 'award',
+                            createdAt: Timestamp.now(),
+                        });
+                        await pointsBatch.commit();
+                    }
 
                     // Best-effort notification — must not roll back the committed badge
                     try {

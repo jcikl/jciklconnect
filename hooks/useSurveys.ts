@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { useFirestoreCollection } from './useFirestoreCollection';
 import { SurveysService, Survey, SurveyResponse } from '../services/surveysService';
 import { useToast } from '../components/ui/Common';
@@ -6,6 +7,7 @@ import { useAuth } from './useAuth';
 export const useSurveys = () => {
   const { member } = useAuth();
   const { showToast } = useToast();
+  const isSubmittingRef = useRef(false);
 
   const { data: surveys, loading, error, reload: loadSurveys } = useFirestoreCollection<Survey>({
     loader: () => SurveysService.getAllSurveys(),
@@ -51,6 +53,8 @@ export const useSurveys = () => {
 
   const submitResponse = async (surveyId: string, answers: Record<string, any>) => {
     if (!member) { showToast('Please login to submit survey', 'error'); return; }
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     try {
       await SurveysService.submitResponse({ surveyId, memberId: member.id, answers });
       await loadSurveys();
@@ -59,6 +63,8 @@ export const useSurveys = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to submit survey';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 

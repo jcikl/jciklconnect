@@ -155,7 +155,7 @@ export const WorkflowVisualDesigner: React.FC<WorkflowVisualDesignerProps> = ({
     }
 
     for (const node of actionNodes) {
-      if ((node.config as any)?.type === 'send_email' && !(node.config as any)?.to) {
+      if ((node.config as any)?.type === 'send_email' && !(node.config as any)?.recipient) {
         showToast('请填写邮件发送节点的收件人', 'error'); return;
       }
       if (node.type === 'condition' && !(node.config as any)?.field) {

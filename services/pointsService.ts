@@ -1617,7 +1617,23 @@ export class PointsService {
               }
             }
           } catch (loStarError) {
-            console.error('approveClaim: failed to update loStarProgress (non-fatal)', loStarError);
+            // P2 Fix: Log with enough context for admin to identify the stuck submission
+            // rather than swallowing silently. This is non-fatal — claim approval succeeded.
+            // TODO: Add retry logic (e.g. Cloud Task) so loStarProgress is eventually consistent.
+            const { errorLoggingService: els } = await import('./errorLoggingService');
+            els.logError(
+              loStarError instanceof Error ? loStarError : new Error(String(loStarError)),
+              {
+                component: 'PointsService',
+                action: 'approveClaim.updateLoStarProgress',
+                additionalData: {
+                  submissionId: cs.id,
+                  memberId: cs.memberId,
+                  category: (cs as any).category,
+                  delta: resolvedPoints,
+                }
+              }
+            );
           }
         }
 
@@ -2145,7 +2161,7 @@ export class PointsService {
       // 3. Calculate Sponsorship Points
       let sponsorship = 0;
       const sponsorshipsSnap = await getDocs(
-        query(collection(db, COLLECTIONS.SPONSORSHIPS || 'sponsorships'), where('memberId', '==', memberId))
+        query(collection(db, COLLECTIONS.SPONSORSHIPS), where('memberId', '==', memberId))
       );
       sponsorshipsSnap.forEach(sDoc => {
         const s = sDoc.data();

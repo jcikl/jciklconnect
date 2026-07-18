@@ -1,5 +1,5 @@
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { app } from '../config/firebase';
 
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY || '';
@@ -8,6 +8,7 @@ export const usePushNotifications = () => {
   const [permission, setPermission] = useState<NotificationPermission>('default');
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const isRequestingRef = useRef(false);
 
   useEffect(() => {
     if (typeof Notification !== 'undefined') {
@@ -17,6 +18,8 @@ export const usePushNotifications = () => {
 
   const requestPermission = async (): Promise<string | null> => {
     if (typeof Notification === 'undefined') return null;
+    if (isRequestingRef.current) return null;
+    isRequestingRef.current = true;
     setLoading(true);
     try {
       const result = await Notification.requestPermission();
@@ -32,6 +35,7 @@ export const usePushNotifications = () => {
       return null;
     } finally {
       setLoading(false);
+      isRequestingRef.current = false;
     }
   };
 
