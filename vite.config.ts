@@ -13,6 +13,11 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 3000,
       host: '0.0.0.0',
+      proxy: {
+        // Forward Netlify function calls to the netlify dev server (port 8888).
+        // Without this, /.netlify/functions/* 404s when running `npm run dev` alone.
+        '/.netlify/functions': 'http://localhost:8888',
+      },
     },
     plugins: [
       react(),

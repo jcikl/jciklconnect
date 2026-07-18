@@ -4,14 +4,14 @@ import { GuestAnalyticsService, pathToGuestPage, GuestPage } from '../../service
 import { useAuth } from '../../hooks/useAuth';
 
 export const GuestAnalyticsTracker: React.FC = () => {
-  const { member, loading: authLoading } = useAuth();
+  const { user, member, loading: authLoading } = useAuth();
   const location = useLocation();
   const pageRef = useRef<GuestPage | null>(null);
   const startRef = useRef<number>(0);
 
   useEffect(() => {
     // Wait for auth to resolve, then only track confirmed unauthenticated visitors
-    if (authLoading || member) return;
+    if (authLoading || user || member) return;
     const page = pathToGuestPage(location.pathname);
     if (pageRef.current) {
       GuestAnalyticsService.trackDwell(pageRef.current, (performance.now() - startRef.current) / 1000);
@@ -19,7 +19,7 @@ export const GuestAnalyticsTracker: React.FC = () => {
     pageRef.current = page;
     startRef.current = performance.now();
     if (page) GuestAnalyticsService.trackPageView(page);
-  }, [location.pathname, member, authLoading]);
+  }, [location.pathname, user, member, authLoading]);
 
   useEffect(() => {
     const flush = () => {
