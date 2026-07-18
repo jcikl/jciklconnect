@@ -4,6 +4,7 @@ import { bankTransactionImportConfig } from './config/bankTransactionImportConfi
 import { FinanceService } from '../../../services/financeService';
 import { Project, BankAccount, Transaction } from '../../../types';
 import { Select } from '../../ui/Form';
+import { useToast } from '../../ui/Common';
 import { ProjectsService } from '../../../services/projectsService';
 import { EventPaymentMatchingService } from '../../../services/eventPaymentMatchingService';
 
@@ -23,6 +24,7 @@ export const BankTransactionImportModal: React.FC<Props> = ({
   onClose,
   onImported,
 }) => {
+  const { showToast } = useToast();
   const [bankAccounts, setBankAccounts] = React.useState<BankAccount[]>([]);
   const [projects, setProjects] = React.useState<Project[]>([]);
   const [selectedBankAccountId, setSelectedBankAccountId] = React.useState<string>('');
@@ -57,6 +59,7 @@ export const BankTransactionImportModal: React.FC<Props> = ({
     if (selectedBankAccountId) {
       EventPaymentMatchingService.runAutoMatch(selectedBankAccountId).catch((err) => {
         console.warn('[BankTransactionImportModal] Auto-match after import failed:', err);
+        showToast('Import completed, but auto-matching failed — please match manually', 'warning');
       });
     }
     onImported();

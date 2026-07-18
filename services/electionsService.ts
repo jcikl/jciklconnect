@@ -120,31 +120,42 @@ export class ElectionsService {
 
   static async openElection(electionId: string): Promise<void> {
     if (isDevMode()) return;
-    const snap = await getDoc(doc(db, COLLECTIONS.ELECTIONS, electionId));
-    if (!snap.exists()) throw new Error('Election not found');
-    const data = snap.data() as Election;
-    if (data.status !== 'draft') {
-      throw new Error(`Cannot open election in status '${data.status}'. Election must be in 'draft' status first.`);
-    }
-    await updateDoc(doc(db, COLLECTIONS.ELECTIONS, electionId), {
-      status: 'open',
-      updatedAt: Timestamp.now(),
+    const electionRef = doc(db, COLLECTIONS.ELECTIONS, electionId);
+    // P1 Fix 8: use runTransaction so concurrent openElection calls cannot both
+    // pass the status check and both write.
+    await runTransaction(db, async (txn) => {
+      const snap = await txn.get(electionRef);
+      if (!snap.exists()) throw new Error('Election not found');
+      const data = snap.data() as Election;
+      if (data.status !== 'draft') {
+        throw new Error(`Cannot open election in status '${data.status}'. Election must be in 'draft' status first.`);
+      }
+      txn.update(electionRef, {
+        status: 'open',
+        openedAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      });
     });
     cacheService.deleteByPrefix('elections:');
   }
 
   static async closeElection(electionId: string): Promise<void> {
     if (isDevMode()) return;
-    const snap = await getDoc(doc(db, COLLECTIONS.ELECTIONS, electionId));
-    if (!snap.exists()) throw new Error('Election not found');
-    const data = snap.data() as Election;
-    if (data.status !== 'open') {
-      throw new Error(`Cannot close election in status '${data.status}'. Election must be 'open' first.`);
-    }
-    await updateDoc(doc(db, COLLECTIONS.ELECTIONS, electionId), {
-      status: 'closed',
-      closedAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
+    const electionRef = doc(db, COLLECTIONS.ELECTIONS, electionId);
+    // P1 Fix 8: use runTransaction so concurrent closeElection calls cannot both
+    // pass the status check and both write.
+    await runTransaction(db, async (txn) => {
+      const snap = await txn.get(electionRef);
+      if (!snap.exists()) throw new Error('Election not found');
+      const data = snap.data() as Election;
+      if (data.status !== 'open') {
+        throw new Error(`Cannot close election in status '${data.status}'. Election must be 'open' first.`);
+      }
+      txn.update(electionRef, {
+        status: 'closed',
+        closedAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      });
     });
     cacheService.deleteByPrefix('elections:');
   }
@@ -157,15 +168,18 @@ export class ElectionsService {
     if (isDevMode()) return {};
     const col = COLLECTIONS.ELECTIONS;
     const electionRef = doc(db, col, electionId);
+
+    // Verify status before reading all ballots (avoids loading ballots for non-closed elections)
     const electionSnap = await getDoc(electionRef);
     if (!electionSnap.exists()) throw new Error('Election not found');
     const electionData = electionSnap.data() as Election;
     if (electionData.status !== 'closed') {
       throw new Error(`Cannot tally election in status '${electionData.status}'. Election must be 'closed' first.`);
     }
+
+    // Compute tally outside the transaction (transactions cannot run arbitrary queries)
     const snap = await getDocs(collection(db, `${col}/${electionId}/ballots`));
     const tally: Record<string, Record<string, number>> = {};
-
     for (const d of snap.docs) {
       const ballot = d.data() as Ballot;
       for (const [position, candidateId] of Object.entries(ballot.votes)) {
@@ -174,12 +188,22 @@ export class ElectionsService {
       }
     }
 
-    // Mark election as tallied
-    await updateDoc(doc(db, col, electionId), {
-      status: 'tallied',
-      tally,
-      talliedAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
+    // P2 Fix 9: wrap the status re-check + result write in runTransaction so
+    // concurrent tally calls cannot both write, avoiding a double audit trail.
+    await runTransaction(db, async (txn) => {
+      const snap2 = await txn.get(electionRef);
+      if (!snap2.exists()) throw new Error('Election not found');
+      const currentStatus = (snap2.data() as Election).status;
+      if (currentStatus === 'tallied') return; // already done — idempotent
+      if (currentStatus !== 'closed') {
+        throw new Error(`Cannot tally election in status '${currentStatus}'. Election must be 'closed' first.`);
+      }
+      txn.update(electionRef, {
+        status: 'tallied',
+        tally,
+        talliedAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      });
     });
     cacheService.deleteByPrefix('elections:');
     return tally;

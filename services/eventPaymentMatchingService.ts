@@ -85,10 +85,12 @@ export class EventPaymentMatchingService {
     );
 
     // Fetch bank-imported transactions (unmatched or partially matched)
+    // TODO: paginate for datasets > 500 bank transactions
     const bankQuery = query(
       collection(db, COLLECTIONS.TRANSACTIONS),
       where('source', '==', 'bank_import'),
       ...(bankAccountId ? [where('bankAccountId', '==', bankAccountId)] : []),
+      limit(500),
     );
 
     const [incomeSnap, bankSnap] = await Promise.all([getDocs(incomeQuery), getDocs(bankQuery)]);

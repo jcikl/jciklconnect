@@ -176,7 +176,9 @@ export class GamificationService {
                         metadata,
                         progress: 100, // Fully earned
                     };
-                    const badgeAwardRef = doc(collection(db, COLLECTIONS.BADGE_AWARDS));
+                    // Fix 2 (P1): deterministic doc ID prevents concurrent checkEligibleBadgesForMember
+                    // calls from both awarding the same badge — last-write-wins on the same doc ID.
+                    const badgeAwardRef = doc(db, COLLECTIONS.BADGE_AWARDS, `${memberId}_${awardId}`);
                     batch.set(badgeAwardRef, awardData);
 
                     // Fix 1 (P0): badges arrayUnion always runs when !alreadyAwarded, regardless of pointsReward.
@@ -206,22 +208,21 @@ export class GamificationService {
                                 points: increment(award.pointsReward),
                                 tier: newTier,
                             });
-                        }
-                    }
 
-                    if (award.pointsReward > 0 && member) {
-                        // Also create a points transaction record in the same batch
-                        const pointsTxRef = doc(collection(db, COLLECTIONS.POINTS));
-                        batch.set(pointsTxRef, {
-                            memberId,
-                            points: award.pointsReward,
-                            amount: award.pointsReward,
-                            category: 'achievement',
-                            description: `Award unlocked: ${award.name}`,
-                            relatedEntityId: awardId,
-                            relatedEntityType: 'award',
-                            createdAt: Timestamp.now(),
-                        });
+                            // Fix 1 (P1): points TX record only written when this is a genuinely new award.
+                            // Moving this inside !alreadyAwarded prevents ghost TX records when alreadyAwarded=true.
+                            const pointsTxRef = doc(collection(db, COLLECTIONS.POINTS));
+                            batch.set(pointsTxRef, {
+                                memberId,
+                                points: award.pointsReward,
+                                amount: award.pointsReward,
+                                category: 'achievement',
+                                description: `Award unlocked: ${award.name}`,
+                                relatedEntityId: awardId,
+                                relatedEntityType: 'award',
+                                createdAt: Timestamp.now(),
+                            });
+                        }
                     }
 
                     await batch.commit();

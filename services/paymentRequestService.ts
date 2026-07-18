@@ -299,18 +299,20 @@ export class PaymentRequestService {
         if (status === 'rejected') prUpdatePayload.rejectionReason = rejectionReason ?? null;
 
         if (status === 'approved') {
-          const pr = { id: snap0.id, ...snap0.data() } as PaymentRequest;
-          const category = pr.category === 'projects_activities' ? 'Projects & Activities' : 'Administrative';
-          const projectId = pr.activityId || pr.activityRef || undefined;
-
-          // BUD-001: guard against overspending a project budget before writing anything.
-          if (projectId) {
-            const projectDoc = await projectFinancialService.getProjectFinancialAccount(projectId).catch(() => null);
+          // BUD-001: preliminary budget check using snap0 (non-atomic guard before writing anything).
+          // RC-002 note: snap0 is used here only for the budget guard. The actual PR fields used
+          // to build the expense-tx payload are re-read from the fresh snap inside runTransaction
+          // below, so a concurrent edit between getDoc and runTransaction cannot produce a stale
+          // expense transaction.
+          const pr0 = { id: snap0.id, ...snap0.data() } as PaymentRequest;
+          const projectId0 = pr0.activityId || pr0.activityRef || undefined;
+          if (projectId0) {
+            const projectDoc = await projectFinancialService.getProjectFinancialAccount(projectId0).catch(() => null);
             if (projectDoc && typeof projectDoc.budget === 'number' && projectDoc.budget > 0) {
               const currentExpenses = typeof projectDoc.totalExpenses === 'number'
                 ? projectDoc.totalExpenses
                 : 0;
-              const prAmount = pr.totalAmount ?? pr.amount ?? 0;
+              const prAmount = pr0.totalAmount ?? pr0.amount ?? 0;
               if (currentExpenses + prAmount > projectDoc.budget) {
                 throw new Error(
                   `Approving this payment request (RM ${prAmount.toFixed(2)}) would exceed the project budget. ` +
@@ -320,30 +322,14 @@ export class PaymentRequestService {
             }
           }
 
-          const year = new Date(pr.date || pr.createdAt).getFullYear();
-          const description = pr.items?.length
-            ? pr.items.map((i: any) => i.purpose).filter(Boolean).join(', ')
-            : (pr.purpose || pr.referenceNumber);
-          const txDate = pr.date || pr.createdAt?.split('T')[0] || new Date().toISOString().split('T')[0];
-          const transactionPayload = removeUndefined({
-            date: Timestamp.fromDate(new Date(txDate)),
-            description,
-            referenceNumber: pr.referenceNumber,
-            amount: pr.totalAmount || pr.amount,
-            type: 'Expense',
-            category,
-            status: 'Pending',
-            paymentRequestId: pr.id,
-            projectId: projectId || (category === 'Administrative' ? 'Administrative' : undefined),
-            bankAccountId: pr.claimFromBankAccountId || undefined,
-            purpose: pr.purpose || undefined,
-            year,
-            source: 'manual',
-            createdAt: now,
-            updatedAt: now,
-          });
+          // Fix 1 (P1): pre-allocate the expense tx ref so its ID is available after the transaction.
           const txRef = doc(collection(db, COLLECTIONS.TRANSACTIONS));
+          // Capture fresh PR data from inside the transaction for post-tx side effects.
+          let freshPr: PaymentRequest | null = null;
+
           // RC-002: atomic guard — second approver sees updated status and throws.
+          // All expense-tx payload fields are now read from freshSnap (not from snap0) so a
+          // concurrent PR edit cannot produce a stale amount or bankAccountId in the expense tx.
           await runTransaction(db, async (txn) => {
             const freshSnap = await txn.get(ref);
             if (!freshSnap.exists()) throw new Error('Payment request not found');
@@ -351,9 +337,38 @@ export class PaymentRequestService {
             if (currentStatus !== 'submitted') {
               throw new Error(`Cannot ${status} a payment request with status "${currentStatus}" — only submitted requests can be approved or rejected.`);
             }
+
+            // Build payload from FRESH snap data (Fix 1)
+            const pr = { id: freshSnap.id, ...freshSnap.data() } as PaymentRequest;
+            freshPr = pr;
+            const category = pr.category === 'projects_activities' ? 'Projects & Activities' : 'Administrative';
+            const projectId = pr.activityId || pr.activityRef || undefined;
+            const year = new Date(pr.date || pr.createdAt).getFullYear();
+            const description = pr.items?.length
+              ? pr.items.map((i: any) => i.purpose).filter(Boolean).join(', ')
+              : (pr.purpose || pr.referenceNumber);
+            const txDate = pr.date || pr.createdAt?.split('T')[0] || new Date().toISOString().split('T')[0];
+            const transactionPayload = removeUndefined({
+              date: Timestamp.fromDate(new Date(txDate)),
+              description,
+              referenceNumber: pr.referenceNumber,
+              amount: pr.totalAmount || pr.amount,
+              type: 'Expense',
+              category,
+              status: 'Pending',
+              paymentRequestId: pr.id,
+              projectId: projectId || (category === 'Administrative' ? 'Administrative' : undefined),
+              bankAccountId: pr.claimFromBankAccountId || undefined,
+              purpose: pr.purpose || undefined,
+              year,
+              source: 'manual',
+              createdAt: now,
+              updatedAt: now,
+            });
+
             txn.set(txRef, transactionPayload);
             txn.update(ref, prUpdatePayload);
-            // Fix 1 (P0): decrement bankAccount.currentBalance atomically with the expense tx creation
+            // Fix 1: decrement bankAccount.currentBalance atomically with the expense tx creation
             if (pr.claimFromBankAccountId) {
               const bankAccountRef = doc(db, COLLECTIONS.BANK_ACCOUNTS, pr.claimFromBankAccountId);
               txn.update(bankAccountRef, { currentBalance: increment(-(pr.totalAmount || pr.amount)) });
@@ -362,10 +377,14 @@ export class PaymentRequestService {
           invalidateFinanceCache();
 
           // BIZ-003: Sync project financial account balance if this PR is tied to a project.
-          // Production: projectFinancialService derives totals dynamically from Firestore, so
-          // this is a no-op there — the expense transaction written above is already the source.
-          // Dev mode: the in-memory account balance must be updated explicitly.
-          if (projectId) {
+          // Use freshPr (captured from inside the transaction) so post-tx side effects use the
+          // same data that was committed — not the potentially stale snap0.
+          const pr = freshPr as unknown as PaymentRequest;
+          const projectId = pr?.activityId || pr?.activityRef || undefined;
+          const description = pr?.items?.length
+            ? pr.items.map((i: any) => i.purpose).filter(Boolean).join(', ')
+            : (pr?.purpose || pr?.referenceNumber);
+          if (projectId && pr) {
             try {
               await projectFinancialService.addTransaction(projectId, {
                 type: 'expense',
@@ -385,25 +404,47 @@ export class PaymentRequestService {
             }
           }
         } else {
-          // E-5: query linked expense txs first, then batch status update + deletions atomically
+          // Rejection path.
+          // Step 1: Mark PR as rejected first (always safe, no expense-tx dependency).
+          await updateDoc(ref, prUpdatePayload);
+          invalidateFinanceCache();
+
+          // Step 2: Try to delete linked expense txs.
+          // Fix 3 (P1): A concurrent reconciliation of a linked expense tx can cause the batch
+          // delete to fail (Firestore rule blocks deleting Reconciled txs). The PR is already
+          // marked rejected above, so the only risk is a dangling expense tx — which finance
+          // must reverse manually. We log the failure and surface it rather than leaving the
+          // PR stuck in 'submitted'.
           const linkedQ = query(
             collection(db, COLLECTIONS.TRANSACTIONS),
             where('paymentRequestId', '==', id),
             where('type', '==', 'Expense')
           );
           const linkedSnap = await getDocs(linkedQ);
-          const batch = writeBatch(db);
-          batch.update(ref, prUpdatePayload);
+          const deleteBatch = writeBatch(db);
+          let hasDeletes = false;
           for (const txDoc of linkedSnap.docs) {
             const tx = txDoc.data() as import('../types').Transaction;
             if (tx.status === 'Reconciled' || tx.status === 'Partially Reconciled') {
               console.warn(`[PaymentRequestService] Skipping delete of reconciled transaction ${txDoc.id} linked to PR ${id} — reconcile must be reversed manually first`);
               continue;
             }
-            batch.delete(txDoc.ref);
+            deleteBatch.delete(txDoc.ref);
+            hasDeletes = true;
           }
-          await batch.commit();
-          invalidateFinanceCache();
+          if (hasDeletes) {
+            try {
+              await deleteBatch.commit();
+              invalidateFinanceCache();
+            } catch (deleteErr) {
+              // Some expense txs may have been reconciled since the query — skip and log.
+              // PR is already rejected so no further status change is needed.
+              errorLoggingService.logError(
+                deleteErr instanceof Error ? deleteErr : new Error(String(deleteErr)),
+                { component: 'paymentRequestService', action: 'rejectPR.deleteExpenseTxs' }
+              );
+            }
+          }
         }
 
         // Notify applicant (AA)

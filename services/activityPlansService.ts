@@ -14,6 +14,7 @@ import {
   orderBy,
   Timestamp,
   writeBatch,
+  runTransaction,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
@@ -373,11 +374,18 @@ export class ActivityPlansService {
       () => {},
       async () => {
         try {
-          // FIX P1: status guard
+          // FIX P1: status guard (cache read for quick reject)
           const plan = await this.getActivityPlanById(planId);
           if (!plan) throw new Error('Activity plan not found');
           if (plan.status !== 'Draft') {
             throw new Error(`Cannot submit plan in status "${plan.status}" — only Draft plans can be submitted`);
+          }
+
+          // P2 Fix 10: verify live status from Firestore to prevent double-submit
+          // when the cached copy is within the 3-min TTL window.
+          const liveSnap = await getDoc(doc(db, COLLECTIONS.ACTIVITY_PLANS, planId));
+          if (liveSnap.exists() && liveSnap.data()?.status !== 'Draft') {
+            throw new Error(`Activity plan is already in status '${liveSnap.data()?.status}', cannot submit`);
           }
 
           await this.updateActivityPlan(planId, {

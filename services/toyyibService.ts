@@ -1,4 +1,4 @@
-import { collection, doc, setDoc, getDocs, deleteDoc, serverTimestamp, addDoc, updateDoc, query, where, orderBy, limit, increment, writeBatch, runTransaction } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, deleteDoc, serverTimestamp, addDoc, updateDoc, query, where, orderBy, limit, increment, writeBatch, runTransaction, Timestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { db } from '../config/firebase';
 import { COLLECTIONS, TOYYIB_CONFIG } from '../config/constants';
@@ -478,18 +478,42 @@ export class ToyyibService {
       where('isActive', '==', true),
       limit(1),
     ));
-    // Fix 9: return stored categoryCode field (doc ID is now deterministic, not the code)
     if (!snap.empty) return (snap.docs[0].data().categoryCode as string) || snap.docs[0].id;
 
+    // Fix 4 (P1): use a Firestore transaction to atomically claim the deterministic doc slot.
+    // Two concurrent callers both pass the getDocs check above; only one wins the transaction
+    // and proceeds to call the ToyyibPay API. The other finds the __pending__ placeholder and
+    // waits (or the transaction retries), preventing duplicate categories.
+    const categoryDocRef = doc(db, COLLECTIONS.TOYYIB_CATEGORIES, `${year}_membership`);
+    let categoryCode: string | null = null;
+
+    await runTransaction(db, async (txn) => {
+      const existing = await txn.get(categoryDocRef);
+      if (existing.exists()) {
+        const data = existing.data();
+        if (data.categoryCode && data.categoryCode !== '__pending__') {
+          categoryCode = data.categoryCode as string;
+        }
+        return; // Slot already claimed — another caller is creating or already created it
+      }
+      // Reserve the slot with a placeholder to block concurrent callers
+      txn.set(categoryDocRef, { categoryCode: '__pending__', createdAt: Timestamp.now() });
+    });
+
+    if (categoryCode) return categoryCode;
+
+    // Won the race — now call the ToyyibPay API outside the transaction
     const catName = `${year} Membership`;
     const result = await proxyCall('createCategory', { catname: catName, catdescription: catName });
     if (!Array.isArray(result) || !result[0]?.CategoryCode) {
+      // Roll back the placeholder so a future attempt can try again
+      await setDoc(categoryDocRef, { categoryCode: null, isActive: false, updatedAt: serverTimestamp() }, { merge: true }).catch(() => {});
       throw new Error(`Failed to create ToyyibPay category for ${catName}`);
     }
-    const categoryCode: string = result[0].CategoryCode;
-    // Fix 9: use deterministic doc ID so concurrent callers write the same document
-    // (setDoc with merge:true is idempotent).
-    await setDoc(doc(db, COLLECTIONS.TOYYIB_CATEGORIES, `${year}_membership`), {
+    categoryCode = result[0].CategoryCode as string;
+
+    // Replace the placeholder with the real code
+    await setDoc(categoryDocRef, {
       categoryCode,
       categoryName: catName,
       categoryDescription: catName,
@@ -513,17 +537,36 @@ export class ToyyibService {
       where('isActive', '==', true),
       limit(1),
     ));
-    // Fix 10: return stored categoryCode field (doc ID is now deterministic, not the code)
     if (!snap.empty) return (snap.docs[0].data().categoryCode as string) || snap.docs[0].id;
 
+    // Fix 4 (P1): use a Firestore transaction to atomically claim the deterministic doc slot.
+    // Mirrors the same pattern used in getOrCreateMembershipCategory.
+    const categoryDocRef = doc(db, COLLECTIONS.TOYYIB_CATEGORIES, `${projectId}_category`);
+    let categoryCode: string | null = null;
+
+    await runTransaction(db, async (txn) => {
+      const existing = await txn.get(categoryDocRef);
+      if (existing.exists()) {
+        const data = existing.data();
+        if (data.categoryCode && data.categoryCode !== '__pending__') {
+          categoryCode = data.categoryCode as string;
+        }
+        return; // Slot already claimed
+      }
+      txn.set(categoryDocRef, { categoryCode: '__pending__', createdAt: Timestamp.now() });
+    });
+
+    if (categoryCode) return categoryCode;
+
+    // Won the race — call the ToyyibPay API outside the transaction
     const result = await proxyCall('createCategory', { catname: projectTitle, catdescription: projectTitle });
     if (!Array.isArray(result) || !result[0]?.CategoryCode) {
+      await setDoc(categoryDocRef, { categoryCode: null, isActive: false, updatedAt: serverTimestamp() }, { merge: true }).catch(() => {});
       throw new Error(`Failed to create ToyyibPay category for ${projectTitle}`);
     }
-    const categoryCode: string = result[0].CategoryCode;
-    // Fix 10: use deterministic doc ID so concurrent callers write the same document
-    // (setDoc with merge:true is idempotent).
-    await setDoc(doc(db, COLLECTIONS.TOYYIB_CATEGORIES, `${projectId}_category`), {
+    categoryCode = result[0].CategoryCode as string;
+
+    await setDoc(categoryDocRef, {
       categoryCode,
       categoryName: projectTitle,
       categoryDescription: projectTitle,

@@ -152,12 +152,15 @@ export class MemberStatsService {
       };
 
       // Top performers (top 10 by points)
+      // Fix 15 (P2): use computed attendanceCheckins/attendanceMonths instead of
+      // the deprecated flat attendanceRate field so members on the new schema show
+      // correct attendance rather than 0%.
       const topPerformers = membersInPeriod
         .map(m => ({
           memberId: m.id,
           name: m.name,
           points: m.points,
-          attendanceRate: m.attendanceRate,
+          attendanceRate: getEffectiveAttendanceRate(m),
         }))
         .sort((a, b) => b.points - a.points)
         .slice(0, 10);

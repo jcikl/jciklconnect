@@ -94,8 +94,8 @@ exports.handler = async (event) => {
     }
 
     // Send password reset email via Firebase REST API
-    const apiKey = process.env.VITE_FIREBASE_API_KEY;
-    if (!apiKey) throw new Error('VITE_FIREBASE_API_KEY missing');
+    const apiKey = process.env.FIREBASE_WEB_API_KEY;
+    if (!apiKey) throw new Error('FIREBASE_WEB_API_KEY missing');
 
     const resetRes = await fetch(
       `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${apiKey}`,
@@ -125,7 +125,7 @@ exports.handler = async (event) => {
       }
       // Still return neutral — don't expose internal errors
     } else {
-      console.log('[auto-invite] password setup email sent to', emailKey);
+      console.log('[auto-invite] password setup email sent, target redacted');
       // Log successful send
       try {
         await db.collection('emailLogs').add({

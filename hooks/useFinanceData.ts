@@ -228,13 +228,15 @@ export function useFinanceData(searchQuery?: string) {
     }
   }, [reportYear, showToast]);
 
-  const loadProjectAccounts = useCallback(async (year: number = projectAccountYearFilter) => {
+  const loadProjectAccounts = useCallback(async (year: number = projectAccountYearFilter, getIgnore?: () => boolean) => {
+    const stale = () => getIgnore?.() ?? false;
     setLoadingProjectAccounts(true);
     try {
       const [list, ptTrx] = await Promise.all([
         projectFinancialService.getAllProjectAccounts(year),
         projectFinancialService.getAllProjectTrackerTransactions()
       ]);
+      if (stale()) return;
       setProjectAccounts(list);
 
       const ptSummary: Record<string, { income: number; expenses: number }> = {};
@@ -252,15 +254,16 @@ export function useFinanceData(searchQuery?: string) {
           ptSummary[pid].expenses += amount;
         }
       });
-      setProjectTrackerSummary(ptSummary);
+      if (!stale()) setProjectTrackerSummary(ptSummary);
     } catch (err) {
+      if (stale()) return;
       errorLoggingService.logError(
         err instanceof Error ? err : new Error(String(err)),
         { component: 'useFinanceData', action: 'loadProjectAccounts' }
       );
       showToast('Failed to load project financial data', 'error');
     } finally {
-      setLoadingProjectAccounts(false);
+      if (!stale()) setLoadingProjectAccounts(false);
     }
   }, [projectAccountYearFilter, showToast]);
 
@@ -269,9 +272,11 @@ export function useFinanceData(searchQuery?: string) {
     return projects;
   }, [projects]);
 
-  const loadMembers = useCallback(async () => {
+  const loadMembers = useCallback(async (getIgnore?: () => boolean) => {
+    const stale = () => getIgnore?.() ?? false;
     try {
       const list = await MembersService.getAllMembers();
+      if (stale()) return [];
       const mappedMembers = list.map(m => ({
         id: m.id,
         name: m.fullName && m.name
@@ -285,9 +290,10 @@ export function useFinanceData(searchQuery?: string) {
         joinDate: m.joinDate,
         membership: m.membership,
       }));
-      setMembers(mappedMembers);
+      if (!stale()) setMembers(mappedMembers);
       return mappedMembers;
     } catch (err) {
+      if (stale()) return [];
       errorLoggingService.logError(
         err instanceof Error ? err : new Error(String(err)),
         { component: 'useFinanceData', action: 'loadMembers' }
@@ -1068,7 +1074,7 @@ export function useFinanceData(searchQuery?: string) {
   useEffect(() => {
     let ignore = false;
     if (moduleTab === 'Project Account') {
-      loadProjectAccounts(projectAccountYearFilter);
+      loadProjectAccounts(projectAccountYearFilter, () => ignore);
     }
     return () => { ignore = true; };
   }, [moduleTab, projectAccountYearFilter, loadProjectAccounts]);
@@ -1080,7 +1086,7 @@ export function useFinanceData(searchQuery?: string) {
   useEffect(() => {
     let ignore = false;
     if (moduleTab === 'Membership' || (editingTransaction?.category === 'Membership' && isEditModalOpen) || (isModalOpen && recordFormCategory === 'Membership')) {
-      loadMembers();
+      loadMembers(() => ignore);
     }
     return () => { ignore = true; };
   }, [moduleTab, editingTransaction?.category, isEditModalOpen, isModalOpen, recordFormCategory, loadMembers]);

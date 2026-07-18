@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { collection, doc, getDocs, limit, query, updateDoc, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
@@ -20,11 +20,14 @@ export interface ToyyibPaymentResult {
 export function useToyyibPayment() {
   const [isPaying, setIsPaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isPayingRef = useRef(false);
 
   const payMembershipDues = async (
     member: Member,
     year: number,
   ): Promise<ToyyibPaymentResult> => {
+    if (isPayingRef.current) return null as unknown as ToyyibPaymentResult;
+    isPayingRef.current = true;
     setIsPaying(true);
     setError(null);
     try {
@@ -91,6 +94,7 @@ export function useToyyibPayment() {
       setError(msg);
       throw e;
     } finally {
+      isPayingRef.current = false;
       setIsPaying(false);
     }
   };
@@ -99,6 +103,8 @@ export function useToyyibPayment() {
     member: Member,
     project: { id: string; title: string; ticketPrice: number },
   ): Promise<ToyyibPaymentResult> => {
+    if (isPayingRef.current) return null as unknown as ToyyibPaymentResult;
+    isPayingRef.current = true;
     setIsPaying(true);
     setError(null);
     try {
@@ -150,6 +156,7 @@ export function useToyyibPayment() {
       setError(msg);
       throw e;
     } finally {
+      isPayingRef.current = false;
       setIsPaying(false);
     }
   };

@@ -1,6 +1,6 @@
 ﻿// Data Import/Export Service
 import Papa from 'papaparse';
-import { collection, doc, writeBatch } from 'firebase/firestore';
+import { collection, doc, writeBatch, Timestamp } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 // xlsx is dynamically imported inside importFromFile() and exportToExcel() to avoid eager loading
@@ -490,12 +490,24 @@ export class DataImportExportService {
 
     for (const { row: normalizedRow, originalIndex } of normalizedRows) {
       try {
+        // Fix 12 (P1): pass member rows through normalizeMemberData so nested
+        // schema fields (general, contact, business, jciCareer) are populated.
+        if (entityType === 'members' || entityType === COLLECTIONS.MEMBERS) {
+          const memberNormalized = MembersService.normalizeMemberData(normalizedRow);
+          Object.assign(normalizedRow, memberNormalized);
+        }
+
         const existingId = await this.checkIfRecordExists(normalizedRow, entityType, existingMemberEmailToId);
         const colName = getCollectionName(entityType);
         if (existingId) {
+          // Fix 14 (P1): stamp updatedAt on every imported update
+          normalizedRow.updatedAt = Timestamp.now();
           currentBatch.update(doc(db, colName, existingId), normalizedRow);
           summary.updated++;
         } else {
+          // Fix 14 (P1): stamp createdAt + updatedAt on every new imported document
+          normalizedRow.createdAt = Timestamp.now();
+          normalizedRow.updatedAt = Timestamp.now();
           currentBatch.set(doc(collection(db, colName)), normalizedRow);
           summary.created++;
         }
@@ -515,6 +527,12 @@ export class DataImportExportService {
     } catch (batchError) {
       const batchErrorMessage = batchError instanceof Error ? batchError.message : 'Batch write failed';
       throw new Error(`导入中断：已成功提交 ${committedBatches} 批，最后批次失败：${batchErrorMessage}`);
+    }
+
+    // Fix 13 (P1): invalidate members cache after all batches so the next read
+    // reflects imported data instead of serving the stale pre-import snapshot.
+    if (entityType === 'members' || entityType === COLLECTIONS.MEMBERS) {
+      MembersService.invalidateMembersCache();
     }
 
     const status = errors.length > 0 ? 'partial' : 'success';

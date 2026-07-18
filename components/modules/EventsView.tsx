@@ -220,10 +220,15 @@ export const EventsView: React.FC<{ searchQuery?: string; initialSelectedEventId
         <EventDetailModal
           event={selectedEvent}
           onClose={() => setSelectedEvent(null)}
-          onRegister={(formData) => {
+          onRegister={async (formData) => {
             if (member) {
-              registerForEvent(selectedEvent.id, member.id, formData);
-              setSelectedEvent(null);
+              try {
+                await registerForEvent(selectedEvent.id, member.id, formData);
+                setSelectedEvent(null);
+                showToast('Registration successful', 'success');
+              } catch (err) {
+                showToast('Registration failed — please try again', 'error');
+              }
             }
           }}
           onCheckIn={() => {

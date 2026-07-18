@@ -15,6 +15,7 @@ import {
   Timestamp,
   DocumentData,
   writeBatch,
+  runTransaction,
   deleteField,
   arrayRemove,
   DocumentSnapshot,
@@ -448,9 +449,21 @@ export class MembersService {
       if (!EMAIL_RE.test(memberData.email)) throw new Error('Invalid email format');
       if (memberData.idNumber && !/^\d{12}$/.test(memberData.idNumber)) throw new Error('IC number must be 12 digits');
 
-      // VAL-01: check email uniqueness before writing
-      const existing = await this.getMemberByEmail(memberData.email);
-      if (existing) throw new Error('A member with this email already exists');
+      // P0 Fix 11: claim email slot atomically via runTransaction on a deterministic
+      // secondary-index document. Two concurrent createMember calls with the same email
+      // both attempt to set the same emailSlot doc — only the first succeeds.
+      const emailSlotRef = doc(
+        db,
+        'memberEmails',
+        memberData.email.toLowerCase().replace(/[^a-z0-9@.]/g, '_')
+      );
+      await runTransaction(db, async (txn) => {
+        const existing = await txn.get(emailSlotRef);
+        if (existing.exists()) {
+          throw new Error('A member with this email already exists');
+        }
+        txn.set(emailSlotRef, { email: memberData.email, createdAt: Timestamp.now() });
+      });
 
       const payload = {
         ...memberData,
@@ -474,6 +487,8 @@ export class MembersService {
       const normalizedData = this.normalizeMemberData(cleanMemberData);
 
       const docRef = await addDoc(collection(db, COLLECTIONS.MEMBERS), normalizedData);
+      // Stamp the email slot with the new member ID so it can be looked up later
+      await updateDoc(emailSlotRef, { memberId: docRef.id });
       logWrite(CACHE_KEY_ALL_MEMBERS, 'membersService.createMember');
       this.invalidateMembersCache();
 

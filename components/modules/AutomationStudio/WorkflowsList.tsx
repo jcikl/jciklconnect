@@ -1,6 +1,7 @@
-import React from 'react';
-import { GitBranch, Plus, Clock, Play, PowerOff, Power, Edit, Trash2 } from 'lucide-react';
-import { Card, Button, Badge } from '../../ui/Common';
+import React, { useState } from 'react';
+import { GitBranch, Plus, Clock, Play, PowerOff, Power, Edit, Trash2, Loader2 } from 'lucide-react';
+import { Card, Button, Badge, ConfirmDialog, CONFIRM_CLOSED } from '../../ui/Common';
+import type { ConfirmState } from '../../ui/Common';
 import { Workflow } from '../../../services/automationService';
 import { formatDate } from '../../../utils/dateUtils';
 
@@ -21,6 +22,32 @@ export const WorkflowsList: React.FC<WorkflowsListProps> = ({
   onExecute,
   onCreate,
 }) => {
+  const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
+  const [isExecuting, setIsExecuting] = useState<Record<string, boolean>>({});
+
+  const handleDeleteClick = (workflowId: string, workflowName: string) => {
+    setConfirmState({
+      open: true,
+      title: 'Delete Workflow',
+      message: `Are you sure you want to delete "${workflowName}"? This action cannot be undone.`,
+      confirmLabel: 'Delete',
+      variant: 'danger',
+      onConfirm: () => {
+        onDelete(workflowId);
+        setConfirmState(CONFIRM_CLOSED);
+      },
+    });
+  };
+
+  const handleExecuteClick = async (workflowId: string) => {
+    if (isExecuting[workflowId]) return;
+    setIsExecuting(prev => ({ ...prev, [workflowId]: true }));
+    try {
+      await onExecute(workflowId);
+    } finally {
+      setIsExecuting(prev => ({ ...prev, [workflowId]: false }));
+    }
+  };
   if (workflows.length === 0) {
     return (
       <div className="text-center py-20">
@@ -88,10 +115,13 @@ export const WorkflowsList: React.FC<WorkflowsListProps> = ({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => onExecute(workflow.id!)}
+                onClick={() => handleExecuteClick(workflow.id!)}
                 title="Execute Now"
+                disabled={!!isExecuting[workflow.id!]}
               >
-                <Play size={16} />
+                {isExecuting[workflow.id!]
+                  ? <Loader2 size={16} className="animate-spin" />
+                  : <Play size={16} />}
               </Button>
               <Button
                 variant="ghost"
@@ -103,7 +133,7 @@ export const WorkflowsList: React.FC<WorkflowsListProps> = ({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => onDelete(workflow.id!)}
+                onClick={() => handleDeleteClick(workflow.id!, workflow.name)}
                 className="text-red-500 hover:text-red-700"
               >
                 <Trash2 size={16} />
@@ -112,6 +142,15 @@ export const WorkflowsList: React.FC<WorkflowsListProps> = ({
           </div>
         </Card>
       ))}
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        confirmLabel={confirmState.confirmLabel}
+        variant={confirmState.variant}
+        onConfirm={confirmState.onConfirm}
+        onCancel={() => setConfirmState(CONFIRM_CLOSED)}
+      />
     </div>
   );
 };

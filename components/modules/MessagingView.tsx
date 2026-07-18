@@ -23,6 +23,8 @@ import { formatDate, formatTime, formatRelativeTime } from '../../utils/dateUtil
 
 export const MessagingView: React.FC = () => {
   const [messageContent, setMessageContent] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  const isSendingRef = useRef(false);
   const [isNewConversationModalOpen, setNewConversationModalOpen] = useState(false);
   const [conversationType, setConversationType] = useState<'direct' | 'group' | 'project'>('direct');
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
@@ -53,12 +55,17 @@ export const MessagingView: React.FC = () => {
 
   const handleSendMessage = async () => {
     if (!messageContent.trim() || !selectedConversation?.id) return;
-
+    if (isSendingRef.current) return;
+    isSendingRef.current = true;
+    setIsSending(true);
     try {
       await sendMessage(selectedConversation.id, messageContent);
       setMessageContent('');
     } catch (err) {
       // Error handled in hook
+    } finally {
+      isSendingRef.current = false;
+      setIsSending(false);
     }
   };
 
@@ -340,7 +347,7 @@ export const MessagingView: React.FC = () => {
                       }}
                     />
                   </div>
-                  <Button onClick={handleSendMessage} disabled={!messageContent.trim()}>
+                  <Button onClick={handleSendMessage} disabled={!messageContent.trim() || isSending}>
                     <Send size={18} />
                   </Button>
                 </div>
@@ -442,7 +449,7 @@ export const MessagingView: React.FC = () => {
                         }}
                         className="rounded border-slate-300"
                       />
-                      <img src={m.avatar} alt={m.name} className="w-8 h-8 rounded-full" />
+                      <img src={m.avatar || getInitialsSvg(m.name, 32)} alt={m.name} className="w-8 h-8 rounded-full" />
                       <span className="text-sm text-slate-900">{m.name}</span>
                     </label>
                   ))}

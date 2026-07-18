@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../../hooks/useAuth';
 import {
   DollarSign,
   TrendingUp,
@@ -51,11 +52,14 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
   project,
   onClose,
 }) => {
+  const { user } = useAuth();
   const { showToast } = useToast();
   const [account, setAccount] = useState<ProjectFinancialAccount | null>(null);
   const [summary, setSummary] = useState<ProjectFinancialSummary | null>(null);
   const [transactions, setTransactions] = useState<ProjectTransaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'transactions' | 'budget' | 'reports'>('overview');
   const [showCreateAccount, setShowCreateAccount] = useState(false);
   const [showAddTransaction, setShowAddTransaction] = useState(false);
@@ -105,6 +109,7 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
   };
 
   const handleCreateAccount = async () => {
+    setIsCreating(true);
     try {
       const accountData: CreateProjectAccountData = {
         projectId: project.id,
@@ -114,17 +119,20 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
         budgetCategories: newAccountData.budgetCategories || [],
       };
 
-      await projectFinancialService.createProjectFinancialAccount(accountData, 'current-user');
+      await projectFinancialService.createProjectFinancialAccount(accountData, user?.uid ?? '');
       await loadProjectFinancialData();
     } catch (error) {
       console.error('Error creating project financial account:', error);
       showToast('Failed to create account', 'error');
+    } finally {
+      setIsCreating(false);
     }
   };
 
   const handleAddTransaction = async () => {
     if (!account) return;
 
+    setIsSubmitting(true);
     try {
       const transactionData: RecordTransactionData = {
         projectId: project.id,
@@ -136,7 +144,7 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
         tags: newTransactionData.tags,
       };
 
-      await projectFinancialService.recordProjectTransaction(account.id, transactionData, 'current-user');
+      await projectFinancialService.recordProjectTransaction(account.id, transactionData, user?.uid ?? '');
       await loadProjectFinancialData();
       setShowAddTransaction(false);
       setNewTransactionData({
@@ -148,6 +156,8 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
     } catch (error) {
       console.error('Error adding transaction:', error);
       showToast('Failed to add transaction', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -267,9 +277,10 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
               </button>
               <button
                 onClick={handleCreateAccount}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                disabled={isCreating}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Create Account
+                {isCreating ? 'Creating…' : 'Create Account'}
               </button>
             </div>
           </div>
@@ -521,18 +532,15 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
               <Forms.Select
                 label="Type"
                 value={newTransactionData.type}
-                onChange={(e) => setNewTransactionData(prev => ({ 
-                  ...prev, 
-                  type: e.target.value as 'income' | 'expense' 
+                onChange={(e) => setNewTransactionData(prev => ({
+                  ...prev,
+                  type: e.target.value as 'income' | 'expense'
                 }))}
                 options={[
                   { value: 'expense', label: 'Expense' },
                   { value: 'income', label: 'Income' }
                 ]}
-              >
-                <option value="expense">Expense</option>
-                <option value="income">Income</option>
-              </Forms.Select>
+              />
 
               <Forms.Input
                 label="Amount"
@@ -560,9 +568,9 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
               <Forms.Select
                 label="Category"
                 value={newTransactionData.categoryId || ''}
-                onChange={(e) => setNewTransactionData(prev => ({ 
-                  ...prev, 
-                  categoryId: e.target.value || undefined 
+                onChange={(e) => setNewTransactionData(prev => ({
+                  ...prev,
+                  categoryId: e.target.value || undefined
                 }))}
                 options={[
                   { value: '', label: 'No Category' },
@@ -571,14 +579,7 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
                     label: category.name
                   }))
                 ]}
-              >
-                <option value="">No Category</option>
-                {account.budgetCategories.map(category => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </Forms.Select>
+              />
 
               <Forms.Input
                 label="Date"
@@ -601,9 +602,10 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
               </button>
               <button
                 onClick={handleAddTransaction}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                disabled={isSubmitting}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Add Transaction
+                {isSubmitting ? 'Saving…' : 'Add Transaction'}
               </button>
             </div>
           </div>

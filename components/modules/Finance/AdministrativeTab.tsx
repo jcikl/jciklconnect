@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Edit, Trash2, Briefcase, FileText, ChevronDown } from 'lucide-react';
-import { Button, Badge, ConfirmDialog, CONFIRM_CLOSED } from '../../ui/Common';
+import { Button, Badge, ConfirmDialog, CONFIRM_CLOSED, useToast } from '../../ui/Common';
 import type { ConfirmState } from '../../ui/Common';
 import { LoadingState } from '../../ui/Loading';
 import { formatCurrency } from '../../../utils/formatUtils';
@@ -50,6 +50,7 @@ const AdministrativeTabBase: React.FC<AdministrativeTabProps> = ({
   setIsAddAdministrativeProjectOpen,
   projects,
 }) => {
+  const { showToast } = useToast();
   const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
 
   const requestDeleteTransaction = (id: string, description?: string) => {
@@ -72,7 +73,10 @@ const AdministrativeTabBase: React.FC<AdministrativeTabProps> = ({
   React.useEffect(() => {
     PaymentRequestService.list({ pageSize: 500 }).then(({ items }) => {
       setAdminPRs(items.filter(pr => pr.category === 'administrative'));
-    }).catch(() => {});
+    }).catch((err) => {
+      showToast('Failed to load payment requests', 'error');
+      console.error('[AdministrativeTab] loadPaymentRequests failed:', err);
+    });
   }, []);
 
   const activeYear = adminAccountYearFilter;

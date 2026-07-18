@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Link2, Link2Off, CheckCircle, AlertCircle, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { Transaction, BankAccount } from '../../../types';
 import { FinanceService } from '../../../services/financeService';
-import { Modal, Button, Badge } from '../../ui/Common';
+import { Modal, Button, Badge, useToast } from '../../ui/Common';
 import { formatCurrency } from '../../../utils/formatUtils';
 
 interface Props {
@@ -32,6 +32,7 @@ function formatDate(d: string) {
 export const BankMatchingModal: React.FC<Props> = ({
   isOpen, onClose, account, currentUserId, onComplete,
 }) => {
+  const { showToast } = useToast();
   const [bankImports, setBankImports] = useState<Transaction[]>([]);
   const [manualEntries, setManualEntries] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
@@ -108,8 +109,9 @@ export const BankMatchingModal: React.FC<Props> = ({
       const { bankImports: b, manualEntries: m } = await FinanceService.getUnmatchedForReconciliation(account.id);
       setBankImports(b);
       setManualEntries(m);
-    } catch {
+    } catch (err) {
       setError('Failed to unmatch');
+      showToast('Failed to unmatch transaction — please try again', 'error');
     } finally {
       setSaving(null);
     }

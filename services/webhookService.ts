@@ -193,6 +193,10 @@ export class WebhookService {
   }
 
   // Trigger webhook
+  // IMPORTANT: This method sends HTTP requests from the browser, which are blocked by CORS
+  // for most webhook endpoints. This should be moved to a Netlify Function.
+  // TODO: Create netlify/functions/trigger-webhook.js that accepts {webhookId, event, data}
+  // and performs the outbound HTTP call server-side where CORS does not apply.
   static async triggerWebhook(webhookId: string, event: string, data: any): Promise<boolean> {
     if (isDevMode()) { console.log('[WebhookService] dev mode — skipping real HTTP request'); return true; }
     const webhook = await this.getWebhookById(webhookId);
@@ -259,7 +263,15 @@ export class WebhookService {
         lastError = new Error(`HTTP ${response.status} ${response.statusText}`);
       } catch (err) {
         clearTimeout(timeout);
-        lastError = err instanceof Error ? err : new Error(String(err));
+        const rawMsg = err instanceof Error ? err.message : String(err);
+        if (rawMsg === 'Failed to fetch' || rawMsg.includes('NetworkError')) {
+          lastError = new Error(
+            'Failed to fetch: the webhook endpoint may be blocking browser requests due to CORS. ' +
+            'Move triggerWebhook to a Netlify Function to send requests server-side.'
+          );
+        } else {
+          lastError = err instanceof Error ? err : new Error(rawMsg);
+        }
         response = null;
       }
     }

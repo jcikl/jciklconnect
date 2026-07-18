@@ -563,8 +563,17 @@ export class PromotionService {
       console.warn('[promoteToOfficialMember] syncBoardMemberDisplayFields failed (non-fatal):', syncErr);
     }
 
-    // Send notification AFTER batch succeeds
-    await this.sendPromotionNotification(promotion);
+    // Fix 10 (P1): notification failure must not make the caller believe the promotion failed —
+    // the batch already committed successfully above.
+    try {
+      await this.sendPromotionNotification(promotion);
+    } catch (notificationErr) {
+      errorLoggingService.logError(
+        notificationErr instanceof Error ? notificationErr : new Error(String(notificationErr)),
+        { component: 'promoteToOfficialMember.notification', additionalData: { memberId } }
+      );
+      // Intentionally do not rethrow — promotion succeeded, notification failure is non-fatal
+    }
 
     return promotion;
   }

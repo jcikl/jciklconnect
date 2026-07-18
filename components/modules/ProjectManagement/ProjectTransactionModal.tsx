@@ -41,6 +41,7 @@ export const ProjectTransactionModal: React.FC<ProjectTransactionModalProps> = (
             setBankAccounts(accounts);
         } catch (err) {
             console.error('Failed to load bank accounts', err);
+            showToast('Failed to load bank accounts', 'warning');
         }
     };
 

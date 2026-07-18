@@ -8,6 +8,7 @@ import {
   updateDoc,
   deleteDoc,
   writeBatch,
+  runTransaction,
   query,
   where,
   orderBy,
@@ -293,27 +294,41 @@ export class AutomationService {
       // P1 — exclude timestamp so the same trigger never spawns a second execution
       const idempotencyKey = `${workflowId}_${triggerId}`;
 
-      // ── P1: Idempotency guard — skip if already running or succeeded ─────────
-      const dupSnap = await getDocs(
-        query(
-          collection(db, COLLECTIONS.WORKFLOW_EXECUTIONS),
-          where('workflowId', '==', workflowId),
-          where('idempotencyKey', '==', idempotencyKey),
-          where('status', 'in', ['running', 'success']),
-          limit(1)
-        )
-      );
-      if (!dupSnap.empty) {
-        const existingId = dupSnap.docs[0].id;
+      // ── P0-Fix 1: Atomic idempotency guard via runTransaction ────────────────
+      // Use a deterministic execution doc ID so concurrent triggers both attempt
+      // to create the same document — only the first succeeds; the second gets
+      // DUPLICATE_EXECUTION and returns the existing record (no double points/emails).
+      const executionDocId = `${workflowId}_${idempotencyKey}`;
+      const executionRef = doc(db, COLLECTIONS.WORKFLOW_EXECUTIONS, executionDocId);
+
+      let isDuplicate = false;
+      let duplicateExecution: WorkflowExecution | undefined;
+      await runTransaction(db, async (txn) => {
+        const existing = await txn.get(executionRef);
+        if (existing.exists()) {
+          isDuplicate = true;
+          duplicateExecution = {
+            id: existing.id,
+            ...existing.data(),
+            startedAt: existing.data().startedAt?.toDate?.()?.toISOString() ?? existing.data().startedAt,
+            completedAt: existing.data().completedAt?.toDate?.()?.toISOString() ?? existing.data().completedAt,
+          } as WorkflowExecution;
+          return; // no-op commit — existing record wins
+        }
+        txn.set(executionRef, {
+          workflowId,
+          triggerId,
+          idempotencyKey,
+          status: 'running',
+          startedAt: serverTimestamp(),
+        });
+      });
+
+      if (isDuplicate && duplicateExecution) {
         console.log(
-          `AutomationService: workflow already executed for this trigger, skipping. executionId=${existingId}`
+          `AutomationService: workflow already executed for this trigger, skipping. executionId=${executionDocId}`
         );
-        return {
-          id: existingId,
-          ...dupSnap.docs[0].data(),
-          startedAt: dupSnap.docs[0].data().startedAt?.toDate?.()?.toISOString() ?? dupSnap.docs[0].data().startedAt,
-          completedAt: dupSnap.docs[0].data().completedAt?.toDate?.()?.toISOString() ?? dupSnap.docs[0].data().completedAt,
-        } as WorkflowExecution;
+        return duplicateExecution;
       }
       // ─────────────────────────────────────────────────────────────────────────
 
@@ -340,7 +355,8 @@ export class AutomationService {
       }
       // ─────────────────────────────────────────────────────────────────────────
 
-      // Create execution record — includes idempotencyKey to match workflowService schema
+      // Execution record was already created atomically in the transaction above.
+      // Build the in-memory representation for return value construction.
       const execution: Omit<WorkflowExecution, 'id'> = {
         workflowId,
         workflowName: workflow.name,
@@ -352,14 +368,14 @@ export class AutomationService {
         context,
       };
 
-      const executionRef = await addDoc(
-        collection(db, COLLECTIONS.WORKFLOW_EXECUTIONS),
-        {
-          ...execution,
-          startedAt: serverTimestamp(),
-          idempotencyKey,
-        }
-      );
+      // Update the pre-created execution doc with workflow name + full context
+      await updateDoc(executionRef, {
+        workflowName: workflow.name,
+        triggeredBy,
+        executedSteps: [],
+        nodeExecutions: [],
+        context,
+      });
 
       const executedSteps: WorkflowExecutionStep[] = [];
       let executionError: WorkflowExecution['error'] | undefined;
@@ -552,8 +568,8 @@ export class AutomationService {
           if (memberId) {
             await PointsService.awardPoints(
               memberId,
-              category,
               amount,
+              category,
               description,
               relatedEntityId,
               relatedEntityType

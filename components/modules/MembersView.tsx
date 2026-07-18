@@ -160,6 +160,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
 
   const [isBatchActionModalOpen, setIsBatchActionModalOpen] = useState(false);
   const [batchActionType, setBatchActionType] = useState<'delete' | 'set' | null>(null);
+  const [isBatchDeleting, setIsBatchDeleting] = useState(false);
 
   const { member: currentMember } = useAuth();
   const { isAdmin, isBoard, isDeveloper } = usePermissions();
@@ -635,10 +636,16 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
         footer={
           <div className="flex justify-end gap-3 w-full">
             <Button variant="outline" onClick={() => setIsBatchActionModalOpen(false)}>Cancel</Button>
-            <Button variant="danger" onClick={async () => {
-              await batchDeleteMembers(Array.from(selectedIds));
-              setSelectedIds(new Set());
-              setIsBatchActionModalOpen(false);
+            <Button variant="danger" disabled={isBatchDeleting} onClick={async () => {
+              if (isBatchDeleting) return;
+              setIsBatchDeleting(true);
+              try {
+                await batchDeleteMembers(Array.from(selectedIds));
+                setSelectedIds(new Set());
+                setIsBatchActionModalOpen(false);
+              } finally {
+                setIsBatchDeleting(false);
+              }
             }}>Delete Members</Button>
           </div>
         }

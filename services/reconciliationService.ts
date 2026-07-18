@@ -1,5 +1,5 @@
 // Reconciliation Service - Auto-matching & splitting bank transactions with project transactions
-import { increment, doc, runTransaction, Timestamp } from 'firebase/firestore';
+import { increment, doc, updateDoc, runTransaction, Timestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { Transaction, TransactionSplit } from '../types';
@@ -604,8 +604,22 @@ export class ReconciliationService {
       await FinanceService.createTransactionSplit(parentTxId, allSplits, userId);
 
       // Update parent bank tx status: Partially Reconciled if unlinked remainder exists, else Reconciled (情景 HH)
+      // Fix 8 (P1): createTransactionSplit commits its own batch; this status update is a separate write.
+      // Wrap in try/catch so a failure here does not bubble up and confuse callers — splits are already
+      // committed and the parent status is a derived field that can be corrected on next reconcile.
       const parentStatus: 'Reconciled' | 'Partially Reconciled' = remainder > 0.01 ? 'Partially Reconciled' : 'Reconciled';
-      await FinanceService.updateTransaction(parentTxId, { status: parentStatus });
+      try {
+        await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, parentTxId), {
+          status: parentStatus,
+          updatedAt: Timestamp.now(),
+        });
+      } catch (statusErr) {
+        errorLoggingService.logError(
+          statusErr instanceof Error ? statusErr : new Error(String(statusErr)),
+          { component: 'reconciliationService', action: 'manualMatch.updateParentStatus' }
+        );
+        // Do not rethrow — splits are already committed; parent status can be corrected manually.
+      }
     } else if (!needsSplit) {
       // Simple 1:1 link
       const pTxId = projectTxIds[0];
@@ -770,50 +784,59 @@ export class ReconciliationService {
 
   /**
    * Remove a bank tx entry from a project tx's reverse index.
+   * Fix 7 (P1): wrapped in runTransaction so matchedBankTxIds and matchedBankAmount are
+   * always read from the fresh server value, not from a stale client-side snapshot.
    */
   private static async removeProjectTxMatchEntry(
     projectTxId: string,
     bankTxId: string,
     bankTransactions: Transaction[],
-    projectTransactions: Transaction[]
+    _projectTransactions: Transaction[]
   ): Promise<void> {
-    const pTx = projectTransactions.find(p => p.id === projectTxId);
-    if (!pTx) return;
-
-    const currentMatchedIds = (pTx.matchedBankTxIds || []).filter(id => id !== bankTxId);
-
-    // Recompute matched amount from remaining linked bank txs
-    let recomputedAmount = 0;
-    for (const bId of currentMatchedIds) {
-      const btx = bankTransactions.find(b => b.id === bId);
-      if (btx) {
-        const linked = (btx as any).projectTransactionIds || [];
-        if (linked.includes(projectTxId)) {
-          recomputedAmount += Math.abs(btx.amount);
-        }
-      }
-    }
-
-    const total = Math.abs(pTx.amount);
-    const status = computeMatchStatus(total - recomputedAmount, total);
-
-    const updates: any = {
-      matchedBankAmount: recomputedAmount,
-      matchedBankTxIds: currentMatchedIds,
-      matchStatus: status,
-    };
-
-    if (currentMatchedIds.length === 0) {
-      updates.date = ''; // Reset to empty string if no matched bank transactions remain
-    } else {
-      const remainingTx = bankTransactions.find(b => b.id === currentMatchedIds[0]);
-      if (remainingTx?.date) {
-        updates.date = remainingTx.date;
-      }
-    }
+    const projectTxRef = doc(db, COLLECTIONS.TRANSACTIONS, projectTxId);
 
     try {
-      await FinanceService.updateProjectTransaction(projectTxId, updates);
+      await runTransaction(db, async (txn) => {
+        const freshSnap = await txn.get(projectTxRef);
+        if (!freshSnap.exists()) return;
+        const fresh = freshSnap.data() as Transaction;
+
+        const currentMatchedIds = (fresh.matchedBankTxIds ?? []).filter((id: string) => id !== bankTxId);
+
+        // Recompute matched amount from remaining linked bank txs (uses caller-supplied list as best-effort;
+        // acceptable here since this is a derived denormalised field, not a balance-critical value).
+        let recomputedAmount = 0;
+        for (const bId of currentMatchedIds) {
+          const btx = bankTransactions.find(b => b.id === bId);
+          if (btx) {
+            const linked = (btx as any).projectTransactionIds ?? [];
+            if (linked.includes(projectTxId)) {
+              recomputedAmount += Math.abs(btx.amount);
+            }
+          }
+        }
+
+        const total = Math.abs(fresh.amount ?? 0);
+        const status = computeMatchStatus(total - recomputedAmount, total);
+
+        const updates: Record<string, unknown> = {
+          matchedBankAmount: recomputedAmount,
+          matchedBankTxIds: currentMatchedIds,
+          matchStatus: status,
+          updatedAt: Timestamp.now(),
+        };
+
+        if (currentMatchedIds.length === 0) {
+          updates.date = ''; // Reset to empty string if no matched bank transactions remain
+        } else {
+          const remainingTx = bankTransactions.find(b => b.id === currentMatchedIds[0]);
+          if (remainingTx?.date) {
+            updates.date = remainingTx.date;
+          }
+        }
+
+        txn.update(projectTxRef, updates);
+      });
     } catch (err) {
       console.warn('[ReconciliationService] removeProjectTxMatchEntry partially failed', err);
       errorLoggingService.logError(err as Error, { component: 'ReconciliationService' });

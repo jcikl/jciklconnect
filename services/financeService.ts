@@ -998,10 +998,27 @@ export class FinanceService {
         try {
           const splitRef = doc(db, COLLECTIONS.TRANSACTION_SPLITS, splitId);
 
-          // TX-W2 / Fix 7 (P1): validate amount totals and write atomically inside a single
-          // runTransaction. Sibling splits are fetched via getDocs (which is allowed inside
-          // the transaction callback, though not part of Firestore's atomic read set); the
-          // parent document is read via tx.get() which IS part of the atomic read set.
+          // Fix 6 (P1): Sibling splits are fetched BEFORE the transaction so each sibling ref
+          // can be read inside the callback via tx.get(), which includes them in Firestore's
+          // atomic read set and causes the transaction to retry if any sibling is concurrently
+          // modified — preventing two concurrent updates from both passing the sum validation.
+          let siblingRefs: import('firebase/firestore').DocumentReference[] = [];
+          if (updates.amount !== undefined) {
+            // Pre-read the split doc to learn the parentTransactionId (this is a non-transactional
+            // read used only for fetching sibling refs; the authoritative read is tx.get() below).
+            const preSplitSnap = await getDoc(splitRef);
+            if (preSplitSnap.exists()) {
+              const preSplit = preSplitSnap.data() as TransactionSplit;
+              const siblingsSnap = await getDocs(query(
+                collection(db, COLLECTIONS.TRANSACTION_SPLITS),
+                where('parentTransactionId', '==', preSplit.parentTransactionId)
+              ));
+              siblingRefs = siblingsSnap.docs
+                .filter(d => d.id !== splitId)
+                .map(d => d.ref);
+            }
+          }
+
           let currentSplit: TransactionSplit;
           await runTransaction(db, async (tx) => {
             const freshSnap = await tx.get(splitRef);
@@ -1009,16 +1026,19 @@ export class FinanceService {
             currentSplit = freshSnap.data() as TransactionSplit;
 
             if (updates.amount !== undefined) {
-              const allSplits = await this.getTransactionSplits(currentSplit.parentTransactionId);
-              const totalSplitAmount = allSplits.reduce((sum, s) => {
-                return sum + (s.id === splitId ? updates.amount! : s.amount);
-              }, 0);
+              // Read each sibling atomically inside the transaction (part of the read set)
+              const siblingDocs = await Promise.all(siblingRefs.map(ref => tx.get(ref)));
+              const siblingTotal = siblingDocs
+                .filter(d => d.exists())
+                .reduce((sum, d) => sum + ((d.data()?.amount as number) ?? 0), 0);
+
               const parentDoc = await tx.get(doc(db, COLLECTIONS.TRANSACTIONS, currentSplit.parentTransactionId));
               if (parentDoc.exists()) {
-                const parentAmount = parentDoc.data().amount;
-                if (Math.abs(totalSplitAmount - parentAmount) > 0.01) {
+                const parentAmount = parentDoc.data().amount as number;
+                const newTotal = siblingTotal + updates.amount!;
+                if (Math.abs(newTotal - parentAmount) > 0.01) {
                   throw new Error(
-                    `Split amounts (${totalSplitAmount}) must equal parent transaction amount (${parentAmount})`
+                    `Split amounts (${newTotal}) must equal parent transaction amount (${parentAmount})`
                   );
                 }
               }

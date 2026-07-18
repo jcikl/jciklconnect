@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MessageSquare, Bell, FileText, Send, MoreHorizontal, ThumbsUp, TrendingUp, TrendingDown, BarChart3, Info, X, Megaphone, Users, Calendar, Target, Edit, Trash2, Eye } from 'lucide-react';
 import { Card, Button, Tabs, Badge, Modal, useToast, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
 import type { ConfirmState } from '../ui/Common';
@@ -14,6 +14,13 @@ import { MessagingView } from './MessagingView';
 import { AIPredictionService } from '../../services/aiPredictionService';
 import { CommunicationService } from '../../services/communicationService';
 import { NewsPost } from '../../types';
+
+// Generate an inline SVG data URI with initials — avoids external requests blocked by CSP
+const getInitialsSvg = (name: string, size = 48): string => {
+    const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?';
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><rect width="${size}" height="${size}" fill="#0097D7" rx="${size / 2}"/><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" fill="white" font-family="sans-serif" font-size="${Math.round(size * 0.4)}px">${initials}</text></svg>`;
+    return `data:image/svg+xml;base64,${btoa(svg)}`;
+};
 
 export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
     const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
@@ -61,22 +68,29 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
     const [sentimentSummary, setSentimentSummary] = useState<any>(null);
 
     // Auto-analyze sentiment for all posts when they load
+    const cancelledRef = useRef(false);
     useEffect(() => {
+        cancelledRef.current = false;
         const analyzeAllPosts = async () => {
             for (const post of posts) {
+                if (cancelledRef.current) break;
                 if (!sentimentAnalysis[post.id] && !analyzingPosts.has(post.id)) {
                     setAnalyzingPosts(prev => new Set(prev).add(post.id));
                     try {
                         const analysis = await AIPredictionService.analyzeSentiment(post.content, 'post', post.id);
-                        setSentimentAnalysis(prev => ({ ...prev, [post.id]: analysis }));
+                        if (!cancelledRef.current) {
+                            setSentimentAnalysis(prev => ({ ...prev, [post.id]: analysis }));
+                        }
                     } catch (err) {
                         // Silently fail - sentiment analysis is optional
                     } finally {
-                        setAnalyzingPosts(prev => {
-                            const next = new Set(prev);
-                            next.delete(post.id);
-                            return next;
-                        });
+                        if (!cancelledRef.current) {
+                            setAnalyzingPosts(prev => {
+                                const next = new Set(prev);
+                                next.delete(post.id);
+                                return next;
+                            });
+                        }
                     }
                 }
             }
@@ -85,6 +99,7 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
         if (posts.length > 0) {
             analyzeAllPosts();
         }
+        return () => { cancelledRef.current = true; };
     }, [posts]);
 
     // Calculate sentiment summary
@@ -168,7 +183,7 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
                             <div className="p-4 sm:p-6 bg-slate-50/50">
                                 <div className="flex gap-3 sm:gap-4">
                                     {member && (
-                                        <img src={member.avatar} alt={member.name} className="w-10 h-10 rounded-full bg-slate-200 flex-shrink-0" />
+                                        <img src={member.avatar || getInitialsSvg(member.name, 40)} alt={member.name} className="w-10 h-10 rounded-full bg-slate-200 flex-shrink-0" />
                                     )}
                                     {!member && (
                                         <div className="w-10 h-10 rounded-full bg-slate-200 flex-shrink-0"></div>

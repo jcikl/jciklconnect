@@ -232,15 +232,44 @@ export class PointsService {
       points = Math.round(points * Math.max(1, hours));
     }
 
+    // Fix 4 (P1): deterministic doc ID + runTransaction prevents concurrent calls from
+    // double-awarding attendance points for the same member+event.
+    const dedupRef = doc(db, COLLECTIONS.POINTS, `${memberId}_${eventId}_attendance`);
+
     if (!isDevMode()) {
-      const existing = await getDocs(query(
-        collection(db, COLLECTIONS.POINTS),
-        where('memberId', '==', memberId),
-        where('relatedEntityId', '==', eventId),
-        where('category', '==', POINT_CATEGORIES.EVENT_ATTENDANCE),
-        limit(1)
-      ));
-      if (!existing.empty) return existing.docs[0].id;
+      await runTransaction(db, async (txn) => {
+        const existing = await txn.get(dedupRef);
+        if (existing.exists()) return; // already awarded — idempotent exit
+
+        const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
+        const memberSnap = await txn.get(memberRef);
+        if (!memberSnap.exists()) throw new Error('Member not found');
+
+        const currentMemberPoints: number = memberSnap.data()?.points || 0;
+        const awardYear = new Date().getFullYear();
+
+        txn.set(dedupRef, {
+          memberId,
+          points,
+          amount: points,
+          category: POINT_CATEGORIES.EVENT_ATTENDANCE,
+          description: `Attended ${eventType} event`,
+          relatedEntityId: eventId,
+          sourceId: eventId,
+          relatedEntityType: 'event',
+          sourceType: 'event',
+          createdAt: Timestamp.now(),
+        });
+        txn.update(memberRef, {
+          points: increment(points),
+          tier: PointsService.calculateTier(currentMemberPoints + points),
+          [`yearlyPoints.${awardYear}`]: increment(points),
+          updatedAt: Timestamp.now(),
+        });
+      });
+      PointsService.invalidatePointsCache();
+      MembersService.invalidateMembersCache();
+      return dedupRef.id;
     }
 
     return this.awardPoints(
@@ -296,15 +325,45 @@ export class PointsService {
       }
     }
 
+    // Fix 5 (P1): deterministic doc ID + runTransaction prevents concurrent calls from
+    // double-awarding task completion points for the same member+task.
+    const dedupRef = doc(db, COLLECTIONS.POINTS, `${memberId}_${taskId}_task_completion`);
+
     if (!isDevMode()) {
-      const existing = await getDocs(query(
-        collection(db, COLLECTIONS.POINTS),
-        where('memberId', '==', memberId),
-        where('relatedEntityId', '==', taskId),
-        where('category', '==', POINT_CATEGORIES.PROJECT_TASK),
-        limit(1)
-      ));
-      if (!existing.empty) return existing.docs[0].id;
+      await runTransaction(db, async (txn) => {
+        const existing = await txn.get(dedupRef);
+        if (existing.exists()) return; // already awarded — idempotent exit
+
+        const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
+        const memberSnap = await txn.get(memberRef);
+        if (!memberSnap.exists()) throw new Error('Member not found');
+
+        const currentMemberPoints: number = memberSnap.data()?.points || 0;
+        const awardYear = new Date().getFullYear();
+
+        txn.set(dedupRef, {
+          memberId,
+          points,
+          amount: points,
+          category: POINT_CATEGORIES.PROJECT_TASK,
+          description: `Completed ${priority} priority task`,
+          relatedEntityId: taskId,
+          sourceId: taskId,
+          relatedEntityType: 'task',
+          sourceType: 'task',
+          metadata: { projectId, priority },
+          createdAt: Timestamp.now(),
+        });
+        txn.update(memberRef, {
+          points: increment(points),
+          tier: PointsService.calculateTier(currentMemberPoints + points),
+          [`yearlyPoints.${awardYear}`]: increment(points),
+          updatedAt: Timestamp.now(),
+        });
+      });
+      PointsService.invalidatePointsCache();
+      MembersService.invalidateMembersCache();
+      return dedupRef.id;
     }
 
     return this.awardPoints(
@@ -875,6 +934,9 @@ export class PointsService {
               createdAt: Timestamp.now()
             });
           });
+          // Fix 6 (P2): invalidate caches after transaction commits
+          PointsService.invalidatePointsCache();
+          MembersService.invalidateMembersCache();
         } catch (error) {
           console.error('Error during point transfer:', error);
           throw error;
@@ -898,7 +960,7 @@ export class PointsService {
       () => `mock-escrow-${Date.now()}`,
       async () => {
         try {
-          return await runTransaction(db, async (transaction) => {
+          const escrowId = await runTransaction(db, async (transaction) => {
             const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
             const memberDoc = await transaction.get(memberRef);
 
@@ -944,6 +1006,10 @@ export class PointsService {
 
             return escrowRef.id;
           });
+          // Fix 7 (P2): invalidate caches after escrow lock commits
+          PointsService.invalidatePointsCache();
+          MembersService.invalidateMembersCache();
+          return escrowId;
         } catch (error) {
           console.error('Error locking points:', error);
           throw error;
@@ -1008,6 +1074,9 @@ export class PointsService {
               createdAt: Timestamp.now()
             });
           });
+          // Fix 7 (P2): invalidate caches after escrow release commits
+          PointsService.invalidatePointsCache();
+          MembersService.invalidateMembersCache();
         } catch (error) {
           console.error('Error releasing escrow:', error);
           throw error;
@@ -1052,6 +1121,18 @@ export class PointsService {
               updatedAt: Timestamp.now(),
             });
             t.update(escrowDoc.ref, { status: 'Expired', expiredAt: Timestamp.now() });
+            // Fix 8 (P2): write a POINTS TX record so the restored points appear in history
+            const restorationTxRef = doc(collection(db, COLLECTIONS.POINTS));
+            t.set(restorationTxRef, {
+              memberId,
+              amount,
+              points: amount,
+              category: 'ESCROW_EXPIRED',
+              description: `Escrow expired — points restored`,
+              relatedEntityId: escrowDoc.id,
+              relatedEntityType: 'escrow',
+              createdAt: Timestamp.now(),
+            });
           });
           expired++;
         } catch (err) {
@@ -1413,151 +1494,141 @@ export class PointsService {
 
   // Approve a claim
   // P0-A fix: atomically update submission status AND create a points transaction in one batch.
+  // Fix 3 (P1): wrapped in runTransaction to prevent concurrent double-approval — both readers
+  // seeing PENDING and both awarding points.
   static async approveClaim(submissionId: string, grantedPoints: number, approverId: string): Promise<void> {
     if (isDevMode()) {
       console.log(`[DEV MODE] Approved claim ${submissionId} with ${grantedPoints} points.`);
       return;
     }
     try {
-      // Fetch submission to get memberId for points award
       const submissionRef = doc(db, COLLECTIONS.INCENTIVE_SUBMISSIONS, submissionId);
-      const submissionSnap = await getDoc(submissionRef);
-      if (!submissionSnap.exists()) throw new Error(`Submission ${submissionId} not found`);
-      const submission = submissionSnap.data() as IncentiveSubmission;
 
       // TODO: milestone-level approval not yet implemented; milestoneId is present on the
-      // submission (submission.milestoneId) but sub-milestone score tracking is not supported yet.
-      // The full submission is approved as a whole for now.
+      // submission but sub-milestone score tracking is not supported yet.
 
-      // P1-B: if the caller passes 0 points, derive a sensible default from the standard's
-      // first milestone so scoreAwarded is never silently zeroed on approval.
-      let resolvedPoints = grantedPoints;
-      if (resolvedPoints <= 0) {
-        try {
-          const stdSnap = await getDoc(doc(db, COLLECTIONS.INCENTIVE_STANDARDS, submission.standardId));
+      let resolvedPoints = 0;
+      let capturedSubmission: (IncentiveSubmission & { id: string }) | null = null;
+
+      // Fix 3 (P1): all reads happen before writes inside the transaction so Firestore
+      // can detect the concurrent-approval conflict and retry/abort as needed.
+      await runTransaction(db, async (txn) => {
+        // --- ALL READS ---
+        const submissionSnap = await txn.get(submissionRef);
+        if (!submissionSnap.exists()) throw new Error(`Submission ${submissionId} not found`);
+        const submission = submissionSnap.data() as IncentiveSubmission;
+
+        if (submission.status !== 'PENDING') {
+          throw new Error(`Submission ${submissionId} is already ${submission.status} — skipping duplicate approval`);
+        }
+
+        // P1-B: derive fallback points from standard if caller passes 0.
+        let rPoints = grantedPoints;
+        if (rPoints <= 0 && submission.standardId) {
+          const stdSnap = await txn.get(doc(db, COLLECTIONS.INCENTIVE_STANDARDS, submission.standardId));
           if (stdSnap.exists()) {
             const std = stdSnap.data() as IncentiveStandard;
-            resolvedPoints = std.milestones?.[0]?.points || submission.scoreAwarded || 0;
+            rPoints = std.milestones?.[0]?.points || submission.scoreAwarded || 0;
+          } else {
+            rPoints = submission.scoreAwarded || 0;
           }
-        } catch (stdErr) {
-          console.error('approveClaim: could not fetch standard for scoreAwarded fallback', stdErr);
         }
-      }
 
-      const batch = writeBatch(db);
+        let memberCurrentPoints = 0;
+        if (submission.memberId && rPoints > 0) {
+          const memberSnap = await txn.get(doc(db, COLLECTIONS.MEMBERS, submission.memberId));
+          memberCurrentPoints = memberSnap.exists() ? (memberSnap.data()?.points || 0) : 0;
+        }
 
-      // 1. Update submission status to APPROVED
-      batch.update(submissionRef, {
-        status: 'APPROVED',
-        scoreAwarded: resolvedPoints,
-        approvedBy: approverId,
-      });
+        // Capture for post-transaction side effects (survives transaction retry)
+        resolvedPoints = rPoints;
+        capturedSubmission = { ...submission, id: submissionId };
 
-      // 2. Create a points transaction for the member (if there is one)
-      // Note: expiresAt is defined in types but not enforced; metadata is stored but not read.
-      if (submission.memberId && resolvedPoints > 0) {
-        const txRef = doc(collection(db, COLLECTIONS.POINTS));
-        batch.set(txRef, {
-          memberId: submission.memberId,
-          points: resolvedPoints,
-          amount: resolvedPoints,
-          category: 'Incentive_Claim',
-          description: `Incentive claim approved (submission: ${submissionId})`,
-          relatedEntityId: submissionId,
-          relatedEntityType: 'incentiveSubmission',
-          sourceId: submissionId,           // backward compatibility
-          sourceType: 'incentiveSubmission', // backward compatibility
-          createdAt: Timestamp.now(),
+        // --- ALL WRITES ---
+        txn.update(submissionRef, {
+          status: 'APPROVED',
+          scoreAwarded: rPoints,
+          approvedBy: approverId,
         });
 
-        // E4 fix: update member aggregate points INSIDE the batch so that the
-        // points transaction and the member total are committed atomically.
-        // The separate updateMemberPoints call that previously followed batch.commit()
-        // has been removed — this increment replaces it.
-        const memberRef = doc(db, COLLECTIONS.MEMBERS, submission.memberId);
+        if (submission.memberId && rPoints > 0) {
+          const newTier = PointsService.calculateTier(memberCurrentPoints + rPoints);
+          const memberRef = doc(db, COLLECTIONS.MEMBERS, submission.memberId);
+          txn.update(memberRef, { points: increment(rPoints), tier: newTier, updatedAt: Timestamp.now() });
 
-        // P0 fix: calculate new tier based on current + awarded points so member.tier
-        // is always in sync after claim approval.
-        // TODO (Fix 8): The getDoc→batch.commit sequence has a narrow race window — if another
-        // awardPoints call commits between this getDoc and batch.commit(), the tier written here
-        // will be computed from a stale points total. Acceptable for now because incentive claim
-        // approvals are low-frequency admin actions. To eliminate the race, refactor to use
-        // runTransaction so the read and write are atomic.
-        const memberSnap = await getDoc(memberRef);
-        const currentPoints: number = memberSnap.exists() ? (memberSnap.data().points || 0) : 0;
-        const newTier = PointsService.calculateTier(currentPoints + resolvedPoints);
-        batch.update(memberRef, { points: increment(resolvedPoints), tier: newTier, updatedAt: Timestamp.now() });
-      }
-
-      await batch.commit();
-
-      // P0-A: Update loStarProgress inline to mirror Cloud Function onSubmissionApproved.
-      // The Cloud Function may not be deployed in all environments, so we replicate its logic
-      // here as a reliable fallback. Errors are non-fatal — loStarProgress is a derived cache.
-      if (submission.loId && resolvedPoints > 0) {
-        try {
-          const stdSnap = await getDoc(doc(db, COLLECTIONS.INCENTIVE_STANDARDS, submission.standardId));
-          if (stdSnap.exists()) {
-            const std = stdSnap.data() as IncentiveStandard;
-            const category = std.category;
-            const programId = std.programId;
-
-            const progSnap = await getDoc(doc(db, COLLECTIONS.INCENTIVE_PROGRAMS, programId));
-            if (progSnap.exists()) {
-              const program = progSnap.data() as IncentiveProgram;
-              const minScore = program.categories?.[category]?.minScore ?? 250;
-              const year = program.year || new Date().getFullYear();
-
-              const progressRef = doc(db, COLLECTIONS.LO_STAR_PROGRESS, `${submission.loId}_${year}`);
-              await runTransaction(db, async (t) => {
-                const progressSnap = await t.get(progressRef);
-                const data: Record<string, any> = progressSnap.exists()
-                  ? { ...progressSnap.data() }
-                  : {
-                      loId: submission.loId,
-                      year,
-                      categories: {},
-                      details: {},
-                      totalPoints: 0,
-                      starsUnlocked: 0,
-                    };
-
-                if (!data.categories[category]) {
-                  data.categories[category] = { current: 0, total: minScore, stars: 0 };
-                }
-                const currentPoints = (data.categories[category].current || 0) + resolvedPoints;
-                data.categories[category].current = currentPoints;
-                data.categories[category].stars = currentPoints >= minScore ? 1 : 0;
-                data.totalPoints = (data.totalPoints || 0) + resolvedPoints;
-
-                let totalStars = 0;
-                Object.values(data.categories as Record<string, any>).forEach((cat: any) => {
-                  totalStars += cat.stars || 0;
-                });
-                data.starsUnlocked = totalStars;
-                data.lastUpdated = Timestamp.now();
-
-                t.set(progressRef, data, { merge: true });
-              });
-            }
-          }
-        } catch (loStarError) {
-          console.error('approveClaim: failed to update loStarProgress (non-fatal)', loStarError);
+          const txRef = doc(collection(db, COLLECTIONS.POINTS));
+          txn.set(txRef, {
+            memberId: submission.memberId,
+            points: rPoints,
+            amount: rPoints,
+            category: 'Incentive_Claim',
+            description: `Incentive claim approved (submission: ${submissionId})`,
+            relatedEntityId: submissionId,
+            relatedEntityType: 'incentiveSubmission',
+            sourceId: submissionId,           // backward compatibility
+            sourceType: 'incentiveSubmission', // backward compatibility
+            createdAt: Timestamp.now(),
+          });
         }
-      }
+      });
 
-      // E5 fix: best-effort badge/achievement check after points are approved.
-      // GamificationService is dynamically imported to avoid the circular dependency
-      // (gamificationService.ts already imports pointsService.ts).
-      // TODO: replace the inner body with GamificationService.checkEligibleBadgesForMember(memberId)
-      //       and an achievementService.checkAndAwardAchievements(memberId) call once those
-      //       methods are implemented.
-      if (submission.memberId) {
-        try {
-          const { GamificationService } = await import('./gamificationService');
-          await GamificationService.checkEligibleBadgesForMember(submission.memberId);
-        } catch (err) {
-          console.warn('[approveClaim] Badge/achievement check failed (non-critical):', err);
+      // Post-transaction side effects — non-atomic, non-fatal
+      if (capturedSubmission) {
+        const cs = capturedSubmission as IncentiveSubmission & { id: string };
+
+        // P0-A: Update loStarProgress inline to mirror Cloud Function onSubmissionApproved.
+        if (cs.loId && resolvedPoints > 0) {
+          try {
+            const stdSnap = await getDoc(doc(db, COLLECTIONS.INCENTIVE_STANDARDS, cs.standardId));
+            if (stdSnap.exists()) {
+              const std = stdSnap.data() as IncentiveStandard;
+              const category = std.category;
+              const programId = std.programId;
+
+              const progSnap = await getDoc(doc(db, COLLECTIONS.INCENTIVE_PROGRAMS, programId));
+              if (progSnap.exists()) {
+                const program = progSnap.data() as IncentiveProgram;
+                const minScore = program.categories?.[category]?.minScore ?? 250;
+                const year = program.year || new Date().getFullYear();
+
+                const progressRef = doc(db, COLLECTIONS.LO_STAR_PROGRESS, `${cs.loId}_${year}`);
+                await runTransaction(db, async (t) => {
+                  const progressSnap = await t.get(progressRef);
+                  const data: Record<string, any> = progressSnap.exists()
+                    ? { ...progressSnap.data() }
+                    : { loId: cs.loId, year, categories: {}, details: {}, totalPoints: 0, starsUnlocked: 0 };
+
+                  if (!data.categories[category]) {
+                    data.categories[category] = { current: 0, total: minScore, stars: 0 };
+                  }
+                  const currentPts = (data.categories[category].current || 0) + resolvedPoints;
+                  data.categories[category].current = currentPts;
+                  data.categories[category].stars = currentPts >= minScore ? 1 : 0;
+                  data.totalPoints = (data.totalPoints || 0) + resolvedPoints;
+
+                  let totalStars = 0;
+                  Object.values(data.categories as Record<string, any>).forEach((cat: any) => {
+                    totalStars += cat.stars || 0;
+                  });
+                  data.starsUnlocked = totalStars;
+                  data.lastUpdated = Timestamp.now();
+                  t.set(progressRef, data, { merge: true });
+                });
+              }
+            }
+          } catch (loStarError) {
+            console.error('approveClaim: failed to update loStarProgress (non-fatal)', loStarError);
+          }
+        }
+
+        // E5 fix: best-effort badge/achievement check after points are approved.
+        if (cs.memberId) {
+          try {
+            const { GamificationService } = await import('./gamificationService');
+            await GamificationService.checkEligibleBadgesForMember(cs.memberId);
+          } catch (err) {
+            console.warn('[approveClaim] Badge/achievement check failed (non-critical):', err);
+          }
         }
       }
 

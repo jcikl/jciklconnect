@@ -267,6 +267,8 @@ export class BoardManagementService {
 
           await batch.commit();
           MembersService.invalidateMembersCache();
+          // Fix 12 (P2): invalidate getAllBoardMembers cache after transition writes
+          apiCache.deleteByPrefix('boardMembers:');
 
           // --- Phase 4: notifications (best-effort, non-atomic) ---
           await this.sendTransitionNotifications(transition);
@@ -593,6 +595,11 @@ export class BoardManagementService {
         });
       }
       await boardBatch.commit();
+      // Fix 11 (P1): bust member and boardMembers caches immediately after role changes land
+      // so that any read between now and syncMemberDocumentsForTerm sees fresh data.
+      MembersService.invalidateMembersCache();
+      // Fix 12 (P2): invalidate getAllBoardMembers cache so stale board lists are not served.
+      apiCache.deleteByPrefix('boardMembers:');
 
           // Fix 9 (P1): boardBatch is already committed. If syncMemberDocumentsForTerm fails,
           // boardMembers are set but member role fields may be stale. Log with enough context
@@ -1028,6 +1035,8 @@ export class BoardManagementService {
 
           await assignBatch.commit();
           MembersService.invalidateMembersCache();
+          // Fix 12 (P2): invalidate getAllBoardMembers cache after assignment writes
+          apiCache.deleteByPrefix('boardMembers:');
 
           // Best-effort notifications
           await Promise.allSettled(

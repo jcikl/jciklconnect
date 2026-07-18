@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ToyyibService, ToyyibCategory, ToyyibBillRecord, CreateBillParams, ToyyibBillResponse } from '../services/toyyibService';
 
 // ── useToyyibCategories ────────────────────────────────────────────────────
@@ -75,14 +75,18 @@ export interface UseCreateBillResult {
 export function useCreateBill(): UseCreateBillResult {
   const [isCreating, setIsCreating] = useState(false);
   const [lastBill, setLastBill] = useState<ToyyibBillResponse | null>(null);
+  const isCreatingRef = useRef(false);
 
   const createBill = useCallback(async (params: CreateBillParams): Promise<ToyyibBillResponse> => {
+    if (isCreatingRef.current) return null as unknown as ToyyibBillResponse;
+    isCreatingRef.current = true;
     setIsCreating(true);
     try {
       const res = await ToyyibService.createBill(params);
       setLastBill(res);
       return res;
     } finally {
+      isCreatingRef.current = false;
       setIsCreating(false);
     }
   }, []);

@@ -16,6 +16,7 @@ import {
 import { db } from '../config/firebase';
 import { COLLECTIONS, CONTRACT_STATUS } from '../config/constants';
 import { PointsService } from './pointsService';
+import { errorLoggingService } from './errorLoggingService';
 
 export interface CommitmentContract {
   id?: string;
@@ -231,18 +232,8 @@ export class ContractService {
       try {
         await PointsService.awardPoints(data.memberId, 'ROLE_FULFILLMENT', bonus, `Commitment Bonus: ${data.goalTitle}`, contractId, 'contract');
       } catch (bonusErr) {
-        console.error('ContractService.fulfillContract: bonus awardPoints failed', bonusErr);
-        // P1 — write a finance_alert so admin can manually award the missed bonus
-        try {
-          await addDoc(collection(db, 'finance_alerts'), {
-            type: 'contract_bonus_missing',
-            message: `合约质押已退回但奖励积分未发放，请手动补发 ${bonus} 分给 ${data.memberId}`,
-            contractId,
-            memberId: data.memberId,
-            bonusPoints: bonus,
-            createdAt: serverTimestamp(),
-          });
-        } catch {}
+        await errorLoggingService.logError(bonusErr instanceof Error ? bonusErr : new Error(String(bonusErr)), { component: 'ContractService', action: 'fulfillContract.awardBonus', additionalData: { contractId, memberId: data.memberId } });
+        throw new Error(`Contract fulfilled but bonus award failed: ${bonusErr instanceof Error ? bonusErr.message : String(bonusErr)}. Please contact admin.`);
       }
     }
 

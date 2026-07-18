@@ -181,7 +181,7 @@ service cloud.firestore {
       
       // Allow update: post author or board/admin/super_admin (if member doc exists)
       allow update: if isAuthenticated() &&
-                       (request.resource.data.author.id == request.auth.uid ||
+                       (resource.data.author.id == request.auth.uid ||
                         (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
                          get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN', 'SUPER_ADMIN']));
 
@@ -400,7 +400,9 @@ service cloud.firestore {
            // E1 fix: added rejectionReason/reviewedBy/reviewedAt — service clears these on resubmit
            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'updatedBy', 'rejectionReason', 'reviewedBy', 'reviewedAt']) ||
          canAccessFinance() && paymentRequestInMyScope() &&
-           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt', 'updatedAt', 'updatedBy', 'remark', 'rejectionReason', 'paidAt']));
+           // Fix 9 (P2): added 'projectBudgetSyncFailed' and 'expenseTxFailed' so finance staff
+           // can write these flag fields without needing admin rights.
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt', 'updatedAt', 'updatedBy', 'remark', 'rejectionReason', 'paidAt', 'projectBudgetSyncFailed', 'expenseTxFailed']));
       allow delete: if isAuthenticated() && (
         (resource.data.get('applicantId', null) == request.auth.uid && resource.data.get('status', null) == 'draft') ||
         isAdmin() || isDeveloper());
@@ -565,7 +567,7 @@ service cloud.firestore {
     match /votes/{voteId} {
       // FIX 4: split read — resource.data is null in list queries; protect ballot privacy
       allow get: if isAdmin() || (isMember() && resource.data.voterId == request.auth.uid);
-      allow list: if isMember();
+      allow list: if isAdmin();
       allow create: if isMember() && request.resource.data.voterId == request.auth.uid;
       allow update, delete: if false;  // votes are immutable once cast
 
@@ -1052,18 +1054,6 @@ service cloud.firestore {
       allow write: if isBoard() || isAdmin();
     }
 
-    // System config collection (e.g. radar_mappings)
-    match /system/{docId} {
-      allow read: if isAuthenticated();
-      allow write: if isBoard();
-    }
-
-    // Radar Contributions collection
-    match /RadarContributions/{recordId} {
-      allow read: if isAuthenticated();
-      allow write: if isBoard();
-    }
-    
     // Radar Contributions collection
     match /RadarContributions/{contributionId} {
       allow read: if isAuthenticated();
@@ -1168,7 +1158,7 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && isAdmin();
     }
 
-    // Audit log collection — immutable write-once records; Board can create, Admin reads
+    // Audit log collection — immutable write-once records; Admin-only access for audit integrity
     // FIX: new block added; without this, auditLog had zero rules (default deny — all writes silently failed)
     match /auditLog/{logId} {
       allow read: if isAdmin();

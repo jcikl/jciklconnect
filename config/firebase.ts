@@ -91,7 +91,11 @@ if (typeof window !== 'undefined') {
       isTokenAutoRefreshEnabled: true,
     });
   } else {
-    console.warn('[Firebase] App Check not initialized: VITE_RECAPTCHA_SITE_KEY not set');
+    if (import.meta.env.PROD) {
+      console.error('[Firebase] CRITICAL: VITE_RECAPTCHA_SITE_KEY is missing. App Check is disabled — Firestore is unprotected against unauthenticated access. Add the key to Netlify environment variables.');
+    } else {
+      console.warn('[Firebase] App Check disabled in dev mode (VITE_RECAPTCHA_SITE_KEY not set).');
+    }
   }
 
 }

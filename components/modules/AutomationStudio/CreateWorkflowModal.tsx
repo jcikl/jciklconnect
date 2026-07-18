@@ -25,6 +25,7 @@ export const CreateWorkflowModal: React.FC<CreateWorkflowModalProps> = ({ onClos
   const [active, setActive] = useState(true);
   const [editingStep, setEditingStep] = useState<WorkflowStep | null>(null);
   const [showStepModal, setShowStepModal] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const { createWorkflow } = useAutomation();
   const { members } = useMembers();
@@ -74,6 +75,7 @@ export const CreateWorkflowModal: React.FC<CreateWorkflowModalProps> = ({ onClos
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return;
     if (!workflowName.trim()) {
       showToast('Please enter a workflow name', 'error');
       return;
@@ -82,6 +84,7 @@ export const CreateWorkflowModal: React.FC<CreateWorkflowModalProps> = ({ onClos
       showToast('Please add at least one step to the workflow', 'error');
       return;
     }
+    setIsSaving(true);
     try {
       await createWorkflow({
         name: workflowName,
@@ -93,6 +96,8 @@ export const CreateWorkflowModal: React.FC<CreateWorkflowModalProps> = ({ onClos
       onSuccess?.();
     } catch (err) {
       // Error handled by hook
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -332,8 +337,8 @@ export const CreateWorkflowModal: React.FC<CreateWorkflowModalProps> = ({ onClos
 
           {/* Actions */}
           <div className="flex gap-3 pt-4 border-t">
-            <Button type="submit" className="flex-1">
-              <Save size={16} className="mr-2" /> Create Workflow
+            <Button type="submit" className="flex-1" disabled={isSaving}>
+              <Save size={16} className="mr-2" /> {isSaving ? 'Creating…' : 'Create Workflow'}
             </Button>
             <Button type="button" variant="ghost" onClick={onClose}>
               Cancel

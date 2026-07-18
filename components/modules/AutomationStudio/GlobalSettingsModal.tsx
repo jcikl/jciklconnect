@@ -13,7 +13,7 @@ export const GlobalSettingsModal: React.FC<GlobalSettingsModalProps> = ({ isOpen
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     // In a real app, save to backend
-    showToast('Global settings saved', 'success');
+    showToast('Global settings are not yet persistent — changes are temporary', 'warning');
     onClose();
   };
 

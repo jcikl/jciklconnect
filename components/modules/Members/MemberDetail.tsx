@@ -79,6 +79,9 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
   const [assessmentShowZh, setAssessmentShowZh] = useState(false);
   const [savingAssessment, setSavingAssessment] = useState(false);
   const [showPaymentHistoryModal, setShowPaymentHistoryModal] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const isSavingRef = useRef(false);
+  const [isStatusUpdating, setIsStatusUpdating] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarUploadProgress, setAvatarUploadProgress] = useState(0);
   const sessionUploads = useRef<string[]>([]);
@@ -258,6 +261,9 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
 
   const handleGlobalSave = async () => {
     if (!inlineValues) return;
+    if (isSavingRef.current) return;
+    isSavingRef.current = true;
+    setIsSaving(true);
     const skillsArr = inlineValues.skills.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -317,6 +323,23 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
       showToast('Profile updated successfully', 'success');
     } catch (err) {
       showToast('Failed to update profile', 'error');
+    } finally {
+      isSavingRef.current = false;
+      setIsSaving(false);
+    }
+  };
+
+  const handleStatusToggle = async () => {
+    if (isStatusUpdating) return;
+    const newRole = member.role === UserRole.INACTIVE ? UserRole.MEMBER : UserRole.INACTIVE;
+    setIsStatusUpdating(true);
+    try {
+      await updateMember(member.id, { role: newRole });
+      showToast(`Member ${newRole === UserRole.INACTIVE ? 'deactivated' : 'activated'} successfully`, 'success');
+    } catch (err) {
+      showToast('Failed to update member status', 'error');
+    } finally {
+      setIsStatusUpdating(false);
     }
   };
 
@@ -559,6 +582,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
 
       } catch (err) {
         console.error('Error fetching activities logs:', err);
+        if (!cancelled) showToast('Failed to load activities', 'error');
       } finally {
         if (!cancelled) setActivitiesLoading(false);
       }
@@ -840,7 +864,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
           <div className="flex gap-2">
             {isEditMode ? (
               <>
-                <Button variant="primary" size="sm" onClick={handleGlobalSave} className="flex-1 h-9 font-bold">Save Changes</Button>
+                <Button variant="primary" size="sm" onClick={handleGlobalSave} disabled={isSaving} className="flex-1 h-9 font-bold">Save Changes</Button>
                 <Button variant="outline" size="sm" onClick={() => { setIsEditMode(false); setActiveInlineEditCard(null); setInlineValues(null); }} className="flex-1 h-9 font-bold">Cancel</Button>
               </>
             ) : (
@@ -852,16 +876,9 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
                   <Button
                     variant="outline"
                     size="sm"
+                    disabled={isStatusUpdating}
                     className={`flex-1 h-9 font-bold ${member.role === UserRole.INACTIVE ? 'text-green-600 border-green-200 hover:bg-green-50' : 'text-amber-600 border-amber-200 hover:bg-amber-50'}`}
-                    onClick={async () => {
-                      const newRole = member.role === UserRole.INACTIVE ? UserRole.MEMBER : UserRole.INACTIVE;
-                      try {
-                        await updateMember(member.id, { role: newRole });
-                        showToast(`Member ${newRole === UserRole.INACTIVE ? 'deactivated' : 'activated'} successfully`, 'success');
-                      } catch (err) {
-                        showToast('Failed to update member status', 'error');
-                      }
-                    }}
+                    onClick={handleStatusToggle}
                   >
                     {member.role === UserRole.INACTIVE ? 'Activate' : 'Set Inactive'}
                   </Button>
@@ -966,7 +983,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
             <div className="flex gap-2 shrink-0">
               {isEditMode ? (
                 <>
-                  <Button variant="primary" size="sm" onClick={handleGlobalSave} className="flex-none h-10 px-6 font-bold">Save Changes</Button>
+                  <Button variant="primary" size="sm" onClick={handleGlobalSave} disabled={isSaving} className="flex-none h-10 px-6 font-bold">Save Changes</Button>
                   <Button variant="outline" size="sm" onClick={() => { setIsEditMode(false); setActiveInlineEditCard(null); setInlineValues(null); }} className="flex-none h-10 px-6 font-bold">Cancel</Button>
                 </>
               ) : (
@@ -978,16 +995,9 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
                     <Button
                       variant="outline"
                       size="sm"
+                      disabled={isStatusUpdating}
                       className={`flex-none h-10 px-6 font-bold ${member.role === UserRole.INACTIVE ? 'text-green-600 border-green-200 hover:bg-green-50' : 'text-amber-600 border-amber-200 hover:bg-amber-50'}`}
-                      onClick={async () => {
-                        const newRole = member.role === UserRole.INACTIVE ? UserRole.MEMBER : UserRole.INACTIVE;
-                        try {
-                          await updateMember(member.id, { role: newRole });
-                          showToast(`Member ${newRole === UserRole.INACTIVE ? 'deactivated' : 'activated'} successfully`, 'success');
-                        } catch (err) {
-                          showToast('Failed to update member status', 'error');
-                        }
-                      }}
+                      onClick={handleStatusToggle}
                     >
                       {member.role === UserRole.INACTIVE ? 'Activate Member' : 'Set Inactive'}
                     </Button>

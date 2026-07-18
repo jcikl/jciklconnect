@@ -1,8 +1,10 @@
 import {
     collection,
+    doc,
     query,
     where,
     getDocs,
+    runTransaction,
     Timestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -293,22 +295,33 @@ export class IncentiveCalculatorService {
         const snapshot = await getDocs(q);
 
         if (snapshot.empty) {
-            // Create new auto-approved submission
-            // P1 fix: submitIncentiveClaim creates the record as PENDING (it doesn't write
-            // APPROVED directly). We must call approveClaim afterwards to update the status,
-            // award points, and update loStarProgress atomically.
-            const submission: any = {
-                standardId: standard.id,
-                loId,
-                quantity,
-                scoreAwarded: score,
-                status: 'PENDING',
-                evidenceText: `Auto-calculated${milestoneId ? ` for milestone ${milestoneId}` : ''} by system on ${new Date().toLocaleDateString()}`
-            };
-            if (milestoneId) submission.milestoneId = milestoneId;
+            // Fix 9 (P1): deterministic submission ID + runTransaction prevents concurrent
+            // calculateAll calls from creating duplicate approved submissions.
+            const submissionId = `${loId}_${standard.id!}_${milestoneId ?? 'base'}`;
+            const submissionRef = doc(db, COLLECTIONS.INCENTIVE_SUBMISSIONS, submissionId);
 
-            const submissionId = await PointsService.submitIncentiveClaim(submission);
-            await PointsService.approveClaim(submissionId, score, 'system');
+            await runTransaction(db, async (txn) => {
+                const existing = await txn.get(submissionRef);
+                // Skip if already created in a concurrent call or previous run
+                if (existing.exists() &&
+                    (existing.data()?.status === 'APPROVED' || existing.data()?.status === 'PENDING')) return;
+
+                txn.set(submissionRef, {
+                    standardId: standard.id,
+                    loId,
+                    quantity,
+                    scoreAwarded: score,
+                    status: 'APPROVED',
+                    evidenceText: `Auto-calculated${milestoneId ? ` for milestone ${milestoneId}` : ''} by system on ${new Date().toLocaleDateString()}`,
+                    submittedAt: Timestamp.now(),
+                    approvedAt: Timestamp.now(),
+                    approvedBy: 'system',
+                    evidenceFiles: [],
+                    ...(milestoneId ? { milestoneId } : {}),
+                }, { merge: false });
+            });
+
+            PointsService.invalidateIncentiveCache();
         } else {
             // Update existing if it was an auto-submission
             const sub = snapshot.docs[0];

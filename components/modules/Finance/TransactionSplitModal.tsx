@@ -10,6 +10,7 @@ import { MembershipType, MembershipRuleConfig } from '../../../types';
 import * as Forms from '../../ui/Form';
 import { Combobox } from '../../ui/Combobox';
 import { Modal, Button, useToast } from '../../ui/Common';
+import { errorLoggingService } from '../../../services/errorLoggingService';
 
 interface TransactionSplitModalProps {
   transaction: Transaction;
@@ -449,7 +450,14 @@ export function TransactionSplitModal({
     setError(null);
 
     try {
-      await Promise.all(existingSplits.map((split) => FinanceService.deleteTransactionSplit(split.id)));
+      const splitIds = existingSplits.map((split) => split.id);
+      try {
+        await Promise.all(splitIds.map(id => FinanceService.deleteTransactionSplit(id)));
+      } catch (err) {
+        showToast('Partial cancel failed — please retry to clean up remaining splits', 'error');
+        await errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { component: 'TransactionSplitModal', action: 'handleCancelSplit', additionalData: { splitIds } });
+        throw err;
+      }
       onSuccess();
       onClose();
     } catch (err) {

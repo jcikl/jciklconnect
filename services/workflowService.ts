@@ -552,8 +552,8 @@ export class WorkflowService {
         if (memberId) {
           await PointsService.awardPoints(
             memberId,
-            category,
             amount,
+            category,
             description,
             relatedEntityId,
             relatedEntityType

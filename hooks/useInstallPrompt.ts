@@ -20,9 +20,13 @@ export function useInstallPrompt() {
       promptRef.current = e as BeforeInstallPromptEvent;
       setCanPrompt(true);
     };
+    const handleAppInstalled = () => setCanPrompt(false);
     window.addEventListener('beforeinstallprompt', handler);
-    window.addEventListener('appinstalled', () => setCanPrompt(false));
-    return () => window.removeEventListener('beforeinstallprompt', handler);
+    window.addEventListener('appinstalled', handleAppInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
   }, []);
 
   const triggerInstall = async () => {

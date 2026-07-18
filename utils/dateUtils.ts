@@ -125,7 +125,7 @@ export const isFuture = (date: string | Date): boolean => {
 };
 
 export const getCalendarYear = (date?: Date): number => {
-  return (date || new Date()).getFullYear();
+  return (date || nowMYT()).getFullYear();
 };
 
 // ─── Malaysia Time (MYT = UTC+8) helpers ────────────────────────────────────

@@ -51,7 +51,7 @@ export class EventsService {
       : (typeof endDateVal === 'string' ? endDateVal : undefined);
     // Use eventStartTime as primary time, fallback to time for backward compatibility
     const timeVal = data.eventStartTime ?? data.time;
-    const endTimeVal = data.eventEndTime ?? undefined;
+    const endTimeVal = data.eventEndTime ?? data.endTime ?? undefined;
     return {
       id: d.id,
       title: data.title ?? data.name ?? '',
@@ -134,7 +134,7 @@ export class EventsService {
             eventData = this.projectDocToEvent({ id: docSnap.id, data: () => d });
           }
           if (eventData) {
-            apiCache.set(`events:id:${eventId}`, eventData, 180);
+            apiCache.set(`events:id:${eventId}`, eventData, EVENTS_TTL);
           }
           return eventData;
         } catch (error) {
@@ -401,25 +401,21 @@ export class EventsService {
       async () => {
         try {
           const eventRef = doc(db, COLLECTIONS.PROJECTS, eventId);
-          const event = await this.getEventById(eventId);
-          if (!event) throw new Error('Event not found');
+          // Use deterministic reg ID (matches registerForEvent)
+          const deterministicRegId = `${eventId}_${memberId}`;
+          const regRef = doc(db, COLLECTIONS.EVENT_REGISTRATIONS, deterministicRegId);
 
-          // P1 FIX: commit the registration status change FIRST (atomically with the event
-          // counter decrement), then delete the finance transaction. If finance deletion
-          // fails, it only means a stale Pending income record survives — much safer than
-          // the previous order where finance was deleted before the batch commit, leaving
-          // the member still showing as 'registered' if the batch then failed.
-          const reg = await EventRegistrationService.getByEventAndMember(eventId, memberId);
-          const financeTransactionId: string | undefined = reg?.financeTransactionId ?? undefined;
+          let financeTransactionId: string | undefined;
 
-          if (!reg || reg.status === 'cancelled') {
-            return; // already cancelled, idempotent — prevents driving attendees counter negative
-          }
-
-          if (reg) {
-            const regRef = doc(db, COLLECTIONS.EVENT_REGISTRATIONS, reg.id);
-            const batch = writeBatch(db);
-            batch.update(regRef, {
+          // P0 Fix 5: wrap status check + write in runTransaction so two concurrent
+          // cancels cannot both read 'registered' and both decrement the counter.
+          await runTransaction(db, async (txn) => {
+            const regSnap = await txn.get(regRef);
+            if (!regSnap.exists() || regSnap.data()?.status === 'cancelled') {
+              return; // idempotent — already cancelled or never existed
+            }
+            financeTransactionId = regSnap.data()?.financeTransactionId ?? undefined;
+            txn.update(regRef, {
               status: 'cancelled',
               cancelledAt: Timestamp.now(),
               cancelledBy,
@@ -428,12 +424,11 @@ export class EventsService {
               financeTransactionId: null,
               updatedAt: Timestamp.now(),
             });
-            batch.update(eventRef, {
+            txn.update(eventRef, {
               attendees: increment(-1),
               registeredMembers: arrayRemove(memberId),
             });
-            await batch.commit();
-          }
+          });
 
           // After status is committed, clean up the linked finance transaction (best effort).
           if (financeTransactionId) {
@@ -528,6 +523,8 @@ export class EventsService {
             if (i === 0) {
               batch.update(doc(db, COLLECTIONS.PROJECTS, eventId), {
                 status: 'Cancelled',
+                attendees: 0,
+                registeredMembers: [],
                 updatedAt: now,
               });
             }
@@ -597,6 +594,8 @@ export class EventsService {
         if (active.length === 0) {
           await updateDoc(doc(db, COLLECTIONS.PROJECTS, eventId), {
             status: 'Cancelled',
+            attendees: 0,
+            registeredMembers: [],
             updatedAt: Timestamp.now(),
           });
         }

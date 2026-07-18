@@ -39,7 +39,7 @@ export const useMembers = (loIdFilter?: string | null): UseMembersResult => {
     deps: [loIdFilter, currentMember?.loId, currentMember?.role, isDevModeFromAuth, authLoading],
   });
 
-  const createMember = async (memberData: MemberCreateInput) => {
+  const createMember = useCallback(async (memberData: MemberCreateInput) => {
     if (isCreatingRef.current) return '' as string;
     isCreatingRef.current = true;
     try {
@@ -54,9 +54,9 @@ export const useMembers = (loIdFilter?: string | null): UseMembersResult => {
     } finally {
       isCreatingRef.current = false;
     }
-  };
+  }, [user, loadMembers, showToast]);
 
-  const updateMember = async (memberId: string, updates: Partial<Member>) => {
+  const updateMember = useCallback(async (memberId: string, updates: Partial<Member>) => {
     if (isUpdatingRef.current) return;
     isUpdatingRef.current = true;
     try {
@@ -70,9 +70,9 @@ export const useMembers = (loIdFilter?: string | null): UseMembersResult => {
     } finally {
       isUpdatingRef.current = false;
     }
-  };
+  }, [user, loadMembers, showToast]);
 
-  const deleteMember = async (memberId: string) => {
+  const deleteMember = useCallback(async (memberId: string) => {
     if (isDeletingRef.current) return;
     isDeletingRef.current = true;
     try {
@@ -90,9 +90,9 @@ export const useMembers = (loIdFilter?: string | null): UseMembersResult => {
     } finally {
       isDeletingRef.current = false;
     }
-  };
+  }, [loadMembers, showToast]);
 
-  const batchUpdateMembers = async (memberIds: string[], updates: Partial<Member>) => {
+  const batchUpdateMembers = useCallback(async (memberIds: string[], updates: Partial<Member>) => {
     if (isBatchUpdatingRef.current) return;
     isBatchUpdatingRef.current = true;
     try {
@@ -105,9 +105,9 @@ export const useMembers = (loIdFilter?: string | null): UseMembersResult => {
     } finally {
       isBatchUpdatingRef.current = false;
     }
-  };
+  }, [loadMembers, showToast]);
 
-  const batchDeleteMembers = async (memberIds: string[]) => {
+  const batchDeleteMembers = useCallback(async (memberIds: string[]) => {
     if (isBatchDeletingRef.current) return;
     isBatchDeletingRef.current = true;
     try {
@@ -120,7 +120,7 @@ export const useMembers = (loIdFilter?: string | null): UseMembersResult => {
     } finally {
       isBatchDeletingRef.current = false;
     }
-  };
+  }, [loadMembers, showToast]);
 
   return {
     members,

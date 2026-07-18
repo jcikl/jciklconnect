@@ -95,6 +95,10 @@ export const TransactionForm: React.FC<Props> = ({
   const [selectedVar, setSelectedVar] = React.useState(getVal('inventoryVariant') || '');
   const [invQty, setInvQty] = React.useState(getVal('inventoryQuantity') || 1);
   const [membershipRules, setMembershipRules] = React.useState<Record<MembershipType, MembershipRuleConfig> | null>(null);
+  // Controlled state for create-mode fields used in auto-fill effects
+  const [createAmount, setCreateAmount] = React.useState<number>(0);
+  const [createType, setCreateType] = React.useState<'Income' | 'Expense'>('Expense');
+  const [createPurpose, setCreatePurpose] = React.useState<string>('');
 
   React.useEffect(() => {
     const fetchRules = async () => {
@@ -120,58 +124,35 @@ export const TransactionForm: React.FC<Props> = ({
     if (category !== 'Membership' || !membershipRules) return;
 
     const year = isEdit ? (editingMembershipYear || new Date().getFullYear()) : (recordFormYear || new Date().getFullYear());
-    
-    const getAmountVal = () => {
-      if (isEdit) return editingTransaction?.amount || 0;
-      const el = document.getElementsByName('amount')[0] as HTMLInputElement;
-      return el ? parseFloat(el.value) || 0 : 0;
-    };
+    const amount = isEdit ? (editingTransaction?.amount || 0) : createAmount;
+    const newPurpose = resolveMembershipPurpose(amount, year, membershipRules);
 
-    const updatePurpose = () => {
-      const amount = getAmountVal();
-      const newPurpose = resolveMembershipPurpose(amount, year, membershipRules);
-
-      if (isEdit) {
-        if (editingTransaction?.purpose !== newPurpose) {
-          handleEditChange('purpose', newPurpose);
-        }
-      } else {
-        const purposeField = document.getElementsByName('purpose')[0] as HTMLInputElement;
-        if (purposeField && purposeField.value !== newPurpose) {
-          purposeField.value = newPurpose;
-        }
+    if (isEdit) {
+      if (editingTransaction?.purpose !== newPurpose) {
+        handleEditChange('purpose', newPurpose);
       }
-    };
-
-    // Run once initially
-    updatePurpose();
-
-    // Listen for changes on amount element if in create mode
-    if (!isEdit) {
-      const amountEl = document.getElementsByName('amount')[0];
-      if (amountEl) {
-        amountEl.addEventListener('input', updatePurpose);
-        return () => amountEl.removeEventListener('input', updatePurpose);
+    } else {
+      if (createPurpose !== newPurpose) {
+        setCreatePurpose(newPurpose);
       }
     }
-  }, [isEdit, editingTransaction?.category, editingTransaction?.amount, recordFormCategory, recordFormYear, editingMembershipYear, membershipRules]);
+  }, [isEdit, editingTransaction?.category, editingTransaction?.amount, recordFormCategory, recordFormYear, editingMembershipYear, membershipRules, createAmount]);
 
   // Effect to auto-fill purpose
   React.useEffect(() => {
     if (!linkInventory || !selectedInvId || !selectedVar) return;
 
     const itemName = inventoryItems.find(i => i.id === selectedInvId)?.name || '';
-    const type = isEdit ? editingTransaction?.type : (document.getElementsByName('type')[0] as HTMLSelectElement)?.value || 'Expense';
+    const type = isEdit ? editingTransaction?.type : createType;
     const prefix = type === 'Income' ? '销售' : '补货';
     const newPurpose = `${prefix} - ${itemName} (${selectedVar})`;
 
     if (isEdit) {
       handleEditChange('purpose', newPurpose);
     } else {
-      const purposeField = document.getElementsByName('purpose')[0] as HTMLInputElement;
-      if (purposeField) purposeField.value = newPurpose;
+      setCreatePurpose(newPurpose);
     }
-  }, [linkInventory, selectedInvId, selectedVar]);
+  }, [linkInventory, selectedInvId, selectedVar, createType]);
 
   return (
     <div className="space-y-4">
@@ -221,13 +202,13 @@ export const TransactionForm: React.FC<Props> = ({
         {isEdit ? (
           <Input name="amount" label="Amount" type="number" step="0.01" defaultValue={((getVal('amount') as any) || '').toString()} required onChange={(e: any) => handleEditChange('amount', parseFloat(e.target.value))} />
         ) : (
-          <Input name="amount" label="Amount" type="number" step="0.01" placeholder="0.00" required />
+          <Input name="amount" label="Amount" type="number" step="0.01" placeholder="0.00" required value={createAmount || ''} onChange={(e: any) => setCreateAmount(parseFloat(e.target.value) || 0)} />
         )}
 
         {isEdit ? (
           <Select name="type" label="Type" value={(getVal('type') as string) || 'Expense'} onChange={(e) => handleEditChange('type', e.target.value)} options={[{ label: 'Expense', value: 'Expense' }, { label: 'Income', value: 'Income' }]} required />
         ) : (
-          <Select name="type" label="Type" options={[{ label: 'Expense', value: 'Expense' }, { label: 'Income', value: 'Income' }]} required />
+          <Select name="type" label="Type" value={createType} onChange={(e) => setCreateType(e.target.value as 'Income' | 'Expense')} options={[{ label: 'Expense', value: 'Expense' }, { label: 'Income', value: 'Income' }]} required />
         )}
       </div>
 
@@ -378,9 +359,9 @@ export const TransactionForm: React.FC<Props> = ({
             ) : recordFormCategory === 'Administrative' ? (
               <Select name="purpose" label="Purpose" options={[{ label: 'Select...', value: '' }, ...adminPurposes.map(p => ({ label: p, value: p }))]} />
             ) : recordFormCategory === 'Membership' ? (
-              <Input name="purpose" label="Purpose (Derived)" readOnly disabled className="bg-slate-50 text-slate-500 font-medium" placeholder="Auto-generated based on Config" />
+              <Input name="purpose" label="Purpose (Derived)" readOnly disabled className="bg-slate-50 text-slate-500 font-medium" value={createPurpose} placeholder="Auto-generated based on Config" />
             ) : (
-              <Input name="purpose" label="Purpose" placeholder="e.g. AGM venue deposit" />
+              <Input name="purpose" label="Purpose" value={createPurpose} onChange={(e: any) => setCreatePurpose(e.target.value)} placeholder="e.g. AGM venue deposit" />
             )}
           </div>
         </div>

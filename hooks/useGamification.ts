@@ -76,11 +76,12 @@ export const useGamification = (memberId?: string) => {
         try {
             await GamificationService.awardAward(awardId, targetMemberId, memberId, reason);
             showToast('Recognition awarded successfully!', 'success');
+            await loadAllAwards();
         } catch (err) {
             showToast('Failed to award recognition', 'error');
             throw err;
         }
-    }, [memberId, showToast]);
+    }, [memberId, showToast, loadAllAwards]);
 
     const createAward = useCallback(async (awardData: Omit<AwardDefinition, 'id'>) => {
         try {
