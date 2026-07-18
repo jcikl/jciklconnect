@@ -1,7 +1,7 @@
 ﻿import React, { useState, useEffect } from 'react';
 import {
   TrendingUp, CheckCircle, Clock, Award, AlertCircle,
-  Calendar, FileText, User, Users, RefreshCw, Check, X, Save, Edit3, ChevronDown, ChevronUp, Sparkles, Filter
+  Calendar, FileText, User, Users, RefreshCw, Check, X, Save, Edit3, ChevronDown, ChevronUp, Sparkles, Filter, Hourglass
 } from 'lucide-react';
 import { Card, Button, Badge, ProgressBar, Modal, useToast } from '../../ui/Common';
 import { useAuth } from '../../../hooks/useAuth';
@@ -51,7 +51,7 @@ const formatDatedDetail = (date?: string, detail?: string): string => {
 
 const parseDatedDetail = (value?: string): { date: string; detail: string } => {
   const text = (value || '').trim();
-  const match = text.match(/^(\d{4}-\d{2}-\d{2})\s*[-â€“]\s*(.*)$/);
+  const match = text.match(/^(\d{4}-\d{2}-\d{2})\s*[-—]\s*(.*)$/);
   if (match) {
     return { date: match[1], detail: match[2]?.trim() || '' };
   }
@@ -699,6 +699,26 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
     });
   }, [filteredEngagementMembers, pendingOnly, activeView]);
 
+  const engagementStats = React.useMemo(() => {
+    if (activeView === 'promotion') return null;
+    const year = activeView as EngagementYear;
+    const members = filteredEngagementMembers;
+    const total = members.length;
+    if (total === 0) return null;
+    const reqDefs = PromotionService.ENGAGEMENT_REQUIREMENTS[year];
+    const reqCounts: Record<string, number> = {};
+    reqDefs.forEach(r => { reqCounts[r.key] = 0; });
+    let completed = 0;
+    for (const m of members) {
+      const p = PromotionService.buildEngagementProgress(m, year);
+      if (p.isCompleted) completed++;
+      for (const r of p.requirements) {
+        if (r.isCompleted) reqCounts[r.key] = (reqCounts[r.key] ?? 0) + 1;
+      }
+    }
+    return { total, completed, reqDefs, reqCounts };
+  }, [filteredEngagementMembers, activeView]);
+
   const handleQuickPromote = async (memberId: string) => {
     setPromotingConfirmId(null);
     setQuickPromotingId(memberId);
@@ -731,7 +751,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
             onClick={() => { setActiveView(view.key); setPendingOnly(false); }}
             className={`flex-1 relative py-2 px-3 rounded-lg text-xs font-bold transition-all ${
               activeView === view.key
-                ? 'bg-white shadow-sm text-slate-900'
+                ? 'bg-jci-blue shadow-sm text-white'
                 : 'text-slate-500 hover:text-slate-700'
             }`}
           >
@@ -751,13 +771,12 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
           {/* Stats + completion rates â€” collapsible */}
           {statistics && (
             <Card>
-              {/* Always-visible: 4 stat chips + expand toggle */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {/* Always-visible: 3 stat chips + expand toggle */}
+              <div className="grid grid-cols-3 gap-2">
                 {[
                   { label: 'Probation', value: statistics.totalProbationMembers, color: 'text-slate-900' },
                   { label: 'Eligible', value: statistics.eligibleForPromotion, color: 'text-green-600' },
-                  { label: 'Promoted', value: statistics.promotedThisYear, color: 'text-purple-600' },
-                  { label: 'Avg Days', value: statistics.averageTimeToPromotion, color: 'text-amber-600' },
+                  { label: 'Official', value: statistics.promotedThisYear, color: 'text-purple-600' },
                 ].map(s => (
                   <div key={s.label} className="text-center p-2 rounded-xl bg-slate-50 border border-slate-100">
                     <div className={`text-xl font-black ${s.color}`}>{s.value}</div>
@@ -765,56 +784,54 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                   </div>
                 ))}
               </div>
-              <button
-                onClick={() => setStatsExpanded(v => !v)}
-                className="mt-3 w-full flex items-center justify-center gap-1 text-[10px] font-semibold text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                {statsExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                {statsExpanded ? 'Hide completion rates' : 'Show completion rates'}
-              </button>
-              {/* Collapsible completion rates */}
-              {statsExpanded && (
-                <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Completion Rates</p>
-                  {Object.entries(statistics.requirementCompletionRates).map(([type, rate]: [string, any]) => (
+              <div className="mt-3 pt-3 border-t border-slate-100 space-y-1.5">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Completion Rates</p>
+                {([
+                  { type: 'bod_meeting_attendance',     label: 'BOD Meeting Attendance'    },
+                  { type: 'event_organizing_committee', label: 'Event Organizing Committee' },
+                  { type: 'event_participation',        label: 'Event Participation'        },
+                  { type: 'jci_inspire_completion',     label: 'JCI Inspire Completion'     },
+                ] as const).map(({ type, label }) => {
+                  const rate = statistics.requirementCompletionRates[type] ?? 0;
+                  const numerator = Math.round(rate * statistics.totalProbationMembers / 100);
+                  const denominator = statistics.totalProbationMembers;
+                  return (
                     <div key={type} className="flex items-center gap-3">
-                      <span className="text-[11px] text-slate-600 w-36 shrink-0 truncate">
-                        {type.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
-                      </span>
+                      <span className="text-[11px] text-slate-600 w-36 shrink-0 truncate">{label}</span>
                       <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-jci-blue transition-all duration-500"
-                          style={{ width: `${rate}%` }}
-                        />
+                        <div className="h-full rounded-full bg-jci-blue transition-all duration-500" style={{ width: `${rate}%` }} />
                       </div>
-                      <span className="text-[11px] font-bold text-slate-700 w-9 text-right shrink-0">{rate.toFixed(0)}%</span>
+                      <span className="text-[11px] font-bold text-slate-700 w-14 text-right shrink-0 tabular-nums">{numerator}<span className="text-slate-400 font-normal">/{denominator}</span></span>
                     </div>
-                  ))}
-                </div>
-              )}
+                  );
+                })}
+              </div>
             </Card>
           )}
 
           {/* Probation Members List */}
           <Card>
             <div className="flex items-center justify-between mb-4">
-              <span className="font-bold text-slate-900">Probation Members{filteredProbationMembers.length ? ` Â· ${filteredProbationMembers.length}` : ''}</span>
+              <span className="font-bold text-slate-900">Probation Members{filteredProbationMembers.length ? ` · ${filteredProbationMembers.length}` : ''}</span>
               <button
                 onClick={handleBulkPromoAutoSuggest}
                 disabled={bulkAutoSuggesting}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-50 transition-colors shadow-sm"
               >
                 {bulkAutoSuggesting ? <RefreshCw size={12} className="animate-spin" /> : <Sparkles size={12} className="text-amber-500" />}
-                {bulkAutoSuggesting && bulkProgress ? `${bulkProgress.current}/${bulkProgress.total}â€¦` : 'Auto-Suggest All'}
+                {bulkAutoSuggesting && bulkProgress ? `${bulkProgress.current}/${bulkProgress.total}…` : 'Auto-Suggest All'}
               </button>
             </div>
             <div className="space-y-2">
               {filteredProbationMembers.map(member => {
+                const participationCount = member.promotionProgress?.eventParticipation
+                  ? String(member.promotionProgress.eventParticipation).split(/[,\n;]+/).map((s: string) => s.trim()).filter(Boolean).length
+                  : 0;
                 const reqs = [
-                  { label: 'BOD', done: !!member.promotionProgress?.bodMeetingAttended },
-                  { label: 'Organizer', done: !!member.promotionProgress?.eventOrganizerParticipation },
-                  { label: 'Participation', done: !!member.promotionProgress?.eventParticipation },
-                  { label: 'Inspire', done: !!member.promotionProgress?.jciInspireCompleted },
+                  { label: 'BOD', done: !!member.promotionProgress?.bodMeetingAttended, partial: false },
+                  { label: 'Organizer', done: !!member.promotionProgress?.eventOrganizerParticipation, partial: false },
+                  { label: 'Participation', done: participationCount >= 2, partial: participationCount === 1 },
+                  { label: 'Inspire', done: !!member.promotionProgress?.jciInspireCompleted, partial: false },
                 ];
                 const doneCount = reqs.filter(r => r.done).length;
                 const isEligible = doneCount === 4;
@@ -866,7 +883,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                               onClick={() => setPromotingConfirmId(member.id)}
                               className="inline-flex items-center gap-1 text-[10px] font-bold text-green-700 bg-green-100 border border-green-200 hover:bg-green-200 px-2 py-0.5 rounded-full transition-colors"
                             >
-                              <CheckCircle size={10} /> Eligible Â· Promote â†’
+                              <CheckCircle size={10} /> Eligible · Promote →
                             </button>
                           )
                         ) : (
@@ -875,7 +892,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                               <div
                                 key={req.label}
                                 title={req.label}
-                                className={`w-2 h-2 rounded-full ${req.done ? 'bg-green-500' : 'bg-slate-200'}`}
+                                className={`w-2 h-2 rounded-full ${req.done ? 'bg-green-500' : req.partial ? 'bg-amber-400' : 'bg-slate-200'}`}
                               />
                             ))}
                           </div>
@@ -897,10 +914,12 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                           className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
                             req.done
                               ? 'bg-green-50 border-green-200 text-green-700'
+                              : req.partial
+                              ? 'bg-amber-50 border-amber-200 text-amber-700'
                               : 'bg-slate-50 border-slate-200 text-slate-400'
                           }`}
                         >
-                          {req.done ? <Check size={9} /> : <Clock size={9} />}
+                          {req.done ? <Check size={9} /> : req.partial ? <Hourglass size={9} /> : <Clock size={9} />}
                           {req.label}
                         </div>
                       ))}
@@ -916,12 +935,69 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
         </>
       )}
 
+      {activeView !== 'promotion' && engagementStats && (
+        <Card>
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            {[
+              { label: 'Total', value: engagementStats.total, color: 'text-slate-900' },
+              { label: 'Completed', value: engagementStats.completed, color: 'text-green-600' },
+              { label: 'Pending', value: engagementStats.total - engagementStats.completed, color: 'text-amber-600' },
+            ].map(s => (
+              <div key={s.label} className="text-center p-2 rounded-xl bg-slate-50 border border-slate-100">
+                <div className={`text-xl font-black ${s.color}`}>{s.value}</div>
+                <div className="text-[10px] text-slate-500 font-medium mt-0.5">{s.label}</div>
+              </div>
+            ))}
+          </div>
+          <div className="mb-3 pt-3 border-t border-slate-100 space-y-3">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Completion Rates</p>
+            {(['Leadership Experience', 'Skills Development', 'JCI Experience'] as const).map(group => {
+              const groupReqs = engagementStats.reqDefs.filter(r => r.group === group);
+              if (groupReqs.length === 0) return null;
+              const groupColors: Record<string, string> = {
+                'Leadership Experience': 'text-purple-600',
+                'Skills Development': 'text-blue-600',
+                'JCI Experience': 'text-indigo-600',
+              };
+              const groupBarColors: Record<string, string> = {
+                'Leadership Experience': 'bg-purple-500',
+                'Skills Development': 'bg-blue-500',
+                'JCI Experience': 'bg-indigo-500',
+              };
+              return (
+                <div key={group}>
+                  <p className={`text-[10px] font-bold uppercase tracking-wide mb-1.5 ${groupColors[group]}`}>{group}</p>
+                  <div className="space-y-1.5">
+                    {groupReqs.map(req => {
+                      const count = engagementStats.reqCounts[req.key] ?? 0;
+                      const total = engagementStats.total;
+                      const pct = total > 0 ? (count / total) * 100 : 0;
+                      return (
+                        <div key={req.key} className="flex items-center gap-3">
+                          <span className="text-[11px] text-slate-600 w-36 shrink-0 truncate">{req.title}</span>
+                          <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full transition-all duration-500 ${groupBarColors[group]}`} style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="text-[11px] font-bold text-slate-700 w-14 text-right shrink-0 tabular-nums">
+                            {count}<span className="text-slate-400 font-normal">/{total}</span>
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
       {activeView !== 'promotion' && (
         <Card>
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
             <span className="font-bold text-slate-900">
               {ENGAGEMENT_VIEW_LABELS[activeView]}
-              {displayedEngagementMembers.length ? ` Â· ${displayedEngagementMembers.length}` : ''}
+              {displayedEngagementMembers.length ? ` · ${displayedEngagementMembers.length}` : ''}
             </span>
             <div className="flex items-center gap-1.5">
               {/* Pending Only toggle */}
@@ -945,7 +1021,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-50 transition-colors shadow-sm"
               >
                 {bulkAutoSuggesting ? <RefreshCw size={12} className="animate-spin" /> : <Sparkles size={12} className="text-amber-500" />}
-                {bulkAutoSuggesting && bulkProgress ? `${bulkProgress.current}/${bulkProgress.total}â€¦` : 'Auto-Suggest All'}
+                {bulkAutoSuggesting && bulkProgress ? `${bulkProgress.current}/${bulkProgress.total}…` : 'Auto-Suggest All'}
               </button>
             </div>
           </div>
@@ -1139,7 +1215,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                 className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-50 transition-colors shadow-sm"
               >
                 {promoAutoSuggesting ? <RefreshCw size={13} className="animate-spin" /> : <Sparkles size={13} className="text-amber-500" />}
-                <span>{promoAutoSuggesting ? 'Scanningâ€¦' : 'Auto-Suggest from Activity'}</span>
+                <span>{promoAutoSuggesting ? 'Scanning…' : 'Auto-Suggest from Activity'}</span>
               </button>
             </div>
 
@@ -1212,7 +1288,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                   ) : (
                     <div className="flex flex-col sm:flex-row gap-2">
                       <input type="text" className={`${inputClassName} flex-1`}
-                        placeholder={REQUIREMENT_PLACEHOLDER[req.type] || 'Enter detailsâ€¦'}
+                        placeholder={REQUIREMENT_PLACEHOLDER[req.type] || 'Enter details…'}
                         value={editValues[`${req.type}_detail`] || ''}
                         onChange={(e) => setEditValues(prev => ({ ...prev, [`${req.type}_detail`]: e.target.value }))} />
                       <div className="flex gap-2">
@@ -1251,7 +1327,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
             {/* Dues info */}
             <div className="flex items-start gap-2 p-3 rounded-xl bg-blue-50 border border-blue-100 text-xs text-blue-800">
               <AlertCircle size={14} className="text-blue-500 mt-0.5 shrink-0" />
-              <span>Upon promotion: dues change from <strong>RM350</strong> (Probation) â†’ <strong>RM300</strong> (Full Member).</span>
+              <span>Upon promotion: dues change from <strong>RM350</strong> (Probation) → <strong>RM300</strong> (Full Member).</span>
             </div>
           </div>
         )}
@@ -1286,7 +1362,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                   <div className="flex justify-between items-center">
                     <span className="text-xs font-medium text-slate-500">
                       {engagementProgress.completedCount}/{engagementProgress.totalCount} completed
-                      {pendingTotal > 0 && <span className="ml-2 text-amber-500">Â· {pendingTotal} pending</span>}
+                      {pendingTotal > 0 && <span className="ml-2 text-amber-500">· {pendingTotal} pending</span>}
                     </span>
                     <span className="text-xs font-bold text-slate-700">{engagementProgress.overallProgress.toFixed(0)}%</span>
                   </div>
@@ -1304,7 +1380,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                   className="shrink-0 flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-50 transition-colors shadow-sm"
                 >
                   {autoSuggesting ? <RefreshCw size={13} className="animate-spin" /> : <Sparkles size={13} className="text-amber-500" />}
-                  <span className="hidden sm:inline">{autoSuggesting ? 'Scanningâ€¦' : 'Auto-Suggest'}</span>
+                  <span className="hidden sm:inline">{autoSuggesting ? 'Scanning…' : 'Auto-Suggest'}</span>
                 </button>
               </div>
 

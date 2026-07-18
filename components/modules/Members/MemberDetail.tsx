@@ -40,6 +40,7 @@ import { MentorMatchingModal } from './MentorMatchingModal';
 import { MemberDetailBasicTab } from './MemberDetailBasicTab';
 import { MemberDetailProfessionalTab } from './MemberDetailProfessionalTab';
 import { MemberDetailCareerTab } from './MemberDetailCareerTab';
+import { MemberDetailContactTab } from './MemberDetailContactTab';
 import { MemberDetailActivitiesTab } from './MemberDetailActivitiesTab';
 import { AsyncErrorBoundary } from '../../ui/AsyncErrorBoundary';
 // Generate an inline SVG data URI with initials — avoids external requests blocked by CSP
@@ -97,7 +98,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
   const [activeInlineEditCard, setActiveInlineEditCard] = useState<'basic' | 'professional' | 'contact' | 'apparel' | 'career' | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [inlineValues, setInlineValues] = useState<any>(null);
-  const [activeDetailTab, setActiveDetailTab] = useState<'basic' | 'professional' | 'career' | 'activities'>('basic');
+  const [activeDetailTab, setActiveDetailTab] = useState<'basic' | 'contact' | 'professional' | 'career' | 'activities'>('basic');
   const [activitiesLoading, setActivitiesLoading] = useState(false);
   const [projectRoles, setProjectRoles] = useState<any[]>([]);
   const [sponsorshipRecords, setSponsorshipRecords] = useState<any[]>([]);
@@ -1082,92 +1083,12 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
         </div>
       </section>
 
-      {/* NEW: Wolf-like Persona & Ambition Visualizer (Phase 1) */}
-      {canEditMembers && <div className="grid grid-cols-2 gap-3 md:gap-6">
-        <Card className="bg-gradient-to-br from-indigo-900 to-slate-900 text-white border-none shadow-xl overflow-hidden relative">
-          <div className="absolute top-0 right-0 p-8 opacity-5">
-            <Target size={120} />
-          </div>
-          <div className="relative z-10 p-2">
-            <div className="flex justify-between items-center mb-4 gap-2">
-              <h3 className="text-sm font-black text-blue-300 uppercase tracking-widest flex items-center gap-2">
-                <Sparkles size={16} /> JCI Pillar Diagnosis
-              </h3>
-              {(canEditMembers || isSelfView) && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowAssessmentModal(true)}
-                  className="text-[10px] bg-white/10 hover:bg-white/20 text-white border border-white/20 px-2.5 py-1 h-auto flex items-center gap-1 font-bold rounded-lg transition-all"
-                >
-                  <Settings size={12} />
-                  Update Assessment
-                </Button>
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                { label: 'Individual', val: pillarDiagnosis.individual, color: 'bg-blue-400' },
-                { label: 'Business', val: pillarDiagnosis.business, color: 'bg-emerald-400' },
-                { label: 'Community', val: pillarDiagnosis.community, color: 'bg-purple-400' },
-                { label: 'International', val: pillarDiagnosis.international, color: 'bg-orange-400' }
-              ].map((p, i) => (
-                <div key={i} className="space-y-2">
-                  <div className="flex justify-between text-[10px] font-black uppercase tracking-tighter">
-                    <span>{p.label}</span>
-                    <span>{p.val}%</span>
-                  </div>
-                  <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${p.val}%` }}
-                      className={`h-full ${p.color} shadow-[0_0_8px_rgba(255,255,255,0.3)]`}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-6 p-3 bg-white/5 rounded-xl border border-white/10">
-              <p className="text-[10px] text-blue-200 font-bold uppercase mb-1">Dominant Persona</p>
-              <p className="text-lg font-black italic text-white flex items-center gap-2">
-                {pillarDiagnosis.dominant}
-                <Badge className="bg-jci-blue text-blue text-[8px]">AI Profile</Badge>
-              </p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="bg-white border-2 border-slate-900 border-b-8 border-r-8 hover:translate-x-1 hover:translate-y-1 transition-all flex flex-col justify-between">
-          <div className="p-2 h-full flex flex-col justify-between">
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
-                <Target size={16} className="text-jci-blue animate-pulse" /> Elite Leaderboard Radar
-              </h3>
-              <div className="relative">
-                <select
-                  value={radarYear}
-                  onChange={(e) => setRadarYear(Number(e.target.value))}
-                  className="appearance-none bg-slate-100 text-jci-blue text-[10px] font-black uppercase tracking-wider rounded-full pl-2.5 pr-6 py-1 border border-slate-200 cursor-pointer hover:bg-slate-200/70 transition-all focus:outline-none focus:ring-1 focus:ring-jci-blue/50"
-                  style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%230097D7' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center' }}
-                >
-                  {availableYears.map(y => (
-                    <option key={y} value={y} className="bg-white text-slate-900">{y}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="flex-1 min-h-[220px] w-full relative">
-              <PointsSourceRadarChart memberId={member.id} year={radarYear} lightTheme={true} />
-            </div>
-          </div>
-        </Card>
-      </div>}
-
       {/* Tab Selector */}
       <div className="border-b border-slate-200 mb-6">
         <Tabs
           tabs={[
             { id: 'basic', label: 'Basic Information' },
+            { id: 'contact', label: 'Contact' },
             { id: 'professional', label: 'Professional & Business' },
             { id: 'career', label: 'JCI Career' },
             { id: 'activities', label: 'Activities Log' }
@@ -1196,6 +1117,17 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
             avatarUploadProgress={avatarUploadProgress}
             handleInlineAvatarUpload={handleInlineAvatarUpload}
             resolveIntroducerDisplay={resolveIntroducerDisplay}
+          />
+        </AsyncErrorBoundary>
+      )}
+      {activeDetailTab === 'contact' && (
+        <AsyncErrorBoundary>
+          <MemberDetailContactTab
+            member={member}
+            isEditMode={isEditMode}
+            inlineValues={inlineValues}
+            setInlineValues={setInlineValues}
+            canViewSensitiveFields={canViewSensitiveFields}
           />
         </AsyncErrorBoundary>
       )}
@@ -1239,6 +1171,13 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
             projectRoles={projectRoles}
             recruitedMembers={recruitedMembers}
             isPresident={isPresident}
+            canEditMembers={canEditMembers}
+            isSelfView={isSelfView}
+            setShowAssessmentModal={setShowAssessmentModal}
+            pillarDiagnosis={pillarDiagnosis}
+            radarYear={radarYear}
+            setRadarYear={setRadarYear}
+            availableYears={availableYears}
           />
         </AsyncErrorBoundary>
       )}

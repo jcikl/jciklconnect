@@ -10,7 +10,6 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { useMembers } from '../../hooks/useMembers';
 import { Textarea, Input, Select, Checkbox } from '../ui/Form';
 import { formatRelativeTime, formatDate } from '../../utils/dateUtils';
-import { MessagingView } from './MessagingView';
 import { AIPredictionService } from '../../services/aiPredictionService';
 import { CommunicationService } from '../../services/communicationService';
 import { NewsPost } from '../../types';
@@ -143,9 +142,6 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
         }
     };
 
-    if (activeTab === 'Messages') {
-        return <MessagingView />;
-    }
 
     return (
         <div className="space-y-6">
@@ -155,22 +151,16 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
                     <p className="text-slate-500">Stay connected with announcements and discussions.</p>
                 </div>
                 <div className="flex gap-2">
-                    {canManageAnnouncements && activeTab === 'Announcements' && (
-                        <Button onClick={() => setIsAnnouncementModalOpen(true)}>
+                    {(canManageAnnouncements || activeTab !== 'Announcements') && (
+                        <Button onClick={() => {
+                            if (activeTab === 'Announcements' && canManageAnnouncements) {
+                                setIsAnnouncementModalOpen(true);
+                            }
+                        }}>
                             <Megaphone size={16} className="mr-2" />
-                            Create Announcement
+                            {activeTab === 'Announcements' ? 'New Announcement' : 'New Post'}
                         </Button>
                     )}
-                    <Button onClick={() => {
-                        if (activeTab === 'Announcements' && canManageAnnouncements) {
-                            setIsAnnouncementModalOpen(true);
-                        } else {
-                            // Handle new post
-                        }
-                    }}>
-                        <Send size={16} className="mr-2" />
-                        {activeTab === 'Announcements' ? 'New Announcement' : 'New Post'}
-                    </Button>
                 </div>
             </div>
 
@@ -178,7 +168,7 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
                 <div className="lg:col-span-2 space-y-6">
                     <Card noPadding>
                         <div className="px-4 md:px-6">
-                            <Tabs tabs={['Newsfeed', 'Announcements', 'Mentions', 'Messages']} activeTab={activeTab} onTabChange={setActiveTab} />
+                            <Tabs tabs={['Newsfeed', 'Announcements']} activeTab={activeTab} onTabChange={setActiveTab} />
                         </div>
                         <div className="divide-y divide-slate-100">
                             {/* Create Post Input */}

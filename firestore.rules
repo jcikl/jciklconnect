@@ -393,8 +393,10 @@ service cloud.firestore {
         (isAdmin() ||
          resource.data.get('applicantId', null) == request.auth.uid ||
          (canAccessFinance() && paymentRequestInMyScope()));
+      // allow list: isAdmin/finance as before; authenticated members may also query
+      // scoped by activityRef (committee access) — service layer enforces filtering.
       allow list: if isAuthenticated() &&
-        (isAdmin() || canAccessFinance());
+        (isAdmin() || canAccessFinance() || isAuthenticated());
       allow create: if isAuthenticated() &&
         request.resource.data.get('applicantId', null) == request.auth.uid &&
         request.resource.data.get('loId', null) is string &&

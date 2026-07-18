@@ -1,8 +1,9 @@
-﻿import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Save, Users, Plus, Trash2, ChevronRight, Award, Shield, RefreshCw, Camera, Quote, Tag, AlignLeft, ImageIcon } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Save, Users, Plus, Trash2, ChevronRight, Award, RefreshCw, Camera, Quote, Tag, AlignLeft, ImageIcon } from 'lucide-react';
 import { Card, Button, useToast, Badge, Modal } from '../../ui/Common';
-import { Select, Input } from '../../ui/Form';
+import { Input } from '../../ui/Form';
 import { MemberSelector } from '../../ui/MemberSelector';
+import { Tabs } from '../../ui/Tabs';
 import { BoardManagementService } from '../../../services/boardManagementService';
 import { uploadBoardAvatarToCloudinary, uploadPresidentialLogoToCloudinary, uploadBodGroupPhotoToCloudinary, uploadMemberGroupPhotoToCloudinary, deleteFromCloudinary } from '../../../services/cloudinaryService';
 import { BoardMember, BoardTermSettings, Member } from '../../../types';
@@ -14,32 +15,73 @@ const POSITION_ORDER: Record<string, number> = {
   'General Legal Council': 4,
   'Secretary': 5,
   'Honorary Treasurer': 6,
-  'Vice President (Individual)': 7,
-  'Vice President (Business)': 8,
-  'Vice President (Community)': 9,
-  'Vice President (International Affairs)': 10,
-  'Vice President (LOM)': 11,
-  'Area Officer': 12,
-  'National Officer': 13,
-  'JCI Officer': 14,
+  'JCI Officer': 7,
+  'Vice President (Individual)': 8,
+  'Vice President (Business)': 9,
+  'Vice President (Community)': 10,
+  'Vice President (International Affairs)': 11,
+  'Vice President (LOM)': 12,
+  'Area Officer': 13,
+  'National Officer': 14,
 };
 
-/** Board è®¾å®šå¼¹çª—çš„èŒä½åˆ†ç»„æ ‡ç­¾ */
-const POSITION_GROUPS: { key: string; label: string; positions: string[] }[] = [
-  {
-    key: 'exco',
-    label: 'EXCO',
-    positions: ['President', 'Immediate Past President', 'Secretary', 'Honorary Treasurer', 'General Legal Council', 'Executive Vice President'],
-  },
-  {
-    key: 'vp',
-    label: 'VP',
-    positions: ['Vice President (Individual)', 'Vice President (Business)', 'Vice President (Community)', 'Vice President (International Affairs)', 'Vice President (LOM)'],
-  },
-  { key: 'area', label: 'Area Officer', positions: ['Area Officer'] },
-  { key: 'national', label: 'National Officer', positions: ['National Officer'] },
-  { key: 'jci', label: 'JCI Officer', positions: ['JCI Officer'] },
+// Positions handled as fixed single-slot assignments
+const FIXED_POSITIONS = [
+  'President',
+  'Immediate Past President',
+  'Executive Vice President',
+  'General Legal Council',
+  'Secretary',
+  'Honorary Treasurer',
+  'JCI Officer',
+  'Vice President (Individual)',
+  'Vice President (Business)',
+  'Vice President (Community)',
+  'Vice President (International Affairs)',
+  'Vice President (LOM)',
 ];
+
+// Which fixed positions belong to each tab
+const TAB_POSITIONS: Record<string, string[]> = {
+  president: ['President'],
+  exco: ['Immediate Past President', 'Executive Vice President', 'General Legal Council', 'Secretary', 'Honorary Treasurer', 'JCI Officer'],
+  vp: ['Vice President (Individual)', 'Vice President (Business)', 'Vice President (Community)', 'Vice President (International Affairs)', 'Vice President (LOM)'],
+};
+
+const BOARD_EDIT_TABS = [
+  { id: 'president', label: 'President', shortLabel: 'Pres' },
+  { id: 'exco', label: 'EXCO', shortLabel: 'EXCO' },
+  { id: 'vp', label: 'VP', shortLabel: 'VP' },
+  { id: 'area', label: 'Area Officer', shortLabel: 'Area' },
+  { id: 'national', label: 'National Officer', shortLabel: 'National' },
+];
+
+interface FlexOfficer {
+  localId: string;
+  positionName: string;
+  memberId: string;
+  boardAvatarUrl?: string;
+}
+
+// Isolated input with local state so typing doesn't re-render parent
+const PositionNameInput: React.FC<{
+  value: string;
+  placeholder: string;
+  onChange: (v: string) => void;
+}> = ({ value, placeholder, onChange }) => {
+  const [local, setLocal] = React.useState(value);
+  React.useEffect(() => { setLocal(value); }, [value]);
+  return (
+    <input
+      type="text"
+      className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-jci-blue/40 focus:border-jci-blue"
+      placeholder={placeholder}
+      value={local}
+      onChange={e => setLocal(e.target.value)}
+      onBlur={() => onChange(local)}
+    />
+  );
+};
 
 interface BoardOfDirectorsSectionProps {
   members: Member[];
@@ -79,8 +121,10 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
   const [removingDirectorId, setRemovingDirectorId] = useState<string | null>(null);
   const { showToast } = useToast();
 
-  const positions = BoardManagementService.getDefaultBoardPositions();
-  const [activePositionGroup, setActivePositionGroup] = useState<string>('exco');
+  const [activeTab, setActiveTab] = useState<string>('president');
+  const [dirTab, setDirTab] = useState<string>('president');
+  const [areaOfficers, setAreaOfficers] = useState<FlexOfficer[]>([]);
+  const [nationalOfficers, setNationalOfficers] = useState<FlexOfficer[]>([]);
 
   const handleBodAvatarUpload = async (
     member: Member,
@@ -122,6 +166,29 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
       }
       showToast(`Photo updated for ${member.name}`, 'success');
     } catch (err) {
+      showToast('Failed to upload photo', 'error');
+    } finally {
+      setUploadingKey(null);
+      setUploadProgress(0);
+    }
+  };
+
+  const handleFlexAvatarUpload = async (
+    type: 'area' | 'national',
+    localId: string,
+    member: Member,
+    file: File
+  ) => {
+    if (!selectedTerm) return;
+    const key = `flex:${type}:${localId}`;
+    setUploadingKey(key);
+    setUploadProgress(0);
+    try {
+      const url = await uploadBoardAvatarToCloudinary(file, member, selectedTerm, p => setUploadProgress(p));
+      const setter = type === 'area' ? setAreaOfficers : setNationalOfficers;
+      setter(prev => prev.map(o => o.localId === localId ? { ...o, boardAvatarUrl: url } : o));
+      showToast(`Photo updated for ${member.name}`, 'success');
+    } catch {
       showToast('Failed to upload photo', 'error');
     } finally {
       setUploadingKey(null);
@@ -188,6 +255,7 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
   const handleOpenManage = async (year: string, forceEdit = false) => {
     setSelectedTerm(year);
     setIsEditing(forceEdit);
+    setActiveTab('president');
     setLoading(true);
     try {
       const [boardMembers, ts] = await Promise.all([
@@ -202,7 +270,7 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
         commissionDirectorAvatars?: Record<string, string>;
       }> = {};
 
-      positions.forEach(pos => {
+      FIXED_POSITIONS.forEach(pos => {
         const found = boardMembers.find(bm => bm.position === pos && bm.isActive);
         map[pos] = {
           memberId: found?.memberId || '',
@@ -211,8 +279,36 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
           commissionDirectorAvatars: found?.commissionDirectorAvatars || {},
         };
       });
-
       setAssignments(map);
+
+      // Flex area officers: positions matching /area/i that are NOT fixed, plus legacy "Area Officer"
+      const areaEntries = boardMembers.filter(bm =>
+        bm.isActive && (
+          (!FIXED_POSITIONS.includes(bm.position) && /area/i.test(bm.position)) ||
+          bm.position === 'Area Officer'
+        )
+      );
+      setAreaOfficers(areaEntries.map(bm => ({
+        localId: Math.random().toString(36).slice(2),
+        positionName: bm.position,
+        memberId: bm.memberId,
+        boardAvatarUrl: bm.boardAvatarUrl || '',
+      })));
+
+      // Flex national officers
+      const nationalEntries = boardMembers.filter(bm =>
+        bm.isActive && (
+          (!FIXED_POSITIONS.includes(bm.position) && /national/i.test(bm.position)) ||
+          bm.position === 'National Officer'
+        )
+      );
+      setNationalOfficers(nationalEntries.map(bm => ({
+        localId: Math.random().toString(36).slice(2),
+        positionName: bm.position,
+        memberId: bm.memberId,
+        boardAvatarUrl: bm.boardAvatarUrl || '',
+      })));
+
       setShowManageModal(true);
     } catch (err) {
       showToast('Failed to load board details', 'error');
@@ -257,15 +353,29 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
     if (!selectedTerm) return;
     setSaving(true);
     try {
-      const list = Object.entries(assignments)
-        .filter(([_, data]) => data.memberId)
-        .map(([position, data]) => ({
-          position,
-          memberId: data.memberId,
-          commissionDirectorIds: data.commissionDirectorIds,
-          boardAvatarUrl: data.boardAvatarUrl || undefined,
-          commissionDirectorAvatars: data.commissionDirectorAvatars,
-        }));
+      const list = [
+        ...Object.entries(assignments)
+          .filter(([_, data]) => data.memberId)
+          .map(([position, data]) => ({
+            position,
+            memberId: data.memberId,
+            commissionDirectorIds: data.commissionDirectorIds,
+            boardAvatarUrl: data.boardAvatarUrl || undefined,
+            commissionDirectorAvatars: data.commissionDirectorAvatars,
+          })),
+        ...areaOfficers.filter(o => o.memberId).map(o => ({
+          position: o.positionName.trim() || 'Area Officer',
+          memberId: o.memberId,
+          commissionDirectorIds: [] as string[],
+          boardAvatarUrl: o.boardAvatarUrl || undefined,
+        })),
+        ...nationalOfficers.filter(o => o.memberId).map(o => ({
+          position: o.positionName.trim() || 'National Officer',
+          memberId: o.memberId,
+          commissionDirectorIds: [] as string[],
+          boardAvatarUrl: o.boardAvatarUrl || undefined,
+        })),
+      ];
 
       try {
         await BoardManagementService.setBoardForTerm(selectedTerm, list);
@@ -319,18 +429,32 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
       if (data.memberId) ids.add(data.memberId);
       data.commissionDirectorIds.forEach(id => ids.add(id));
     });
+    areaOfficers.forEach(o => { if (o.memberId) ids.add(o.memberId); });
+    nationalOfficers.forEach(o => { if (o.memberId) ids.add(o.memberId); });
     return ids;
-  }, [assignments]);
+  }, [assignments, areaOfficers, nationalOfficers]);
 
-  const assignedPositions = useMemo(() => {
-    return Object.entries(assignments)
-      .filter(([_, data]) => data.memberId)
-      .sort((a, b) => {
-        const orderA = POSITION_ORDER[a[0]] || 99;
-        const orderB = POSITION_ORDER[b[0]] || 99;
-        return orderA - orderB;
-      });
-  }, [assignments]);
+  const allBoardList = useMemo(() => {
+    type BoardEntry = {
+      position: string;
+      memberId: string;
+      commissionDirectorIds: string[];
+      boardAvatarUrl?: string;
+      commissionDirectorAvatars?: Record<string, string>;
+      entryType: 'fixed' | 'area' | 'national';
+    };
+    const result: BoardEntry[] = [];
+    Object.entries(assignments).forEach(([position, data]) => {
+      if (data.memberId) result.push({ position, ...data, entryType: 'fixed' });
+    });
+    areaOfficers.forEach(o => {
+      if (o.memberId) result.push({ position: o.positionName || 'Area Officer', memberId: o.memberId, commissionDirectorIds: [], boardAvatarUrl: o.boardAvatarUrl, entryType: 'area' });
+    });
+    nationalOfficers.forEach(o => {
+      if (o.memberId) result.push({ position: o.positionName || 'National Officer', memberId: o.memberId, commissionDirectorIds: [], boardAvatarUrl: o.boardAvatarUrl, entryType: 'national' });
+    });
+    return result.sort((a, b) => (POSITION_ORDER[a.position] ?? 99) - (POSITION_ORDER[b.position] ?? 99));
+  }, [assignments, areaOfficers, nationalOfficers]);
 
   if (loading && terms.length === 0) {
     return (
@@ -340,6 +464,235 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
       </div>
     );
   }
+
+  // ── Inner render helpers (close over state) ──────────────────────────────
+
+  const renderPositionCard = (position: string) => {
+    const sel = members.find(m => m.id === assignments[position]?.memberId);
+    const boardAvatar = assignments[position]?.boardAvatarUrl || '';
+    const avatarSrc = boardAvatar || sel?.avatar || sel?.avatarUrl || '';
+    const isUp = uploadingKey === `${position}:board`;
+
+    return (
+      <div key={position} className="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-slate-50 rounded-lg flex items-center justify-center text-slate-400 border border-slate-100">
+              <Award size={20} />
+            </div>
+            <div>
+              <h4 className="font-bold text-slate-900">{position}</h4>
+              <p className="text-xs text-slate-500">Assignment for {selectedTerm}</p>
+            </div>
+          </div>
+          <div className="w-full sm:w-80">
+            <MemberSelector
+              label=""
+              members={sortedMembers}
+              getOptionLabel={getMemberLabel}
+              value={assignments[position]?.memberId || ''}
+              onChange={(id) => handleAssignmentChange(position, id)}
+              selfOption={false}
+              showLookupFields={false}
+              placeholder="Search member..."
+              disabled={!canManage}
+            />
+          </div>
+        </div>
+
+        {sel && (
+          <div className="flex items-center gap-3 pt-3 border-t border-slate-100">
+            <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
+              {avatarSrc
+                ? <img src={avatarSrc} alt={sel.name} className="w-full h-full object-cover" />
+                : <div className="w-full h-full flex items-center justify-center text-slate-400 font-bold text-sm">{sel.name.charAt(0)}</div>}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-slate-700 truncate">{sel.name}</p>
+              {boardAvatar && <p className="text-[10px] text-jci-blue font-medium">Board photo set</p>}
+              {isUp && <div className="mt-1 h-1 rounded-full bg-slate-200 overflow-hidden"><div className="h-full bg-jci-blue transition-all" style={{ width: `${uploadProgress}%` }} /></div>}
+            </div>
+            <label className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${isUp ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-100 hover:bg-blue-50 hover:text-jci-blue text-slate-600 cursor-pointer'}`}>
+              <Camera size={12} />
+              {isUp ? 'Uploading...' : 'Photo'}
+              <input type="file" accept="image/*" className="hidden" disabled={isUp} onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) handleBodAvatarUpload(sel, f, position, 'board'); }} />
+            </label>
+          </div>
+        )}
+
+        {assignments[position]?.memberId && (
+          <div className="pt-4 border-t border-slate-50 space-y-3">
+            <div className="flex items-center justify-between">
+              <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Commission Directors</h5>
+              {canManage && (
+                <div className="w-80">
+                  <MemberSelector
+                    label=""
+                    members={sortedMembers}
+                    getOptionLabel={getMemberLabel}
+                    value=""
+                    onChange={(id) => handleAddCommissionDirector(position, id)}
+                    selfOption={false}
+                    showLookupFields={false}
+                    placeholder="+ Add Director"
+                  />
+                </div>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {assignments[position].commissionDirectorIds.length === 0 ? (
+                <p className="text-xs text-slate-400 italic">No commission directors assigned</p>
+              ) : (
+                assignments[position].commissionDirectorIds.map(id => {
+                  const m = members.find(mem => mem.id === id);
+                  const dirBoardAvatar = assignments[position]?.commissionDirectorAvatars?.[id] || '';
+                  const dirAvatar = dirBoardAvatar || m?.avatar || m?.avatarUrl || '';
+                  const isDirUp = uploadingKey === `${position}:commission:${id}`;
+                  return (
+                    <div key={id} className="flex items-center gap-1.5 bg-slate-50 pl-1.5 pr-1 py-1 rounded-full border border-slate-200">
+                      <div className="w-6 h-6 rounded-full overflow-hidden bg-slate-200 shrink-0">
+                        {dirAvatar
+                          ? <img src={dirAvatar} alt={m?.name} className="w-full h-full object-cover" />
+                          : <div className="w-full h-full flex items-center justify-center text-[9px] font-bold text-slate-500">{m?.name?.charAt(0)}</div>}
+                      </div>
+                      <span className="text-xs font-medium text-slate-700">{m?.name || 'Unknown'}</span>
+                      {canManage && (
+                        <>
+                          <label className={`transition-colors rounded-full p-0.5 ${isDirUp ? 'text-slate-200 cursor-not-allowed' : 'text-slate-300 hover:text-jci-blue cursor-pointer'}`} title="Upload photo">
+                            <Camera size={11} />
+                            <input type="file" accept="image/*" className="hidden" disabled={isDirUp || !m} onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f && m) handleBodAvatarUpload(m, f, position, 'commission'); }} />
+                          </label>
+                          {removingDirectorId === `${position}:${id}` ? (
+                            <span className="flex items-center gap-1 text-xs">
+                              <button onClick={() => { handleRemoveCommissionDirector(position, id); setRemovingDirectorId(null); }} className="text-red-500 hover:underline">确认</button>
+                              <button onClick={() => setRemovingDirectorId(null)} className="text-slate-400 hover:underline">取消</button>
+                            </span>
+                          ) : (
+                            <button onClick={() => setRemovingDirectorId(`${position}:${id}`)} className="hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-full transition-colors p-0.5">
+                              <Trash2 size={11} />
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderFlexOfficerTab = (type: 'area' | 'national', defaultTitle: string) => {
+    const officers = type === 'area' ? areaOfficers : nationalOfficers;
+    const setOfficers = type === 'area' ? setAreaOfficers : setNationalOfficers;
+
+    const addOfficer = () => setOfficers(prev => [...prev, {
+      localId: Math.random().toString(36).slice(2),
+      positionName: defaultTitle,
+      memberId: '',
+      boardAvatarUrl: '',
+    }]);
+
+    const removeOfficer = (localId: string) => setOfficers(prev => prev.filter(o => o.localId !== localId));
+
+    const updateOfficer = (localId: string, patch: Partial<FlexOfficer>) =>
+      setOfficers(prev => prev.map(o => o.localId === localId ? { ...o, ...patch } : o));
+
+    return (
+      <div className="space-y-3">
+        {canManage && (
+          <button
+            onClick={addOfficer}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-slate-200 text-slate-400 hover:border-jci-blue hover:text-jci-blue transition-colors text-sm font-semibold"
+          >
+            <Plus size={16} /> Add {defaultTitle}
+          </button>
+        )}
+
+        {officers.length === 0 && (
+          <div className="py-8 text-center">
+            <Users size={32} className="text-slate-200 mx-auto mb-2" />
+            <p className="text-sm text-slate-400">No {defaultTitle}s assigned yet.</p>
+          </div>
+        )}
+
+        {officers.map(officer => {
+          const sel = members.find(m => m.id === officer.memberId);
+          const isUp = uploadingKey === `flex:${type}:${officer.localId}`;
+          return (
+            <div key={officer.localId} className="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center text-slate-400 border border-slate-100 shrink-0">
+                  <Award size={15} />
+                </div>
+                <PositionNameInput
+                  value={officer.positionName}
+                  placeholder={`e.g. ${defaultTitle} - Central KL`}
+                  onChange={v => updateOfficer(officer.localId, { positionName: v })}
+                />
+                {canManage && (
+                  <button
+                    onClick={() => removeOfficer(officer.localId)}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
+                    title="Remove"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                )}
+              </div>
+
+              <MemberSelector
+                label=""
+                members={sortedMembers}
+                getOptionLabel={getMemberLabel}
+                value={officer.memberId}
+                onChange={id => updateOfficer(officer.localId, { memberId: id })}
+                selfOption={false}
+                showLookupFields={false}
+                placeholder="Search member..."
+                disabled={!canManage}
+              />
+
+              {sel && (
+                <div className="flex items-center gap-3 pt-3 border-t border-slate-100">
+                  <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
+                    {(officer.boardAvatarUrl || sel.avatar || sel.avatarUrl)
+                      ? <img src={officer.boardAvatarUrl || sel.avatar || sel.avatarUrl || undefined} alt={sel.name} className="w-full h-full object-cover" />
+                      : <div className="w-full h-full flex items-center justify-center text-slate-400 font-bold text-sm">{sel.name.charAt(0)}</div>}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-slate-700 truncate">{sel.name}</p>
+                    {officer.boardAvatarUrl && <p className="text-[10px] text-jci-blue font-medium">Board photo set</p>}
+                    {isUp && <div className="mt-1 h-1 rounded-full bg-slate-200 overflow-hidden"><div className="h-full bg-jci-blue transition-all" style={{ width: `${uploadProgress}%` }} /></div>}
+                  </div>
+                  <label className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${isUp ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-100 hover:bg-blue-50 hover:text-jci-blue text-slate-600 cursor-pointer'}`}>
+                    <Camera size={12} />
+                    {isUp ? 'Uploading...' : 'Photo'}
+                    <input type="file" accept="image/*" className="hidden" disabled={isUp} onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) handleFlexAvatarUpload(type, officer.localId, sel, f); }} />
+                  </label>
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+      </div>
+    );
+  };
+
+  // ────────────────────────────────────────────────────────────────────────
+
+  const filteredDirList = allBoardList.filter(e => {
+    if (dirTab === 'president') return e.position === 'President';
+    if (dirTab === 'exco') return TAB_POSITIONS.exco.includes(e.position);
+    if (dirTab === 'vp') return TAB_POSITIONS.vp.includes(e.position);
+    if (dirTab === 'area') return e.entryType === 'area';
+    if (dirTab === 'national') return e.entryType === 'national';
+    return true;
+  });
 
   return (
     <div className="space-y-2">
@@ -401,6 +754,22 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
         title={isEditing ? `Configure Board of Directors - ${selectedTerm}` : `Board of Directors Directory - ${selectedTerm}`}
         size="xl"
         drawerOnMobile
+        subHeader={isEditing ? (
+          <Tabs
+            tabs={BOARD_EDIT_TABS}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            mobileFallback="scroll"
+            fullWidth
+          />
+        ) : allBoardList.length > 0 ? (
+          <Tabs
+            tabs={BOARD_EDIT_TABS}
+            activeTab={dirTab}
+            onTabChange={setDirTab}
+            fullWidth
+          />
+        ) : undefined}
         footer={
           <div className="flex gap-3 w-full">
             {isEditing ? (
@@ -431,361 +800,243 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
       >
         <div className="space-y-4">
           {isEditing ? (
-            <div className="space-y-3">
-              {/* Presidential Identity */}
-              <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 space-y-3">
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-7 h-7 rounded-lg bg-amber-400/20 flex items-center justify-center">
-                    <Award size={15} className="text-amber-600" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-black text-slate-800">Presidential Identity</h4>
-                    <p className="text-[10px] text-slate-500">Displayed on the guest home page President Spotlight</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="sm:col-span-3">
-                    <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 mb-1">
-                      <Quote size={11} /> Presidential Theme
-                    </label>
-                    <input
-                      type="text"
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400"
-                      placeholder="e.g. Ignite. Lead. Transform."
-                      value={termSettings.presidentTheme || ''}
-                      onChange={e => setTermSettings(prev => ({ ...prev, presidentTheme: e.target.value }))}
-                    />
-                  </div>
-                  <div className="sm:col-span-3">
-                    <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 mb-1">
-                      <Tag size={11} /> Tagline
-                    </label>
-                    <input
-                      type="text"
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400"
-                      placeholder="e.g. Empowering Young Leaders"
-                      value={termSettings.tagline || ''}
-                      onChange={e => setTermSettings(prev => ({ ...prev, tagline: e.target.value }))}
-                    />
-                  </div>
-                  <div className="sm:col-span-3">
-                    <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 mb-1">
-                      <AlignLeft size={11} /> Short Description
-                    </label>
-                    <textarea
-                      rows={3}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400 resize-none"
-                      placeholder="A brief message from the president about this year's direction..."
-                      value={termSettings.shortDescription || ''}
-                      onChange={e => setTermSettings(prev => ({ ...prev, shortDescription: e.target.value }))}
-                    />
-                  </div>
-                  {/* Theme Logo card */}
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="flex items-center gap-1 text-xs font-bold text-slate-600">
-                        <ImageIcon size={11} /> Theme Logo
-                      </label>
-                    </div>
-                    <div className="relative rounded-xl overflow-hidden bg-slate-100 border border-slate-200" style={{ aspectRatio: '16/9' }}>
-                      {termSettings.logoUrl
-                        ? <img src={termSettings.logoUrl} alt="logo" className="w-full h-full object-contain p-4" />
-                        : <div className="w-full h-full flex flex-col items-center justify-center gap-1.5"><ImageIcon size={20} className="text-slate-300" /><span className="text-[10px] text-slate-400 font-medium">No logo</span></div>}
-                      <div className="absolute inset-0 flex items-end justify-between p-2 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 hover:opacity-100 transition-opacity">
-                        <label className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-bold bg-white/90 text-slate-700 cursor-pointer hover:bg-white transition-colors shadow-sm">
-                          <Camera size={10} /> {termSettings.logoUrl ? 'Replace' : 'Upload'}
-                          <input type="file" accept="image/*" className="hidden" onChange={async e => {
-                            const f = e.target.files?.[0]; e.target.value = '';
-                            if (!f || !selectedTerm) return;
-                            setLogoUploading(true); setLogoUploadProgress(0);
-                            try {
-                              const url = await uploadPresidentialLogoToCloudinary(f, selectedTerm, p => setLogoUploadProgress(p));
-                              if (termSettings.logoUrl) deleteFromCloudinary(termSettings.logoUrl).catch(() => {});
-                              setTermSettings(prev => ({ ...prev, logoUrl: url }));
-                              showToast('Logo uploaded', 'success');
-                            } catch { showToast('Upload failed', 'error'); }
-                            finally { setLogoUploading(false); setLogoUploadProgress(0); }
-                          }} />
-                        </label>
-                        {termSettings.logoUrl && (
-                          <button onClick={() => setTermSettings(prev => ({ ...prev, logoUrl: '' }))} className="w-7 h-7 rounded-lg bg-white/90 hover:bg-red-50 flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors shadow-sm">
-                            <Trash2 size={12} />
-                          </button>
-                        )}
-                      </div>
-                      {logoUploading && (
-                        <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-2 px-4">
-                          <p className="text-xs text-white font-bold">Uploading…</p>
-                          <div className="w-full h-1.5 rounded-full bg-white/30 overflow-hidden"><div className="h-full bg-white transition-all rounded-full" style={{ width: `${logoUploadProgress}%` }} /></div>
-                        </div>
-                      )}
-                    </div>
-                    {!logoUploading && (
-                      <label className="flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-bold border border-dashed border-slate-300 text-slate-500 hover:border-slate-400 hover:text-slate-700 cursor-pointer transition-colors bg-white">
-                        <Camera size={11} /> {termSettings.logoUrl ? 'Replace logo' : 'Upload logo'}
-                        <input type="file" accept="image/*" className="hidden" onChange={async e => {
-                          const f = e.target.files?.[0]; e.target.value = '';
-                          if (!f || !selectedTerm) return;
-                          setLogoUploading(true); setLogoUploadProgress(0);
-                          try {
-                            const url = await uploadPresidentialLogoToCloudinary(f, selectedTerm, p => setLogoUploadProgress(p));
-                            if (termSettings.logoUrl) deleteFromCloudinary(termSettings.logoUrl).catch(() => {});
-                            setTermSettings(prev => ({ ...prev, logoUrl: url }));
-                            showToast('Logo uploaded', 'success');
-                          } catch { showToast('Upload failed', 'error'); }
-                          finally { setLogoUploading(false); setLogoUploadProgress(0); }
-                        }} />
-                      </label>
-                    )}
-                  </div>
-                  {/* Group Photos — side by side cards */}
-                  {([
-                    {
-                      key: 'groupPhotoUrl' as const,
-                      label: 'BOD Group Photo',
-                      dest: 'About page',
-                      color: 'blue',
-                      uploading: groupPhotoUploading,
-                      progress: groupPhotoUploadProgress,
-                      onUpload: async (f: File) => {
-                        setGroupPhotoUploading(true); setGroupPhotoUploadProgress(0);
-                        try {
-                          const url = await uploadBodGroupPhotoToCloudinary(f, selectedTerm!, p => setGroupPhotoUploadProgress(p));
-                          if (termSettings.groupPhotoUrl) deleteFromCloudinary(termSettings.groupPhotoUrl).catch(() => {});
-                          setTermSettings(prev => ({ ...prev, groupPhotoUrl: url }));
-                          showToast('BOD group photo uploaded', 'success');
-                        } catch { showToast('Upload failed', 'error'); }
-                        finally { setGroupPhotoUploading(false); setGroupPhotoUploadProgress(0); }
-                      },
-                      onClear: () => setTermSettings(prev => ({ ...prev, groupPhotoUrl: '' })),
-                      url: termSettings.groupPhotoUrl,
-                    },
-                    {
-                      key: 'memberGroupPhotoUrl' as const,
-                      label: 'Member Group Photo',
-                      dest: 'Home hero',
-                      color: 'sky',
-                      uploading: memberGroupPhotoUploading,
-                      progress: memberGroupPhotoUploadProgress,
-                      onUpload: async (f: File) => {
-                        setMemberGroupPhotoUploading(true); setMemberGroupPhotoUploadProgress(0);
-                        try {
-                          const url = await uploadMemberGroupPhotoToCloudinary(f, selectedTerm!, p => setMemberGroupPhotoUploadProgress(p));
-                          if (termSettings.memberGroupPhotoUrl) deleteFromCloudinary(termSettings.memberGroupPhotoUrl).catch(() => {});
-                          setTermSettings(prev => ({ ...prev, memberGroupPhotoUrl: url }));
-                          showToast('Member group photo uploaded', 'success');
-                        } catch { showToast('Upload failed', 'error'); }
-                        finally { setMemberGroupPhotoUploading(false); setMemberGroupPhotoUploadProgress(0); }
-                      },
-                      onClear: () => setTermSettings(prev => ({ ...prev, memberGroupPhotoUrl: '' })),
-                      url: termSettings.memberGroupPhotoUrl,
-                    },
-                  ] as const).map(item => (
-                    <div key={item.key} className="flex flex-col gap-1.5">
-                      <div className="flex items-center justify-between">
-                        <label className="flex items-center gap-1 text-xs font-bold text-slate-600">
-                          <Camera size={11} /> {item.label}
-                        </label>
-                        <span className="text-[10px] text-slate-400 font-medium">{item.dest}</span>
-                      </div>
-                      <div className="relative rounded-xl overflow-hidden bg-slate-100 border border-slate-200" style={{ aspectRatio: '16/9' }}>
-                        {item.url
-                          ? <img src={item.url} alt={item.label} className="w-full h-full object-cover" />
-                          : (
-                            <div className="w-full h-full flex flex-col items-center justify-center gap-1.5">
-                              <Camera size={20} className="text-slate-300" />
-                              <span className="text-[10px] text-slate-400 font-medium">No photo</span>
-                            </div>
-                          )}
-                        {/* Overlay actions */}
-                        <div className="absolute inset-0 flex items-end justify-between p-2 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 hover:opacity-100 transition-opacity">
-                          <label className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-bold bg-white/90 text-slate-700 cursor-pointer hover:bg-white transition-colors shadow-sm">
-                            <Camera size={10} /> {item.url ? 'Replace' : 'Upload'}
-                            <input type="file" accept="image/*" className="hidden" onChange={async e => {
-                              const f = e.target.files?.[0]; e.target.value = '';
-                              if (!f) return;
-                              await item.onUpload(f);
-                            }} />
-                          </label>
-                          {item.url && (
-                            <button onClick={item.onClear} className="w-7 h-7 rounded-lg bg-white/90 hover:bg-red-50 flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors shadow-sm">
-                              <Trash2 size={12} />
-                            </button>
-                          )}
-                        </div>
-                        {/* Upload progress overlay */}
-                        {item.uploading && (
-                          <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-2 px-6">
-                            <p className="text-xs text-white font-bold">Uploading…</p>
-                            <div className="w-full h-1.5 rounded-full bg-white/30 overflow-hidden">
-                              <div className="h-full bg-white transition-all rounded-full" style={{ width: `${item.progress}%` }} />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      {/* Static fallback upload button (touch-friendly, no hover needed) */}
-                      {!item.uploading && (
-                        <label className="flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-bold border border-dashed border-slate-300 text-slate-500 hover:border-slate-400 hover:text-slate-700 cursor-pointer transition-colors bg-white">
-                          <Camera size={11} /> {item.url ? 'Replace photo' : 'Upload photo'}
-                          <input type="file" accept="image/*" className="hidden" onChange={async e => {
-                            const f = e.target.files?.[0]; e.target.value = '';
-                            if (!f) return;
-                            await item.onUpload(f);
-                          }} />
-                        </label>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
+            <div className="space-y-3 h-[420px] overflow-y-auto md:h-[480px] pr-1">
+              {/* President tab: position card + Presidential Identity */}
+              {activeTab === 'president' && (
+                <div className="space-y-3">
+                  {renderPositionCard('President')}
 
-              {/* Position group tabs */}
-              <div className="flex gap-1.5 flex-wrap sticky top-0 z-10 bg-white py-2 -my-2">
-                {POSITION_GROUPS.map(group => {
-                  const assignedCount = group.positions.filter(p => assignments[p]?.memberId).length;
-                  const isActive = activePositionGroup === group.key;
-                  return (
-                    <button
-                      key={group.key}
-                      onClick={() => setActivePositionGroup(group.key)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors flex items-center gap-1.5 ${
-                        isActive ? 'bg-jci-blue text-white shadow-sm' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                      }`}
-                    >
-                      {group.label}
-                      <span className={`text-[10px] font-black ${isActive ? 'text-white/70' : assignedCount === group.positions.length ? 'text-emerald-600' : 'text-slate-400'}`}>
-                        {assignedCount}/{group.positions.length}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {positions.filter(p => (POSITION_GROUPS.find(g => g.key === activePositionGroup)?.positions || []).includes(p)).map(position => (
-                <div key={position} className="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-slate-50 rounded-lg flex items-center justify-center text-slate-400 border border-slate-100">
-                        <Award size={20} />
+                  {/* Presidential Identity card */}
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 space-y-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="w-7 h-7 rounded-lg bg-amber-400/20 flex items-center justify-center">
+                        <Award size={15} className="text-amber-600" />
                       </div>
                       <div>
-                        <h4 className="font-bold text-slate-900">{position}</h4>
-                        <p className="text-xs text-slate-500">Assignment for {selectedTerm}</p>
+                        <h4 className="text-sm font-black text-slate-800">Presidential Identity</h4>
+                        <p className="text-[10px] text-slate-500">Displayed on the guest home page President Spotlight</p>
                       </div>
                     </div>
-
-                    <div className="w-full sm:w-80">
-                      <MemberSelector
-                        label=""
-                        members={sortedMembers.filter(m => !allAssignedIds.has(m.id) || m.id === (assignments[position]?.memberId || ''))}
-                        getOptionLabel={getMemberLabel}
-                        value={assignments[position]?.memberId || ''}
-                        onChange={(id) => handleAssignmentChange(position, id)}
-                        selfOption={false}
-                        showLookupFields={false}
-                        placeholder="Search member..."
-                        disabled={!canManage}
-                      />
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="sm:col-span-3">
+                        <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 mb-1">
+                          <Quote size={11} /> Presidential Theme
+                        </label>
+                        <input
+                          type="text"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400"
+                          placeholder="e.g. Ignite. Lead. Transform."
+                          value={termSettings.presidentTheme || ''}
+                          onChange={e => setTermSettings(prev => ({ ...prev, presidentTheme: e.target.value }))}
+                        />
+                      </div>
+                      <div className="sm:col-span-3">
+                        <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 mb-1">
+                          <Tag size={11} /> Tagline
+                        </label>
+                        <input
+                          type="text"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400"
+                          placeholder="e.g. Empowering Young Leaders"
+                          value={termSettings.tagline || ''}
+                          onChange={e => setTermSettings(prev => ({ ...prev, tagline: e.target.value }))}
+                        />
+                      </div>
+                      <div className="sm:col-span-3">
+                        <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 mb-1">
+                          <AlignLeft size={11} /> Short Description
+                        </label>
+                        <textarea
+                          rows={3}
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400 resize-none"
+                          placeholder="A brief message from the president about this year's direction..."
+                          value={termSettings.shortDescription || ''}
+                          onChange={e => setTermSettings(prev => ({ ...prev, shortDescription: e.target.value }))}
+                        />
+                      </div>
+                      {/* Theme Logo card */}
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between">
+                          <label className="flex items-center gap-1 text-xs font-bold text-slate-600">
+                            <ImageIcon size={11} /> Theme Logo
+                          </label>
+                        </div>
+                        <div className="relative rounded-xl overflow-hidden bg-slate-100 border border-slate-200" style={{ aspectRatio: '16/9' }}>
+                          {termSettings.logoUrl
+                            ? <img src={termSettings.logoUrl} alt="logo" className="w-full h-full object-contain p-4" />
+                            : <div className="w-full h-full flex flex-col items-center justify-center gap-1.5"><ImageIcon size={20} className="text-slate-300" /><span className="text-[10px] text-slate-400 font-medium">No logo</span></div>}
+                          <div className="absolute inset-0 flex items-end justify-between p-2 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 hover:opacity-100 transition-opacity">
+                            <label className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-bold bg-white/90 text-slate-700 cursor-pointer hover:bg-white transition-colors shadow-sm">
+                              <Camera size={10} /> {termSettings.logoUrl ? 'Replace' : 'Upload'}
+                              <input type="file" accept="image/*" className="hidden" onChange={async e => {
+                                const f = e.target.files?.[0]; e.target.value = '';
+                                if (!f || !selectedTerm) return;
+                                setLogoUploading(true); setLogoUploadProgress(0);
+                                try {
+                                  const url = await uploadPresidentialLogoToCloudinary(f, selectedTerm, p => setLogoUploadProgress(p));
+                                  if (termSettings.logoUrl) deleteFromCloudinary(termSettings.logoUrl).catch(() => {});
+                                  setTermSettings(prev => ({ ...prev, logoUrl: url }));
+                                  showToast('Logo uploaded', 'success');
+                                } catch { showToast('Upload failed', 'error'); }
+                                finally { setLogoUploading(false); setLogoUploadProgress(0); }
+                              }} />
+                            </label>
+                            {termSettings.logoUrl && (
+                              <button onClick={() => setTermSettings(prev => ({ ...prev, logoUrl: '' }))} className="w-7 h-7 rounded-lg bg-white/90 hover:bg-red-50 flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors shadow-sm">
+                                <Trash2 size={12} />
+                              </button>
+                            )}
+                          </div>
+                          {logoUploading && (
+                            <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-2 px-4">
+                              <p className="text-xs text-white font-bold">Uploading…</p>
+                              <div className="w-full h-1.5 rounded-full bg-white/30 overflow-hidden"><div className="h-full bg-white transition-all rounded-full" style={{ width: `${logoUploadProgress}%` }} /></div>
+                            </div>
+                          )}
+                        </div>
+                        {!logoUploading && (
+                          <label className="flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-bold border border-dashed border-slate-300 text-slate-500 hover:border-slate-400 hover:text-slate-700 cursor-pointer transition-colors bg-white">
+                            <Camera size={11} /> {termSettings.logoUrl ? 'Replace logo' : 'Upload logo'}
+                            <input type="file" accept="image/*" className="hidden" onChange={async e => {
+                              const f = e.target.files?.[0]; e.target.value = '';
+                              if (!f || !selectedTerm) return;
+                              setLogoUploading(true); setLogoUploadProgress(0);
+                              try {
+                                const url = await uploadPresidentialLogoToCloudinary(f, selectedTerm, p => setLogoUploadProgress(p));
+                                if (termSettings.logoUrl) deleteFromCloudinary(termSettings.logoUrl).catch(() => {});
+                                setTermSettings(prev => ({ ...prev, logoUrl: url }));
+                                showToast('Logo uploaded', 'success');
+                              } catch { showToast('Upload failed', 'error'); }
+                              finally { setLogoUploading(false); setLogoUploadProgress(0); }
+                            }} />
+                          </label>
+                        )}
+                      </div>
+                      {/* Group Photos — side by side cards */}
+                      {([
+                        {
+                          key: 'groupPhotoUrl' as const,
+                          label: 'BOD Group Photo',
+                          dest: 'About page',
+                          color: 'blue',
+                          uploading: groupPhotoUploading,
+                          progress: groupPhotoUploadProgress,
+                          onUpload: async (f: File) => {
+                            setGroupPhotoUploading(true); setGroupPhotoUploadProgress(0);
+                            try {
+                              const url = await uploadBodGroupPhotoToCloudinary(f, selectedTerm!, p => setGroupPhotoUploadProgress(p));
+                              if (termSettings.groupPhotoUrl) deleteFromCloudinary(termSettings.groupPhotoUrl).catch(() => {});
+                              setTermSettings(prev => ({ ...prev, groupPhotoUrl: url }));
+                              showToast('BOD group photo uploaded', 'success');
+                            } catch { showToast('Upload failed', 'error'); }
+                            finally { setGroupPhotoUploading(false); setGroupPhotoUploadProgress(0); }
+                          },
+                          onClear: () => setTermSettings(prev => ({ ...prev, groupPhotoUrl: '' })),
+                          url: termSettings.groupPhotoUrl,
+                        },
+                        {
+                          key: 'memberGroupPhotoUrl' as const,
+                          label: 'Member Group Photo',
+                          dest: 'Home hero',
+                          color: 'sky',
+                          uploading: memberGroupPhotoUploading,
+                          progress: memberGroupPhotoUploadProgress,
+                          onUpload: async (f: File) => {
+                            setMemberGroupPhotoUploading(true); setMemberGroupPhotoUploadProgress(0);
+                            try {
+                              const url = await uploadMemberGroupPhotoToCloudinary(f, selectedTerm!, p => setMemberGroupPhotoUploadProgress(p));
+                              if (termSettings.memberGroupPhotoUrl) deleteFromCloudinary(termSettings.memberGroupPhotoUrl).catch(() => {});
+                              setTermSettings(prev => ({ ...prev, memberGroupPhotoUrl: url }));
+                              showToast('Member group photo uploaded', 'success');
+                            } catch { showToast('Upload failed', 'error'); }
+                            finally { setMemberGroupPhotoUploading(false); setMemberGroupPhotoUploadProgress(0); }
+                          },
+                          onClear: () => setTermSettings(prev => ({ ...prev, memberGroupPhotoUrl: '' })),
+                          url: termSettings.memberGroupPhotoUrl,
+                        },
+                      ] as const).map(item => (
+                        <div key={item.key} className="flex flex-col gap-1.5">
+                          <div className="flex items-center justify-between">
+                            <label className="flex items-center gap-1 text-xs font-bold text-slate-600">
+                              <Camera size={11} /> {item.label}
+                            </label>
+                            <span className="text-[10px] text-slate-400 font-medium">{item.dest}</span>
+                          </div>
+                          <div className="relative rounded-xl overflow-hidden bg-slate-100 border border-slate-200" style={{ aspectRatio: '16/9' }}>
+                            {item.url
+                              ? <img src={item.url} alt={item.label} className="w-full h-full object-cover" />
+                              : (
+                                <div className="w-full h-full flex flex-col items-center justify-center gap-1.5">
+                                  <Camera size={20} className="text-slate-300" />
+                                  <span className="text-[10px] text-slate-400 font-medium">No photo</span>
+                                </div>
+                              )}
+                            <div className="absolute inset-0 flex items-end justify-between p-2 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 hover:opacity-100 transition-opacity">
+                              <label className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-bold bg-white/90 text-slate-700 cursor-pointer hover:bg-white transition-colors shadow-sm">
+                                <Camera size={10} /> {item.url ? 'Replace' : 'Upload'}
+                                <input type="file" accept="image/*" className="hidden" onChange={async e => {
+                                  const f = e.target.files?.[0]; e.target.value = '';
+                                  if (!f) return;
+                                  await item.onUpload(f);
+                                }} />
+                              </label>
+                              {item.url && (
+                                <button onClick={item.onClear} className="w-7 h-7 rounded-lg bg-white/90 hover:bg-red-50 flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors shadow-sm">
+                                  <Trash2 size={12} />
+                                </button>
+                              )}
+                            </div>
+                            {item.uploading && (
+                              <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-2 px-6">
+                                <p className="text-xs text-white font-bold">Uploading…</p>
+                                <div className="w-full h-1.5 rounded-full bg-white/30 overflow-hidden">
+                                  <div className="h-full bg-white transition-all rounded-full" style={{ width: `${item.progress}%` }} />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          {!item.uploading && (
+                            <label className="flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-bold border border-dashed border-slate-300 text-slate-500 hover:border-slate-400 hover:text-slate-700 cursor-pointer transition-colors bg-white">
+                              <Camera size={11} /> {item.url ? 'Replace photo' : 'Upload photo'}
+                              <input type="file" accept="image/*" className="hidden" onChange={async e => {
+                                const f = e.target.files?.[0]; e.target.value = '';
+                                if (!f) return;
+                                await item.onUpload(f);
+                              }} />
+                            </label>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   </div>
-
-                  {assignments[position]?.memberId && (() => {
-                    const sel = members.find(m => m.id === assignments[position].memberId);
-                    if (!sel) return null;
-                    const boardAvatar = assignments[position]?.boardAvatarUrl || '';
-                    const avatarSrc = boardAvatar || sel.avatar || sel.avatarUrl || '';
-                    const isUp = uploadingKey === `${position}:board`;
-                    return (
-                      <div className="flex items-center gap-3 pt-3 border-t border-slate-100">
-                        <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
-                          {avatarSrc
-                            ? <img src={avatarSrc} alt={sel.name} className="w-full h-full object-cover" />
-                            : <div className="w-full h-full flex items-center justify-center text-slate-400 font-bold text-sm">{sel.name.charAt(0)}</div>}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold text-slate-700 truncate">{sel.name}</p>
-                          {boardAvatar && <p className="text-[10px] text-jci-blue font-medium">Board photo set</p>}
-                          {isUp && <div className="mt-1 h-1 rounded-full bg-slate-200 overflow-hidden"><div className="h-full bg-jci-blue transition-all" style={{ width: `${uploadProgress}%` }} /></div>}
-                        </div>
-                        <label className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${isUp ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-100 hover:bg-blue-50 hover:text-jci-blue text-slate-600 cursor-pointer'}`}>
-                          <Camera size={12} />
-                          {isUp ? 'Uploading...' : 'Photo'}
-                          <input type="file" accept="image/*" className="hidden" disabled={isUp} onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) handleBodAvatarUpload(sel, f, position, 'board'); }} />
-                        </label>
-                      </div>
-                    );
-                  })()}
-
-                  {assignments[position]?.memberId && (
-                    <div className="pt-4 border-t border-slate-50 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Commission Directors</h5>
-                        {canManage && (
-                          <div className="w-80">
-                            <MemberSelector
-                              label=""
-                              members={sortedMembers.filter(m => !allAssignedIds.has(m.id))}
-                              getOptionLabel={getMemberLabel}
-                              value=""
-                              onChange={(id) => handleAddCommissionDirector(position, id)}
-                              selfOption={false}
-                              showLookupFields={false}
-                              placeholder="+ Add Director"
-                            />
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        {assignments[position].commissionDirectorIds.length === 0 ? (
-                          <p className="text-xs text-slate-400 italic">No commission directors assigned</p>
-                        ) : (
-                          assignments[position].commissionDirectorIds.map(id => {
-                            const m = members.find(mem => mem.id === id);
-                            const dirBoardAvatar = assignments[position]?.commissionDirectorAvatars?.[id] || '';
-                            const dirAvatar = dirBoardAvatar || m?.avatar || m?.avatarUrl || '';
-                            const isDirUp = uploadingKey === `${position}:commission:${id}`;
-                            return (
-                              <div key={id} className="flex items-center gap-1.5 bg-slate-50 pl-1.5 pr-1 py-1 rounded-full border border-slate-200">
-                                <div className="w-6 h-6 rounded-full overflow-hidden bg-slate-200 shrink-0">
-                                  {dirAvatar
-                                    ? <img src={dirAvatar} alt={m?.name} className="w-full h-full object-cover" />
-                                    : <div className="w-full h-full flex items-center justify-center text-[9px] font-bold text-slate-500">{m?.name?.charAt(0)}</div>}
-                                </div>
-                                <span className="text-xs font-medium text-slate-700">{m?.name || 'Unknown'}</span>
-                                {canManage && (
-                                  <>
-                                    <label className={`transition-colors rounded-full p-0.5 ${isDirUp ? 'text-slate-200 cursor-not-allowed' : 'text-slate-300 hover:text-jci-blue cursor-pointer'}`} title="Upload photo">
-                                      <Camera size={11} />
-                                      <input type="file" accept="image/*" className="hidden" disabled={isDirUp || !m} onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f && m) handleBodAvatarUpload(m, f, position, 'commission'); }} />
-                                    </label>
-                                    {removingDirectorId === `${position}:${id}` ? (
-                                      <span className="flex items-center gap-1 text-xs">
-                                        <button onClick={() => { handleRemoveCommissionDirector(position, id); setRemovingDirectorId(null); }} className="text-red-500 hover:underline">确认</button>
-                                        <button onClick={() => setRemovingDirectorId(null)} className="text-slate-400 hover:underline">取消</button>
-                                      </span>
-                                    ) : (
-                                      <button onClick={() => setRemovingDirectorId(`${position}:${id}`)} className="hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-full transition-colors p-0.5">
-                                        <Trash2 size={11} />
-                                      </button>
-                                    )}
-                                  </>
-                                )}
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                    </div>
-                  )}
                 </div>
-              ))}
+              )}
+
+              {/* EXCO tab */}
+              {activeTab === 'exco' && (
+                <div className="space-y-3">
+                  {TAB_POSITIONS.exco.map(position => renderPositionCard(position))}
+                </div>
+              )}
+
+              {/* VP tab */}
+              {activeTab === 'vp' && (
+                <div className="space-y-3">
+                  {TAB_POSITIONS.vp.map(position => renderPositionCard(position))}
+                </div>
+              )}
+
+              {/* Area Officer tab */}
+              {activeTab === 'area' && renderFlexOfficerTab('area', 'Area Officer')}
+
+              {/* National Officer tab */}
+              {activeTab === 'national' && renderFlexOfficerTab('national', 'National Officer')}
             </div>
           ) : (
-            <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
-              {/* Presidential Identity summary */}
-              {(termSettings.presidentTheme || termSettings.tagline || termSettings.shortDescription || termSettings.logoUrl || termSettings.groupPhotoUrl || termSettings.memberGroupPhotoUrl) && (
-                <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-4 space-y-3">
+            <div className="h-[420px] overflow-y-auto md:h-[480px] pr-1">
+              {/* Presidential Identity — shown only on President tab */}
+              {dirTab === 'president' && (termSettings.presidentTheme || termSettings.tagline || termSettings.shortDescription || termSettings.logoUrl || termSettings.groupPhotoUrl || termSettings.memberGroupPhotoUrl) && (
+                <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-4 space-y-3 mb-4">
                   {(termSettings.presidentTheme || termSettings.tagline || termSettings.shortDescription) && (
                     <div className="min-w-0">
                       {termSettings.presidentTheme && (
@@ -839,7 +1090,7 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                   </div>
                 </div>
               )}
-              {assignedPositions.length === 0 ? (
+              {allBoardList.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <Users className="w-12 h-12 text-slate-300 mb-2" />
                   <p className="text-slate-500 font-medium">No board members assigned for this term.</p>
@@ -849,13 +1100,20 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                     </Button>
                   )}
                 </div>
-              ) : (
+              )}
+              {allBoardList.length > 0 && filteredDirList.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Users className="w-10 h-10 text-slate-300 mb-2" />
+                  <p className="text-slate-400 font-medium text-sm">No members assigned in this category.</p>
+                </div>
+              )}
+              {filteredDirList.length > 0 && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {assignedPositions.map(([position, data]) => {
-                    const bm = members.find(m => m.id === data.memberId);
+                  {filteredDirList.map(({ position, memberId, commissionDirectorIds, boardAvatarUrl, commissionDirectorAvatars }) => {
+                    const bm = members.find(m => m.id === memberId);
                     if (!bm) return null;
                     const isPresident = position === 'President';
-                    const directors = data.commissionDirectorIds
+                    const directors = commissionDirectorIds
                       .map(id => members.find(m => m.id === id))
                       .filter(Boolean) as Member[];
 
@@ -874,7 +1132,7 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                         )}
                         <div className="flex items-center gap-4">
                           <img
-                            src={data.boardAvatarUrl || bm.avatar || bm.avatarUrl || undefined}
+                            src={boardAvatarUrl || bm.avatar || bm.avatarUrl || undefined}
                             alt={bm.name}
                             className={`rounded-xl object-cover bg-slate-100 border shrink-0 ${isPresident ? 'w-16 h-16 border-blue-300' : 'w-12 h-12 border-slate-200'
                               }`}
@@ -894,7 +1152,7 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                             <div className="flex flex-wrap gap-2">
                               {directors.map(dir => (
                                 <div key={dir.id} className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/60 rounded-full pl-1.5 pr-3 py-0.5 max-w-[200px] truncate">
-                                  <img src={data.commissionDirectorAvatars?.[dir.id] || dir.avatar || dir.avatarUrl || undefined} className="w-5 h-5 rounded-full object-cover shrink-0" alt="" />
+                                  <img src={commissionDirectorAvatars?.[dir.id] || dir.avatar || dir.avatarUrl || undefined} className="w-5 h-5 rounded-full object-cover shrink-0" alt="" />
                                   <span className="text-[10px] font-semibold text-slate-600 truncate">{dir.name}</span>
                                 </div>
                               ))}
@@ -906,11 +1164,10 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                   })}
                 </div>
               )}
-            </div>
+              </div>
           )}
         </div>
       </Modal>
     </div>
   );
 };
-

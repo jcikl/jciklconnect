@@ -1,8 +1,10 @@
 import * as React from 'react';
-import { GraduationCap, Award } from 'lucide-react';
-import { Card, Badge } from '../../ui/Common';
+import { GraduationCap, Award, Target, Sparkles, Settings } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Card, Badge, Button } from '../../ui/Common';
 import type { Member } from '../../../types';
 import { formatDateToDDMMMYYYY } from '../../../utils/dateUtils';
+import { PointsSourceRadarChart } from '../../dashboard/Analytics';
 
 interface MemberDetailActivitiesTabProps {
   member: Member;
@@ -13,16 +15,106 @@ interface MemberDetailActivitiesTabProps {
   projectRoles: any[];
   recruitedMembers: any[];
   isPresident: boolean;
+  canEditMembers: boolean;
+  isSelfView: boolean;
+  setShowAssessmentModal: (v: boolean) => void;
+  pillarDiagnosis: { individual: number; business: number; community: number; international: number; dominant: string };
+  radarYear: number;
+  setRadarYear: (y: number) => void;
+  availableYears: number[];
 }
 
 const MemberDetailActivitiesTabBase: React.FC<MemberDetailActivitiesTabProps> = (props) => {
   const {
-    activitiesLoading, radarContributions, groupedRadarContributions,
+    member, activitiesLoading, radarContributions, groupedRadarContributions,
     sponsorshipRecords, projectRoles, recruitedMembers, isPresident,
+    canEditMembers, isSelfView, setShowAssessmentModal, pillarDiagnosis,
+    radarYear, setRadarYear, availableYears,
   } = props;
 
   return (
-    <div className="grid lg:grid-cols-3 gap-6 animate-in fade-in duration-300">
+    <div className="space-y-6 animate-in fade-in duration-300">
+      {canEditMembers && <div className="grid grid-cols-2 gap-3 md:gap-6">
+        <Card className="bg-gradient-to-br from-indigo-900 to-slate-900 text-white border-none shadow-xl overflow-hidden relative">
+          <div className="absolute top-0 right-0 p-8 opacity-5">
+            <Target size={120} />
+          </div>
+          <div className="relative z-10 p-2">
+            <div className="flex justify-between items-center mb-4 gap-2">
+              <h3 className="text-sm font-black text-blue-300 uppercase tracking-widest flex items-center gap-2">
+                <Sparkles size={16} /> JCI Pillar Diagnosis
+              </h3>
+              {(canEditMembers || isSelfView) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAssessmentModal(true)}
+                  className="text-[10px] bg-white/10 hover:bg-white/20 text-white border border-white/20 px-2.5 py-1 h-auto flex items-center gap-1 font-bold rounded-lg transition-all"
+                >
+                  <Settings size={12} />
+                  Update Assessment
+                </Button>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                { label: 'Individual', val: pillarDiagnosis.individual, color: 'bg-blue-400' },
+                { label: 'Business', val: pillarDiagnosis.business, color: 'bg-emerald-400' },
+                { label: 'Community', val: pillarDiagnosis.community, color: 'bg-purple-400' },
+                { label: 'International', val: pillarDiagnosis.international, color: 'bg-orange-400' }
+              ].map((p, i) => (
+                <div key={i} className="space-y-2">
+                  <div className="flex justify-between text-[10px] font-black uppercase tracking-tighter">
+                    <span>{p.label}</span>
+                    <span>{p.val}%</span>
+                  </div>
+                  <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${p.val}%` }}
+                      className={`h-full ${p.color} shadow-[0_0_8px_rgba(255,255,255,0.3)]`}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 p-3 bg-white/5 rounded-xl border border-white/10">
+              <p className="text-[10px] text-blue-200 font-bold uppercase mb-1">Dominant Persona</p>
+              <p className="text-lg font-black italic text-white flex items-center gap-2">
+                {pillarDiagnosis.dominant}
+                <Badge className="bg-jci-blue text-blue text-[8px]">AI Profile</Badge>
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="bg-white border-2 border-slate-900 border-b-8 border-r-8 hover:translate-x-1 hover:translate-y-1 transition-all flex flex-col justify-between">
+          <div className="p-2 h-full flex flex-col justify-between">
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                <Target size={16} className="text-jci-blue animate-pulse" /> Elite Leaderboard Radar
+              </h3>
+              <div className="relative">
+                <select
+                  value={radarYear}
+                  onChange={(e) => setRadarYear(Number(e.target.value))}
+                  className="appearance-none bg-slate-100 text-jci-blue text-[10px] font-black uppercase tracking-wider rounded-full pl-2.5 pr-6 py-1 border border-slate-200 cursor-pointer hover:bg-slate-200/70 transition-all focus:outline-none focus:ring-1 focus:ring-jci-blue/50"
+                  style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%230097D7' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center' }}
+                >
+                  {availableYears.map(y => (
+                    <option key={y} value={y} className="bg-white text-slate-900">{y}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex-1 min-h-[220px] w-full relative">
+              <PointsSourceRadarChart memberId={member.id} year={radarYear} lightTheme={true} />
+            </div>
+          </div>
+        </Card>
+      </div>}
+
+      <div className="grid lg:grid-cols-3 gap-6">
       <div className="lg:col-span-2 space-y-6">
         {/* Radar Contributions / Events Log */}
         <Card title="Radar Contribution History" description="Historical points imported from JCI Radar system">
@@ -200,6 +292,7 @@ const MemberDetailActivitiesTabBase: React.FC<MemberDetailActivitiesTabProps> = 
           </Card>
         )}
       </div>
+    </div>
     </div>
   );
 };

@@ -1,4 +1,4 @@
-﻿// Payment Requests “ submit, my applications, finance list and review
+// Payment Requests " submit, my applications, finance list and review
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Plus, RefreshCw, CheckCircle, XCircle, Search, X, FileText, Download, Eye, Clock, Copy, Check, Landmark, DollarSign, Paperclip, Sparkles, Building2, User, Trash2 } from 'lucide-react';
 import { Button, Card, Modal, useToast, Tabs, Badge, PageHeader, ConfirmDialog } from '../ui/Common';
@@ -102,10 +102,27 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
   const loId = (member as { loId?: string })?.loId ?? DEFAULT_LO_ID;
   const activityRefFilter = isActivityFinance ? (member as { activityFinanceActivityId?: string | null })?.activityFinanceActivityId ?? null : null;
 
+  // Approve/reject: only current-term President, Secretary, or Honorary Treasurer
+  const APPROVER_BOARD_TITLES = ['President', 'Secretary', 'Honorary Treasurer'];
+  const currentBoardPos: string = (member as any)?.currentBoardPosition ?? (member as any)?.jciCareer?.currentBoardPosition ?? '';
+  const isApprover = APPROVER_BOARD_TITLES.some(t => currentBoardPos.includes(t));
+
   const { members: memberOptions } = useMembers(loId);
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+
+  // Committee member: regular member who is on the committee of any project
+  const committeeActivityIds = useMemo(
+    () => projects
+      .filter(p => (p as any).committee?.some((c: any) => c.memberId === user?.uid))
+      .map(p => p.id),
+    [projects, user?.uid]
+  );
+  const isCommitteeMember = !canViewFinance && committeeActivityIds.length > 0;
+  const canSeeAllTab = canViewFinance || isCommitteeMember;
+  // Bank details (bankName, accountHolder, accountNumber) visible only to Board/Admin with finance access
+  const canSeeBankDetails = canViewFinance;
 
   useEffect(() => {
     ProjectsService.getAllProjects().then(setProjects).catch((e) => { console.error(e); showToast('参考数据加载失败，部分字段可能显示为空', 'warning'); });
@@ -149,33 +166,48 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
   }, [user?.uid, showToast]);
 
   const loadFinanceList = useCallback(async () => {
-    if (!canViewFinance) return;
+    if (!canViewFinance && !isCommitteeMember) return;
     setFinanceLoading(true);
     setFinanceListError(null);
     try {
-      const { items } = await PaymentRequestService.list({
-        loId,
-        ...(activityRefFilter ? { activityRef: activityRefFilter } : {}),
-        ...(searchRef.trim() ? { referenceNumber: searchRef.trim() } : {}),
-        ...(statusFilter ? { status: statusFilter as PaymentRequestStatus } : {}),
-        pageSize: 200,
-      });
-      setFinanceList(items);
+      if (canViewFinance) {
+        const { items } = await PaymentRequestService.list({
+          loId,
+          ...(activityRefFilter ? { activityRef: activityRefFilter } : {}),
+          ...(searchRef.trim() ? { referenceNumber: searchRef.trim() } : {}),
+          ...(statusFilter ? { status: statusFilter as PaymentRequestStatus } : {}),
+          pageSize: 200,
+        });
+        setFinanceList(items);
+      } else {
+        // Committee member: load PRs per activity they're in
+        const results = await Promise.all(
+          committeeActivityIds.map(actId =>
+            PaymentRequestService.list({ activityRef: actId, pageSize: 100 })
+              .then(r => r.items)
+              .catch(() => [] as PaymentRequest[])
+          )
+        );
+        const seen = new Set<string>();
+        setFinanceList(
+          results.flat().filter(pr => { if (seen.has(pr.id)) return false; seen.add(pr.id); return true; })
+        );
+      }
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Failed to load finance list', 'error');
       setFinanceListError('Failed to load requests. Click to retry.');
     } finally {
       setFinanceLoading(false);
     }
-  }, [canViewFinance, loId, activityRefFilter, searchRef, statusFilter, showToast]);
+  }, [canViewFinance, isCommitteeMember, committeeActivityIds, loId, activityRefFilter, searchRef, statusFilter, showToast]);
 
   useEffect(() => {
     loadMyList();
   }, [loadMyList]);
 
   useEffect(() => {
-    if (activeTab === 'all' && canViewFinance) loadFinanceList();
-  }, [activeTab, canViewFinance, loadFinanceList]);
+    if (activeTab === 'all' && canSeeAllTab) loadFinanceList();
+  }, [activeTab, canSeeAllTab, loadFinanceList]);
 
   const filteredMyList = useMemo(() => {
     const term = (searchQuery || '').toLowerCase();
@@ -238,7 +270,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
 
   const handleApproveReject = async (id: string, status: 'approved' | 'rejected', rejectionReason?: string) => {
     if (!user?.uid) return;
-    if (!canEditFinance && !isAdmin) { showToast('Insufficient permissions', 'error'); return; }
+    if (!isApprover && !isAdmin) { showToast('Only President, Secretary, or Honorary Treasurer may approve/reject', 'error'); return; }
     setActioningId(id);
     const reviewerBoardTitle = (member as any)?.currentBoardPosition ?? (member as any)?.jciCareer?.currentBoardPosition;
     try {
@@ -710,7 +742,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
               fullWidth
               tabs={[
                 { id: 'my', label: 'My Requests' },
-                ...(canViewFinance ? [{ id: 'all', label: 'All' }] : []),
+                ...(canSeeAllTab ? [{ id: 'all', label: 'All' }] : []),
               ]}
               activeTab={activeTab}
               onTabChange={(id) => { setActiveTab(id as 'my' | 'all'); setExpandedId(null); }}
@@ -735,7 +767,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
             <Tabs
               tabs={[
                 { id: 'my', label: 'My Applications' },
-                ...(canViewFinance ? [{ id: 'all', label: 'All Applications' }] : []),
+                ...(canSeeAllTab ? [{ id: 'all', label: 'All Applications' }] : []),
               ]}
               activeTab={activeTab}
               onTabChange={(id) => { setActiveTab(id as 'my' | 'all'); setExpandedId(null); }}
@@ -820,8 +852,8 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                                 <p className="font-medium text-slate-800 truncate">{pr.purpose}</p>
                                 <p className="text-xs text-slate-400 mt-0.5 truncate flex items-center gap-1">
                                   {pr.category === 'administrative'
-                                    ? <><Building2 size={11} />{pr.activityId || '”'}</>
-                                    : <><Sparkles size={11} className="text-orange-400" />{projects.find(p => p.id === pr.activityId)?.name || pr.activityRef || '”'}</>
+                                    ? <><Building2 size={11} />{pr.activityId || '"'}</>
+                                    : <><Sparkles size={11} className="text-orange-400" />{projects.find(p => p.id === pr.activityId)?.name || pr.activityRef || '"'}</>
                                   }
                                 </p>
                               </td>
@@ -876,7 +908,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                                   {pr.attachmentUrls && pr.attachmentUrls.length > 0 && (
                                     <p className="text-xs text-jci-blue mt-2.5 flex items-center gap-1">
                                       <Paperclip size={11} />
-                                      {pr.attachmentUrls.length} attachment{pr.attachmentUrls.length > 1 ? 's' : ''} ” view in PDF
+                                      {pr.attachmentUrls.length} attachment{pr.attachmentUrls.length > 1 ? 's' : ''} " view in PDF
                                     </p>
                                   )}
                                 </td>
@@ -917,8 +949,8 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                             <span className="font-mono text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">{pr.referenceNumber}</span>
                             <span className="text-[10px] text-slate-400 truncate flex items-center gap-1">
                               {pr.category === 'administrative'
-                                ? <><Building2 size={10} />{pr.activityId || '”'}</>
-                                : <><Sparkles size={10} className="text-orange-400" />{projects.find(p => p.id === pr.activityId)?.name || pr.activityRef || '”'}</>
+                                ? <><Building2 size={10} />{pr.activityId || '"'}</>
+                                : <><Sparkles size={10} className="text-orange-400" />{projects.find(p => p.id === pr.activityId)?.name || pr.activityRef || '"'}</>
                               }
                             </span>
                             <span className="text-[10px] text-slate-300 ml-auto shrink-0">{new Date(pr.createdAt).toLocaleDateString()}</span>
@@ -1006,11 +1038,11 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                                 <span className="font-mono text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">{pr.referenceNumber}</span>
                               </td>
                               <td className="py-3 px-2">
-                                <p className="font-medium text-slate-800 truncate">{pr.applicantName || '”'}</p>
+                                <p className="font-medium text-slate-800 truncate">{pr.applicantName || '"'}</p>
                                 <p className="text-xs text-slate-400 mt-0.5 truncate flex items-center gap-1">
                                   {pr.category === 'administrative'
-                                    ? <><Building2 size={11} />{pr.activityId || '”'}</>
-                                    : <><Sparkles size={11} className="text-orange-400" />{projects.find(p => p.id === pr.activityId)?.name || pr.activityRef || '”'}</>
+                                    ? <><Building2 size={11} />{pr.activityId || '"'}</>
+                                    : <><Sparkles size={11} className="text-orange-400" />{projects.find(p => p.id === pr.activityId)?.name || pr.activityRef || '"'}</>
                                   }
                                 </p>
                               </td>
@@ -1023,7 +1055,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                                     <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); handlePreviewPDF(pr); }} title="View PDF">
                                       <Eye size={13} />
                                     </Button>
-                                    {pr.status === 'submitted' && (canEditFinance || isAdmin) && (
+                                    {pr.status === 'submitted' && (isApprover || isAdmin) && (
                                       <>
                                         <Button size="sm" variant="success" onClick={(e) => { e.stopPropagation(); handleApproveReject(pr.id, 'approved'); }} disabled={actioningId !== null} title="Approve">
                                           <CheckCircle size={13} />
@@ -1078,24 +1110,30 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                                       <div>
                                         <div className="flex items-center justify-between mb-1.5">
                                           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Bank Details</p>
-                                          <CopyButton text={`${pr.bankName}\n${pr.accountHolder}\n${pr.accountNumber}`} label="Copy All" />
+                                          {canSeeBankDetails && <CopyButton text={`${pr.bankName}\n${pr.accountHolder}\n${pr.accountNumber}`} label="Copy All" />}
                                         </div>
                                         <div className="space-y-1.5 text-xs">
                                           <div className="flex justify-between items-center gap-2">
                                             <span className="text-slate-400 shrink-0">Bank</span>
-                                            <span className="font-medium text-slate-700 flex items-center gap-1 truncate">{pr.bankName} <CopyButton text={pr.bankName || ''} /></span>
+                                            {canSeeBankDetails
+                                              ? <span className="font-medium text-slate-700 flex items-center gap-1 truncate">{pr.bankName} <CopyButton text={pr.bankName || ''} /></span>
+                                              : <span className="text-slate-400 tracking-widest">●●●●</span>}
                                           </div>
                                           <div className="flex justify-between items-center gap-2">
                                             <span className="text-slate-400 shrink-0">Holder</span>
-                                            <span className="font-medium text-slate-700 flex items-center gap-1 truncate">{pr.accountHolder} <CopyButton text={pr.accountHolder || ''} /></span>
+                                            {canSeeBankDetails
+                                              ? <span className="font-medium text-slate-700 flex items-center gap-1 truncate">{pr.accountHolder} <CopyButton text={pr.accountHolder || ''} /></span>
+                                              : <span className="text-slate-400 tracking-widest">●●●●</span>}
                                           </div>
                                           <div className="flex justify-between items-center gap-2">
                                             <span className="text-slate-400 shrink-0">A/C No</span>
-                                            <span className="font-mono font-bold text-slate-700 flex items-center gap-1">{pr.accountNumber} <CopyButton text={pr.accountNumber || ''} /></span>
+                                            {canSeeBankDetails
+                                              ? <span className="font-mono font-bold text-slate-700 flex items-center gap-1">{pr.accountNumber} <CopyButton text={pr.accountNumber || ''} /></span>
+                                              : <span className="text-slate-400 tracking-widest">●●●● ●●●●</span>}
                                           </div>
                                           <div className="flex justify-between items-center gap-2">
                                             <span className="text-slate-400 shrink-0">Claim From</span>
-                                            <span className="font-medium text-slate-700 truncate">{bankAccounts.find(a => a.id === pr.claimFromBankAccountId)?.name || '”'}</span>
+                                            <span className="font-medium text-slate-700 truncate">{bankAccounts.find(a => a.id === pr.claimFromBankAccountId)?.name || '—'}</span>
                                           </div>
                                         </div>
                                       </div>
@@ -1110,7 +1148,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                                   {pr.attachmentUrls && pr.attachmentUrls.length > 0 && (
                                     <p className="text-xs text-jci-blue mt-2.5 flex items-center gap-1">
                                       <Paperclip size={11} />
-                                      {pr.attachmentUrls.length} attachment{pr.attachmentUrls.length > 1 ? 's' : ''} ” view in PDF
+                                      {pr.attachmentUrls.length} attachment{pr.attachmentUrls.length > 1 ? 's' : ''} " view in PDF
                                     </p>
                                   )}
                                 </td>
@@ -1141,7 +1179,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2 min-w-0">
                               {(() => { const s = PR_STATUS_BADGE[pr.status] ?? PR_STATUS_BADGE.draft; return <Badge variant={s.variant} icon={s.icon}>{s.label}</Badge>; })()}
-                              <p className="font-medium text-slate-800 text-sm truncate">{pr.applicantName || '”'}</p>
+                              <p className="font-medium text-slate-800 text-sm truncate">{pr.applicantName || '"'}</p>
                             </div>
                             <p className="font-bold text-jci-blue text-sm shrink-0">{formatCurrency(pr.totalAmount || pr.amount)}</p>
                           </div>
@@ -1149,8 +1187,8 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                             <span className="font-mono text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">{pr.referenceNumber}</span>
                             <span className="text-[10px] text-slate-400 truncate flex items-center gap-1">
                               {pr.category === 'administrative'
-                                ? <><Building2 size={10} />{pr.activityId || '”'}</>
-                                : <><Sparkles size={10} className="text-orange-400" />{projects.find(p => p.id === pr.activityId)?.name || pr.activityRef || '”'}</>
+                                ? <><Building2 size={10} />{pr.activityId || '"'}</>
+                                : <><Sparkles size={10} className="text-orange-400" />{projects.find(p => p.id === pr.activityId)?.name || pr.activityRef || '"'}</>
                               }
                             </span>
                             <span className="text-[10px] text-slate-300 ml-auto shrink-0">{new Date(pr.createdAt).toLocaleDateString()}</span>
@@ -1162,20 +1200,26 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                               <div className="mb-3">
                                 <div className="flex items-center justify-between mb-1.5">
                                   <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Bank Details</p>
-                                  <CopyButton text={`${pr.bankName}\n${pr.accountHolder}\n${pr.accountNumber}`} label="Copy All" />
+                                  {canSeeBankDetails && <CopyButton text={`${pr.bankName}\n${pr.accountHolder}\n${pr.accountNumber}`} label="Copy All" />}
                                 </div>
                                 <div className="bg-white rounded-lg border border-slate-200 p-2.5 space-y-1.5 text-xs">
                                   <div className="flex justify-between items-center">
                                     <span className="text-slate-400">Bank</span>
-                                    <span className="font-medium text-slate-700 flex items-center gap-1">{pr.bankName} <CopyButton text={pr.bankName || ''} /></span>
+                                    {canSeeBankDetails
+                                      ? <span className="font-medium text-slate-700 flex items-center gap-1">{pr.bankName} <CopyButton text={pr.bankName || ''} /></span>
+                                      : <span className="text-slate-400 tracking-widest">●●●●</span>}
                                   </div>
                                   <div className="flex justify-between items-center">
                                     <span className="text-slate-400">Holder</span>
-                                    <span className="font-medium text-slate-700 flex items-center gap-1">{pr.accountHolder} <CopyButton text={pr.accountHolder || ''} /></span>
+                                    {canSeeBankDetails
+                                      ? <span className="font-medium text-slate-700 flex items-center gap-1">{pr.accountHolder} <CopyButton text={pr.accountHolder || ''} /></span>
+                                      : <span className="text-slate-400 tracking-widest">●●●●</span>}
                                   </div>
                                   <div className="flex justify-between items-center">
                                     <span className="text-slate-400">A/C No</span>
-                                    <span className="font-mono font-bold text-slate-700 flex items-center gap-1">{pr.accountNumber} <CopyButton text={pr.accountNumber || ''} /></span>
+                                    {canSeeBankDetails
+                                      ? <span className="font-mono font-bold text-slate-700 flex items-center gap-1">{pr.accountNumber} <CopyButton text={pr.accountNumber || ''} /></span>
+                                      : <span className="text-slate-400 tracking-widest">●●●● ●●●●</span>}
                                   </div>
                                 </div>
                               </div>
@@ -1197,7 +1241,7 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
                               <Button size="sm" variant="secondary" onClick={() => handlePreviewPDF(pr)}>
                                 <Eye size={13} className="mr-1" /> PDF
                               </Button>
-                              {pr.status === 'submitted' && (
+                              {pr.status === 'submitted' && (isApprover || isAdmin) && (
                                 <>
                                   <Button size="sm" variant="success" onClick={() => handleApproveReject(pr.id, 'approved')} disabled={actioningId !== null} className="flex-1">Approve</Button>
                                   <Button size="sm" variant="danger" onClick={() => handleRejectClick(pr.id)} disabled={actioningId !== null} className="flex-1">Reject</Button>

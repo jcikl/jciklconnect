@@ -1472,8 +1472,7 @@ export const JCIKLApp: React.FC = () => {
                       <p className={`font-black text-sm leading-tight truncate ${'text-white'}`}>{member?.name || 'Member'}</p>
                       <p className={`text-xs truncate mt-0.5 ${'text-slate-400'}`}>{member?.email || ''}</p>
                       <div className="flex items-center gap-1.5 mt-1">
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${'bg-jci-blue/20 text-jci-blue'}`}>{member?.tier || 'Member'}</span>
-                        <span className={`text-[10px] font-bold ${'text-slate-500'}`}>{member?.points ?? 0} pts</span>
+                        <span className={`text-[10px] font-bold ${'text-slate-500'}`}>{((member as any)?.yearlyPoints?.[new Date().getFullYear()] ?? member?.points ?? 0)} pts {new Date().getFullYear()}</span>
                       </div>
                     </div>
                     <div className={`text-xs font-bold shrink-0 ${'text-slate-500'}`}>

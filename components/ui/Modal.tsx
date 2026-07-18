@@ -13,6 +13,7 @@ interface ModalProps {
   variant?: 'default' | 'jci';
   footer?: React.ReactNode;
   header?: React.ReactNode;
+  subHeader?: React.ReactNode;
   className?: string;
   footerClassName?: string;
   headerStyle?: React.CSSProperties;
@@ -52,6 +53,7 @@ export const Modal: React.FC<ModalProps> = ({
   noHeader,
   mobileHeight,
   onScroll,
+  subHeader,
 }) => {
   const containerRef = React.useRef<HTMLDivElement>(null);
 
@@ -167,6 +169,11 @@ export const Modal: React.FC<ModalProps> = ({
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><path d="M18 6L6 18M6 6l12 12" /></svg>
               </button>
             </div>
+          </div>
+        )}
+        {subHeader && (
+          <div className="flex-none px-4 md:px-6 py-2 border-b border-slate-100 bg-white">
+            {subHeader}
           </div>
         )}
         <div

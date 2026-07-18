@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Modal, useToast, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
+import { Card, Button, Modal, useToast, ConfirmDialog, CONFIRM_CLOSED, Tabs } from '../ui/Common';
 import type { ConfirmState } from '../ui/Common';
 import { Input } from '../ui/Form';
 import { MembersService } from '../../services/membersService';
@@ -488,44 +488,23 @@ export const RadarDataImporter: React.FC = () => {
   };
 
   return (
-    <div className="p-6  mx-auto space-y-6">
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+    <div className="p-4 md:p-6 mx-auto space-y-4 md:space-y-6">
+      <div className="space-y-3">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Radar Contribution System</h1>
-          <p className="text-sm text-slate-500 mt-1">Import tabular data or manage existing contribution records.</p>
+          <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">Radar Contribution System</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Import tabular data or manage existing contribution records.</p>
         </div>
-        <div className="flex bg-slate-100/80 p-1.5 rounded-2xl ring-1 ring-slate-200/50 flex-wrap gap-1">
-          <Button
-            onClick={() => setViewMode('import')}
-            className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${viewMode === 'import' ? 'bg-gradient-to-r from-jci-blue to-blue-600 text-white shadow-md' : 'text-black hover:text-slate-700 bg-transparent hover:bg-slate-200/50'}`}
-          >
-            Data Importer
-          </Button>
-          <Button
-            onClick={() => setViewMode('ledger')}
-            className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${viewMode === 'ledger' ? 'bg-gradient-to-r from-jci-blue to-blue-600 text-white shadow-md' : 'text-black hover:text-slate-700 bg-transparent hover:bg-slate-200/50'}`}
-          >
-            Contribution Ledger
-          </Button>
-          <Button
-            onClick={() => setViewMode('scores')}
-            className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${viewMode === 'scores' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md' : 'text-black hover:text-slate-700 bg-transparent hover:bg-slate-200/50'}`}
-          >
-            Member Scores
-          </Button>
-          <Button
-            onClick={() => setViewMode('sponsorships')}
-            className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${viewMode === 'sponsorships' ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-md' : 'text-black hover:text-slate-700 bg-transparent hover:bg-slate-200/50'}`}
-          >
-            Sponsorships
-          </Button>
-          <Button
-            onClick={() => setViewMode('config')}
-            className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${viewMode === 'config' ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md' : 'text-black hover:text-slate-700 bg-transparent hover:bg-slate-200/50'}`}
-          >
-            Points Config
-          </Button>
-        </div>
+        <Tabs
+          tabs={[
+            { id: 'import', label: 'Data Importer', shortLabel: 'Import' },
+            { id: 'ledger', label: 'Contribution Ledger', shortLabel: 'Ledger' },
+            { id: 'scores', label: 'Member Scores', shortLabel: 'Scores' },
+            { id: 'sponsorships', label: 'Sponsorships', shortLabel: 'Sponsors' },
+            { id: 'config', label: 'Points Config', shortLabel: 'Config' },
+          ]}
+          activeTab={viewMode}
+          onTabChange={(tab) => setViewMode(tab as typeof viewMode)}
+        />
       </div>
 
       {viewMode === 'ledger' ? (

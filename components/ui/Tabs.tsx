@@ -92,7 +92,12 @@ export const Tabs: React.FC<TabsProps> = ({
               className={`whitespace-nowrap px-4 py-2 rounded-lg font-bold text-xs md:text-sm transition-all flex items-center gap-2 ${fullWidth ? 'flex-1 justify-center' : 'flex-shrink-0'} ${activeTab === tab.id ? 'bg-jci-blue text-white shadow-sm border border-slate-200/20' : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'}`}
             >
               {tab.icon && <span className="shrink-0">{tab.icon}</span>}
-              {tab.label}
+              {tab.shortLabel ? (
+                <>
+                  <span className="md:hidden">{tab.shortLabel}</span>
+                  <span className="hidden md:inline">{tab.label}</span>
+                </>
+              ) : tab.label}
               {tab.badge && <span className="ml-1">{tab.badge}</span>}
             </button>
           ))}

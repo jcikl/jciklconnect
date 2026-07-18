@@ -173,28 +173,9 @@ export const TemplatesView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Templates</h2>
-          <p className="text-slate-500">Manage reusable templates for events, activity plans, and budgets.</p>
-        </div>
-        {canManage && (
-          <Button onClick={() => {
-            if (activeTab === 'events') {
-              setSelectedEventTemplate(null);
-              setIsEventModalOpen(true);
-            } else if (activeTab === 'activityPlans') {
-              setSelectedActivityPlanTemplate(null);
-              setIsActivityPlanModalOpen(true);
-            } else {
-              setSelectedBudgetTemplate(null);
-              setIsBudgetModalOpen(true);
-            }
-          }}>
-            <Plus size={16} className="mr-2" />
-            Create Template
-          </Button>
-        )}
+      <div>
+        <h2 className="text-2xl font-bold text-slate-900">Templates</h2>
+        <p className="text-slate-500">Manage reusable templates for events, activity plans, and budgets.</p>
       </div>
 
       <Card noPadding>
@@ -215,144 +196,126 @@ export const TemplatesView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
         </div>
         <div className="p-4">
           {activeTab === 'events' && (
-            <LoadingState loading={loading} error={error} empty={filteredEventTemplates.length === 0} emptyMessage="No event templates found">
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredEventTemplates.map(template => (
-                  <Card key={template.id} className="hover:shadow-md transition-shadow">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <h3 className="font-bold text-slate-900 mb-1">{template.name}</h3>
-                        <Badge variant="info">{template.type}</Badge>
+            <LoadingState loading={loading} error={error}>
+              <div className="space-y-4">
+                {canManage && (
+                  <button
+                    onClick={() => { setSelectedEventTemplate(null); setIsEventModalOpen(true); }}
+                    className="w-full flex items-center gap-2 px-4 py-3 rounded-xl border border-dashed border-slate-300 text-slate-500 hover:border-jci-blue hover:text-jci-blue hover:bg-jci-blue/5 transition-all text-sm font-medium"
+                  >
+                    <Plus size={16} />
+                    New Event Template
+                  </button>
+                )}
+                {filteredEventTemplates.length === 0 && (
+                  <p className="text-sm text-slate-400 text-center py-6">No event templates yet.</p>
+                )}
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredEventTemplates.map(template => (
+                    <Card key={template.id} className="hover:shadow-md transition-shadow">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <h3 className="font-bold text-slate-900 mb-1">{template.name}</h3>
+                          <Badge variant="info">{template.type}</Badge>
+                        </div>
+                        {canManage && (
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="sm" onClick={() => { setSelectedEventTemplate(template); setIsEventModalOpen(true); }}>
+                              <Edit size={14} />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => setConfirmState({ open: true, title: 'Delete Template', message: 'Are you sure you want to delete this template?', variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await deleteEventTemplate(template.id!); } })} className="text-red-500 hover:text-red-700">
+                              <Trash2 size={14} />
+                            </Button>
+                          </div>
+                        )}
                       </div>
-                      {canManage && (
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedEventTemplate(template);
-                              setIsEventModalOpen(true);
-                            }}
-                          >
-                            <Edit size={14} />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setConfirmState({ open: true, title: 'Delete Template', message: 'Are you sure you want to delete this template?', variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await deleteEventTemplate(template.id!); } })}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <Trash2 size={14} />
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                    {template.description && (
-                      <p className="text-sm text-slate-600 mb-3">{template.description}</p>
-                    )}
-                    <div className="space-y-2 text-xs text-slate-500">
-                      {template.defaultLocation && (
-                        <div className="flex items-center gap-2">
-                          <Calendar size={12} />
-                          <span>{template.defaultLocation}</span>
-                        </div>
-                      )}
-                      {template.defaultBudget && (
-                        <div className="flex items-center gap-2">
-                          <DollarSign size={12} />
-                          <span>{formatCurrency(template.defaultBudget)}</span>
-                        </div>
-                      )}
-                      {template.checklist && template.checklist.length > 0 && (
-                        <div className="flex items-start gap-2">
-                          <CheckSquare size={12} className="mt-0.5" />
-                          <span>{template.checklist.length} checklist items</span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="mt-4 pt-4 border-t">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full"
-                        onClick={() => {
-                          showToast('Template copied to clipboard', 'success');
-                        }}
-                      >
-                        <Copy size={14} className="mr-2" />
-                        Use Template
-                      </Button>
-                    </div>
-                  </Card>
-                ))}
+                      {template.description && <p className="text-sm text-slate-600 mb-3">{template.description}</p>}
+                      <div className="space-y-2 text-xs text-slate-500">
+                        {template.defaultLocation && <div className="flex items-center gap-2"><Calendar size={12} /><span>{template.defaultLocation}</span></div>}
+                        {template.defaultBudget && <div className="flex items-center gap-2"><DollarSign size={12} /><span>{formatCurrency(template.defaultBudget)}</span></div>}
+                        {template.checklist && template.checklist.length > 0 && <div className="flex items-start gap-2"><CheckSquare size={12} className="mt-0.5" /><span>{template.checklist.length} checklist items</span></div>}
+                      </div>
+                      <div className="mt-4 pt-4 border-t">
+                        <Button variant="outline" size="sm" className="w-full" onClick={() => showToast('Template copied to clipboard', 'success')}>
+                          <Copy size={14} className="mr-2" />Use Template
+                        </Button>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
               </div>
             </LoadingState>
           )}
 
           {activeTab === 'activityPlans' && (
-            <LoadingState loading={loading} error={error} empty={filteredActivityPlanTemplates.length === 0} emptyMessage="No activity plan templates found">
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredActivityPlanTemplates.map(template => (
-                  <Card key={template.id} className="hover:shadow-md transition-shadow">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <h3 className="font-bold text-slate-900 mb-1">{template.name}</h3>
-                        <Badge variant="info">{template.type}</Badge>
+            <LoadingState loading={loading} error={error}>
+              <div className="space-y-4">
+                {canManage && (
+                  <button
+                    onClick={() => { setSelectedActivityPlanTemplate(null); setIsActivityPlanModalOpen(true); }}
+                    className="w-full flex items-center gap-2 px-4 py-3 rounded-xl border border-dashed border-slate-300 text-slate-500 hover:border-jci-blue hover:text-jci-blue hover:bg-jci-blue/5 transition-all text-sm font-medium"
+                  >
+                    <Plus size={16} />
+                    New Activity Plan Template
+                  </button>
+                )}
+                {filteredActivityPlanTemplates.length === 0 && (
+                  <p className="text-sm text-slate-400 text-center py-6">No activity plan templates yet.</p>
+                )}
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredActivityPlanTemplates.map(template => (
+                    <Card key={template.id} className="hover:shadow-md transition-shadow">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <h3 className="font-bold text-slate-900 mb-1">{template.name}</h3>
+                          <Badge variant="info">{template.type}</Badge>
+                        </div>
+                        {canManage && (
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="sm" onClick={() => { setSelectedActivityPlanTemplate(template); setIsActivityPlanModalOpen(true); }}>
+                              <Edit size={14} />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => setConfirmState({ open: true, title: 'Delete Template', message: 'Are you sure you want to delete this template?', variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await deleteActivityPlanTemplate(template.id!); } })} className="text-red-500 hover:text-red-700">
+                              <Trash2 size={14} />
+                            </Button>
+                          </div>
+                        )}
                       </div>
-                      {canManage && (
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedActivityPlanTemplate(template);
-                              setIsActivityPlanModalOpen(true);
-                            }}
-                          >
-                            <Edit size={14} />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setConfirmState({ open: true, title: 'Delete Template', message: 'Are you sure you want to delete this template?', variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await deleteActivityPlanTemplate(template.id!); } })}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <Trash2 size={14} />
-                          </Button>
+                      {template.description && <p className="text-sm text-slate-600 mb-3">{template.description}</p>}
+                      {template.defaultObjectives && (
+                        <div className="mb-2">
+                          <p className="text-xs text-slate-500 mb-1">Objectives:</p>
+                          <p className="text-sm text-slate-700">{template.defaultObjectives}</p>
                         </div>
                       )}
-                    </div>
-                    {template.description && (
-                      <p className="text-sm text-slate-600 mb-3">{template.description}</p>
-                    )}
-                    {template.defaultObjectives && (
-                      <div className="mb-2">
-                        <p className="text-xs text-slate-500 mb-1">Objectives:</p>
-                        <p className="text-sm text-slate-700">{template.defaultObjectives}</p>
+                      <div className="mt-4 pt-4 border-t">
+                        <Button variant="outline" size="sm" className="w-full" onClick={() => showToast('Template copied to clipboard', 'success')}>
+                          <Copy size={14} className="mr-2" />Use Template
+                        </Button>
                       </div>
-                    )}
-                    <div className="mt-4 pt-4 border-t">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full"
-                        onClick={() => {
-                          showToast('Template copied to clipboard', 'success');
-                        }}
-                      >
-                        <Copy size={14} className="mr-2" />
-                        Use Template
-                      </Button>
-                    </div>
-                  </Card>
-                ))}
+                    </Card>
+                  ))}
+                </div>
               </div>
             </LoadingState>
           )}
 
           {activeTab === 'budgets' && (
-            <LoadingState loading={loading} error={error} empty={filteredBudgetTemplates.length === 0} emptyMessage="No budget templates found">
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <LoadingState loading={loading} error={error}>
+              <div className="space-y-4">
+                {canManage && (
+                  <button
+                    onClick={() => { setSelectedBudgetTemplate(null); setIsBudgetModalOpen(true); }}
+                    className="w-full flex items-center gap-2 px-4 py-3 rounded-xl border border-dashed border-slate-300 text-slate-500 hover:border-jci-blue hover:text-jci-blue hover:bg-jci-blue/5 transition-all text-sm font-medium"
+                  >
+                    <Plus size={16} />
+                    New Budget Template
+                  </button>
+                )}
+                {filteredBudgetTemplates.length === 0 && (
+                  <p className="text-sm text-slate-400 text-center py-6">No budget templates yet.</p>
+                )}
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredBudgetTemplates.map(template => (
                   <Card key={template.id} className="hover:shadow-md transition-shadow">
                     <div className="flex items-start justify-between mb-3">
@@ -410,6 +373,7 @@ export const TemplatesView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                     </div>
                   </Card>
                 ))}
+                </div>
               </div>
             </LoadingState>
           )}

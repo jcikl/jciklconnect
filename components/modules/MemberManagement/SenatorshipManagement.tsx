@@ -28,6 +28,7 @@ export const SenatorshipManagement: React.FC<Props> = ({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [localSearch, setLocalSearch] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'date'>('name');
+  const [mobileSection, setMobileSection] = useState<'pending' | 'validated'>('pending');
 
   const term = (searchQuery || localSearch).toLowerCase().trim();
 
@@ -99,21 +100,19 @@ export const SenatorshipManagement: React.FC<Props> = ({
   const renderRow = (member: Member, mode: 'pending' | 'validated') => (
     <div
       key={member.id}
-      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-white rounded-xl border border-slate-100 hover:border-jci-blue/20 hover:shadow-sm transition-all"
+      className="flex items-center justify-between gap-3 p-3 bg-white rounded-xl border border-slate-100 hover:border-jci-blue/20 hover:shadow-sm transition-all"
     >
-      <div className="flex items-start gap-3 min-w-0">
+      <div className="flex items-center gap-3 min-w-0">
         <div className="w-10 h-10 rounded-xl bg-jci-blue flex items-center justify-center text-white font-semibold shrink-0 text-sm">
           {(member.name || '?').split(' ').map((n) => n[0]).join('').slice(0, 2)}
         </div>
         <div className="min-w-0">
-          <div className="font-medium text-slate-900 truncate">{member.name}</div>
+          <div className="font-medium text-slate-900 text-sm truncate">{member.name}</div>
           {member.fullName && member.fullName !== member.name && (
-            <div className="text-sm text-slate-600 truncate">{member.fullName}</div>
+            <div className="text-xs text-slate-500 truncate">{member.fullName}</div>
           )}
-          <div className="text-sm font-mono text-indigo-700 mt-0.5">
-            No. {member.senatorshipId}
-          </div>
-          <div className="mt-1">
+          <div className="flex items-center gap-2 flex-wrap mt-0.5">
+            <span className="text-xs font-mono text-indigo-700">No. {member.senatorshipId}</span>
             <MembershipTypeDisplay
               member={{
                 nationality: member.nationality,
@@ -127,9 +126,9 @@ export const SenatorshipManagement: React.FC<Props> = ({
             />
           </div>
           {mode === 'validated' && (member.jciCareer?.senatorshipValidatedAt ?? member.senatorshipValidatedAt) && (
-            <p className="text-xs text-slate-500 mt-1">
-              Validated {new Date((member.jciCareer?.senatorshipValidatedAt ?? member.senatorshipValidatedAt)!).toLocaleDateString()}
-              {(member.jciCareer?.senatorshipValidatedBy ?? member.senatorshipValidatedBy) ? ` by ${member.jciCareer?.senatorshipValidatedBy ?? member.senatorshipValidatedBy}` : ''}
+            <p className="text-xs text-slate-400 mt-0.5">
+              {new Date((member.jciCareer?.senatorshipValidatedAt ?? member.senatorshipValidatedAt)!).toLocaleDateString()}
+              {(member.jciCareer?.senatorshipValidatedBy ?? member.senatorshipValidatedBy) ? ` · ${member.jciCareer?.senatorshipValidatedBy ?? member.senatorshipValidatedBy}` : ''}
             </p>
           )}
         </div>
@@ -207,8 +206,29 @@ export const SenatorshipManagement: React.FC<Props> = ({
         </div>
       </div>
 
+      {/* Mobile pill tab switcher */}
+      <div className="flex sm:hidden gap-1 p-1 bg-slate-100 border border-slate-200/50 rounded-xl">
+        <button
+          onClick={() => setMobileSection('pending')}
+          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all ${mobileSection === 'pending' ? 'bg-jci-blue text-white shadow-sm' : 'text-slate-600 hover:bg-white/40'}`}
+        >
+          <Clock size={12} />
+          Pending
+          <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${mobileSection === 'pending' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-700'}`}>{pending.length}</span>
+        </button>
+        <button
+          onClick={() => setMobileSection('validated')}
+          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all ${mobileSection === 'validated' ? 'bg-jci-blue text-white shadow-sm' : 'text-slate-600 hover:bg-white/40'}`}
+        >
+          <CheckCircle size={12} />
+          Validated
+          <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${mobileSection === 'validated' ? 'bg-white/20 text-white' : 'bg-green-100 text-green-700'}`}>{validated.length}</span>
+        </button>
+      </div>
+
       <div className="grid md:grid-cols-2 gap-4">
         <Card
+          className={mobileSection !== 'pending' ? 'hidden sm:block' : ''}
           title={
             <span className="flex items-center gap-2">
               <Clock size={18} className="text-amber-600" />
@@ -225,6 +245,7 @@ export const SenatorshipManagement: React.FC<Props> = ({
         </Card>
 
         <Card
+          className={mobileSection !== 'validated' ? 'hidden sm:block' : ''}
           title={
             <span className="flex items-center gap-2">
               <CheckCircle size={18} className="text-green-600" />
