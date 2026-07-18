@@ -120,7 +120,7 @@ service cloud.firestore {
       allow get, read: if isAuthenticated() && (
         request.auth.uid == memberId ||
         (resource != null && resource.data.get('email', '') == request.auth.token.get('email', '')) ||
-        isMember() ||
+        isActiveMember() ||
         canReadOrgMembers()
       );
 
@@ -1209,7 +1209,10 @@ service cloud.firestore {
       allow read: if isAuthenticated() && canReadOrgMembers();
       // P1 Fix: require document ID to match the authenticated user's own email so no user can
       // claim another person's email slot. Bulk import uses admin context (isAdmin()) which bypasses this.
-      allow create: if isAdmin() || (isAuthenticated() && request.resource.data.memberId == request.auth.uid && email == request.auth.token.email);
+      allow create: if isAdmin() || (isAuthenticated() &&
+                    !exists(/databases/$(database)/documents/memberEmails/$(email)) &&
+                    request.resource.data.memberId == request.auth.uid &&
+                    email == request.auth.token.email);
       allow update, delete: if isAdmin();
     }
 

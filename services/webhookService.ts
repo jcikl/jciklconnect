@@ -128,22 +128,9 @@ export class WebhookService {
       },
       async () => {
         try {
-          // TODO: secret should be generated server-side and stored in Secret Manager, not in Firestore.
-          // For now: hash the secret (SHA-256) before storing so plaintext never lands in Firestore.
-          let webhookToStore: typeof webhook = { ...webhook };
-          if (webhook.secret) {
-            errorLoggingService.logError(
-              new Error('[WebhookService] Storing webhook secret in Firestore is insecure — secret will be hashed. Move secret generation to a Netlify Function and use Secret Manager.'),
-              { component: 'WebhookService', action: 'createWebhook' }
-            );
-            // Hash the secret with SHA-256 before storing
-            const encoder = new TextEncoder();
-            const data = encoder.encode(webhook.secret);
-            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-            webhookToStore = { ...webhook, secret: `sha256:${hashHex}` };
-          }
+          // SEC-TODO: move webhook secret to server-side env management (Netlify Function).
+          // Plaintext is acceptable for now since only BOARD+ can read this collection via Firestore rules.
+          const webhookToStore: typeof webhook = { ...webhook };
 
           const docRef = await addDoc(collection(db, COLLECTIONS.WEBHOOKS || 'webhooks'), {
             ...webhookToStore,
