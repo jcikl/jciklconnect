@@ -1,4 +1,5 @@
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { isDevMode } from '@/utils/devMode';
@@ -95,19 +96,24 @@ function buildAdminBotMessage(
   );
 }
 
-async function sendWhapiMessage(recipientPhone: string, message: string, token: string): Promise<void> {
+/**
+ * Send a WhatsApp message via the server-side whapi-proxy Netlify Function.
+ * The Whapi API token never touches the browser — it is held in the server env.
+ */
+async function sendWhapiMessage(recipientPhone: string, message: string): Promise<void> {
   const to = `${digitsOnly(recipientPhone)}@s.whatsapp.net`;
-  const response = await fetch('https://gate.whapi.cloud/messages/text', {
+  const idToken = await getAuth().currentUser?.getIdToken();
+  const response = await fetch('/.netlify/functions/whapi-proxy', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
+      ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
     },
-    body: JSON.stringify({ to, body: message }),
+    body: JSON.stringify({ op: 'send', to, message }),
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.message || `Whapi error ${response.status}`);
+    throw new Error(err.error || `whapi-proxy error ${response.status}`);
   }
 }
 
@@ -185,49 +191,40 @@ export async function submitInquiry(params: SubmitInquiryParams): Promise<{
 
   await addDoc(collection(db, COLLECTIONS.INQUIRIES), record);
 
-  // Step 2: Send WhatsApp notifications via Whapi (best-effort; failures are logged, not thrown)
+  // Step 2: Send WhatsApp notifications via the server-side whapi-proxy (best-effort; failures are logged, not thrown)
   if (channel !== 'whatsapp_direct') {
-    // Token comes from environment variables — never from localStorage
-    const token = import.meta.env.VITE_WHAPI_TOKEN as string | undefined;
-    if (!token) {
-      errorLoggingService.logError(
-        new Error('VITE_WHAPI_TOKEN is not set — Whapi notifications skipped'),
-        { component: 'inquiryService', action: 'submitInquiry' }
+    const adminPhone = import.meta.env.VITE_WHAPI_ADMIN_PHONE as string | undefined;
+    const note = !hasPhone
+      ? 'Recipient has no phone number on file.'
+      : !senderInGroup
+      ? 'Sender is not in the WhatsApp group.'
+      : 'Recipient is not in the WhatsApp group.';
+
+    const sends: Promise<void>[] = [];
+
+    if (adminPhone) {
+      const adminMsg = buildAdminBotMessage(
+        senderName, senderPhone, senderCompany,
+        recipientName, businessName, requirements, note
       );
-    } else {
-      const adminPhone = import.meta.env.VITE_WHAPI_ADMIN_PHONE as string | undefined;
-      const note = !hasPhone
-        ? 'Recipient has no phone number on file.'
-        : !senderInGroup
-        ? 'Sender is not in the WhatsApp group.'
-        : 'Recipient is not in the WhatsApp group.';
-
-      const sends: Promise<void>[] = [];
-
-      if (adminPhone) {
-        const adminMsg = buildAdminBotMessage(
-          senderName, senderPhone, senderCompany,
-          recipientName, businessName, requirements, note
-        );
-        sends.push(sendWhapiMessage(adminPhone, adminMsg, token));
-      }
-
-      if (hasPhone) {
-        const recipientMsg = buildRecipientBotMessage(
-          recipientName, senderName, senderPhone, senderCompany, requirements
-        );
-        sends.push(sendWhapiMessage(recipientPhone, recipientMsg, token));
-      }
-
-      // Log Whapi failures without throwing — Firestore record already persisted
-      await Promise.allSettled(sends).then(results => {
-        results.forEach(r => {
-          if (r.status === 'rejected') {
-            errorLoggingService.logError(r.reason instanceof Error ? r.reason : new Error(String(r.reason)), { component: 'inquiryService', action: 'sendWhapiMessage' });
-          }
-        });
-      });
+      sends.push(sendWhapiMessage(adminPhone, adminMsg));
     }
+
+    if (hasPhone) {
+      const recipientMsg = buildRecipientBotMessage(
+        recipientName, senderName, senderPhone, senderCompany, requirements
+      );
+      sends.push(sendWhapiMessage(recipientPhone, recipientMsg));
+    }
+
+    // Log Whapi failures without throwing — Firestore record already persisted
+    await Promise.allSettled(sends).then(results => {
+      results.forEach(r => {
+        if (r.status === 'rejected') {
+          errorLoggingService.logError(r.reason instanceof Error ? r.reason : new Error(String(r.reason)), { component: 'inquiryService', action: 'sendWhapiMessage' });
+        }
+      });
+    });
   }
 
   return { channel, waUrl };

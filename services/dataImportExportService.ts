@@ -473,10 +473,15 @@ export class DataImportExportService {
     let opsInCurrentBatch = 0;
     let committedBatches = 0;
 
+    // FIX: Explicit whitelist — never fall through to raw user input as a collection path.
+    const ALLOWED_IMPORT_ENTITY_TYPES: Record<string, string> = {
+      'members': COLLECTIONS.MEMBERS,
+      'events': COLLECTIONS.EVENTS,
+    };
     const getCollectionName = (et: string): string => {
-      if (et === 'members') return COLLECTIONS.MEMBERS;
-      if (et === 'events') return COLLECTIONS.EVENTS;
-      return et;
+      const collectionName = ALLOWED_IMPORT_ENTITY_TYPES[et];
+      if (!collectionName) throw new Error(`Unsupported entity type: ${et}`);
+      return collectionName;
     };
 
     const flushBatch = async () => {

@@ -5,9 +5,9 @@ import { getFirestore } from 'firebase-admin/firestore';
 if (!getApps().length) {
   initializeApp({
     credential: cert({
-      projectId: process.env.VITE_FIREBASE_PROJECT_ID,
-      clientEmail: process.env.VITE_FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.VITE_FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n'),
     }),
   });
 }
@@ -44,7 +44,15 @@ export const handler = async (event) => {
     const decoded = await getAuth().verifyIdToken(idToken);
     const callerDoc = await getFirestore().collection('members').doc(decoded.uid).get();
     const role = callerDoc.data()?.role;
-    if (!['ADMIN', 'SUPER_ADMIN'].includes(role) && decoded.uid !== uid) {
+    const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(role);
+
+    // INACTIVE accounts may not update any email, even their own
+    if (role === 'INACTIVE') {
+      return { statusCode: 403, body: JSON.stringify({ error: 'Forbidden' }) };
+    }
+
+    // Non-admins may only update their own email
+    if (!isAdmin && decoded.uid !== uid) {
       return { statusCode: 403, body: JSON.stringify({ error: 'Forbidden' }) };
     }
   } catch {

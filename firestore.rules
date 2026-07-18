@@ -158,7 +158,8 @@ service cloud.firestore {
            'deletedAt', 'deletedBy', 'createdAt', 'createdBy',
            'attendanceCheckins', 'attendanceMonths', 'attendanceYear',
            'leaderboardScore', 'points',
-           'churnRisk', 'tier', 'birthdayMMDD', 'isDeveloper'
+           'churnRisk', 'tier', 'birthdayMMDD', 'isDeveloper',
+           'isCurrentBoardMember', 'currentBoardPosition'
          ]) &&
          (resource.data.get('role', 'GUEST') == 'GUEST' ||
           (request.resource.data.get('general', {}).get('nationality', null) == resource.data.get('general', {}).get('nationality', null) &&
@@ -186,8 +187,10 @@ service cloud.firestore {
       // Allow read: authenticated users (including those without member doc yet)
       allow read: if isAuthenticated();
       
-      // Allow create: authenticated users (simplified - don't require member doc)
-      allow create: if isAuthenticated();
+      // Allow create: active members only (MEMBER+); GUEST excluded; require author attribution
+      allow create: if isActiveMember() &&
+                       request.resource.data.keys().hasAll(['author', 'content', 'createdAt']) &&
+                       request.resource.data.author.id == request.auth.uid;
       
       // Allow update: post author or board/admin/super_admin (if member doc exists)
       allow update: if isAuthenticated() &&
@@ -391,7 +394,7 @@ service cloud.firestore {
          resource.data.get('applicantId', null) == request.auth.uid ||
          (canAccessFinance() && paymentRequestInMyScope()));
       allow list: if isAuthenticated() &&
-        (isAdmin() || canAccessFinance() || isMember());
+        (isAdmin() || canAccessFinance());
       allow create: if isAuthenticated() &&
         request.resource.data.get('applicantId', null) == request.auth.uid &&
         request.resource.data.get('loId', null) is string &&
@@ -554,11 +557,11 @@ service cloud.firestore {
       // resource.data valid for get; service-layer where(memberId == uid) handles list ownership
       allow get: if isAuthenticated() &&
                     (resource.data.memberId == request.auth.uid || isBoard() || isAdmin());
-      allow list: if isMember();
+      allow list: if isActiveMember();
       allow create: if isAuthenticated() && request.resource.data.memberId == request.auth.uid;
       allow update, delete: if isBoard() || isAdmin();
     }
-    
+
     // Elections collection (board elections with sub-collection ballots)
     // FIX 1: collection had no match block — all access silently denied by catch-all
     match /elections/{electionId} {
@@ -597,10 +600,11 @@ service cloud.firestore {
     }
     
     // /proposals collection — no service implementation as of 2026-07. Rule kept as placeholder.
+    // FIX 9: require MEMBER+ to read/create proposals — GUEST excluded
     match /proposals/{proposalId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && 
+      allow read: if isActiveMember();
+      allow create: if isActiveMember();
+      allow update, delete: if isAuthenticated() &&
                                exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
                                get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
     }
@@ -787,8 +791,10 @@ service cloud.firestore {
     // Benefit Usage collection
     match /benefitUsage/{usageId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && 
+      allow create: if isAuthenticated() &&
+        request.resource.data.memberId == request.auth.uid &&
+        request.resource.data.keys().hasOnly(['memberId', 'benefitId', 'usedAt', 'notes', 'createdAt', 'loId']);
+      allow update, delete: if isAuthenticated() &&
                                exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
                                get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
     }
@@ -918,7 +924,7 @@ service cloud.firestore {
       allow get: if isAuthenticated() && (isBoard() || isAdmin() ||
                      resource.data.mentorId == request.auth.uid ||
                      resource.data.menteeId == request.auth.uid);
-      allow list: if isMember();
+      allow list: if isActiveMember();
       allow create: if isAuthenticated() &&
                      exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
                      (getUserRole() in ['BOARD', 'ADMIN'] ||
@@ -1016,10 +1022,13 @@ service cloud.firestore {
       allow list: if isBoard() || isAdmin();
       allow create: if isMember();
       // Members may only update their own signature fields; board/admin unrestricted
+      // FIX 4: restrict status values members can set — prevent self-escalation to 'active'/'completed'
       allow update: if isAdmin() || isBoard() ||
                        (isMember() &&
                         request.resource.data.diff(resource.data).affectedKeys()
-                          .hasOnly(['signerIds', 'status', 'proofUrl', 'updatedAt']));
+                          .hasOnly(['signerIds', 'status', 'proofUrl', 'updatedAt']) &&
+                        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']) ||
+                         request.resource.data.get('status', '') in ['pending_signature', 'signed', 'verifying']));
       allow delete: if isAdmin();
     }
     match /pointEscrow/{escrowId} {
@@ -1029,7 +1038,10 @@ service cloud.firestore {
                      resource.data.memberId == request.auth.uid);
       allow list: if isBoard() || isAdmin();
       allow create: if isAdmin() ||
-                       (isMember() && request.resource.data.memberId == request.auth.uid);
+                       (isMember() &&
+                        request.resource.data.memberId == request.auth.uid &&
+                        request.resource.data.get('status', '') == 'pending' &&
+                        request.resource.data.keys().hasOnly(['memberId', 'contractId', 'amount', 'status', 'createdAt', 'loId', 'type']));
       // Board can update status/release fields only; admin unrestricted
       allow update: if isAdmin() ||
                        (isBoard() &&

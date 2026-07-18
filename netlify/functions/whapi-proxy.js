@@ -77,6 +77,9 @@ exports.handler = async (event) => {
       whapiRes = await fetch('https://gate.whapi.cloud/limits', { headers: whapiHeaders });
     } else if (op === 'group') {
       if (!groupId) return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'groupId required' }) };
+      if (!/^[a-zA-Z0-9_\-@.]{1,64}$/.test(groupId)) {
+        return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'Invalid groupId format' }) };
+      }
       whapiRes = await fetch(`https://gate.whapi.cloud/groups/${groupId}`, { headers: whapiHeaders });
     } else if (op === 'send') {
       if (!to || !message) return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'to and message required' }) };

@@ -1,12 +1,13 @@
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 
 if (!getApps().length) {
   initializeApp({
     credential: cert({
-      projectId: process.env.VITE_FIREBASE_PROJECT_ID,
-      clientEmail: process.env.VITE_FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.VITE_FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n'),
     }),
   });
 }
@@ -14,9 +15,27 @@ if (!getApps().length) {
 // Checks if a given field value already exists in the members collection.
 // members collection is the sole source of truth for registration eligibility.
 // Supports: field=email, field=phone
+// Requires a valid Firebase ID token from a BOARD, ADMIN, or SUPER_ADMIN caller.
 export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
+  }
+
+  // Verify caller identity — only BOARD+ may enumerate PII fields
+  const authHeader = event.headers.authorization || event.headers.Authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
+  }
+  const idToken = authHeader.split('Bearer ')[1];
+  try {
+    const decoded = await getAuth().verifyIdToken(idToken);
+    const callerDoc = await getFirestore().collection('members').doc(decoded.uid).get();
+    const callerRole = callerDoc.data()?.role;
+    if (!['BOARD', 'ADMIN', 'SUPER_ADMIN'].includes(callerRole)) {
+      return { statusCode: 403, body: JSON.stringify({ error: 'Forbidden' }) };
+    }
+  } catch {
+    return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
   }
 
   let field, value;

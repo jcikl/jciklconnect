@@ -10,6 +10,7 @@ import {
   orderBy,
   serverTimestamp,
   writeBatch,
+  runTransaction,
   increment,
   Timestamp,
 } from 'firebase/firestore';
@@ -144,20 +145,24 @@ export class ContractService {
     currentUserId: string
   ): Promise<void> {
     const contractRef = doc(db, COLLECTIONS.CONTRACTS, contractId);
-    const contractDoc = await getDoc(contractRef);
-    if (!contractDoc.exists()) throw new Error('Contract not found');
+    // FIX: Wrap in runTransaction to prevent TOCTOU — two concurrent "Submit Proof"
+    // requests can no longer both pass the status check and overwrite each other's proofUrl.
+    await runTransaction(db, async (transaction) => {
+      const contractDoc = await transaction.get(contractRef);
+      if (!contractDoc.exists()) throw new Error('Contract not found');
 
-    const data = contractDoc.data() as CommitmentContract;
-    if (data.status !== CONTRACT_STATUS.ACTIVE) {
-      throw new Error(`Cannot verify a contract with status: ${data.status}`);
-    }
+      const data = contractDoc.data() as CommitmentContract;
+      if (data.status !== CONTRACT_STATUS.ACTIVE) {
+        throw new Error(`Cannot verify a contract with status: ${data.status}`);
+      }
 
-    await updateDoc(contractRef, {
-      status: CONTRACT_STATUS.VERIFYING,
-      proofUrl,
-      verifiedBy: currentUserId,
-      verifiedAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
+      transaction.update(contractRef, {
+        status: CONTRACT_STATUS.VERIFYING,
+        proofUrl,
+        verifiedBy: currentUserId,
+        verifiedAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
     });
   }
 
@@ -168,46 +173,57 @@ export class ContractService {
    * FIX P1-C: failurePenalty deduction is now applied when status → FAILED.
    */
   static async enforcePenalty(contractId: string): Promise<void> {
-     const contractRef = doc(db, COLLECTIONS.CONTRACTS, contractId);
-     const contractDoc = await getDoc(contractRef);
-     if (!contractDoc.exists()) return;
-     const data = contractDoc.data() as CommitmentContract;
+    const contractRef = doc(db, COLLECTIONS.CONTRACTS, contractId);
 
-     if (data.status !== CONTRACT_STATUS.ACTIVE && data.status !== CONTRACT_STATUS.VERIFYING) return;
+    // Capture penalty details inside the transaction so we can apply them after commit.
+    let pendingPenalty: { penalty: number; signerId: string } | null = null;
 
-     const batch = writeBatch(db);
+    // FIX: Wrap the entire read-check-write sequence in runTransaction to prevent TOCTOU —
+    // two concurrent enforcePenalty calls can no longer both pass the status check and
+    // apply the point penalty twice.
+    await runTransaction(db, async (transaction) => {
+      const contractDoc = await transaction.get(contractRef);
+      if (!contractDoc.exists()) return;
+      const data = contractDoc.data() as CommitmentContract;
 
-     // 1. The staked points are "lost" (not returned); close the escrow
-     const escrowRef = doc(db, COLLECTIONS.POINT_ESCROW, data.escrowId!);
-     batch.update(escrowRef, { status: 'Closed', updatedAt: serverTimestamp() });
+      if (data.status !== CONTRACT_STATUS.ACTIVE && data.status !== CONTRACT_STATUS.VERIFYING) return;
 
-     // 2. Update contract status to Failed
-     batch.update(contractRef, {
-       status: CONTRACT_STATUS.FAILED,
-       updatedAt: serverTimestamp()
-     });
+      // 1. The staked points are "lost" (not returned); close the escrow
+      const escrowRef = doc(db, COLLECTIONS.POINT_ESCROW, data.escrowId!);
+      transaction.update(escrowRef, { status: 'Closed', updatedAt: serverTimestamp() });
 
-     await batch.commit();
+      // 2. Update contract status to Failed
+      transaction.update(contractRef, {
+        status: CONTRACT_STATUS.FAILED,
+        updatedAt: serverTimestamp()
+      });
 
-     // 3. P1-C: Deduct additional failure penalty points if configured
-     const penalty = data.failurePenalty ?? 0;
-     if (penalty > 0) {
-       const signerId = data.signerId || data.memberId;
-       try {
-         // P0 fix: correct signature is (memberId, category, amount, description, ...)
-         await PointsService.awardPoints(
-           signerId,
-           'penalty',
-           -Math.abs(penalty),
-           `Contract failure penalty: ${contractId}`,
-           contractId,
-           'contract'
-         );
-       } catch (penaltyErr) {
-         console.error('ContractService.enforcePenalty: penalty deduction failed', penaltyErr);
-         // Non-fatal: the contract is already marked Failed; log and continue
-       }
-     }
+      // Record penalty details to be applied after the transaction commits
+      const penalty = data.failurePenalty ?? 0;
+      if (penalty > 0) {
+        pendingPenalty = { penalty, signerId: data.signerId || data.memberId };
+      }
+    });
+
+    // 3. P1-C: Deduct additional failure penalty points AFTER transaction commits.
+    //    PointsService.awardPoints is a separate Firestore operation and cannot run inside
+    //    a runTransaction callback — calling it here is safe and non-duplicable.
+    if (pendingPenalty) {
+      const { penalty, signerId } = pendingPenalty;
+      try {
+        await PointsService.awardPoints(
+          signerId,
+          'penalty',
+          -Math.abs(penalty),
+          `Contract failure penalty: ${contractId}`,
+          contractId,
+          'contract'
+        );
+      } catch (penaltyErr) {
+        console.error('ContractService.enforcePenalty: penalty deduction failed', penaltyErr);
+        // Non-fatal: the contract is already marked Failed; log and continue
+      }
+    }
   }
 
   /**

@@ -67,13 +67,19 @@ export class WebhookService {
           );
 
           const snapshot = await getDocs(q);
-          return snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            createdAt: (doc.data().createdAt as Timestamp)?.toDate() || new Date(),
-            updatedAt: (doc.data().updatedAt as Timestamp)?.toDate() || new Date(),
-            lastTriggered: doc.data().lastTriggered ? (doc.data().lastTriggered as Timestamp)?.toDate() : undefined,
-          } as Webhook));
+          return snapshot.docs.map(doc => {
+            const data = doc.data();
+            // Strip secret before returning to the browser — same as getWebhookById.
+            // The secret is used for HMAC signing and must stay server-side only.
+            const { secret: _secret, ...safeData } = data;
+            return {
+              id: doc.id,
+              ...safeData,
+              createdAt: (data.createdAt as Timestamp)?.toDate() || new Date(),
+              updatedAt: (data.updatedAt as Timestamp)?.toDate() || new Date(),
+              lastTriggered: data.lastTriggered ? (data.lastTriggered as Timestamp)?.toDate() : undefined,
+            } as Webhook;
+          });
         } catch (error) {
           errorLoggingService.logError(error as Error, { component: 'WebhookService', action: 'getAllWebhooks' });
           throw error;
