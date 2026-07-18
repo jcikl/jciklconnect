@@ -40,7 +40,16 @@ import { getCurrentBoardCalendarYear } from './utils/boardMembership';
 import { trimCloudinaryImage } from './services/cloudinaryService';
 import { MembersService } from './services/membersService';
 import { registerPushNotifications, unregisterPushNotifications, onForegroundMessage } from './services/notificationService';
+import { EmailService } from './services/emailService';
 import { DEFAULT_LO_ID } from './config/constants';
+
+// Initialize email service once at app startup — provider/from config lives here,
+// API key lives server-side in RESEND_API_KEY Netlify env var (never in the browser).
+EmailService.initialize({
+  provider: 'resend',
+  fromEmail: 'no-reply@jcikl.cc',
+  fromName: 'JCI Kuala Lumpur',
+}).catch(err => console.error('[EmailService] init failed:', err));
 
 // Module Imports &#8212; lazy-loaded for code splitting (each view is a separate chunk)
 const FinanceView = lazy(() => import('./components/modules/FinanceView').then(m => ({ default: m.FinanceView })));
