@@ -14,10 +14,7 @@ export const trimCloudinaryImage = (url: string): string => {
 // lazy-importing this module does not throw during page initialisation.
 const CLOUD_NAME: string = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 const UPLOAD_PRESET: string = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-const MEMBER_AVATAR_ASSET_ROOT = import.meta.env.VITE_CLOUDINARY_MEMBER_AVATAR_ASSET_ROOT || 'jciklconnect';
-if (!import.meta.env.VITE_CLOUDINARY_MEMBER_AVATAR_ASSET_ROOT) {
-  console.warn('VITE_CLOUDINARY_MEMBER_AVATAR_ASSET_ROOT not set, using default: jciklconnect');
-}
+const MEMBER_AVATAR_ASSET_ROOT = 'jciklconnect';
 
 type MemberAvatarFolderSource = {
   id?: string;

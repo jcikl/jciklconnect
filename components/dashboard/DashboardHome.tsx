@@ -104,6 +104,26 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const [expandedJourneySteps, setExpandedJourneySteps] = useState<Set<string>>(new Set());
 
 
+  const profileCompleteness = React.useMemo(() => {
+    if (!member) return null;
+    const checks = [
+      { label: 'Profile photo', done: !!(member.avatar || (member as any).general?.avatarUrl) },
+      { label: 'Phone number', done: !!member.phone },
+      { label: 'Company name', done: !!member.companyName },
+      { label: 'Industry', done: !!member.industry },
+      { label: 'Position / title', done: !!(member.business?.departmentAndPosition ?? member.departmentAndPosition) },
+      { label: 'Business categories', done: Array.isArray(member.businessCategory) && member.businessCategory.length > 0 },
+      { label: 'Company description', done: !!(member.business?.companyDescription ?? member.companyDescription) },
+      { label: 'Ideal referral', done: !!(member.idealReferralIndustry || member.idealReferral) },
+      { label: 'Social media link', done: !!(member.linkedin || member.facebook || member.instagram || member.wechat) },
+      { label: 'Special member offer', done: !!(member.business?.specialOffer ?? (member as any).specialOffer) },
+    ];
+    const done = checks.filter(c => c.done).length;
+    const pct = Math.round((done / checks.length) * 100);
+    const missing = checks.filter(c => !c.done);
+    return pct < 100 ? { done, total: checks.length, pct, missing } : null;
+  }, [member]);
+
   const handleRestrictedAction = (viewType: string) => {
     // Benefits is reachable by guests — the page itself masks its content
     if (member?.role === UserRole.GUEST && viewType !== 'BENEFITS') {
@@ -498,6 +518,72 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         </div>
       )}
 
+
+      {/* Profile Completeness Widget */}
+      {profileCompleteness && (() => {
+        const { done, total, pct, missing } = profileCompleteness;
+        return (
+          <div
+            className="relative overflow-hidden rounded-2xl shadow-md cursor-pointer group"
+            onClick={() => onNavigate?.('MEMBERS', member?.id)}
+          >
+            {/* gradient bg */}
+            <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(217,119,6,0.92) 0%, rgba(194,65,12,0.88) 60%, rgba(153,27,27,0.85) 100%)' }} />
+            {/* subtle pattern */}
+            <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 80% 20%, white 1px, transparent 1px), radial-gradient(circle at 20% 80%, white 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
+
+            <div className="relative z-10 p-4 space-y-3">
+              {/* header row */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-3xl leading-none select-none drop-shadow-md">📋</span>
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-200/80 leading-none mb-0.5">Your Profile</p>
+                    <h3 className="font-extrabold text-white text-lg leading-tight drop-shadow-sm">{pct}% Complete</h3>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-[11px] font-bold text-amber-200/90">{done} of {total}</span>
+                  <p className="text-[10px] text-amber-300/70 leading-none">fields filled</p>
+                </div>
+              </div>
+
+              {/* progress bar */}
+              <div className="relative h-1.5 rounded-full bg-white/20 overflow-hidden">
+                <motion.div
+                  className="absolute inset-y-0 left-0 rounded-full bg-white"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${pct}%` }}
+                  transition={{ duration: 0.7, ease: 'easeOut' }}
+                />
+              </div>
+
+              {/* missing chips */}
+              <div className="flex flex-wrap gap-1.5">
+                {missing.slice(0, 4).map(c => (
+                  <span key={c.label} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 text-[11px] font-medium text-white">
+                    <span className="w-1 h-1 rounded-full bg-amber-300 flex-shrink-0" />
+                    {c.label}
+                  </span>
+                ))}
+                {missing.length > 4 && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-white/15 border border-white/20 text-[11px] font-medium text-amber-200">
+                    +{missing.length - 4} more
+                  </span>
+                )}
+              </div>
+
+              {/* CTA row */}
+              <div className="flex items-center justify-between pt-0.5">
+                <p className="text-[11px] text-amber-200/70">Tap to complete your profile</p>
+                <div className="w-7 h-7 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30 group-hover:bg-white/30 transition-all duration-200">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-white group-hover:translate-x-0.5 transition-transform duration-200"><path d="m9 18 6-6-6-6" /></svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Membership Journey Card */}
       {showJourneyCard && (

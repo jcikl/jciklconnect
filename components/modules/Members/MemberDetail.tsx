@@ -195,7 +195,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
       levelOfManagement: (member.business?.levelOfManagement ?? member.levelOfManagement) || '',
       idealReferralIndustry: member.idealReferralIndustry || '',
       idealReferral: member.idealReferral || (Array.isArray(member.idealReferrals) ? member.idealReferrals.join(', ') : ''),
-      specialOffer: member.specialOffer || '',
+      specialOffer: member.business?.specialOffer ?? member.specialOffer ?? '',
 
       phone: member.phone || '',
       alternatePhone: member.alternatePhone || '',

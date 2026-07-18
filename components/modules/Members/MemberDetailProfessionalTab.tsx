@@ -162,91 +162,94 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
               </div>
             </div>
           ) : (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Col 1 */}
-                <div className="space-y-4 text-sm md:border-r md:border-slate-100 md:pr-6">
+            <div className="space-y-5 text-sm">
+              {/* Company header */}
+              <div>
+                <span className="text-slate-500 text-xs uppercase font-medium">Company Name</span>
+                <p className="font-bold text-slate-900 leading-tight mt-0.5">{member.companyName || 'Freelance / Not Provided'}</p>
+                {member.companyWebsite && (
+                  <a href={member.companyWebsite.startsWith('http') ? member.companyWebsite : `https://${member.companyWebsite}`} target="_blank" rel="noopener noreferrer" className="text-xs text-jci-blue hover:underline block mt-1">
+                    {member.companyWebsite}
+                  </a>
+                )}
+              </div>
+
+              {/* 2-col quick-facts grid */}
+              <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+                <div>
+                  <span className="text-slate-500 text-xs uppercase font-medium">Position</span>
+                  <p className="font-medium text-slate-900 mt-0.5">{(member.business?.departmentAndPosition ?? member.departmentAndPosition) || 'Not provided'}</p>
+                </div>
+                <div>
+                  <span className="text-slate-500 text-xs uppercase font-medium">Level of Mgmt</span>
+                  <p className="font-medium text-slate-900 mt-0.5">{(member.business?.levelOfManagement ?? member.levelOfManagement) || 'Not provided'}</p>
+                </div>
+                <div>
+                  <span className="text-slate-500 text-xs uppercase font-medium">Industry</span>
+                  <p className="font-medium text-slate-900 mt-0.5">{member.industry || 'Not provided'}</p>
+                </div>
+                <div>
+                  <span className="text-slate-500 text-xs uppercase font-medium">Intl. Business</span>
+                  <p className="font-medium text-slate-900 mt-0.5">{member.acceptInternationalBusiness || 'Unknown'}</p>
+                </div>
+              </div>
+
+              {/* Business Categories */}
+              <div>
+                <span className="text-slate-500 text-xs uppercase font-medium">Business Categories</span>
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {Array.isArray(member.businessCategory) && member.businessCategory.length > 0 ? (
+                    member.businessCategory.map((cat, idx) => (
+                      <Badge key={idx} variant="neutral" className="text-[10px]">{cat}</Badge>
+                    ))
+                  ) : (
+                    <span className="text-slate-400 italic">None</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-slate-100 pt-4 space-y-4">
+                {/* Ideal Referral — 2-col on sm+, stacked on mobile */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <span className="text-slate-500 text-xs uppercase font-medium">Company Name</span>
-                    <p className="font-bold text-slate-900 leading-tight mt-0.5">{member.companyName || 'Freelance / Not Provided'}</p>
-                    {member.companyWebsite && (
-                      <a href={member.companyWebsite.startsWith('http') ? member.companyWebsite : `https://${member.companyWebsite}`} target="_blank" rel="noopener noreferrer" className="text-xs text-jci-blue hover:underline block mt-1">
-                        {member.companyWebsite}
-                      </a>
-                    )}
+                    <span className="text-slate-500 text-xs uppercase font-medium">Ideal Referral Industry</span>
+                    <div className="mt-1 text-slate-700 font-medium leading-snug">
+                      {member.idealReferralIndustry
+                        ? <span className="text-xs leading-relaxed">{member.idealReferralIndustry}</span>
+                        : <span className="text-slate-400 italic font-normal">None</span>}
+                    </div>
                   </div>
                   <div>
-                    <span className="text-slate-500 text-xs uppercase font-medium">Position</span>
-                    <p className="font-medium text-slate-900 mt-0.5">{(member.business?.departmentAndPosition ?? member.departmentAndPosition) || 'Not provided'}</p>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 text-xs uppercase font-medium">Level of Mgmt</span>
-                    <p className="font-medium text-slate-900 mt-0.5">{(member.business?.levelOfManagement ?? member.levelOfManagement) || 'Not provided'}</p>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 text-xs uppercase font-medium">Industry</span>
-                    <p className="font-medium text-slate-900 mt-0.5">{member.industry || 'Not provided'}</p>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 text-xs uppercase font-medium">Intl. Business</span>
-                    <p className="font-medium text-slate-900 mt-0.5">{member.acceptInternationalBusiness || 'Unknown'}</p>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 text-xs uppercase font-medium">Business Categories</span>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {Array.isArray(member.businessCategory) && member.businessCategory.length > 0 ? (
-                        member.businessCategory.map((cat, idx) => (
-                          <Badge key={idx} variant="neutral" className="text-[10px]">{cat}</Badge>
+                    <span className="text-slate-500 text-xs uppercase font-medium">Ideal Referral</span>
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {Array.isArray(member.idealReferrals) && member.idealReferrals.length > 0 ? (
+                        member.idealReferrals.map((type, idx) => (
+                          <Badge key={idx} variant="info" className="text-[10px] bg-sky-50 text-sky-600 border-sky-100">{type}</Badge>
                         ))
+                      ) : member.idealReferral ? (
+                        <span className="text-sm text-slate-700 font-medium">{member.idealReferral}</span>
                       ) : (
-                        <span className="text-slate-400 italic">None</span>
+                        <span className="text-slate-400 italic font-normal">None</span>
                       )}
                     </div>
                   </div>
                 </div>
 
-                {/* Col 2-3 */}
-                <div className="md:col-span-2 space-y-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm">
-                    <div>
-                      <span className="text-slate-500 text-xs uppercase font-medium">Ideal Referral Industry</span>
-                      <div className="mt-1 text-slate-700 font-medium">
-                        {member.idealReferralIndustry ? (
-                          <span>{member.idealReferralIndustry}</span>
-                        ) : (
-                          <span className="text-slate-400 italic font-normal">None</span>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 text-xs uppercase font-medium">Ideal Referral</span>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {Array.isArray(member.idealReferrals) && member.idealReferrals.length > 0 ? (
-                          member.idealReferrals.map((type, idx) => (
-                            <Badge key={idx} variant="info" className="text-[10px] bg-sky-50 text-sky-600 border-sky-100">{type}</Badge>
-                          ))
-                        ) : member.idealReferral ? (
-                          <span className="text-sm text-slate-700 font-medium">{member.idealReferral}</span>
-                        ) : (
-                          <span className="text-slate-400 italic font-normal">None</span>
-                        )}
-                      </div>
-                    </div>
+                {/* Company Description */}
+                {(member.business?.companyDescription ?? member.companyDescription) && (
+                  <div className="p-3 bg-slate-50 rounded-lg border-l-4 border-slate-300">
+                    <span className="text-slate-500 text-xs uppercase font-bold mb-1 block">Company Description</span>
+                    <p className="text-xs text-slate-600 leading-relaxed">{member.business?.companyDescription ?? member.companyDescription}</p>
                   </div>
+                )}
 
-                  {(member.business?.companyDescription ?? member.companyDescription) && (
-                    <div className="p-3 bg-slate-50 rounded-lg border-l-4 border-slate-300">
-                      <span className="text-slate-500 text-xs uppercase font-bold mb-1 block">Company Description</span>
-                      <p className="text-xs text-slate-600 leading-relaxed">{member.business?.companyDescription ?? member.companyDescription}</p>
-                    </div>
-                  )}
-
-                  {member.specialOffer && (
-                    <div className="p-3 bg-jci-blue/5 rounded-lg border-l-4 border-jci-blue">
-                      <span className="text-jci-blue text-xs uppercase font-bold mb-1 block">Special Member Offer</span>
-                      <p className="text-sm font-medium text-slate-800">{member.specialOffer}</p>
-                    </div>
-                  )}
+                {/* Special Member Offer */}
+                <div className="p-3 bg-jci-blue/5 rounded-lg border-l-4 border-jci-blue">
+                  <span className="text-jci-blue text-xs uppercase font-bold mb-1 block">Special Member Offer</span>
+                  {(member.business?.specialOffer ?? member.specialOffer)
+                    ? <p className="text-sm font-medium text-slate-800">{member.business?.specialOffer ?? member.specialOffer}</p>
+                    : <p className="text-sm italic text-slate-400">No special offer listed</p>}
                 </div>
               </div>
             </div>
