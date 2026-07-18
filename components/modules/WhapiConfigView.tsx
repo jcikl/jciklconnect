@@ -4,10 +4,10 @@ import { Card, Button, Badge, useToast, ProgressBar } from '../ui/Common';
 import { Input } from '../ui/Form';
 import { useMembers } from '../../hooks/useMembers';
 import { Combobox } from '../ui/Combobox';
+import { getAuth } from 'firebase/auth';
 
 export const WhapiConfigView: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
   const { showToast } = useToast();
-  const [apiKey, setApiKey] = useState('');
   const [loading, setLoading] = useState(false);
   const [testing, setTesting] = useState(false);
   const [status, setStatus] = useState<'connected' | 'disconnected' | 'unknown'>('unknown');
@@ -33,100 +33,73 @@ export const WhapiConfigView: React.FC<{ embedded?: boolean }> = ({ embedded }) 
   } | null>(null);
 
   useEffect(() => {
-    // Load existing config from local storage or mock backend
-    // TODO: move to server-side storage — see S1 security finding
-    const savedConfig = sessionStorage.getItem('whapi_config_key');
-    if (savedConfig) {
-      setApiKey(savedConfig);
-      setStatus('connected');
-      fetchQuota(savedConfig);
-    }
+    // Group ID is non-sensitive config — localStorage is fine.
     const savedGroupId = localStorage.getItem('whapi_sync_group_id');
     if (savedGroupId) setGroupId(savedGroupId);
-    const savedAdminPhone = sessionStorage.getItem('whapi_admin_phone');
+    const savedAdminPhone = localStorage.getItem('whapi_admin_phone');
     if (savedAdminPhone) setAdminPhone(savedAdminPhone);
+    // Token is server-side only (WHAPI_API_TOKEN env var in whapi-proxy.js).
+    // If the proxy responds, mark as connected.
+    setStatus('unknown');
+    fetchQuota();
   }, []);
 
-  const fetchQuota = async (token: string) => {
+  const whapiProxy = async (body: Record<string, unknown>) => {
+    const idToken = await getAuth().currentUser?.getIdToken();
+    if (!idToken) throw new Error('Not authenticated');
+    return fetch('/.netlify/functions/whapi-proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify(body),
+    });
+  };
+
+  const fetchQuota = async () => {
     try {
-      const response = await fetch('https://gate.whapi.cloud/limits', {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (response.status === 204) {
-        // 204 No Content means "No limits" (e.g., Paid channel)
-        setQuotaData({
-          messages: { used: 0, total: 'Unlimited' },
-          chats: { used: 0, total: 'Unlimited' },
-          requests: { used: 0, total: 'Unlimited' }
-        });
-        return;
-      }
+      const response = await whapiProxy({ op: 'limits' });
 
-      if (response.ok) {
+      if (response.status === 204 || response.status === 200) {
         const text = await response.text();
-        console.log('Whapi /limits raw response:', text); // Debugging info
-
         if (!text) {
-          setQuotaData({
-            messages: { used: 0, total: 'Unlimited' },
-            chats: { used: 0, total: 'Unlimited' },
-            requests: { used: 0, total: 'Unlimited' }
-          });
+          setQuotaData({ messages: { used: 0, total: 'Unlimited' }, chats: { used: 0, total: 'Unlimited' }, requests: { used: 0, total: 'Unlimited' } });
+          setStatus('connected');
           return;
         }
-        
         const data = JSON.parse(text);
-        
-        // The API returns values like {"messages":150,"chats":[],"checks":30,"requests":980}
-        // which represents remaining quotas or usage in the sandbox.
         const messagesVal = typeof data?.messages === 'number' ? data.messages : 0;
         const requestsVal = typeof data?.requests === 'number' ? data.requests : 0;
         const chatsVal = Array.isArray(data?.chats) ? data.chats.length : 0;
-
         setQuotaData({
           messages: { used: messagesVal, total: 'Sandbox Quota' },
           chats: { used: chatsVal, total: 'Sandbox Quota' },
-          requests: { used: requestsVal, total: 'Sandbox Quota' }
+          requests: { used: requestsVal, total: 'Sandbox Quota' },
         });
+        setStatus('connected');
       } else {
-        console.error('Whapi /limits error status:', response.status);
-        setQuotaData({
-          messages: { used: 0, total: 'Error' },
-          chats: { used: 0, total: 'Error' },
-          requests: { used: 0, total: 'Error' }
-        });
+        setStatus('disconnected');
+        setQuotaData({ messages: { used: 0, total: 'Error' }, chats: { used: 0, total: 'Error' }, requests: { used: 0, total: 'Error' } });
       }
     } catch (e) {
-      console.error('Failed to fetch limits (possible CORS or network issue):', e);
-      setQuotaData({
-        messages: { used: 0, total: 'Error' },
-        chats: { used: 0, total: 'Error' },
-        requests: { used: 0, total: 'Error' }
-      });
+      console.error('Failed to fetch Whapi limits:', e);
+      setQuotaData({ messages: { used: 0, total: 'Error' }, chats: { used: 0, total: 'Error' }, requests: { used: 0, total: 'Error' } });
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setLoading(true);
-    setTimeout(() => {
-      sessionStorage.setItem('whapi_config_key', apiKey);
-      showToast('Whapi configuration saved successfully', 'success');
-      setStatus('connected');
+    try {
+      // Token is stored server-side as WHAPI_API_TOKEN env var in whapi-proxy.js.
+      // Nothing to save here client-side — just verify the proxy is reachable.
+      await fetchQuota();
+      showToast('Whapi connection verified', 'success');
+    } catch {
+      showToast('Could not reach Whapi proxy', 'error');
+    } finally {
       setLoading(false);
-      fetchQuota(apiKey);
-    }, 800);
+    }
   };
 
   const handleSyncGroup = async () => {
-    if (!apiKey) {
-      showToast('Please save your Whapi Token first', 'warning');
-      return;
-    }
     if (!groupId) {
       showToast('Please enter a WhatsApp Group ID', 'warning');
       return;
@@ -136,13 +109,7 @@ export const WhapiConfigView: React.FC<{ embedded?: boolean }> = ({ embedded }) 
     setSyncStatus({ type: 'info', message: 'Connecting to Whapi and fetching group participants...' });
 
     try {
-      const response = await fetch(`https://gate.whapi.cloud/groups/${groupId}`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        }
-      });
+      const response = await whapiProxy({ op: 'group', groupId });
 
       if (!response.ok) {
         const errJson = await response.json().catch(() => ({}));
@@ -209,33 +176,17 @@ export const WhapiConfigView: React.FC<{ embedded?: boolean }> = ({ embedded }) 
   };
 
   const handleTestConnection = async () => {
-    if (!apiKey) {
-      showToast('Please enter an API Key first', 'warning');
-      return;
-    }
     setTesting(true);
-    
     try {
-      // Real API call to Whapi to check token validity
-      const response = await fetch('https://gate.whapi.cloud/settings', {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        }
-      });
-
-      if (response.ok) {
+      await fetchQuota();
+      if (status !== 'disconnected') {
         showToast('Connection to Whapi successful!', 'success');
-        setStatus('connected');
-        fetchQuota(apiKey);
       } else {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Invalid API Token or Connection Failed');
+        throw new Error('Proxy returned error — check WHAPI_API_TOKEN env var');
       }
     } catch (error) {
       console.error('Whapi connection error:', error);
-      showToast(error instanceof Error ? error.message : 'Connection failed. Please check your token.', 'error');
+      showToast(error instanceof Error ? error.message : 'Connection failed.', 'error');
       setStatus('disconnected');
       setQuotaData(null);
     } finally {
@@ -344,16 +295,12 @@ export const WhapiConfigView: React.FC<{ embedded?: boolean }> = ({ embedded }) 
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700">Whapi API Token</label>
-                <Input 
-                  type="password"
-                  value={apiKey} 
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder="Enter your Whapi Token"
-                />
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                  The API token is configured server-side via the <code>WHAPI_API_TOKEN</code> environment variable in Netlify. It is never stored in the browser.
+                </p>
                 <p className="text-xs text-slate-500">
-                  You can find your API token in the Whapi dashboard. 
-                  <a href="https://whapi.readme.io/reference/" target="_blank" rel="noopener noreferrer" className="text-jci-blue hover:underline ml-1 inline-flex items-center">
-                    View Documentation <ExternalLink size={10} className="ml-0.5" />
+                  <a href="https://whapi.readme.io/reference/" target="_blank" rel="noopener noreferrer" className="text-jci-blue hover:underline inline-flex items-center">
+                    View Whapi Documentation <ExternalLink size={10} className="ml-0.5" />
                   </a>
                 </p>
               </div>
@@ -432,7 +379,7 @@ export const WhapiConfigView: React.FC<{ embedded?: boolean }> = ({ embedded }) 
                   value={adminPhone}
                   onChange={(e) => {
                     setAdminPhone(e.target.value);
-                    sessionStorage.setItem('whapi_admin_phone', e.target.value);
+                    localStorage.setItem('whapi_admin_phone', e.target.value);
                   }}
                   placeholder="e.g. +60123456789"
                   className="w-full text-xs"
@@ -443,7 +390,7 @@ export const WhapiConfigView: React.FC<{ embedded?: boolean }> = ({ embedded }) 
               <Button
                 onClick={handleSyncGroup}
                 isLoading={syncing}
-                disabled={!apiKey || !groupId || membersLoading}
+                disabled={!groupId || membersLoading}
                 variant="primary"
                 className="w-full flex items-center justify-center gap-2 text-xs"
               >
@@ -527,7 +474,7 @@ export const WhapiConfigView: React.FC<{ embedded?: boolean }> = ({ embedded }) 
                   <BarChart2 size={20} className="text-jci-blue" />
                   API Usage & Quota
                 </h3>
-                <Button size="sm" variant="ghost" onClick={() => fetchQuota(apiKey)} className="text-xs flex items-center gap-2">
+                <Button size="sm" variant="ghost" onClick={() => fetchQuota()} className="text-xs flex items-center gap-2">
                   <Activity size={14} /> Refresh Usage
                 </Button>
               </div>

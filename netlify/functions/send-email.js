@@ -14,8 +14,9 @@ if (!getApps().length) {
 
 const ALLOWED_ORIGINS = ['https://app.jcikl.cc', 'http://localhost:3000', 'http://localhost:3001'];
 
-// Roles that are allowed to send emails via this endpoint (MEMBER and above).
-const ALLOWED_ROLES = ['MEMBER', 'BOARD', 'ADMIN', 'SUPER_ADMIN'];
+// SEC: restrict to BOARD and above — MEMBER is too permissive; any member account
+// could use the org's DKIM-signed domain to send phishing to arbitrary recipients.
+const ALLOWED_ROLES = ['BOARD', 'ADMIN', 'SUPER_ADMIN'];
 
 exports.handler = async (event) => {
   const requestOrigin = event.headers.origin || event.headers.Origin || '';

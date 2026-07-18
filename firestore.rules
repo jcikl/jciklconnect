@@ -18,10 +18,18 @@ service cloud.firestore {
     }
     
     function isMember() {
-      return isAuthenticated() && 
+      return isAuthenticated() &&
              exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
              getUserRole() != null &&
              getUserRole() in ['GUEST', 'MEMBER', 'BOARD', 'ADMIN', 'SUPER_ADMIN'];
+    }
+
+    // isActiveMember: MEMBER and above — excludes GUEST (self-registered, not yet vetted)
+    function isActiveMember() {
+      return isAuthenticated() &&
+             exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+             getUserRole() != null &&
+             getUserRole() in ['MEMBER', 'BOARD', 'ADMIN', 'SUPER_ADMIN'];
     }
     
     function memberData() {
@@ -117,9 +125,11 @@ service cloud.firestore {
       );
 
       // Allow listing for email search during linking only (business directory uses businessDirectory subcollection)
+      // SEC: exclude GUEST — isMember() includes GUEST, which would let any self-registered
+      // GUEST dump the full member roster (NRIC, DOB, phone). Use isActiveMember() instead.
       // TODO: loId filter — resource.data is null in list queries so per-doc loId check is not viable here; enforce at service layer
       allow list: if isAuthenticated() && (
-        isMember() ||
+        isActiveMember() ||
         canReadOrgMembers() ||
         (request.query.filters.get('email', []) == [request.auth.token.get('email', '')]) ||
         (request.query.filters.email == [request.auth.token.get('email', '')])
