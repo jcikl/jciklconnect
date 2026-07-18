@@ -1046,7 +1046,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
               <Coins size={12} className="text-jci-blue" />
               <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Total Points</p>
             </div>
-            <p className="text-lg md:text-2xl font-black text-jci-blue">{member.points.toLocaleString()}</p>
+            <p className="text-lg md:text-2xl font-black text-jci-blue">{(member.points ?? 0).toLocaleString()}</p>
           </div>
           <div className="p-2 md:p-4 text-center hover:bg-white transition-colors">
             <div className="flex items-center justify-center gap-1.5 mb-1">
