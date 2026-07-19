@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Send, Megaphone, Edit, Trash2, Eye } from 'lucide-react';
+import { Send, Megaphone, Edit, Trash2, Bell, ChevronDown, ChevronUp } from 'lucide-react';
 import { Card, Button, Badge, Modal, useToast, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
 import type { ConfirmState } from '../ui/Common';
 import { LoadingState } from '../ui/Loading';
@@ -7,12 +7,13 @@ import { useCommunication } from '../../hooks/useCommunication';
 import { useAuth } from '../../hooks/useAuth';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useMembers } from '../../hooks/useMembers';
-import { Textarea, Input, Select, Checkbox } from '../ui/Form';
+import { Textarea, Input, Select } from '../ui/Form';
 import { formatRelativeTime } from '../../utils/dateUtils';
 import { CommunicationService } from '../../services/communicationService';
 import { NewsPost } from '../../types';
 
-// Generate an inline SVG data URI with initials — avoids external requests blocked by CSP
+const MAX_CHARS = 500;
+
 const getInitialsSvg = (name: string, size = 48): string => {
     const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?';
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><rect width="${size}" height="${size}" fill="#0097D7" rx="${size / 2}"/><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" fill="white" font-family="sans-serif" font-size="${Math.round(size * 0.4)}px">${initials}</text></svg>`;
@@ -25,12 +26,16 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
     const [isPosting, setIsPosting] = useState(false);
     const [isAnnouncementModalOpen, setIsAnnouncementModalOpen] = useState(false);
     const [selectedAnnouncement, setSelectedAnnouncement] = useState<NewsPost | null>(null);
+    const [notifExpanded, setNotifExpanded] = useState(false);
+
     const { posts, notifications, loading, error, createPost, markNotificationAsRead } = useCommunication();
     const { member } = useAuth();
     const { isBoard, isAdmin } = usePermissions();
     const { members } = useMembers();
     const { showToast } = useToast();
     const canManageAnnouncements = isBoard || isAdmin;
+
+    const unreadCount = notifications.filter(n => !n.read).length;
 
     const filteredAnnouncements = React.useMemo(() => {
         const term = (searchQuery || '').toLowerCase();
@@ -43,33 +48,76 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
     }, [posts, searchQuery]);
 
     return (
-        <div className="space-y-6">
-            <div>
-                <h2 className="text-2xl font-bold text-slate-900">Communication Hub</h2>
-                <p className="text-slate-500">Stay connected with announcements and discussions.</p>
+        <div className="space-y-4 sm:space-y-6">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <div>
+                    <h2 className="text-2xl font-bold text-slate-900">Communication Hub</h2>
+                    <p className="text-slate-500 text-sm mt-0.5">Announcements from the board</p>
+                </div>
+                {unreadCount > 0 && (
+                    <Badge variant="error" className="text-xs">{unreadCount} unread</Badge>
+                )}
             </div>
 
-            <div className="grid lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 space-y-6">
+            {/* Mobile-only notifications panel */}
+            <div className="lg:hidden">
+                <button
+                    onClick={() => setNotifExpanded(v => !v)}
+                    className="w-full flex items-center justify-between px-4 py-3 bg-white border border-slate-200 rounded-xl shadow-sm text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                    <div className="flex items-center gap-2">
+                        <Bell size={16} className="text-slate-500" />
+                        <span>Notifications</span>
+                        {unreadCount > 0 && (
+                            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-jci-blue text-white text-[10px] font-bold">{unreadCount}</span>
+                        )}
+                    </div>
+                    {notifExpanded ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+                </button>
+                {notifExpanded && (
+                    <div className="mt-2 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                        <NotificationsList
+                            notifications={notifications}
+                            loading={loading}
+                            error={error}
+                            onRead={markNotificationAsRead}
+                        />
+                    </div>
+                )}
+            </div>
+
+            {/* Main grid */}
+            <div className="grid lg:grid-cols-3 gap-4 lg:gap-6">
+                {/* Announcements column */}
+                <div className="lg:col-span-2">
                     <Card noPadding>
                         <div className="divide-y divide-slate-100">
-                            {/* Create Announcement Input */}
+                            {/* Compose */}
                             {canManageAnnouncements && (
-                                <div className="p-4 sm:p-6 bg-slate-50/50">
-                                    <div className="flex gap-3 sm:gap-4">
+                                <div className="p-4 sm:p-5 bg-slate-50/50">
+                                    <div className="flex gap-3">
                                         {member ? (
-                                            <img src={member.avatar || getInitialsSvg(member.name, 40)} alt={member.name} className="w-10 h-10 rounded-full bg-slate-200 flex-shrink-0" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = getInitialsSvg(member.name, 40); }} />
-                                        ) : (
-                                            <div className="w-10 h-10 rounded-full bg-slate-200 flex-shrink-0" />
-                                        )}
-                                        <div className="flex-1">
-                                            <Textarea
-                                                placeholder="Post an announcement..."
-                                                value={postContent}
-                                                onChange={(e) => setPostContent(e.target.value)}
-                                                className="resize-none h-24"
+                                            <img
+                                                src={member.avatar || getInitialsSvg(member.name, 36)}
+                                                alt={member.name}
+                                                className="w-9 h-9 rounded-full bg-slate-200 flex-shrink-0 mt-0.5"
+                                                onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = getInitialsSvg(member.name, 36); }}
                                             />
-                                            <div className="flex justify-end mt-2">
+                                        ) : (
+                                            <div className="w-9 h-9 rounded-full bg-slate-200 flex-shrink-0 mt-0.5" />
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                            <Textarea
+                                                placeholder="Post an announcement to all members..."
+                                                value={postContent}
+                                                onChange={(e) => setPostContent(e.target.value.slice(0, MAX_CHARS))}
+                                                className="resize-none h-20 text-sm"
+                                            />
+                                            <div className="flex items-center justify-between mt-2">
+                                                <span className={`text-xs ${postContent.length > MAX_CHARS * 0.9 ? 'text-amber-500' : 'text-slate-400'}`}>
+                                                    {postContent.length}/{MAX_CHARS}
+                                                </span>
                                                 <Button
                                                     size="sm"
                                                     onClick={async () => {
@@ -92,7 +140,7 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
                                                     }}
                                                     disabled={!postContent.trim() || isPosting}
                                                 >
-                                                    Post
+                                                    {isPosting ? 'Posting...' : 'Post'}
                                                 </Button>
                                             </div>
                                         </div>
@@ -100,7 +148,7 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
                                 </div>
                             )}
 
-                            {/* Announcements Feed */}
+                            {/* Announcements feed */}
                             <AnnouncementsTab
                                 posts={filteredAnnouncements}
                                 loading={loading}
@@ -132,42 +180,30 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
                     </Card>
                 </div>
 
-                <div className="space-y-6">
-                    <Card title="Notifications">
-                        <LoadingState loading={loading} error={error} empty={notifications.length === 0} emptyMessage="No notifications">
-                            <div className="space-y-3">
-                                {notifications.map(notif => (
-                                    <div
-                                        key={notif.id}
-                                        className={`p-3 rounded-lg border text-sm cursor-pointer transition-colors ${notif.read ? 'bg-white border-slate-100' : 'bg-blue-50 border-blue-100'
-                                            }`}
-                                        onClick={() => !notif.read && markNotificationAsRead(notif.id)}
-                                    >
-                                        <div className="flex justify-between items-start mb-1">
-                                            <span className={`font-semibold ${notif.read ? 'text-slate-700' : 'text-slate-900'}`}>{notif.title}</span>
-                                            <span className="text-[10px] text-slate-400">{formatRelativeTime(notif.timestamp)}</span>
-                                        </div>
-                                        <p className="text-slate-600 text-xs">{notif.message}</p>
-                                    </div>
-                                ))}
+                {/* Sidebar — desktop only */}
+                <div className="hidden lg:block">
+                    <div className="sticky top-4 space-y-4">
+                        <Card>
+                            <div className="flex items-center justify-between mb-3">
+                                <h3 className="font-semibold text-slate-900 text-sm">Notifications</h3>
+                                {unreadCount > 0 && (
+                                    <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-jci-blue text-white text-[10px] font-bold">{unreadCount} new</span>
+                                )}
                             </div>
-                        </LoadingState>
-                    </Card>
-
-                    <Card title="Quick Links" className="bg-gradient-to-br from-slate-900 to-slate-800 text-white border-none">
-                        <div className="space-y-2">
-                            <button className="w-full text-left p-2 hover:bg-white/10 rounded flex items-center gap-2 text-sm">
-                                <FileText size={16} className="text-slate-400" /> Policy Documents
-                            </button>
-                            <button className="w-full text-left p-2 hover:bg-white/10 rounded flex items-center gap-2 text-sm">
-                                <FileText size={16} className="text-slate-400" /> Branding Guidelines
-                            </button>
-                        </div>
-                    </Card>
+                            <div className="max-h-96 overflow-y-auto -mx-4 px-4">
+                                <NotificationsList
+                                    notifications={notifications}
+                                    loading={loading}
+                                    error={error}
+                                    onRead={markNotificationAsRead}
+                                />
+                            </div>
+                        </Card>
+                    </div>
                 </div>
             </div>
 
-            {/* Announcement Edit Modal */}
+            {/* Edit modal */}
             <AnnouncementModal
                 isOpen={isAnnouncementModalOpen}
                 onClose={() => {
@@ -194,12 +230,50 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
                     }
                 }}
             />
-      <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
+            <ConfirmDialog
+                open={confirmState.open}
+                title={confirmState.title}
+                message={confirmState.message}
+                confirmLabel={confirmState.confirmLabel}
+                variant={confirmState.variant}
+                onConfirm={confirmState.onConfirm}
+                onCancel={() => setConfirmState(CONFIRM_CLOSED)}
+            />
         </div>
     );
 };
 
-// Announcements Tab Component
+// ─── Notifications list (shared between mobile panel and desktop sidebar) ───
+
+interface NotificationsListProps {
+    notifications: any[];
+    loading: boolean;
+    error: string | null;
+    onRead: (id: string) => void;
+}
+
+const NotificationsList: React.FC<NotificationsListProps> = ({ notifications, loading, error, onRead }) => (
+    <LoadingState loading={loading} error={error} empty={notifications.length === 0} emptyMessage="No notifications">
+        <div className="space-y-2">
+            {notifications.map(notif => (
+                <div
+                    key={notif.id}
+                    className={`p-3 rounded-lg border text-sm cursor-pointer transition-colors ${notif.read ? 'bg-white border-slate-100 hover:bg-slate-50' : 'bg-blue-50 border-blue-100 hover:bg-blue-100'}`}
+                    onClick={() => !notif.read && onRead(notif.id)}
+                >
+                    <div className="flex justify-between items-start gap-2 mb-0.5">
+                        <span className={`font-semibold leading-snug ${notif.read ? 'text-slate-700' : 'text-slate-900'}`}>{notif.title}</span>
+                        <span className="text-[10px] text-slate-400 flex-shrink-0 mt-0.5">{formatRelativeTime(notif.timestamp)}</span>
+                    </div>
+                    <p className="text-slate-500 text-xs leading-relaxed">{notif.message}</p>
+                </div>
+            ))}
+        </div>
+    </LoadingState>
+);
+
+// ─── Announcements feed ───────────────────────────────────────────────────────
+
 interface AnnouncementsTabProps {
     posts: NewsPost[];
     loading: boolean;
@@ -209,63 +283,57 @@ interface AnnouncementsTabProps {
     onDelete: (postId: string) => void;
 }
 
-const AnnouncementsTab: React.FC<AnnouncementsTabProps> = ({ posts, loading, error, canManage, onEdit, onDelete }) => {
+const AnnouncementsTab: React.FC<AnnouncementsTabProps> = ({ posts, loading, error, canManage, onEdit, onDelete }) => (
+    <LoadingState loading={loading} error={error} empty={posts.length === 0} emptyMessage="No announcements yet">
+        <div className="divide-y divide-slate-100">
+            {posts.map(post => (
+                <div key={post.id} className="p-4 sm:p-5 hover:bg-slate-50/60 transition-colors group">
+                    <div className="flex items-start gap-3">
+                        {/* Icon */}
+                        <div className="w-9 h-9 rounded-full bg-jci-blue/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <Megaphone className="text-jci-blue" size={16} />
+                        </div>
 
-    return (
-        <LoadingState loading={loading} error={error} empty={posts.length === 0} emptyMessage="No announcements yet">
-            <div className="divide-y divide-slate-100">
-                {posts.map(post => (
-                    <div key={post.id} className="p-6 hover:bg-slate-50 transition-colors">
-                        <div className="flex items-start justify-between mb-3">
-                            <div className="flex items-center gap-3 flex-1">
-                                <div className="w-12 h-12 rounded-full bg-jci-blue/10 flex items-center justify-center flex-shrink-0">
-                                    <Megaphone className="text-jci-blue" size={20} />
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                                <div>
+                                    <span className="font-semibold text-slate-900 text-sm">{post.author.name}</span>
+                                    <span className="text-slate-400 text-xs ml-2">{post.author.role}</span>
                                 </div>
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <h4 className="font-bold text-slate-900">{post.author.name}</h4>
-                                        <Badge variant="info">Announcement</Badge>
-                                    </div>
-                                    <p className="text-xs text-slate-500">{post.author.role} • {formatRelativeTime(post.timestamp)}</p>
+                                <div className="flex items-center gap-1 flex-shrink-0">
+                                    <span className="text-xs text-slate-400">{formatRelativeTime(post.timestamp)}</span>
+                                    {canManage && (
+                                        <div className="flex gap-1 ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button
+                                                onClick={() => onEdit(post)}
+                                                className="p-1 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors"
+                                                aria-label="Edit"
+                                            >
+                                                <Edit size={13} />
+                                            </button>
+                                            <button
+                                                onClick={() => onDelete(post.id)}
+                                                className="p-1 rounded hover:bg-red-100 text-slate-400 hover:text-red-600 transition-colors"
+                                                aria-label="Delete"
+                                            >
+                                                <Trash2 size={13} />
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
-                            {canManage && (
-                                <div className="flex gap-2">
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => onEdit(post)}
-                                    >
-                                        <Edit size={14} />
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => onDelete(post.id)}
-                                        className="text-red-500 hover:text-red-700"
-                                    >
-                                        <Trash2 size={14} />
-                                    </Button>
-                                </div>
-                            )}
-                        </div>
-                        <div className="pl-15 mb-4">
-                            <p className="text-slate-700 leading-relaxed">{post.content}</p>
-                        </div>
-                        <div className="flex items-center gap-4 text-sm text-slate-500">
-                            <div className="flex items-center gap-1">
-                                <Eye size={14} />
-                                <span>{post.likes || 0} views</span>
-                            </div>
+                            <p className="text-slate-700 text-sm leading-relaxed">{post.content}</p>
                         </div>
                     </div>
-                ))}
-            </div>
-        </LoadingState>
-    );
-};
+                </div>
+            ))}
+        </div>
+    </LoadingState>
+);
 
-// Announcement Modal Component
+// ─── Edit modal ───────────────────────────────────────────────────────────────
+
 interface AnnouncementModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -274,57 +342,20 @@ interface AnnouncementModalProps {
     onSave: (data: any) => void | Promise<void>;
 }
 
-const AnnouncementModal: React.FC<AnnouncementModalProps> = ({ isOpen, onClose, announcement, members, onSave }) => {
+const AnnouncementModal: React.FC<AnnouncementModalProps> = ({ isOpen, onClose, announcement, onSave }) => {
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [formData, setFormData] = useState({
-        title: '',
-        content: '',
-        priority: 'Normal' as 'Low' | 'Normal' | 'High' | 'Urgent',
-        targetAudience: 'All Members' as 'All Members' | 'Board Only' | 'Specific Roles' | 'Specific Members',
-        selectedRoles: [] as string[],
-        selectedMembers: [] as string[],
-        scheduledDate: '',
-        expiresDate: '',
-        sendEmail: false,
-        sendNotification: true,
-    });
+    const [content, setContent] = useState('');
 
     useEffect(() => {
-        if (announcement) {
-            setFormData({
-                title: announcement.content.split('\n')[0] || '',
-                content: announcement.content,
-                priority: 'Normal',
-                targetAudience: 'All Members',
-                selectedRoles: [],
-                selectedMembers: [],
-                scheduledDate: '',
-                expiresDate: '',
-                sendEmail: false,
-                sendNotification: true,
-            });
-        } else {
-            setFormData({
-                title: '',
-                content: '',
-                priority: 'Normal',
-                targetAudience: 'All Members',
-                selectedRoles: [],
-                selectedMembers: [],
-                scheduledDate: '',
-                expiresDate: '',
-                sendEmail: false,
-                sendNotification: true,
-            });
-        }
+        setContent(announcement?.content ?? '');
     }, [announcement, isOpen]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formData.content.trim() || isSubmitting) return;
+        if (!content.trim() || isSubmitting) return;
         setIsSubmitting(true);
         try {
-            await onSave(formData);
+            await onSave({ content });
         } finally {
             setIsSubmitting(false);
         }
@@ -334,144 +365,23 @@ const AnnouncementModal: React.FC<AnnouncementModalProps> = ({ isOpen, onClose, 
         <Modal
             isOpen={isOpen}
             onClose={onClose}
-            title={announcement ? 'Edit Announcement' : 'Create Announcement'}
-            size="lg"
+            title="Edit Announcement"
+            size="md"
             drawerOnMobile
         >
             <form onSubmit={handleSubmit} className="space-y-4">
-                <Input
-                    label="Title"
-                    placeholder="Announcement title..."
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    required
-                />
-
                 <Textarea
                     label="Content"
                     placeholder="Announcement content..."
-                    value={formData.content}
-                    onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                    value={content}
+                    onChange={(e) => setContent(e.target.value.slice(0, MAX_CHARS))}
                     rows={6}
                     required
                 />
-
-                <div className="grid grid-cols-2 gap-4">
-                    <Select
-                        label="Priority"
-                        value={formData.priority}
-                        onChange={(e) => setFormData({ ...formData, priority: e.target.value as any })}
-                        options={[
-                            { label: 'Low', value: 'Low' },
-                            { label: 'Normal', value: 'Normal' },
-                            { label: 'High', value: 'High' },
-                            { label: 'Urgent', value: 'Urgent' },
-                        ]}
-                    />
-                    <Select
-                        label="Target Audience"
-                        value={formData.targetAudience}
-                        onChange={(e) => setFormData({ ...formData, targetAudience: e.target.value as any })}
-                        options={[
-                            { label: 'All Members', value: 'All Members' },
-                            { label: 'Board Only', value: 'Board Only' },
-                            { label: 'Specific Roles', value: 'Specific Roles' },
-                            { label: 'Specific Members', value: 'Specific Members' },
-                        ]}
-                    />
-                </div>
-
-                {formData.targetAudience === 'Specific Roles' && (
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Select Roles</label>
-                        <div className="space-y-2 max-h-40 overflow-y-auto border border-slate-200 rounded-lg p-2">
-                            {['MEMBER', 'BOARD', 'ADMIN', 'PROJECT_LEAD', 'COMMITTEE_CHAIR'].map(role => (
-                                <label key={role} className="flex items-center gap-2 p-2 hover:bg-slate-50 rounded cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.selectedRoles.includes(role)}
-                                        onChange={(e) => {
-                                            if (e.target.checked) {
-                                                setFormData({ ...formData, selectedRoles: [...formData.selectedRoles, role] });
-                                            } else {
-                                                setFormData({ ...formData, selectedRoles: formData.selectedRoles.filter(r => r !== role) });
-                                            }
-                                        }}
-                                        className="rounded border-slate-300"
-                                    />
-                                    <span className="text-sm text-slate-700">{role}</span>
-                                </label>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {formData.targetAudience === 'Specific Members' && (
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Select Members</label>
-                        <div className="space-y-2 max-h-40 overflow-y-auto border border-slate-200 rounded-lg p-2">
-                            {members.map(m => (
-                                <label key={m.id} className="flex items-center gap-2 p-2 hover:bg-slate-50 rounded cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.selectedMembers.includes(m.id)}
-                                        onChange={(e) => {
-                                            if (e.target.checked) {
-                                                setFormData({ ...formData, selectedMembers: [...formData.selectedMembers, m.id] });
-                                            } else {
-                                                setFormData({ ...formData, selectedMembers: formData.selectedMembers.filter(id => id !== m.id) });
-                                            }
-                                        }}
-                                        className="rounded border-slate-300"
-                                    />
-                                    <img src={m.avatar || getInitialsSvg(m.name, 24)} alt={m.name} className="w-6 h-6 rounded-full" onError={(e) => { e.currentTarget.src = getInitialsSvg(m.name, 24); }} />
-                                    <span className="text-sm text-slate-700">{m.name}</span>
-                                </label>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-4">
-                    <Input
-                        label="Scheduled Date (Optional)"
-                        type="datetime-local"
-                        value={formData.scheduledDate}
-                        onChange={(e) => setFormData({ ...formData, scheduledDate: e.target.value })}
-                    />
-                    <Input
-                        label="Expires Date (Optional)"
-                        type="datetime-local"
-                        value={formData.expiresDate}
-                        onChange={(e) => setFormData({ ...formData, expiresDate: e.target.value })}
-                    />
-                </div>
-
-                <div className="space-y-2">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                            type="checkbox"
-                            checked={formData.sendNotification}
-                            onChange={(e) => setFormData({ ...formData, sendNotification: e.target.checked })}
-                            className="rounded border-slate-300"
-                        />
-                        <span className="text-sm text-slate-700">Send in-app notification</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                            type="checkbox"
-                            checked={formData.sendEmail}
-                            onChange={(e) => setFormData({ ...formData, sendEmail: e.target.checked })}
-                            className="rounded border-slate-300"
-                        />
-                        <span className="text-sm text-slate-700">Send email notification</span>
-                    </label>
-                </div>
-
-                <div className="flex gap-3 pt-4">
-                    <Button type="submit" className="flex-1" disabled={isSubmitting}>
-                        <Send size={16} className="mr-2" />
-                        {isSubmitting ? 'Saving...' : (announcement ? 'Update Announcement' : 'Publish Announcement')}
+                <p className="text-xs text-slate-400 text-right">{content.length}/{MAX_CHARS}</p>
+                <div className="flex gap-3 pt-2">
+                    <Button type="submit" className="flex-1" disabled={isSubmitting || !content.trim()}>
+                        {isSubmitting ? 'Saving...' : 'Update Announcement'}
                     </Button>
                     <Button type="button" variant="ghost" onClick={onClose}>
                         Cancel
