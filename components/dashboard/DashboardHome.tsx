@@ -1388,143 +1388,196 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         })()}
       </Modal>
 
-      {/* Profile Completion Drawer */}
-      {profileCompleteness && (
-        <Drawer
-          isOpen={showProfileDrawer}
-          onClose={() => setShowProfileDrawer(false)}
-          title="Complete Your Profile"
-          position="bottom"
-          size="xl"
-          footer={
-            <div className="flex gap-3 justify-end">
-              <Button variant="secondary" onClick={() => setShowProfileDrawer(false)}>Cancel</Button>
-              <Button
-                variant="primary"
-                disabled={profileSaving || Object.keys(profileDraft).length === 0}
-                onClick={async () => {
-                  if (!member?.id || Object.keys(profileDraft).length === 0) return;
-                  setProfileSaving(true);
-                  try {
-                    const updates: Record<string, unknown> = {};
-                    if ('companyDescription' in profileDraft) updates.companyDescription = profileDraft.companyDescription;
-                    if ('idealReferral' in profileDraft) updates.idealReferral = profileDraft.idealReferral;
-                    if ('specialOffer' in profileDraft || 'companyWebsite' in profileDraft || 'acceptInternationalBusiness' in profileDraft || 'levelOfManagement' in profileDraft) {
-                      updates.business = {
-                        ...(member.business ?? {}),
-                        ...(profileDraft.specialOffer !== undefined ? { specialOffer: profileDraft.specialOffer } : {}),
-                        ...(profileDraft.companyWebsite !== undefined ? { companyWebsite: profileDraft.companyWebsite } : {}),
-                        ...(profileDraft.acceptInternationalBusiness !== undefined ? { acceptInternationalBusiness: profileDraft.acceptInternationalBusiness } : {}),
-                        ...(profileDraft.levelOfManagement !== undefined ? { levelOfManagement: profileDraft.levelOfManagement } : {}),
-                      };
-                    }
-                    if ('address' in profileDraft) updates.address = profileDraft.address;
-                    if ('emergencyContactName' in profileDraft) updates.emergencyContactName = profileDraft.emergencyContactName;
-                    if ('emergencyContactRelationship' in profileDraft) updates.emergencyContactRelationship = profileDraft.emergencyContactRelationship;
-                    if ('emergencyContact' in profileDraft) updates.emergencyContact = profileDraft.emergencyContact;
-                    if ('shirtStyle' in profileDraft) updates.shirtStyle = profileDraft.shirtStyle;
-                    if ('tshirtSize' in profileDraft) updates.tshirtSize = profileDraft.tshirtSize;
-                    if ('jacketSize' in profileDraft) updates.jacketSize = profileDraft.jacketSize;
-                    await MembersService.updateMember(member.id, updates as Parameters<typeof MembersService.updateMember>[1]);
-                    showToast('Profile updated!', 'success');
-                    setShowProfileDrawer(false);
-                    setProfileDraft({});
-                  } catch (err) {
-                    showToast('Failed to save. Please try again.', 'error');
-                  } finally {
-                    setProfileSaving(false);
-                  }
-                }}
-              >
-                {profileSaving ? 'Saving…' : 'Save'}
-              </Button>
-            </div>
+      {/* Profile Completion Sheet */}
+      {showProfileDrawer && profileCompleteness && (() => {
+        const { done, total, pct, missing } = profileCompleteness;
+        const set = (key: string, v: string) => setProfileDraft(d => ({ ...d, [key]: v }));
+        const val = (key: string, fallback = '') => profileDraft[key] ?? fallback;
+        const hasBiz = missing.some(f => ['Company description','Ideal referral','Special member offer','Business info'].includes(f.label));
+        const hasPersonal = missing.some(f => f.label === 'Address');
+        const hasEmergency = missing.some(f => f.label === 'Emergency contact');
+        const hasApparel = missing.some(f => f.label === 'Apparel & Items');
+        const r = 26, circ = 2 * Math.PI * r;
+        const handleSave = async () => {
+          if (!member?.id || Object.keys(profileDraft).length === 0) return;
+          setProfileSaving(true);
+          try {
+            const updates: Record<string, unknown> = {};
+            if ('companyDescription' in profileDraft) updates.companyDescription = profileDraft.companyDescription;
+            if ('idealReferral' in profileDraft) updates.idealReferral = profileDraft.idealReferral;
+            if ('specialOffer' in profileDraft || 'companyWebsite' in profileDraft || 'acceptInternationalBusiness' in profileDraft || 'levelOfManagement' in profileDraft) {
+              updates.business = {
+                ...(member.business ?? {}),
+                ...(profileDraft.specialOffer !== undefined ? { specialOffer: profileDraft.specialOffer } : {}),
+                ...(profileDraft.companyWebsite !== undefined ? { companyWebsite: profileDraft.companyWebsite } : {}),
+                ...(profileDraft.acceptInternationalBusiness !== undefined ? { acceptInternationalBusiness: profileDraft.acceptInternationalBusiness } : {}),
+                ...(profileDraft.levelOfManagement !== undefined ? { levelOfManagement: profileDraft.levelOfManagement } : {}),
+              };
+            }
+            if ('address' in profileDraft) updates.address = profileDraft.address;
+            if ('emergencyContactName' in profileDraft) updates.emergencyContactName = profileDraft.emergencyContactName;
+            if ('emergencyContactRelationship' in profileDraft) updates.emergencyContactRelationship = profileDraft.emergencyContactRelationship;
+            if ('emergencyContact' in profileDraft) updates.emergencyContact = profileDraft.emergencyContact;
+            if ('shirtStyle' in profileDraft) updates.shirtStyle = profileDraft.shirtStyle;
+            if ('tshirtSize' in profileDraft) updates.tshirtSize = profileDraft.tshirtSize;
+            if ('jacketSize' in profileDraft) updates.jacketSize = profileDraft.jacketSize;
+            await MembersService.updateMember(member.id, updates as Parameters<typeof MembersService.updateMember>[1]);
+            showToast('Profile updated!', 'success');
+            setShowProfileDrawer(false);
+            setProfileDraft({});
+          } catch {
+            showToast('Failed to save. Please try again.', 'error');
+          } finally {
+            setProfileSaving(false);
           }
-        >
-          <div className="space-y-6">
-            {/* Progress summary */}
-            <div className="flex items-center gap-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-700/40">
-              <div className="flex-1">
-                <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">{profileCompleteness.done} of {profileCompleteness.total} fields filled — {profileCompleteness.pct}% complete</p>
-                <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5">Fill in the missing fields below to complete your profile.</p>
+        };
+        return (
+          <>
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" aria-hidden="true" onClick={() => setShowProfileDrawer(false)} />
+            <div className="fixed z-50 bg-white flex flex-col bottom-0 left-0 right-0 rounded-t-2xl max-h-[88vh] md:bottom-0 md:top-0 md:left-auto md:right-0 md:rounded-none md:rounded-l-2xl md:max-h-none md:w-[460px] shadow-2xl">
+              {/* drag handle (mobile only) */}
+              <div className="md:hidden pt-2.5 pb-1 flex justify-center flex-none" aria-hidden="true">
+                <div className="w-10 h-1 rounded-full bg-slate-300" />
+              </div>
+              {/* Gradient header */}
+              <div className="flex-none px-5 py-4 flex items-center gap-4 rounded-t-2xl md:rounded-none md:rounded-tl-2xl" style={{ background: 'linear-gradient(135deg, rgba(217,119,6,0.96) 0%, rgba(194,65,12,0.93) 55%, rgba(153,27,27,0.90) 100%)' }}>
+                <div className="relative flex-shrink-0 w-14 h-14">
+                  <svg width="56" height="56" viewBox="0 0 56 56" className="-rotate-90" aria-hidden="true">
+                    <circle cx="28" cy="28" r={r} fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="4.5" />
+                    <circle cx="28" cy="28" r={r} fill="none" stroke="white" strokeWidth="4.5"
+                      strokeDasharray={`${circ} ${circ}`} strokeDashoffset={circ * (1 - pct / 100)}
+                      strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.7s ease' }} />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-[13px] font-black text-white leading-none">{pct}%</span>
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-200/75 leading-none mb-0.5">Complete Your Profile</p>
+                  <h3 className="font-extrabold text-white text-base leading-snug truncate">{member?.name ?? 'Your Profile'}</h3>
+                  <p className="text-[11px] text-amber-200/70 mt-0.5">{done} of {total} sections filled</p>
+                </div>
+                <button onClick={() => setShowProfileDrawer(false)} aria-label="Close"
+                  className="flex-shrink-0 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-white" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+              </div>
+              {/* Scrollable sections */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {hasBiz && (
+                  <div className="rounded-xl border border-slate-200 overflow-hidden">
+                    <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-50 border-b border-slate-200">
+                      <span className="text-sm" aria-hidden="true">🏢</span>
+                      <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Business Profile</span>
+                    </div>
+                    <div className="p-4 space-y-3">
+                      {missing.find(f => f.label === 'Company description') && (
+                        <Textarea label="Company Description" rows={2}
+                          value={val('companyDescription', member?.companyDescription ?? '')}
+                          onChange={e => set('companyDescription', e.target.value)} />
+                      )}
+                      {missing.find(f => f.label === 'Ideal referral') && (
+                        <Input label="Ideal Referral" placeholder="e.g. SME owners in F&B industry"
+                          value={val('idealReferral', member?.idealReferral ?? '')}
+                          onChange={e => set('idealReferral', e.target.value)} />
+                      )}
+                      {missing.find(f => f.label === 'Special member offer') && (
+                        <Textarea label="Special Member Offer" rows={2} placeholder="e.g. 10% discount for JCI KL members"
+                          value={val('specialOffer', member?.business?.specialOffer ?? '')}
+                          onChange={e => set('specialOffer', e.target.value)} />
+                      )}
+                      {missing.find(f => f.label === 'Business info') && (<>
+                        <Input label="Company Website" type="url" placeholder="https://"
+                          value={val('companyWebsite', member?.business?.companyWebsite ?? '')}
+                          onChange={e => set('companyWebsite', e.target.value)} />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <Select label="International Business"
+                            value={val('acceptInternationalBusiness', member?.business?.acceptInternationalBusiness ?? '')}
+                            onChange={e => set('acceptInternationalBusiness', e.target.value)}
+                            options={[{ value: '', label: 'Select…' }, { value: 'Yes', label: 'Yes' }, { value: 'No', label: 'No' }, { value: 'Willing to Explore', label: 'Willing to Explore' }]} />
+                          <Input label="Level of Management" placeholder="e.g. Senior Management"
+                            value={val('levelOfManagement', member?.business?.levelOfManagement ?? '')}
+                            onChange={e => set('levelOfManagement', e.target.value)} />
+                        </div>
+                      </>)}
+                    </div>
+                  </div>
+                )}
+                {hasPersonal && (
+                  <div className="rounded-xl border border-slate-200 overflow-hidden">
+                    <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-50 border-b border-slate-200">
+                      <span className="text-sm" aria-hidden="true">🏠</span>
+                      <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Personal Details</span>
+                    </div>
+                    <div className="p-4">
+                      <Input label="Address"
+                        value={val('address', member?.address ?? '')}
+                        onChange={e => set('address', e.target.value)} />
+                    </div>
+                  </div>
+                )}
+                {hasEmergency && (
+                  <div className="rounded-xl border border-slate-200 overflow-hidden">
+                    <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-50 border-b border-slate-200">
+                      <span className="text-sm" aria-hidden="true">🚨</span>
+                      <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Emergency Contact</span>
+                    </div>
+                    <div className="p-4 space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <Input label="Name"
+                          value={val('emergencyContactName', member?.emergencyContactName ?? '')}
+                          onChange={e => set('emergencyContactName', e.target.value)} />
+                        <Input label="Relationship"
+                          value={val('emergencyContactRelationship', member?.emergencyContactRelationship ?? '')}
+                          onChange={e => set('emergencyContactRelationship', e.target.value)} />
+                      </div>
+                      <Input label="Phone" type="tel"
+                        value={val('emergencyContact', member?.emergencyContact ?? '')}
+                        onChange={e => set('emergencyContact', e.target.value)} />
+                    </div>
+                  </div>
+                )}
+                {hasApparel && (
+                  <div className="rounded-xl border border-slate-200 overflow-hidden">
+                    <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-50 border-b border-slate-200">
+                      <span className="text-sm" aria-hidden="true">👕</span>
+                      <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Apparel & Items</span>
+                    </div>
+                    <div className="p-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <Select label="Shirt Style"
+                          value={val('shirtStyle', member?.shirtStyle ?? '')}
+                          onChange={e => set('shirtStyle', e.target.value)}
+                          options={[{ value: '', label: 'Select…' }, { value: 'Unisex', label: 'Unisex' }, { value: 'Lady Cut', label: 'Lady Cut' }]} />
+                        <Select label="T-Shirt Size"
+                          value={val('tshirtSize', member?.tshirtSize ?? '')}
+                          onChange={e => set('tshirtSize', e.target.value)}
+                          options={[{ value: '', label: 'Select…' }, ...['XS','S','M','L','XL','2XL','3XL','5XL','7XL'].map(s => ({ value: s, label: s }))]} />
+                        <Select label="Jacket Size"
+                          value={val('jacketSize', member?.jacketSize ?? '')}
+                          onChange={e => set('jacketSize', e.target.value)}
+                          options={[{ value: '', label: 'Select…' }, ...['XS','S','M','L','XL','2XL','3XL','5XL','7XL'].map(s => ({ value: s, label: s }))]} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* Footer */}
+              <div className="flex-none px-4 py-3 border-t border-slate-100 bg-white flex items-center gap-3">
+                <button onClick={() => setShowProfileDrawer(false)}
+                  className="flex-shrink-0 px-4 py-2.5 text-sm font-semibold text-slate-500 hover:text-slate-700 transition-colors rounded-xl hover:bg-slate-100">
+                  Cancel
+                </button>
+                <button disabled={profileSaving || Object.keys(profileDraft).length === 0}
+                  onClick={handleSave}
+                  className="flex-1 py-2.5 rounded-xl bg-jci-blue text-white text-sm font-bold disabled:opacity-40 hover:bg-opacity-90 transition-all active:scale-[0.98]">
+                  {profileSaving ? 'Saving…' : 'Save Changes'}
+                </button>
               </div>
             </div>
-
-            {profileCompleteness.missing.map(field => {
-              const set = (key: string, val: string) => setProfileDraft(d => ({ ...d, [key]: val }));
-              const val = (key: string, fallback = '') => profileDraft[key] ?? fallback;
-
-              if (field.label === 'Company description') return (
-                <Textarea key={field.label} label="Company Description" rows={3}
-                  value={val('companyDescription', member?.companyDescription ?? '')}
-                  onChange={e => set('companyDescription', e.target.value)} />
-              );
-              if (field.label === 'Ideal referral') return (
-                <Input key={field.label} label="Ideal Referral" placeholder="e.g. SME owners in F&B industry"
-                  value={val('idealReferral', member?.idealReferral ?? '')}
-                  onChange={e => set('idealReferral', e.target.value)} />
-              );
-              if (field.label === 'Special member offer') return (
-                <Textarea key={field.label} label="Special Member Offer" rows={2} placeholder="e.g. 10% discount for JCI KL members"
-                  value={val('specialOffer', member?.business?.specialOffer ?? '')}
-                  onChange={e => set('specialOffer', e.target.value)} />
-              );
-              if (field.label === 'Address') return (
-                <Input key={field.label} label="Address"
-                  value={val('address', member?.address ?? '')}
-                  onChange={e => set('address', e.target.value)} />
-              );
-              if (field.label === 'Emergency contact') return (
-                <div key={field.label} className="space-y-3">
-                  <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Emergency Contact</p>
-                  <Input label="Name"
-                    value={val('emergencyContactName', member?.emergencyContactName ?? '')}
-                    onChange={e => set('emergencyContactName', e.target.value)} />
-                  <Input label="Relationship"
-                    value={val('emergencyContactRelationship', member?.emergencyContactRelationship ?? '')}
-                    onChange={e => set('emergencyContactRelationship', e.target.value)} />
-                  <Input label="Phone" type="tel"
-                    value={val('emergencyContact', member?.emergencyContact ?? '')}
-                    onChange={e => set('emergencyContact', e.target.value)} />
-                </div>
-              );
-              if (field.label === 'Apparel & Items') return (
-                <div key={field.label} className="space-y-3">
-                  <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Apparel & Items</p>
-                  <Select label="Shirt Style"
-                    value={val('shirtStyle', member?.shirtStyle ?? '')}
-                    onChange={e => set('shirtStyle', e.target.value)}
-                    options={[{ value: '', label: 'Select…' }, { value: 'Unisex', label: 'Unisex' }, { value: 'Lady Cut', label: 'Lady Cut' }]} />
-                  <Select label="T-Shirt Size"
-                    value={val('tshirtSize', member?.tshirtSize ?? '')}
-                    onChange={e => set('tshirtSize', e.target.value)}
-                    options={[{ value: '', label: 'Select…' }, ...['XS','S','M','L','XL','2XL','3XL','5XL','7XL'].map(s => ({ value: s, label: s }))]} />
-                  <Select label="Jacket Size"
-                    value={val('jacketSize', member?.jacketSize ?? '')}
-                    onChange={e => set('jacketSize', e.target.value)}
-                    options={[{ value: '', label: 'Select…' }, ...['XS','S','M','L','XL','2XL','3XL','5XL','7XL'].map(s => ({ value: s, label: s }))]} />
-                </div>
-              );
-              if (field.label === 'Business info') return (
-                <div key={field.label} className="space-y-3">
-                  <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Business Info</p>
-                  <Input label="Company Website" type="url" placeholder="https://"
-                    value={val('companyWebsite', member?.business?.companyWebsite ?? '')}
-                    onChange={e => set('companyWebsite', e.target.value)} />
-                  <Select label="Accept International Business"
-                    value={val('acceptInternationalBusiness', member?.business?.acceptInternationalBusiness ?? '')}
-                    onChange={e => set('acceptInternationalBusiness', e.target.value)}
-                    options={[{ value: '', label: 'Select…' }, { value: 'Yes', label: 'Yes' }, { value: 'No', label: 'No' }, { value: 'Willing to Explore', label: 'Willing to Explore' }]} />
-                  <Input label="Level of Management" placeholder="e.g. Senior Management"
-                    value={val('levelOfManagement', member?.business?.levelOfManagement ?? '')}
-                    onChange={e => set('levelOfManagement', e.target.value)} />
-                </div>
-              );
-              return null;
-            })}
-          </div>
-        </Drawer>
-      )}
+          </>
+        );
+      })()}
     </div>
   );
 };
