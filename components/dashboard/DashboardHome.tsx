@@ -1435,12 +1435,12 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
           <>
             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" aria-hidden="true" onClick={() => setShowProfileDrawer(false)} />
             <div className="fixed z-50 bg-white flex flex-col bottom-0 left-0 right-0 rounded-t-2xl max-h-[88vh] md:bottom-0 md:top-0 md:left-auto md:right-0 md:rounded-none md:rounded-l-2xl md:max-h-none md:w-[460px] shadow-2xl">
-              {/* drag handle (mobile only) */}
-              <div className="md:hidden pt-2.5 pb-1 flex justify-center flex-none" aria-hidden="true">
-                <div className="w-10 h-1 rounded-full bg-slate-300" />
-              </div>
-              {/* Gradient header */}
-              <div className="flex-none px-5 py-4 flex items-center gap-4 rounded-t-2xl md:rounded-none md:rounded-tl-2xl" style={{ background: 'linear-gradient(135deg, rgba(217,119,6,0.96) 0%, rgba(194,65,12,0.93) 55%, rgba(153,27,27,0.90) 100%)' }}>
+              {/* Gradient header — drag handle integrated inside (matches journey drawer pattern) */}
+              <div className="flex-none px-5 pt-3 pb-4 flex flex-col rounded-t-2xl md:rounded-none md:rounded-tl-2xl" style={{ background: 'linear-gradient(135deg, rgba(217,119,6,0.96) 0%, rgba(194,65,12,0.93) 55%, rgba(153,27,27,0.90) 100%)' }}>
+                <div className="flex justify-center pb-2 md:hidden" aria-hidden="true">
+                  <div className="w-10 h-1 rounded-full bg-white/30" />
+                </div>
+                <div className="flex items-center gap-4">
                 <div className="relative flex-shrink-0 w-14 h-14">
                   <svg width="56" height="56" viewBox="0 0 56 56" className="-rotate-90" aria-hidden="true">
                     <circle cx="28" cy="28" r={r} fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="4.5" />
@@ -1461,6 +1461,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                   className="flex-shrink-0 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-white" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
                 </button>
+                </div>
               </div>
               {/* Scrollable sections */}
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
