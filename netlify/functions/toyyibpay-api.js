@@ -31,16 +31,35 @@ const CREATE_BILL_ALLOWED_PARAMS = [
   'categoryCode', // required by ToyyibPay to assign the bill to a category
 ];
 
-const SECRET_KEY = process.env.TOYYIBPAY_SECRET_KEY;
-if (!SECRET_KEY) throw new Error('TOYYIBPAY_SECRET_KEY env var not set');
-const IS_SANDBOX = process.env.TOYYIBPAY_SANDBOX !== 'false'; // default sandbox
-const BASE_URL = IS_SANDBOX
-  ? 'https://dev.toyyibpay.com/index.php/api'
-  : 'https://toyyibpay.com/index.php/api';
+// Sandbox key = TOYYIBPAY_SECRET_KEY, Production key = TOYYIBPAY_SECRET_KEY_PROD.
+// Mode (sandbox vs production) is read from Firestore systemConfig/toyyibpay at request time,
+// falling back to TOYYIBPAY_SANDBOX env var if Firestore is unavailable.
+const SECRET_KEY_SANDBOX = process.env.TOYYIBPAY_SECRET_KEY;
+const SECRET_KEY_PROD = process.env.TOYYIBPAY_SECRET_KEY_PROD || process.env.TOYYIBPAY_SECRET_KEY;
+if (!SECRET_KEY_SANDBOX) throw new Error('TOYYIBPAY_SECRET_KEY env var not set');
 
-async function callToyyib(endpoint, extraParams = {}) {
-  const params = new URLSearchParams({ userSecretKey: SECRET_KEY, ...extraParams });
-  const response = await fetch(`${BASE_URL}/${endpoint}`, {
+const ENV_SANDBOX_DEFAULT = process.env.TOYYIBPAY_SANDBOX !== 'false'; // env fallback
+
+async function getToyyibMode() {
+  try {
+    const snap = await getFirestore().doc('systemConfig/toyyibpay').get();
+    if (snap.exists) {
+      const data = snap.data();
+      if (typeof data.isSandbox === 'boolean') return data.isSandbox;
+    }
+  } catch (err) {
+    console.warn('[toyyibpay-api] Could not read systemConfig/toyyibpay, using env fallback:', err.message);
+  }
+  return ENV_SANDBOX_DEFAULT;
+}
+
+async function callToyyib(endpoint, extraParams = {}, isSandbox) {
+  const secretKey = isSandbox ? SECRET_KEY_SANDBOX : SECRET_KEY_PROD;
+  const baseUrl = isSandbox
+    ? 'https://dev.toyyibpay.com/index.php/api'
+    : 'https://toyyibpay.com/index.php/api';
+  const params = new URLSearchParams({ userSecretKey: secretKey, ...extraParams });
+  const response = await fetch(`${baseUrl}/${endpoint}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: params.toString(),
@@ -50,9 +69,9 @@ async function callToyyib(endpoint, extraParams = {}) {
 }
 
 // Try to call ToyyibPay; return fallback when endpoint is unsupported (404/405) or returns non-JSON
-async function callToyyibOrEmpty(endpoint, extraParams = {}, fallback = []) {
+async function callToyyibOrEmpty(endpoint, extraParams = {}, isSandbox, fallback = []) {
   try {
-    return await callToyyib(endpoint, extraParams);
+    return await callToyyib(endpoint, extraParams, isSandbox);
   } catch (err) {
     const isUnsupported =
       err.message.includes('HTTP 404') ||
@@ -110,17 +129,36 @@ exports.handler = async (event) => {
 
   const { action, ...params } = body;
 
-  // createCategory and createBill are BOARD+-only; all other actions require only authentication
+  // createCategory, createBill, and setMode are BOARD+-only; all other actions require only authentication
   if (
-    (action === 'createCategory' || action === 'createBill') &&
+    (action === 'createCategory' || action === 'createBill' || action === 'setMode') &&
     !['BOARD', 'ADMIN', 'SUPER_ADMIN'].includes(callerRole)
   ) {
     return { statusCode: 403, headers: cors, body: JSON.stringify({ error: 'Forbidden' }) };
   }
 
+  // Resolve sandbox/production mode once per request from Firestore (with env fallback)
+  const isSandbox = await getToyyibMode();
+
   try {
     let result;
     switch (action) {
+      case 'getMode':
+        // Returns current mode so client can build correct payment URLs
+        result = { isSandbox, hasProdKey: !!process.env.TOYYIBPAY_SECRET_KEY_PROD };
+        break;
+      case 'setMode': {
+        // BOARD+ can toggle sandbox/production mode — persisted to Firestore
+        if (typeof params.isSandbox !== 'boolean') {
+          return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'isSandbox (boolean) required' }) };
+        }
+        await getFirestore().doc('systemConfig/toyyibpay').set(
+          { isSandbox: params.isSandbox, updatedAt: new Date().toISOString(), updatedBy: decodedUid },
+          { merge: true }
+        );
+        result = { isSandbox: params.isSandbox };
+        break;
+      }
       case 'getCategories':
         // ToyyibPay has no "list all" endpoint — getCategoryDetails requires a specific categoryCode.
         // The client now calls getCategoryDetails per code; this action is kept for compatibility.
@@ -128,11 +166,11 @@ exports.handler = async (event) => {
         break;
       case 'getCategoryDetails':
         if (!params.categoryCode) return { statusCode: 400, headers: cors, body: 'categoryCode required' };
-        result = await callToyyib('getCategoryDetails', { categoryCode: params.categoryCode });
+        result = await callToyyib('getCategoryDetails', { categoryCode: params.categoryCode }, isSandbox);
         break;
       case 'createCategory':
         if (!params.catname || !params.catdescription) return { statusCode: 400, headers: cors, body: 'catname and catdescription required' };
-        result = await callToyyib('createCategory', { catname: params.catname, catdescription: params.catdescription });
+        result = await callToyyib('createCategory', { catname: params.catname, catdescription: params.catdescription }, isSandbox);
         break;
       case 'createBill': {
         // NET-008: Input validation before forwarding to ToyyibPay
@@ -180,7 +218,7 @@ exports.handler = async (event) => {
         sanitized.billReturnUrl = isAllowedReturn
           ? returnUrl
           : 'https://app.jcikl.cc/payment/result';
-        result = await callToyyib('createBill', sanitized);
+        result = await callToyyib('createBill', sanitized, isSandbox);
         break;
       }
       case 'getBills':
@@ -198,7 +236,7 @@ exports.handler = async (event) => {
         result = await callToyyib('getBillTransactions', {
           billCode: params.billCode,
           ...(params.billpaymentStatus ? { billpaymentStatus: params.billpaymentStatus } : {}),
-        });
+        }, isSandbox);
         break;
       default:
         return { statusCode: 400, headers: cors, body: `Unknown action: ${action}` };

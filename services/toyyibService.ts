@@ -116,7 +116,38 @@ async function proxyCall(action: string, params: Record<string, string> = {}): P
   return response.json();
 }
 
+// Cached mode so we don't hit the proxy on every bill URL construction
+let _modeCache: { isSandbox: boolean; hasProdKey: boolean; fetchedAt: number } | null = null;
+
 export class ToyyibService {
+  /** Returns the current sandbox/production mode from the server (cached 60 s). */
+  static async getMode(): Promise<{ isSandbox: boolean; hasProdKey: boolean }> {
+    if (_modeCache && Date.now() - _modeCache.fetchedAt < 60_000) {
+      return { isSandbox: _modeCache.isSandbox, hasProdKey: _modeCache.hasProdKey };
+    }
+    try {
+      const data = await proxyCall('getMode');
+      if (data && typeof data.isSandbox === 'boolean') {
+        _modeCache = { isSandbox: data.isSandbox, hasProdKey: !!data.hasProdKey, fetchedAt: Date.now() };
+        return { isSandbox: data.isSandbox, hasProdKey: !!data.hasProdKey };
+      }
+    } catch {}
+    // Fallback to local constant when proxy not available (local dev)
+    return { isSandbox: TOYYIB_CONFIG.IS_SANDBOX, hasProdKey: false };
+  }
+
+  /** BOARD+ only. Toggle sandbox/production mode — persisted to Firestore via proxy. */
+  static async setMode(isSandbox: boolean): Promise<void> {
+    await proxyCall('setMode', { isSandbox: String(isSandbox) } as any);
+    _modeCache = null; // invalidate cache
+  }
+
+  /** Build the ToyyibPay payment URL using the current server-side mode. */
+  static async buildPaymentUrl(billCode: string): Promise<string> {
+    const { isSandbox } = await ToyyibService.getMode();
+    return `https://${isSandbox ? 'dev.' : ''}toyyibpay.com/${billCode}`;
+  }
+
   /**
    * P0-B (order guarantee): The ToyyibPay API is called FIRST via proxyCall.
    * Only if the API call succeeds does this method write to Firestore (toyyibBills).
@@ -131,7 +162,7 @@ export class ToyyibService {
       const mockBillCode = 'MOCK-' + Math.random().toString(36).substring(7).toUpperCase();
       return {
         billCode: mockBillCode,
-        paymentUrl: `https://${TOYYIB_CONFIG.IS_SANDBOX ? 'dev.' : ''}toyyibpay.com/${mockBillCode}`
+        paymentUrl: `https://${(_modeCache?.isSandbox ?? TOYYIB_CONFIG.IS_SANDBOX) ? 'dev.' : ''}toyyibpay.com/${mockBillCode}`
       };
     }
 
@@ -218,7 +249,7 @@ export class ToyyibService {
       }
       return {
         billCode,
-        paymentUrl: `https://${TOYYIB_CONFIG.IS_SANDBOX ? 'dev.' : ''}toyyibpay.com/${billCode}`
+        paymentUrl: `https://${(_modeCache?.isSandbox ?? TOYYIB_CONFIG.IS_SANDBOX) ? 'dev.' : ''}toyyibpay.com/${billCode}`
       };
     }
     throw new Error(data?.msg || 'Failed to create bill');
@@ -414,7 +445,7 @@ export class ToyyibService {
     const bill = active.data() as ToyyibBillRecord;
     return {
       billCode: bill.billCode,
-      paymentUrl: `https://${TOYYIB_CONFIG.IS_SANDBOX ? 'dev.' : ''}toyyibpay.com/${bill.billCode}`,
+      paymentUrl: `https://${(_modeCache?.isSandbox ?? TOYYIB_CONFIG.IS_SANDBOX) ? 'dev.' : ''}toyyibpay.com/${bill.billCode}`,
     };
   }
 

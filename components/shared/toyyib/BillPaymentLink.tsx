@@ -10,6 +10,7 @@
 import React from 'react';
 import { ExternalLink, Copy } from 'lucide-react';
 import { TOYYIB_CONFIG } from '../../../config/constants';
+import { useToyyibMode } from '../../../hooks/useToyyibMode';
 
 export interface BillPaymentLinkProps {
   billCode: string;
@@ -20,8 +21,9 @@ export interface BillPaymentLinkProps {
   onCopied?: () => void;
 }
 
-export function billPaymentUrl(billCode: string): string {
-  return `https://${TOYYIB_CONFIG.IS_SANDBOX ? 'dev.' : ''}toyyibpay.com/${billCode}`;
+/** Sync helper used outside React (e.g. service layer). Uses cached mode or falls back to constant. */
+export function billPaymentUrl(billCode: string, isSandbox = TOYYIB_CONFIG.IS_SANDBOX): string {
+  return `https://${isSandbox ? 'dev.' : ''}toyyibpay.com/${billCode}`;
 }
 
 export const BillPaymentLink: React.FC<BillPaymentLinkProps> = ({
@@ -31,7 +33,8 @@ export const BillPaymentLink: React.FC<BillPaymentLinkProps> = ({
   className = '',
   onCopied,
 }) => {
-  const url = billPaymentUrl(billCode);
+  const { isSandbox } = useToyyibMode();
+  const url = billPaymentUrl(billCode, isSandbox);
 
   if (variant === 'copy') {
     return (

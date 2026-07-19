@@ -11,6 +11,7 @@ import { ProjectsService } from '../../services/projectsService';
 import { CreateBillForm } from '../shared/toyyib/CreateBillForm';
 import { BillPaymentLink, billPaymentUrl } from '../shared/toyyib/BillPaymentLink';
 import { TOYYIB_CONFIG } from '../../config/constants';
+import { useToyyibMode } from '../../hooks/useToyyibMode';
 import { PaymentButton } from '../shared/toyyib/PaymentButton';
 import { MembersService } from '../../services/membersService';
 import { EventRegistrationService } from '../../services/eventRegistrationService';
@@ -58,6 +59,8 @@ export const ToyyibView: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
   const [showSettings, setShowSettings] = useState(false);
   const [connStatus, setConnStatus] = useState<'idle' | 'testing' | 'ok' | 'fail'>('idle');
   const [showSecretKey, setShowSecretKey] = useState(false);
+  const { isSandbox, hasProdKey, loading: modeLoading } = useToyyibMode();
+  const [togglingMode, setTogglingMode] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   // Test payment panel
@@ -245,7 +248,7 @@ export const ToyyibView: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
       { label: 'Default Category Code', value: TOYYIB_CONFIG.CATEGORY_CODE, key: 'catcode', mono: true },
       { label: 'Callback URL', value: callbackUrl, key: 'callback', mono: true },
       { label: 'Return URL', value: returnUrl, key: 'return', mono: true },
-      { label: 'Endpoint', value: TOYYIB_CONFIG.IS_SANDBOX ? TOYYIB_CONFIG.SANDBOX_ENDPOINT : TOYYIB_CONFIG.ENDPOINT, key: 'endpoint', mono: true },
+      { label: 'Endpoint', value: isSandbox ? TOYYIB_CONFIG.SANDBOX_ENDPOINT : TOYYIB_CONFIG.ENDPOINT, key: 'endpoint', mono: true },
     ];
 
     return (
@@ -275,12 +278,44 @@ export const ToyyibView: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
             </div>
           </div>
 
-          {/* Environment */}
+          {/* Environment toggle */}
           <div className="px-4 sm:px-5 py-3 flex items-center gap-3 border-b border-slate-50">
             <span className="text-xs text-slate-500 font-medium w-28 sm:w-36 flex-shrink-0">Environment</span>
-            <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${TOYYIB_CONFIG.IS_SANDBOX ? 'bg-amber-50 text-amber-600 border border-amber-100' : 'bg-green-50 text-green-700 border border-green-100'}`}>
-              {TOYYIB_CONFIG.IS_SANDBOX ? 'Sandbox' : 'Production'}
-            </span>
+            <div className="flex items-center gap-3 flex-1">
+              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${isSandbox ? 'bg-amber-50 text-amber-600 border border-amber-100' : 'bg-green-50 text-green-700 border border-green-100'}`}>
+                {modeLoading ? '…' : isSandbox ? 'Sandbox' : 'Production'}
+              </span>
+              <button
+                onClick={async () => {
+                  if (!hasProdKey && isSandbox) {
+                    showToast('TOYYIBPAY_SECRET_KEY_PROD is not configured — add it to Netlify env vars first', 'warning');
+                    return;
+                  }
+                  setTogglingMode(true);
+                  try {
+                    await ToyyibService.setMode(!isSandbox);
+                    showToast(`Switched to ${!isSandbox ? 'Sandbox' : 'Production'} mode`, 'success');
+                    // Reload page data after mode switch so bill URLs update
+                    loadData();
+                  } catch {
+                    showToast('Failed to switch mode', 'error');
+                  } finally {
+                    setTogglingMode(false);
+                  }
+                }}
+                disabled={togglingMode || modeLoading}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-lg border border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-800 disabled:opacity-50 transition-colors"
+              >
+                {togglingMode ? <RefreshCw size={11} className="animate-spin" /> : null}
+                Switch to {isSandbox ? 'Production' : 'Sandbox'}
+              </button>
+              {!hasProdKey && (
+                <span className="text-[10px] text-amber-600 flex items-center gap-1">
+                  <AlertCircle size={10} />
+                  No prod key
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Config rows — stack label+value on mobile, inline on desktop */}
