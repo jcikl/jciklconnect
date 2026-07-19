@@ -1410,7 +1410,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         const { done, total, pct, missing } = profileCompleteness;
         const set = (key: string, v: string) => setProfileDraft(d => ({ ...d, [key]: v }));
         const val = (key: string, fallback = '') => profileDraft[key] ?? fallback;
-        const basicLabels = ['Phone number', 'Company name', 'Industry', 'Apparel & Items'];
+        const basicLabels = ['Profile photo', 'Phone number', 'Company name', 'Industry', 'Apparel & Items'];
         const contactLabels = ['Address', 'Emergency contact'];
         const professionalLabels = ['Position / title', 'Business categories', 'Company description', 'Ideal referral', 'Special member offer', 'Company website', 'International business', 'Level of management'];
         const basicCount = missing.filter(f => basicLabels.includes(f.label)).length;
@@ -1460,9 +1460,9 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
           }
         };
         const tabDefs = [
-          { id: 'basic', label: 'Basic Info', count: basicCount },
-          { id: 'contact', label: 'Contact', count: contactCount },
-          { id: 'professional', label: 'Professional', count: professionalCount },
+          { id: 'basic', label: 'Basic Info', count: basicCount, total: basicLabels.length },
+          { id: 'contact', label: 'Contact', count: contactCount, total: contactLabels.length },
+          { id: 'professional', label: 'Professional', count: professionalCount, total: professionalLabels.length },
         ];
         return createPortal(
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-end md:items-center md:justify-center" onClick={() => setShowProfileDrawer(false)}>
@@ -1521,7 +1521,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                               : 'text-white/40'
                           }`}>{tab.label}</span>
                         <span className={`text-[10px] ${tab.count === 0 ? 'text-emerald-400' : 'text-blue-300'}`}>
-                          {tab.count === 0 ? '100%' : `${Math.round(((tabDefs[i].count === basicCount ? 5 : tabDefs[i].count === contactCount ? 2 : 8) - tab.count) / (tabDefs[i].count === basicCount ? 5 : tabDefs[i].count === contactCount ? 2 : 8) * 100)}%`}
+                          {`${Math.round((tab.total - tab.count) / tab.total * 100)}%`}
                         </span>
                       </button>
                     </React.Fragment>
