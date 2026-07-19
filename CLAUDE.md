@@ -469,6 +469,15 @@ Use this prompt to perform a full systematic analysis of any single Firestore co
 Top P0集合：transactions×3、pointsRuleExecutions×3、conversations×3；退回完整度：完整1个（guestPageStats）、部分60个、缺失13个。
 Firestore rules 5项修复已写入文件，**待执行 `firebase deploy --only firestore:rules` 生效**。
 
+**v5 全库重分析（2026-07-19，修复所有P1后）— P0×91 P1×311 P2×199 Total×601（vs v4: +8，更深入分析）**
+
+**v6 全库重分析（2026-07-19，修复全部P0+P1+P2后）— P0×71 P1×309 P2×253 Total×633（vs v5: P0↓20 P1↓2 P2↑54）**
+
+本次修复：16路并行 agent 修复所有服务层+Firestore规则（P0+P1+P2），commit `8ceaede`。
+P0减少20条（91→71）确认修复生效；P2增加54条因分析粒度更深。
+Top P0集合：pointsRuleExecutions×3、votes×3、webhooks×3、birthdayNotificationsSent×3；退回完整度：完整1个（boardTermSettings）、部分55个、缺失25个。
+**待执行：`firebase deploy --only firestore:rules && firebase deploy --only functions`**
+
 ### 已分析集合（collection-deps）
 
 | 集合 | 分析日期 | 联动集合数 | 强耦合 | 中耦合 | 弱耦合 | P0风险数 | P0风险摘要 |

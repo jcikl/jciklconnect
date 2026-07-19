@@ -320,6 +320,7 @@ async function sendFcmPush(memberId, title, body, type, data = {}) {
     });
 }
 // ─── Birthday notifications (runs daily 8 AM Malaysia time = 0:00 UTC) ────────
+// Single source of truth — Netlify function is disabled; no client-side writes.
 exports.sendBirthdayNotifications = functions.pubsub
     .schedule('0 0 * * *')
     .timeZone('Asia/Kuala_Lumpur')
@@ -327,6 +328,8 @@ exports.sendBirthdayNotifications = functions.pubsub
     const nowMYT = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }));
     const todayMonth = nowMYT.getMonth() + 1; // 1-12
     const todayDay = nowMYT.getDate();
+    // YYYY-MM-DD in Malaysia time — used as the dedup key suffix
+    const todayDateStr = `${nowMYT.getFullYear()}-${String(todayMonth).padStart(2, '0')}-${String(todayDay).padStart(2, '0')}`;
     // Fetch all active members
     const membersSnap = await db.collection('members')
         .where('status', '==', 'active')
@@ -354,22 +357,34 @@ exports.sendBirthdayNotifications = functions.pubsub
         return null;
     }
     console.log(`Birthdays today: ${birthdayMembers.map(m => m.name).join(', ')}`);
+    // ── Dedup: check birthdayNotificationsSent before sending ────────────────
+    // Personal wishes: one doc per member per date → {memberId}_{date}
+    const sentRefs = birthdayMembers.map(({ id }) => db.collection('birthdayNotificationsSent').doc(`${id}_${todayDateStr}`));
+    const sentDocs = sentRefs.length > 0 ? await db.getAll(...sentRefs) : [];
+    const alreadySentIds = new Set(sentDocs.filter(d => d.exists).map(d => d.id.replace(`_${todayDateStr}`, '')));
+    const newBirthdayMembers = birthdayMembers.filter(({ id }) => !alreadySentIds.has(id));
+    // Announcements: one control doc per date → announcements_{date}
+    const announcementSentRef = db.collection('birthdayNotificationsSent').doc(`announcements_${todayDateStr}`);
+    const announcementSentDoc = await announcementSentRef.get();
+    const announcementsAlreadySent = announcementSentDoc.exists;
+    if (newBirthdayMembers.length === 0 && announcementsAlreadySent) {
+        console.log('All birthday notifications already sent today — skipping (retry safety).');
+        return null;
+    }
     // 2. Determine other members for announcements
     const allMemberIds = membersSnap.docs.map(d => d.id);
     const birthdayIds = new Set(birthdayMembers.map(m => m.id));
-    const otherMemberIds = allMemberIds.filter(id => !birthdayIds.has(id));
+    const otherMemberIds = announcementsAlreadySent ? [] : allMemberIds.filter(id => !birthdayIds.has(id));
     const birthdayNames = birthdayMembers.map(m => m.name).join(' & ');
-    const announcementBody = birthdayMembers.length === 1
-        ? `Today is ${birthdayNames}'s birthday! 🎉 Send them your wishes.`
-        : `Today is ${birthdayNames}'s birthday! 🎉 Send them your wishes.`;
+    const announcementBody = `Today is ${birthdayNames}'s birthday! 🎉 Send them your wishes.`;
     // F12 fix: collect all Firestore notification objects first, then write in
     // batches of 490 to avoid rate-limiting from hundreds of concurrent .add() calls.
     // FCM sends remain as Promise.all (they cannot be Firestore-batched).
     const BATCH_LIMIT = 490;
     const now2 = admin.firestore.FieldValue.serverTimestamp();
     const firestoreNotifs = [];
-    // Personal birthday wishes
-    for (const { id, name } of birthdayMembers) {
+    // Personal birthday wishes (new members only — deduped)
+    for (const { id, name } of newBirthdayMembers) {
         firestoreNotifs.push({
             memberId: id,
             type: 'birthday_self',
@@ -381,7 +396,7 @@ exports.sendBirthdayNotifications = functions.pubsub
             timestamp: now2,
         });
     }
-    // Announcements to other members
+    // Announcements to other members (skipped if already sent today)
     for (const id of otherMemberIds) {
         firestoreNotifs.push({
             memberId: id,
@@ -408,6 +423,15 @@ exports.sendBirthdayNotifications = functions.pubsub
     }
     if (fsCount > 0)
         await fsBatch.commit();
+    // ── Record sent status for retry-safety dedup ─────────────────────────────
+    const sentBatch = db.batch();
+    for (const { id } of newBirthdayMembers) {
+        sentBatch.set(db.collection('birthdayNotificationsSent').doc(`${id}_${todayDateStr}`), { sentAt: admin.firestore.FieldValue.serverTimestamp(), type: 'personal' });
+    }
+    if (otherMemberIds.length > 0) {
+        sentBatch.set(announcementSentRef, { sentAt: admin.firestore.FieldValue.serverTimestamp(), count: otherMemberIds.length });
+    }
+    await sentBatch.commit();
     // Send FCM pushes concurrently (cannot be batched via Firestore)
     // Look up FCM tokens and send — kept separate from Firestore writes above.
     const sendFcmOnly = async (memberId, title, body, data) => {
@@ -428,10 +452,10 @@ exports.sendBirthdayNotifications = functions.pubsub
             data,
         });
     };
-    const personalFcm = birthdayMembers.map(({ id, name }) => sendFcmOnly(id, `Happy Birthday, ${name}! 🎂`, 'Wishing you a wonderful day filled with joy! From everyone at JCI KL.', { type: 'birthday_self' }).catch(err => console.error(`Failed birthday FCM for ${id}:`, err)));
+    const personalFcm = newBirthdayMembers.map(({ id, name }) => sendFcmOnly(id, `Happy Birthday, ${name}! 🎂`, 'Wishing you a wonderful day filled with joy! From everyone at JCI KL.', { type: 'birthday_self' }).catch(err => console.error(`Failed birthday FCM for ${id}:`, err)));
     const announcementFcm = otherMemberIds.map(id => sendFcmOnly(id, 'Birthday Today! 🎂', announcementBody, { type: 'birthday_announcement', names: birthdayNames }).catch(err => console.error(`Failed announcement FCM for ${id}:`, err)));
     await Promise.all([...personalFcm, ...announcementFcm]);
-    console.log(`Birthday notifications sent: ${birthdayMembers.length} personal, ${otherMemberIds.length} announcements.`);
+    console.log(`Birthday notifications sent: ${newBirthdayMembers.length} personal, ${otherMemberIds.length} announcements.`);
     return null;
 });
 exports.notificationFunctions = {

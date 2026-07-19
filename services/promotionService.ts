@@ -607,8 +607,18 @@ export class PromotionService {
     memberId: string,
     requestedBy: string,
     reason: string,
-    overrideRequirements: boolean = false
+    overrideRequirements: boolean = false,
+    callerRole?: string
   ): Promise<ManualPromotionRequest> {
+    // P0 fix: only ADMIN/SUPER_ADMIN may override requirements — prevents Board members from
+    // bypassing the pending-review flow and promoting members without admin sign-off.
+    if (overrideRequirements) {
+      const ADMIN_ROLES = ['ADMIN', 'SUPER_ADMIN'];
+      if (!callerRole || !ADMIN_ROLES.includes(callerRole.toUpperCase())) {
+        throw new Error('Only administrators can override promotion requirements');
+      }
+    }
+
     const member = await this.getMemberById(memberId);
     if (!member) {
       throw new Error('Member not found');

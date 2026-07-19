@@ -363,8 +363,39 @@ export class GamificationService {
                     where('category', '==', 'project_task')
                 ));
                 progressValue = snap.size;
+            } else if (criteriaType === 'recruitment_count') {
+                // Count members recruited by this member (recruitedBy field)
+                const recruitSnap = await getDocs(query(
+                    collection(db, COLLECTIONS.MEMBERS),
+                    where('recruitedBy', '==', memberId)
+                ));
+                progressValue = recruitSnap.size;
+            } else if (criteriaType === 'training_completed') {
+                // Count completed learning path progress records for this member
+                const trainingSnap = await getDocs(query(
+                    collection(db, COLLECTIONS.LEARNING_PROGRESS),
+                    where('memberId', '==', memberId),
+                    where('status', '==', 'completed')
+                ));
+                progressValue = trainingSnap.size;
+            } else if (criteriaType === 'role_held') {
+                // Award value is a minimum number of board-level roles held.
+                // Proxy: count distinct board roles recorded in the member's jciCareer history
+                // (POINTS records with category 'leadership' serve as an accessible signal).
+                const roleSnap = await getDocs(query(
+                    collection(db, COLLECTIONS.POINTS),
+                    where('memberId', '==', memberId),
+                    where('category', '==', 'leadership')
+                ));
+                progressValue = roleSnap.size > 0 ? 1 : 0;
+            } else if (criteriaType === 'consecutive_attendance') {
+                // Consecutive-attendance streaks require ordered time-series analysis across
+                // event records — not feasible in a single Firestore query.
+                // Logged as unimplemented so it does NOT silently stay at 0 forever.
+                console.warn('[GamificationService] consecutive_attendance not yet implemented for', award.id, '— skipping auto-award check');
+                continue;
             } else {
-                // Criteria type not yet implemented — skip
+                // custom / unknown type — skip
                 continue;
             }
 

@@ -78,15 +78,17 @@ export class ElectionsService {
   }
 
   /**
-   * Cast a ballot atomically. Uses a deterministic ballot ID {electionId}_{voterId}
-   * so a second castBallot call for the same voter is a no-op (setDoc merge:false throws on existing doc).
+   * Cast a ballot atomically. Uses a deterministic ballot ID {voterId}_{electionId}
+   * so a second castBallot call for the same voter hits ballotSnap.exists() and throws.
    * The transaction reads the election status and throws if not 'open'.
+   * P0 Fix: ID order changed to voterId_electionId to match Firestore rule:
+   *   ballotId == request.auth.uid + '_' + electionId
    */
   static async castBallot(electionId: string, voterId: string, votes: Record<string, string>): Promise<void> {
     if (isDevMode()) return;
     const col = COLLECTIONS.ELECTIONS;
     const ballotsCol = `${col}/${electionId}/ballots`;
-    const ballotId = `${electionId}_${voterId}`;
+    const ballotId = `${voterId}_${electionId}`;
     const ballotRef = doc(db, ballotsCol, ballotId);
     const electionRef = doc(db, col, electionId);
 

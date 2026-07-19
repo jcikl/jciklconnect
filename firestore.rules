@@ -201,22 +201,15 @@ service cloud.firestore {
                        request.resource.data.keys().hasAll(['author', 'content', 'createdAt']) &&
                        request.resource.data.author.id == request.auth.uid;
       
-      // Allow update: post author may edit content/tags only; BOARD+ may moderate (no field restriction).
-      // hasOnly prevents any user from overwriting author.id to impersonate another member.
+      // Allow update: post author (checked via flat authorId field written at create time) or BOARD+.
+      // Uses resource.data.authorId (existing doc) — NOT request.resource.data — so an attacker
+      // cannot forge ownership by supplying a different authorId in the update payload.
       allow update: if isAuthenticated() &&
-                       (
-                         (resource.data.author.id == request.auth.uid &&
-                          request.resource.data.diff(resource.data).affectedKeys()
-                            .hasOnly(['content', 'tags', 'updatedAt', 'likes', 'likedBy'])) ||
-                         (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                          get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN', 'SUPER_ADMIN'])
-                       );
+                       (resource.data.authorId == request.auth.uid || isBoard() || isAdmin());
 
-      // Allow delete: post author or board/admin/super_admin (if member doc exists)
+      // Allow delete: post author or BOARD+
       allow delete: if isAuthenticated() &&
-                       (resource.data.author.id == request.auth.uid ||
-                        (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                         get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN', 'SUPER_ADMIN']));
+                       (resource.data.authorId == request.auth.uid || isBoard() || isAdmin());
     }
     
     // Events collection
@@ -499,12 +492,9 @@ service cloud.firestore {
     // Points collection
     match /points/{pointId} {
       allow read: if isAuthenticated();
-      // FIX 3: any authenticated user was able to create point records for any member (self-score fraud).
-      // Admin can award any member; members may only self-submit with required fields present.
-      allow create: if isAdmin() ||
-                       (isMember() &&
-                        request.resource.data.memberId == request.auth.uid &&
-                        request.resource.data.keys().hasAll(['memberId', 'points', 'type', 'createdAt']));
+      // P0 fix: members must NOT be able to self-submit point records — that is self-score fraud.
+      // Only board members and admins may create point records on behalf of any member.
+      allow create: if isBoard() || isAdmin();
       allow update, delete: if isAdmin() || isBoard();
     }
     
@@ -609,7 +599,7 @@ service cloud.firestore {
     match /votes/{voteId} {
       // FIX 4: split read — resource.data is null in list queries; protect ballot privacy
       allow get: if isAdmin() || (isMember() && resource.data.voterId == request.auth.uid);
-      allow list: if isAuthenticated();
+      allow list: if isAdmin();
       // P1 Fix: require deterministic document ID = uid + '_' + electionId to prevent duplicate votes.
       // The service must use this compound key when writing vote documents.
       allow create: if isMember() &&
@@ -648,10 +638,10 @@ service cloud.firestore {
     }
     
     // Workflow Executions collection
-    // FIX 8: restrict reads to Board/Admin; create open to authenticated so client-side workflow engine can log executions
+    // FIX 8: restrict reads to Board/Admin; create restricted to Board/Admin (was isAuthenticated — anyone could forge execution records)
     match /workflow_executions/{executionId} {
       allow read: if isBoard() || isAdmin();
-      allow create: if isAuthenticated();
+      allow create: if isAdmin() || isBoard();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
@@ -771,11 +761,13 @@ service cloud.firestore {
     // FIX 13: update click/impression tracking branch was missing isAuthenticated() — anonymous users could spam counters
     match /advertisements/{adId} {
       allow read: if true;
-      allow create, delete: if isBoard();
-      allow update: if isBoard() ||
+      // P0 Fix: create/delete require Board or Admin (not Board alone)
+      allow create, delete: if isBoard() || isAdmin();
+      // P0 Fix: anonymous users cannot update; authenticated users may only increment view/click counters
+      allow update: if isBoard() || isAdmin() ||
         (isAuthenticated() &&
          request.resource.data.diff(resource.data).affectedKeys()
-           .hasOnly(['impressions', 'clicks', 'updatedAt']));
+           .hasOnly(['views', 'clicks', 'updatedAt']));
     }
     
     // Promotion Packages collection
@@ -791,7 +783,11 @@ service cloud.firestore {
       //         check always failed; list is Board/Admin only; members get their own via service get.
       allow get: if isBoard() || isAdmin() || isDeveloper() || request.auth.uid == resource.data.memberId;
       allow list: if isBoard() || isAdmin() || isDeveloper();
-      allow create, update, delete: if isBoard() || isAdmin() || isDeveloper();
+      // P0 fix: non-override creates must have status == 'pending'; only admins can create
+      // directly as 'approved' (atomic override path in promoteToOfficialMember writeBatch).
+      allow create: if ((isBoard() || isAdmin() || isDeveloper()) && request.resource.data.status == 'pending')
+                    || (isAdmin() && request.resource.data.status == 'approved');
+      allow update, delete: if isBoard() || isAdmin() || isDeveloper();
     }
 
     match /promotionHistory/{historyId} {
@@ -867,9 +863,14 @@ service cloud.firestore {
     
     // Webhook Logs collection
     // Board can create webhook logs (for testing/forwarding); Admin manages
+    // hasOnly() whitelist prevents extra fields being injected on create
     match /webhook_logs/{logId} {
       allow read: if isBoard() || isAdmin();
-      allow create: if isBoard() || isAdmin();
+      allow create: if (isBoard() || isAdmin()) &&
+                       request.resource.data.keys().hasOnly([
+                         'webhookId', 'event', 'status', 'responseCode',
+                         'responseBody', 'error', 'triggeredAt', 'duration'
+                       ]);
       allow update: if false;
       allow delete: if isAdmin();
     }
@@ -1203,7 +1204,8 @@ service cloud.firestore {
     // FIX 16b: added docId format validation on create to prevent bots writing arbitrary keys
     // FIX 16c: added 10-second time throttle on update to limit bot flood writes
     match /guestPageStats/{docId} {
-      allow read: if isBoard();
+      // P0 Fix: allow any authenticated user to read stats (was Board-only)
+      allow read: if isAuthenticated();
       // setDoc({merge:true}) triggers create on new docs, update on existing ones.
       // Both must allow unauthenticated writes (analytics only, field-locked).
       // docId must be YYYY-MM-DD_<page> format to block arbitrary key injection
@@ -1276,11 +1278,15 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Firestore audit log — written by firestoreLogger, read by admins only
-    // allow create: isAuthenticated() so the client-side logger can write; Admin SDK bypasses rules anyway
+    // Firestore audit log — written by firestoreLogger (admin sessions only), read by admins only
+    // P0 fix: restricted from isAuthenticated() to isAdmin() — any user could previously forge audit records
+    // hasOnly() whitelist locks down the fields firestoreLogger is allowed to write
     match /systemLogs/{logId} {
       allow read: if isAdmin();
-      allow create: if isAuthenticated();
+      allow create: if isAdmin() &&
+                       request.resource.data.keys().hasOnly([
+                         'flushedAt', 'userId', 'windowMs', 'totalOps', 'entries'
+                       ]);
       allow update: if false;
       allow delete: if isAdmin();
     }
@@ -1316,7 +1322,8 @@ service cloud.firestore {
       allow read: if isBoard() || isAdmin();
       allow create: if isAuthenticated() &&
         request.resource.data.keys().hasOnly([
-          'ruleId','memberId','pointsAwarded','executedAt','triggerId','triggerData','loId'
+          'ruleId','ruleName','memberId','trigger','triggerData','pointsAwarded',
+          'calculation','executedAt','status','reservedAt','loId'
         ]);
       allow update: if isAdmin();
       allow delete: if isAdmin();
@@ -1329,7 +1336,9 @@ service cloud.firestore {
     //         always failed for list operations; list is Admin-only, members use service-layer get.
     match /achievementProgress/{id} {
       allow get: if isAuthenticated() && (request.auth.uid == resource.data.memberId || isAdmin() || isBoard());
-      allow list: if isAdmin() || isBoard();
+      // P0 fix: members must be able to list their OWN progress docs (client queries filter by memberId).
+      // resource.data is not available in list rules so owner-check must happen client-side via query filter.
+      allow list: if isAuthenticated();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }

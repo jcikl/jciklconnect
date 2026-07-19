@@ -338,43 +338,10 @@ export const JCIKLApp: React.FC = () => {
     signOut();
   }, [user?.uid, signOut]);
 
-  // Generate birthday notifications
-  const birthdayNotifications: Notification[] = React.useMemo(() => {
-    if (!members.length) return [];
-
-    const today = new Date();
-    const todayMonth = today.getMonth() + 1;
-    const todayDate = today.getDate();
-
-    return members
-      .filter(m => {
-        if (!m.dateOfBirth) return false;
-        const [y, mStr, dStr] = m.dateOfBirth.split('-');
-        return parseInt(mStr) === todayMonth && parseInt(dStr) === todayDate;
-      })
-      .map(m => ({
-        id: `birthday-${m.id}-${today.toISOString().split('T')[0]}`,
-        memberId: m.id,
-        title: `ðŸŽ‚ Member Birthday Today!`,
-        message: `It's ${m.name}'s birthday today! Let's send them some warm wishes.`,
-        type: 'info' as const,
-        read: false,
-        timestamp: 'Today'
-      }));
-  }, [members]);
-
-  // Combined notifications — skip client-side birthdays if Firestore already has any birthday notifications
-  const allNotifications = React.useMemo(() => {
-    const firestoreHasBirthday = notifications.some(n =>
-      n.title?.toLowerCase().includes('birthday') || n.message?.toLowerCase().includes('birthday')
-    );
-    const clientBirthdays = firestoreHasBirthday ? [] : birthdayNotifications;
-    return [...clientBirthdays, ...notifications];
-  }, [birthdayNotifications, notifications]);
-
-  const unreadNotifications = allNotifications.filter(n => !n.read && !n.id.startsWith('birthday-'));
-
-  // Birthday notifications handled by Netlify Function cron job — client-side trigger removed
+  // Birthday notifications are sent exclusively by the Cloud Function scheduler
+  // (functions/src/notifications.ts → sendBirthdayNotifications). No client-side generation.
+  const allNotifications = notifications;
+  const unreadNotifications = allNotifications.filter(n => !n.read);
 
   // Sync document.title for accessibility (WCAG 2.4.2)
   React.useEffect(() => {
