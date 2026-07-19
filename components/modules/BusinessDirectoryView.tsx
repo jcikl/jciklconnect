@@ -407,6 +407,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
       {isGuestRole && (
         <MembersOnlyOverlay
           description="The member business directory is exclusive to JCI Kuala Lumpur members. Join us to connect with local businesses and the global JCI network."
+          member={currentUser}
         />
       )}
 

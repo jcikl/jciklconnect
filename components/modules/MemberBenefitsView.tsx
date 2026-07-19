@@ -109,6 +109,7 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
       {/* Guest mask — benefits are visible only to members */}
       {isGuest && (
         <MembersOnlyOverlay
+          member={member}
           description="Member benefits are exclusive to JCI Kuala Lumpur members. Join us to unlock discounts and privileges from our partners."
         />
       )}

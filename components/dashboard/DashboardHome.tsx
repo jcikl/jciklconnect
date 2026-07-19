@@ -32,6 +32,7 @@ import { UserRole } from '../../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { EventDetailModal } from '../modules/EventsView';
 import { PartnershipDetailModal } from './PartnershipDetailModal';
+import { PaymentButton } from '../shared/toyyib/PaymentButton';
 import { useState, useEffect, useRef } from 'react';
 // TODO BUNDLE-009: Swiper (~60KB gz) is statically imported here but only used for the conditional ads
 // carousel. If the carousel grows in complexity, extract it into a lazy AdsCarousel component and
@@ -503,7 +504,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         <div className="w-full relative rounded-2xl overflow-hidden">
           {/* Guest mask — partner benefits are members only */}
           {member?.role === UserRole.GUEST && (
-            <MembersOnlyOverlay compact description="Join JCI KL to unlock partner privileges." />
+            <MembersOnlyOverlay compact description="Join JCI KL to unlock partner privileges." member={member} />
           )}
           <Swiper
             modules={[Autoplay, Pagination]}
