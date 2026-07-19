@@ -267,21 +267,31 @@ export class EventsService {
             }
           }
 
+          // P1 FIX: fetch eventFeedback and eventId-referenced notifications for cleanup.
+          const [feedbackSnap, notifSnap] = await Promise.all([
+            getDocs(query(collection(db, COLLECTIONS.EVENT_FEEDBACK), where('eventId', '==', eventId))),
+            getDocs(query(collection(db, COLLECTIONS.NOTIFICATIONS), where('eventId', '==', eventId))),
+          ]);
+
           // P0 FIX: include the event doc deletion in the same writeBatch as the
           // registration cleanup so both succeed or fail together.
           const BATCH_SIZE = 490;
           const regDocs = regSnap.docs;
           const budgetRef = doc(db, COLLECTIONS.EVENT_BUDGETS, eventId);
-          if (regDocs.length === 0) {
-            // No registrations — single batch containing only the event doc and its budget.
+          // Collect all orphan docs (feedback + notifications) to delete alongside registrations.
+          const orphanDocs = [...feedbackSnap.docs, ...notifSnap.docs];
+          // All docs to delete in chunks (registrations + feedback + notifications).
+          const allDocsToDelete = [...regDocs, ...orphanDocs];
+          if (allDocsToDelete.length === 0) {
+            // No related docs — single batch containing only the event doc and its budget.
             const batch = writeBatch(db);
             batch.delete(eventRef);
             batch.delete(budgetRef);
             await batch.commit();
           } else {
-            for (let i = 0; i < regDocs.length; i += BATCH_SIZE) {
+            for (let i = 0; i < allDocsToDelete.length; i += BATCH_SIZE) {
               const batch = writeBatch(db);
-              regDocs.slice(i, i + BATCH_SIZE).forEach(d => batch.delete(d.ref));
+              allDocsToDelete.slice(i, i + BATCH_SIZE).forEach(d => batch.delete(d.ref));
               // Include the event doc and budget doc delete in the first batch chunk.
               if (i === 0) {
                 batch.delete(eventRef);
@@ -459,26 +469,34 @@ export class EventsService {
 
   // P1-A: Mark an event as Completed (no existing method existed)
   static async completeEvent(eventId: string): Promise<void> {
+    // Statuses that are valid starting points for completion.
+    const COMPLETABLE_STATUSES = ['Active', 'Upcoming', 'Approved'];
     return withDevMode(
       () => {
         const idx = this.mockEvents.findIndex(e => e.id === eventId);
-        if (idx !== -1) this.mockEvents[idx] = { ...this.mockEvents[idx], status: 'Completed' };
+        if (idx === -1) throw new Error('Event not found');
+        const currentStatus = (this.mockEvents[idx] as any).status ?? '';
+        if (!COMPLETABLE_STATUSES.includes(currentStatus)) {
+          throw new Error(`Cannot complete an event with status "${currentStatus}" — only ${COMPLETABLE_STATUSES.join(', ')} events can be completed.`);
+        }
+        this.mockEvents[idx] = { ...this.mockEvents[idx], status: 'Completed' };
       },
       async () => {
-        try {
-          const eventRef = doc(db, COLLECTIONS.PROJECTS, eventId);
-          const batch = writeBatch(db);
-          batch.update(eventRef, {
+        const eventRef = doc(db, COLLECTIONS.PROJECTS, eventId);
+        await runTransaction(db, async (txn) => {
+          const snap = await txn.get(eventRef);
+          if (!snap.exists()) throw new Error('Event not found');
+          const currentStatus = (snap.data() as Record<string, unknown>).status as string | undefined;
+          if (!COMPLETABLE_STATUSES.includes(currentStatus ?? '')) {
+            throw new Error(`Cannot complete an event with status "${currentStatus}" — only ${COMPLETABLE_STATUSES.join(', ')} events can be completed.`);
+          }
+          txn.update(eventRef, {
             status: 'Completed',
             completedAt: Timestamp.now(),
             updatedAt: Timestamp.now(),
           });
-          await batch.commit();
-          this.invalidateEventsCache();
-        } catch (error) {
-          console.error('Error completing event:', error);
-          throw error;
-        }
+        });
+        this.invalidateEventsCache();
       }
     );
   }
@@ -505,8 +523,12 @@ export class EventsService {
           const freshSnap = await txn.get(eventDocRef);
           if (!freshSnap.exists()) throw new Error('Event not found');
           const freshData = freshSnap.data() as Record<string, unknown>;
-          if (freshData.status === 'Cancelled') {
-            return; // Already cancelled — idempotent exit
+          const currentStatus = freshData.status as string | undefined;
+          // P1 fix: throw on invalid source status so callers get a clear error rather than a
+          // silent no-op. Completed events cannot be cancelled; already-cancelled is an error too.
+          const CANCELLABLE_STATUSES = ['Active', 'Upcoming', 'Approved', 'Planning', 'Draft', 'Submitted', 'Under Review'];
+          if (!CANCELLABLE_STATUSES.includes(currentStatus ?? '')) {
+            throw new Error(`Cannot cancel an event with status "${currentStatus}" — only ${CANCELLABLE_STATUSES.join(', ')} events can be cancelled.`);
           }
           eventTitle = (freshData.title ?? freshData.name ?? '') as string;
           txn.update(eventDocRef, { status: 'Cancelled', updatedAt: Timestamp.now() });
@@ -681,9 +703,11 @@ export class EventsService {
             // lives in eventRegistrations; attendanceList here is a denormalised lookup array on the event.
             batch.update(eventRef, { attendanceList: arrayUnion(memberId), updatedAt: now });
             await batch.commit();
+            this.invalidateEventsCache();
           } else {
             // No registration doc — still sync the attendanceList as a best-effort
             await updateDoc(eventRef, { attendanceList: arrayUnion(memberId), updatedAt: Timestamp.now() });
+            this.invalidateEventsCache();
           }
 
           // E-3: PointsService.awardEventAttendancePoints removed — the Cloud Function
@@ -726,8 +750,10 @@ export class EventsService {
             batch.update(regRef, { status: 'registered', checkedInAt: null, updatedAt: now });
             batch.update(eventRef, { attendanceList: arrayRemove(memberId), updatedAt: now });
             await batch.commit();
+            this.invalidateEventsCache();
           } else {
             await updateDoc(eventRef, { attendanceList: arrayRemove(memberId), updatedAt: Timestamp.now() });
+            this.invalidateEventsCache();
           }
 
           // E7 fix: attempt to reverse attendance points that were awarded at check-in.

@@ -3,6 +3,7 @@ import { doc, setDoc, deleteField, updateDoc } from 'firebase/firestore';
 import { app, db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { withDevMode } from '../utils/devMode';
+import { MembersService } from './membersService';
 
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY;
 
@@ -52,6 +53,7 @@ export async function registerPushNotifications(userId: string): Promise<string 
             { fcmToken: token, fcmUpdatedAt: new Date().toISOString() },
             { merge: true }
           );
+          MembersService.invalidateMembersCache();
         }
         return token;
       } catch (err) {
@@ -69,6 +71,7 @@ export async function unregisterPushNotifications(userId: string): Promise<void>
     async () => {
       try {
         await updateDoc(doc(db, COLLECTIONS.MEMBERS, userId), { fcmToken: deleteField() });
+        MembersService.invalidateMembersCache();
       } catch {
         // ignore — user may not have a token
       }

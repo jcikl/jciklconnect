@@ -1129,6 +1129,8 @@ export class PointsService {
               createdAt: Timestamp.now(),
             });
           });
+          PointsService.invalidatePointsCache();
+          MembersService.invalidateMembersCache();
           expired++;
         } catch (err) {
           console.error('[cleanupExpiredEscrow] Failed to expire escrow', escrowDoc.id, err);

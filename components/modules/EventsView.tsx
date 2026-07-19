@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Calendar, MapPin, Users, Filter, Plus, Clock, BrainCircuit, List, FileText, Edit, Trash2, Copy, DollarSign, TrendingUp, AlertTriangle, CheckCircle, RefreshCw, Search, Eye, Star, StarOff, Share2, ArrowLeft, Tag, Info, ChevronDown, Leaf, QrCode } from 'lucide-react';
-import { Card, Button, Badge, Tabs, Modal, useToast, ProgressBar, PageHeader } from '../ui/Common';
+import { Card, Button, Badge, Tabs, Modal, useToast, ProgressBar, PageHeader, ConfirmDialog } from '../ui/Common';
 import { LoadingState } from '../ui/Loading';
 import { useEvents } from '../../hooks/useEvents';
 import { useAuth } from '../../hooks/useAuth';
@@ -308,6 +308,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     emergencyContactPhone: '',
     tshirtSize: '',
   });
+  const [cancelConfirmReg, setCancelConfirmReg] = useState<EventRegistration | null>(null);
   const { isBoard, isAdmin } = usePermissions();
   const { showToast } = useToast();
   const [commDirIds, setCommDirIds] = useState<Set<string>>(new Set());
@@ -544,7 +545,9 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
       });
       const profileUpdate: Record<string, unknown> = { dietaryPreference: addForm.dietary, 'general.dietaryPreference': addForm.dietary };
       if (addForm.tshirtSize) profileUpdate.tshirtSize = addForm.tshirtSize;
-      MembersService.updateMember(addMemberId, profileUpdate as Parameters<typeof MembersService.updateMember>[1]).catch(() => {});
+      MembersService.updateMember(addMemberId, profileUpdate as Parameters<typeof MembersService.updateMember>[1]).catch(() => {
+        showToast('Member added, but failed to update their dietary/t-shirt preference — please update manually.', 'warning');
+      });
       await loadParticipations();
       showToast(`${added?.name ?? 'Member'} added`, 'success');
       setAddMemberId('');
@@ -992,7 +995,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                                         <Button size="sm" variant={reg.status === 'checked_in' ? 'outline' : 'secondary'} className="h-5 px-1" title={reg.status === 'checked_in' ? 'Undo Check-In' : 'Check In'} disabled={updatingRegId !== null} onClick={() => reg.status === 'checked_in' ? handleUndoCheckedIn(reg) : handleMarkCheckedIn(reg)}><CheckCircle size={12} /></Button>
                                       )}
                                       {reg && onCancelRegistration && (
-                                        <Button size="sm" variant="secondary" className="h-5 px-1 text-red-500 border-red-200 hover:bg-red-50" title="Cancel registration" disabled={updatingRegId !== null} onClick={() => handleAdminCancel(reg)}><Trash2 size={12} /></Button>
+                                        <Button size="sm" variant="secondary" className="h-5 px-1 text-red-500 border-red-200 hover:bg-red-50" title="Cancel registration" disabled={updatingRegId !== null} onClick={() => setCancelConfirmReg(reg)}><Trash2 size={12} /></Button>
                                       )}
                                       {!reg && (
                                         <Button size="sm" variant="outline" className="h-5 px-1" title="Register" disabled={updatingRegId !== null} onClick={async () => {
@@ -1206,7 +1209,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                                         <Button size="sm" variant={r.status === 'checked_in' ? 'outline' : 'secondary'} className="h-5 px-1" title={r.status === 'checked_in' ? 'Undo Check-In' : 'Check In'} disabled={updatingRegId !== null} onClick={() => r.status === 'checked_in' ? handleUndoCheckedIn(r) : handleMarkCheckedIn(r)}><CheckCircle size={12} /></Button>
                                       )}
                                       {!isCancelled && onCancelRegistration && (
-                                        <Button size="sm" variant="secondary" className="h-5 px-1 text-red-500 border-red-200 hover:bg-red-50" title="Cancel registration" disabled={updatingRegId !== null} onClick={() => handleAdminCancel(r)}><Trash2 size={12} /></Button>
+                                        <Button size="sm" variant="secondary" className="h-5 px-1 text-red-500 border-red-200 hover:bg-red-50" title="Cancel registration" disabled={updatingRegId !== null} onClick={() => setCancelConfirmReg(r)}><Trash2 size={12} /></Button>
                                       )}
                                     </div>
                                   </div>
@@ -1472,6 +1475,18 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
           <Button variant="ghost" className="w-full mt-2" onClick={() => setMarkPaidReg(null)}>Cancel</Button>
         </Modal>
       )}
+
+      {/* Cancel registration confirmation */}
+      <ConfirmDialog
+        open={!!cancelConfirmReg}
+        title="Cancel Registration"
+        message={`Cancel registration for ${cancelConfirmReg?.memberName ?? cancelConfirmReg?.memberId ?? 'this member'}? This cannot be undone.`}
+        confirmLabel="Cancel Registration"
+        cancelLabel="Go Back"
+        variant="danger"
+        onConfirm={() => { const reg = cancelConfirmReg; setCancelConfirmReg(null); if (reg) handleAdminCancel(reg); }}
+        onCancel={() => setCancelConfirmReg(null)}
+      />
     </>
   );
 };

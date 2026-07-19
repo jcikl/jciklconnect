@@ -216,6 +216,36 @@ export class ProjectsService {
             updateData.reviewedDate = new Date().toISOString();
           }
 
+          // P1-ST: status transition pre-validation — read current status and enforce allowed moves.
+          if (updates.status !== undefined) {
+            const ALLOWED_TRANSITIONS: Record<string, string[]> = {
+              'Draft':        ['Planning', 'Submitted', 'Cancelled'],
+              'Planning':     ['Draft', 'Submitted', 'Active', 'Cancelled'],
+              'Submitted':    ['Under Review', 'Approved', 'Rejected', 'Cancelled'],
+              'Under Review': ['Approved', 'Rejected', 'Cancelled'],
+              'Approved':     ['Active', 'Rejected', 'Cancelled'],
+              'Rejected':     ['Submitted', 'Cancelled'],
+              'Active':       ['Completed', 'Cancelled'],
+              'Completed':    [],          // terminal — no further transitions allowed
+              'Cancelled':    [],          // terminal
+            };
+            const currentSnap = await getDoc(projectRef);
+            if (currentSnap.exists()) {
+              const currentStatus = (currentSnap.data() as Record<string, unknown>).status as string | undefined;
+              if (currentStatus) {
+                const allowed = ALLOWED_TRANSITIONS[currentStatus] ?? [];
+                if (!allowed.includes(updates.status as string)) {
+                  throw new Error(
+                    `Invalid project status transition: "${currentStatus}" → "${updates.status}". ` +
+                    (allowed.length
+                      ? `Allowed next statuses: ${allowed.join(', ')}.`
+                      : 'This status is terminal and cannot be changed.')
+                  );
+                }
+              }
+            }
+          }
+
           await updateDoc(projectRef, updateData);
           this.invalidateProjectsCache();
           (await import('./eventsService')).EventsService.invalidateEventsCache();
@@ -282,21 +312,33 @@ export class ProjectsService {
             }
           }
 
-          // Clear projectId from bank transactions that reference this project (情景 M)
-          const txQuery = query(
-            collection(db, COLLECTIONS.TRANSACTIONS),
-            where('projectId', '==', projectId)
-          );
-          const txSnap = await getDocs(txQuery);
+          // P1 FIX: fetch orphan collections linked to this project.
+          const [txSnap, tasksSnap, reportsSnap, plansSnap] = await Promise.all([
+            // Clear projectId from bank transactions (unlink, not delete)
+            getDocs(query(collection(db, COLLECTIONS.TRANSACTIONS), where('projectId', '==', projectId))),
+            // Hard-delete tasks, projectReports, and activityPlans that belong to this project.
+            getDocs(query(collection(db, COLLECTIONS.TASKS), where('projectId', '==', projectId))),
+            getDocs(query(collection(db, COLLECTIONS.PROJECT_REPORTS), where('projectId', '==', projectId))),
+            getDocs(query(collection(db, COLLECTIONS.ACTIVITY_PLANS), where('projectId', '==', projectId))),
+          ]);
 
-          // Atomically delete the project and unlink all associated transactions
-          const batch = writeBatch(db);
-          batch.delete(projectRef);
+          // Atomically delete the project, unlink transactions, and remove orphan docs.
+          const BATCH_SIZE = 490;
           const now = Timestamp.now();
-          txSnap.docs.forEach(d => {
-            batch.update(d.ref, { projectId: null, updatedAt: now });
-          });
-          await batch.commit();
+          const orphanDeleteDocs = [...tasksSnap.docs, ...reportsSnap.docs, ...plansSnap.docs];
+          const allBatchOps: Array<{ type: 'delete' | 'update'; ref: import('firebase/firestore').DocumentReference; data?: Record<string, unknown> }> = [
+            { type: 'delete', ref: projectRef },
+            ...txSnap.docs.map(d => ({ type: 'update' as const, ref: d.ref, data: { projectId: null, updatedAt: now } })),
+            ...orphanDeleteDocs.map(d => ({ type: 'delete' as const, ref: d.ref })),
+          ];
+          for (let i = 0; i < allBatchOps.length; i += BATCH_SIZE) {
+            const batch = writeBatch(db);
+            allBatchOps.slice(i, i + BATCH_SIZE).forEach(op => {
+              if (op.type === 'delete') batch.delete(op.ref);
+              else batch.update(op.ref, op.data!);
+            });
+            await batch.commit();
+          }
 
           this.invalidateProjectsCache();
           invalidateFinanceCache();
@@ -512,8 +554,11 @@ export class ProjectsService {
   static async updateTask(taskId: string, updates: Partial<Task>): Promise<void> {
     return withDevMode(
       async () => {
-        // Simulate awarding points if task is completed
+        // P1 fix (dev mode): simulate the task write FIRST, then award points —
+        // mirrors production order where runTransaction commits the task update
+        // atomically before the points side-effect fires.
         if (updates.status === 'Done' && updates.assignee && updates.projectId) {
+          console.log(`[DEV MODE] updateTask: writing task ${taskId} status → Done`);
           await PointsService.awardTaskCompletionPoints(
             updates.assignee,
             updates.projectId,

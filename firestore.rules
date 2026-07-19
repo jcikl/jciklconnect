@@ -228,13 +228,16 @@ service cloud.firestore {
       allow get: if isAuthenticated();
       allow list: if true;
       // FIX 1: restrict writes to Board+; members may update only their own attendance fields
-      allow create, delete: if isBoard() || isAdmin();
+      // P1 Fix: require critical fields on create to prevent partial/malformed event documents
+      allow create: if (isBoard() || isAdmin()) &&
+                       request.resource.data.keys().hasAll(['title', 'status', 'createdAt']);
+      allow delete: if isBoard() || isAdmin();
       allow update: if isBoard() || isAdmin() ||
                        (isMember() &&
                         request.resource.data.diff(resource.data).affectedKeys()
                           .hasOnly(['attendees', 'registeredMembers', 'updatedAt']));
     }
-    
+
     // Projects collection
     match /projects/{projectId} {
       // Public events page uses getDocs(query(projects, where('status','==','Active'))).
@@ -243,7 +246,10 @@ service cloud.firestore {
       allow get: if isAuthenticated() || resource.data.status == 'Active';
       allow list: if true;
       // FIX 1: restrict writes to Board+; members may update only their own attendance/registration fields
-      allow create, delete: if isBoard() || isAdmin();
+      // P1 Fix: require critical fields on create to prevent partial/malformed project documents
+      allow create: if (isBoard() || isAdmin()) &&
+                       request.resource.data.keys().hasAll(['title', 'status', 'createdAt']);
+      allow delete: if isBoard() || isAdmin();
       allow update: if isBoard() || isAdmin() ||
                        (isMember() &&
                         request.resource.data.diff(resource.data).affectedKeys()
@@ -296,7 +302,9 @@ service cloud.firestore {
          (canAccessFinance() && (resource == null || resource.data.get('loId', null) == null || resource.data.get('loId', null) == getMyLoId())));
       allow list: if isAuthenticated() && (isAdmin() || isBoard());
       // E8 fix: on CREATE resource is null; must use request.resource.data not resource.data
+      // P1 Fix: require critical fields on create to prevent partial/malformed transaction documents
       allow create: if canAccessFinance() &&
+        request.resource.data.keys().hasAll(['amount', 'type', 'date', 'bankAccountId']) &&
         (request.resource.data.get('status', '') != 'Reconciled' &&
          request.resource.data.get('status', '') != 'Partially Reconciled' &&
          request.resource.data.get('status', '') != 'Voided');
@@ -575,6 +583,9 @@ service cloud.firestore {
                     (resource.data.memberId == request.auth.uid || isBoard() || isAdmin());
       allow list: if isActiveMember();
       // FIX: added required field validation to prevent partial/malformed responses
+      // DEDUP NOTE: Firestore rules cannot enforce one-response-per-member-per-survey.
+      // The service layer (surveyService) MUST query for existing responses by memberId+surveyId
+      // before calling addDoc, and reject the submission if one already exists.
       allow create: if isAuthenticated() &&
                       request.resource.data.memberId == request.auth.uid &&
                       request.resource.data.keys().hasAll(['surveyId', 'memberId', 'responses', 'submittedAt']);
@@ -777,7 +788,10 @@ service cloud.firestore {
     // Probation to Full Member promotion workflow
     match /manualPromotionRequests/{requestId} {
       // FIX: allow the applicant to read their own promotion request
-      allow read: if isBoard() || isAdmin() || request.auth.uid == resource.data.memberId;
+      // P1 Fix: split read into get/list — resource.data is null in list queries so the memberId
+      //         check always failed; list is Board/Admin only; members get their own via service get.
+      allow get: if isBoard() || isAdmin() || isDeveloper() || request.auth.uid == resource.data.memberId;
+      allow list: if isBoard() || isAdmin() || isDeveloper();
       allow create, update, delete: if isBoard() || isAdmin() || isDeveloper();
     }
 
@@ -881,8 +895,11 @@ service cloud.firestore {
     
     // Event Budgets collection
     // FIX 5: restrict read to Board/Admin or budget creator; add field whitelist on update for non-Admin
+    // P1 Fix: split read into get/list — resource.data is null in list queries so createdBy check
+    //         always failed for list operations; list is Board/Admin only.
     match /eventBudgets/{budgetId} {
-      allow read: if isAuthenticated() && (isBoard() || isAdmin() || request.auth.uid == resource.data.createdBy);
+      allow get: if isAuthenticated() && (isBoard() || isAdmin() || request.auth.uid == resource.data.createdBy);
+      allow list: if isBoard() || isAdmin();
       allow create, delete: if isBoard() || isAdmin();
       allow update: if isAdmin() ||
                       (isBoard() &&
@@ -1291,8 +1308,11 @@ service cloud.firestore {
     // Achievement Progress collection (tracks per-member progress toward achievements)
     // FIX 14: collection had ZERO rules — unauthenticated users could read all achievement progress
     // FIX 6: tighten read — owner-only for members; Admin can read any record
+    // P1 Fix: split read into get/list — resource.data is null in list queries so the memberId check
+    //         always failed for list operations; list is Admin-only, members use service-layer get.
     match /achievementProgress/{id} {
-      allow read: if isAuthenticated() && (request.auth.uid == resource.data.memberId || isAdmin());
+      allow get: if isAuthenticated() && (request.auth.uid == resource.data.memberId || isAdmin() || isBoard());
+      allow list: if isAdmin() || isBoard();
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }

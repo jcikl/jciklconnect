@@ -760,6 +760,11 @@ export class PaymentRequestService {
         const now = new Date().toISOString();
         const idx = devPaymentRequests.findIndex((p) => p.id === id);
         if (idx >= 0) {
+          // P1 fix: mirror the production status guard in dev mode.
+          const currentStatus = devPaymentRequests[idx].status;
+          if (currentStatus !== 'submitted' && currentStatus !== 'approved') {
+            throw new Error(`Cannot cancel a payment request with status "${currentStatus}" — only submitted or approved requests can be cancelled.`);
+          }
           devPaymentRequests = [...devPaymentRequests];
           devPaymentRequests[idx] = { ...devPaymentRequests[idx], status: 'cancelled', updatedAt: now, updatedBy: userId };
         }

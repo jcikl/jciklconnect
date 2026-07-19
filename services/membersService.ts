@@ -690,6 +690,16 @@ export class MembersService {
         errorLoggingService.logError(syncErr as Error, { component: 'updateMember', additionalData: { action: 'syncBoardMemberDisplayFields', memberId } });
       }
 
+      // TODO (SYNC-NAME-EVENTREG): When member name changes (general.name / fullName), the
+      // denormalised memberName field in eventRegistrations is not updated here because the
+      // volume of registrations per member can be high (hundreds) and a synchronous batch
+      // would block the write path unacceptably. Accepted eventual-consistency trade-off:
+      // eventRegistrations.memberName may be stale until a periodic reconciliation job
+      // (or a manual admin trigger) backfills it. If this becomes a product issue, add a
+      // Cloud Function triggered on members/{memberId} onUpdate that fans out the patch in
+      // background batches of 500 (Firestore writeBatch limit).
+      // Related field: eventRegistrations.memberName (denormalized from member.general.name)
+
       // Trigger introducer recalculation if introducer changes
       if (cleanUpdates.introducer !== undefined && (!currentData || cleanUpdates.introducer !== currentData.introducer)) {
         if (currentData?.introducer) {
@@ -773,7 +783,7 @@ export class MembersService {
         return typeof found === 'string' ? found.trim() : undefined;
       };
 
-      const display = {
+      const display: Record<string, unknown> = {
         memberName: firstText(
           memberAny.general?.name,
           memberAny.general?.fullName,
@@ -793,6 +803,14 @@ export class MembersService {
           memberAny.departmentAndPosition
         ),
       };
+
+      // Sync displayRole so boardMembers stays consistent when updateMember changes role.
+      // updateMemberRole() already does this atomically, but updateMember() with a role
+      // field also reaches this path — keep both in sync.
+      const memberRole = memberAny.role as string | undefined;
+      if (memberRole) {
+        display.displayRole = memberRole;
+      }
 
       const cleanDisplay = Object.fromEntries(
         Object.entries(display).filter(([, value]) => value !== undefined)
@@ -1155,13 +1173,20 @@ export class MembersService {
       if ('mentorId' in updates) {
         throw new Error('Use assignMentor() to change mentorId — batchUpdateMembers does not sync menteeIds on mentor documents.');
       }
+      // Email changes must go through updateMember so the memberEmails uniqueness slot
+      // and Auth email are updated atomically per-member (each member has a different
+      // current email, which a single batch payload cannot handle correctly).
+      if ('email' in updates || (updates.contact && (updates.contact as any)?.email)) {
+        throw new Error('Use updateMember() to change email — batchUpdateMembers cannot safely update email uniqueness slots for multiple members.');
+      }
       // Base normalization used for display-field detection and display sync
       const normalized = this.normalizeMemberData(updates as Record<string, any>);
       const now = Timestamp.now();
 
       // Fetch all current member docs for:
-      //   (a) per-member normalization to preserve existing nested fields (E3 fix), and
-      //   (b) introducer tracking for stats recalculation (M2 fix).
+      //   (a) per-member normalization to preserve existing nested fields (E3 fix),
+      //   (b) introducer tracking for stats recalculation (M2 fix), and
+      //   (c) senatorship lock guard + membership type sync (variant symmetry fix).
       const introducerChanging = 'introducer' in normalized;
       const oldIntroducerMap = new Map<string, string | undefined>();
       // Chunk reads in batches of 30 to avoid excessive concurrent Firestore connections at scale.
@@ -1183,14 +1208,55 @@ export class MembersService {
         }
       });
 
+      // Pre-compute syncComputedMembershipType per member when updates touch fields that affect
+      // membershipType (nationality, role, senatorship, etc.). Mirrors updateMember behaviour.
+      const MEMBERSHIP_TYPE_FIELDS = new Set([
+        'membershipType', 'role', 'nationality', 'dateOfBirth', 'dob',
+        'senatorCertified', 'senatorshipId', 'senatorshipBoardValidated',
+      ]);
+      const needsMembershipTypeSync = Object.keys(normalized).some(k => MEMBERSHIP_TYPE_FIELDS.has(k));
+      const membershipTypePatchMap = new Map<string, Partial<Member>>();
+      if (needsMembershipTypeSync) {
+        await Promise.all(
+          memberIds.map(async id => {
+            const existing = existingByIds.get(id) ?? null;
+            const patch = await this.syncComputedMembershipType(updates, existing);
+            membershipTypePatchMap.set(id, patch);
+          })
+        );
+      }
+
+      // Fields that are locked once senatorship is board-validated (mirrors updateMember guard).
+      const SENATORSHIP_LOCK_FIELDS = new Set([
+        'senatorshipId', 'senatorCertified', 'senatorshipBoardValidated',
+        'senatorshipValidatedAt', 'senatorshipValidatedBy',
+      ]);
+      const hasSenatorshipFields = Object.keys(normalized).some(k => SENATORSHIP_LOCK_FIELDS.has(k));
+
       // Firestore writeBatch limit is 500; flush every 400 to stay safe
       for (let i = 0; i < memberIds.length; i += 400) {
         const batch = writeBatch(db);
         memberIds.slice(i, i + 400).forEach(id => {
           const existing = existingByIds.get(id) ?? null;
+
+          // Senatorship lock guard: strip protected fields for board-validated members (mirrors updateMember)
+          let memberUpdates: Partial<Member> = updates;
+          if (hasSenatorshipFields && existing?.senatorshipBoardValidated) {
+            memberUpdates = { ...updates };
+            if ('senatorshipId' in memberUpdates && (memberUpdates as any).senatorshipId !== existing.senatorshipId) {
+              delete (memberUpdates as any).senatorshipId;
+            }
+            if ('senatorCertified' in memberUpdates) delete (memberUpdates as any).senatorCertified;
+            if ('senatorshipBoardValidated' in memberUpdates) delete (memberUpdates as any).senatorshipBoardValidated;
+            if ('senatorshipValidatedAt' in memberUpdates) delete (memberUpdates as any).senatorshipValidatedAt;
+            if ('senatorshipValidatedBy' in memberUpdates) delete (memberUpdates as any).senatorshipValidatedBy;
+          }
+
           // Normalize per-member so existing nested fields (socials, emergency, etc.) are preserved (E3 fix)
-          const perMemberNormalized = this.normalizeMemberData(updates as Record<string, any>, existing);
-          batch.update(doc(db, COLLECTIONS.MEMBERS, id), { ...perMemberNormalized, updatedAt: now });
+          const perMemberNormalized = this.normalizeMemberData(memberUpdates as Record<string, any>, existing);
+          // Merge pre-computed membership type patch (mirrors updateMember syncComputedMembershipType)
+          const typePatch = membershipTypePatchMap.get(id) ?? {};
+          batch.update(doc(db, COLLECTIONS.MEMBERS, id), { ...perMemberNormalized, ...typePatch, updatedAt: now });
         });
         await this.commitWithRetry(batch);
       }
