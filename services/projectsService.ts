@@ -16,9 +16,10 @@ import {
   Timestamp,
   arrayUnion,
   arrayRemove,
+  increment,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { COLLECTIONS } from '../config/constants';
+import { COLLECTIONS, POINT_CATEGORIES } from '../config/constants';
 import { Project, Task } from '../types';
 import { PointsService } from './pointsService';
 import { withDevMode, isDevMode } from '../utils/devMode';
@@ -573,31 +574,74 @@ export class ProjectsService {
             updateData.dueDate = updates.dueDate;
           }
 
-          await updateDoc(taskRef, updateData);
+          // P0 FIX: When completing a task, write the task update and points award in a
+          // single runTransaction so both succeed or both fail atomically.
+          const mergedTask = { ...existingData, ...updates } as Task;
+          const isCompletionWithPoints =
+            updates.status === 'Done' &&
+            mergedTask.assignee &&
+            mergedTask.projectId;
 
-          // If task is completed, award points.
-          // P2 FIX: reuse existingData merged with updates instead of a second getDoc.
-          // P1 FIX: wrap in try/catch so a points failure doesn't fail the task update itself.
-          if (updates.status === 'Done') {
-            const mergedTask = { ...existingData, ...updates } as Task;
-            if (mergedTask.assignee && mergedTask.projectId) {
-              try {
-                await PointsService.awardTaskCompletionPoints(
-                  mergedTask.assignee,
-                  mergedTask.projectId,
-                  taskId,
-                  mergedTask.priority
-                );
-              } catch (pointsErr) {
-                const { errorLoggingService } = await import('./errorLoggingService');
-                errorLoggingService.logError(pointsErr as Error, {
-                  component: 'ProjectsService',
-                  action: 'updateTask.awardTaskCompletionPoints',
-                  additionalData: { taskId, memberId: mergedTask.assignee },
-                });
-                // Non-fatal: task update succeeded; points will need manual reconciliation.
-              }
+          if (isCompletionWithPoints) {
+            const memberId = mergedTask.assignee!;
+            const priority = mergedTask.priority ?? 'Medium';
+            const awardYear = new Date().getFullYear();
+            const dedupRef = doc(db, COLLECTIONS.POINTS, `${memberId}_${taskId}_task_completion`);
+            const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
+
+            // Resolve the point value the same way awardTaskCompletionPoints does.
+            const rule = await PointsService.getPointRule(POINT_CATEGORIES.PROJECT_TASK);
+            const priorityMultipliers: Record<string, number> = {
+              Urgent: 2.0, High: 1.5, Medium: 1.0, Low: 0.5,
+            };
+            let points: number;
+            if (rule?.basePoints !== undefined) {
+              points = Math.floor(
+                rule.basePoints * (rule.multiplier ?? 1) * (priorityMultipliers[priority] ?? 1)
+              );
+            } else {
+              const fallback: Record<string, number> = { Urgent: 25, High: 20, Medium: 15, Low: 10 };
+              points = fallback[priority] ?? 15;
             }
+
+            await runTransaction(db, async (txn) => {
+              const dedup = await txn.get(dedupRef);
+              if (dedup.exists()) {
+                // Already awarded — still update the task doc (idempotent).
+                txn.update(taskRef, updateData);
+                return;
+              }
+              const memberSnap = await txn.get(memberRef);
+              if (!memberSnap.exists()) throw new Error('Assignee member not found');
+              const currentPoints: number = memberSnap.data()?.points || 0;
+
+              txn.update(taskRef, updateData);
+              txn.set(dedupRef, {
+                memberId,
+                points,
+                amount: points,
+                category: POINT_CATEGORIES.PROJECT_TASK,
+                description: `Completed ${priority} priority task`,
+                relatedEntityId: taskId,
+                sourceId: taskId,
+                relatedEntityType: 'task',
+                sourceType: 'task',
+                metadata: { projectId: mergedTask.projectId, priority },
+                createdAt: Timestamp.now(),
+              });
+              txn.update(memberRef, {
+                points: increment(points),
+                tier: PointsService.calculateTier(currentPoints + points),
+                [`yearlyPoints.${awardYear}`]: increment(points),
+                updatedAt: Timestamp.now(),
+              });
+            });
+            PointsService.invalidatePointsCache();
+            // MembersService cache invalidated via import to avoid circular dep.
+            const { MembersService } = await import('./membersService');
+            MembersService.invalidateMembersCache();
+          } else {
+            await updateDoc(taskRef, updateData);
           }
         } catch (error) {
           console.error('Error updating task:', error);

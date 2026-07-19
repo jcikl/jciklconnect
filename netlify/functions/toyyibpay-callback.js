@@ -13,6 +13,8 @@
 
 const { initializeApp, getApps, cert } = require('firebase-admin/app');
 const { getFirestore, Timestamp } = require('firebase-admin/firestore');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { COLLECTIONS } = require('../../config/constants');
 
 const TOYYIB_SECRET_KEY = process.env.TOYYIBPAY_SECRET_KEY;
 if (!TOYYIB_SECRET_KEY) throw new Error('TOYYIBPAY_SECRET_KEY env var not set');
@@ -110,7 +112,7 @@ exports.handler = async (event) => {
   // attempt errored out and must be retried, not silently swallowed.
   // Wrapped in a Firestore transaction so concurrent webhooks cannot both
   // read processed:false and both proceed — only one wins the write.
-  const idempotencyRef = db.collection('toyyibpay_webhooks').doc(transactionId);
+  const idempotencyRef = db.collection(COLLECTIONS.TOYYIBPAY_WEBHOOKS).doc(transactionId);
   const alreadyProcessed = await db.runTransaction(async (t) => {
     const doc = await t.get(idempotencyRef);
     if (doc.exists && doc.data().processed === true) return true;
@@ -264,7 +266,7 @@ exports.handler = async (event) => {
         batch.update(yearMatchTx.ref, txUpdate);
         batch.update(db.collection('members').doc(billMemberId), memberUpdate);
         await batch.commit()
-          .catch(err => console.warn('[toyyibpay-callback] Could not sync membership status:', err));
+          .catch(err => { console.warn('[toyyibpay-callback] Could not sync membership status:', err); throw err; });
       } else {
         // ── P0-A: Idempotency check at transaction level (defense-in-depth) ────
         // The outer toyyibpay_webhooks check guards the full request, but if two

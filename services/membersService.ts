@@ -615,7 +615,25 @@ export class MembersService {
       // call financeService.syncMemberMembership(memberId, `${year} membership`) afterwards.
       // TODO (SYNC-004): Detect membership.amount changes here and trigger syncMemberMembership
       // via dynamic import to avoid circular dependency.
-      await updateDoc(memberRef, normalizedUpdates);
+
+      // FIX: When email is changing, update memberEmails uniqueness slots atomically in the
+      // same writeBatch as the member document update — no window where the old slot is freed
+      // and the new slot is unclaimed (or vice-versa).
+      if (emailChanging && newEmail && currentEmail) {
+        const sanitizedOld = currentEmail.toLowerCase().replace(/[^a-z0-9@.]/g, '_');
+        const sanitizedNew = newEmail.toLowerCase().replace(/[^a-z0-9@.]/g, '_');
+        const emailBatch = writeBatch(db);
+        emailBatch.update(memberRef, normalizedUpdates);
+        emailBatch.delete(doc(db, 'memberEmails', sanitizedOld));
+        emailBatch.set(doc(db, 'memberEmails', sanitizedNew), {
+          email: newEmail,
+          memberId,
+          createdAt: Timestamp.now(),
+        });
+        await emailBatch.commit();
+      } else {
+        await updateDoc(memberRef, normalizedUpdates);
+      }
       const _frames = (new Error().stack ?? '').split('\n').slice(2);
       const _named = _frames
         .map(l => l.trim().replace(/^at /, '').replace(/ \(.*\)/, '').trim())
@@ -849,6 +867,11 @@ export class MembersService {
       const mentorId: string | undefined = targetDoc.exists()
         ? (targetDoc.data() as Omit<Member, 'id'>).mentorId
         : undefined;
+      // FIX: release the memberEmails uniqueness slot in the same batch as the soft-delete so
+      // the email can be reused (e.g. re-registration) and the old slot does not stay locked forever.
+      const targetEmailRaw: string | undefined = targetDoc.exists()
+        ? ((targetDoc.data() as any)?.contact?.email || (targetDoc.data() as any)?.email)
+        : undefined;
       const deleteBatch = writeBatch(db);
       deleteBatch.update(doc(db, COLLECTIONS.MEMBERS, memberId), {
         role: 'INACTIVE',
@@ -861,6 +884,10 @@ export class MembersService {
           menteeIds: arrayRemove(memberId),
           updatedAt: Timestamp.now(),
         });
+      }
+      if (targetEmailRaw) {
+        const sanitizedDelEmail = targetEmailRaw.toLowerCase().replace(/[^a-z0-9@.]/g, '_');
+        deleteBatch.delete(doc(db, 'memberEmails', sanitizedDelEmail));
       }
       await this.commitWithRetry(deleteBatch);
 
@@ -1266,6 +1293,27 @@ export class MembersService {
           batch.update(doc(db, COLLECTIONS.MEMBERS, id), data);
         });
         await this.commitWithRetry(batch);
+      }
+
+      // FIX: Release memberEmails uniqueness slots so emails can be re-registered.
+      // Mirror the logic in single deleteMember: contact.email → email → sanitize → batch.delete.
+      const memberEmailsToRelease: string[] = [];
+      targetDocs.forEach(d => {
+        if (!d.exists()) return;
+        const data = d.data() as any;
+        const rawEmail: string | undefined = data?.contact?.email || data?.email;
+        if (rawEmail) {
+          memberEmailsToRelease.push(rawEmail.toLowerCase().replace(/[^a-z0-9@.]/g, '_'));
+        }
+      });
+      if (memberEmailsToRelease.length > 0) {
+        for (let i = 0; i < memberEmailsToRelease.length; i += 400) {
+          const emailBatch = writeBatch(db);
+          memberEmailsToRelease.slice(i, i + 400).forEach(sanitizedEmail => {
+            emailBatch.delete(doc(db, 'memberEmails', sanitizedEmail));
+          });
+          await this.commitWithRetry(emailBatch);
+        }
       }
 
       // Clean up boardMembers and businessDirectory for all deleted members (E-01)

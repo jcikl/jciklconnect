@@ -666,10 +666,12 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
 
   const handleUndoCheckedIn = async (reg: EventRegistration) => {
     setUpdatingRegId(reg.id);
-    const prevStatus = reg.paidAt ? 'paid' : 'registered';
     try {
-      await EventRegistrationService.updateStatus(reg.id, prevStatus, { checkedInAt: null, checkedInByName: null });
+      // P0 fix: call undoAttendance instead of bare updateStatus so that the batch
+      // write (status revert + attendanceList removal) and points reversal all run.
+      await EventsService.undoAttendance(reg.eventId, reg.memberId);
       EventsService.invalidateEventsCache();
+      const prevStatus = reg.paidAt ? 'paid' : 'registered';
       setParticipations((prev) => prev.map((r) => (r.id === reg.id ? { ...r, status: prevStatus as EventRegistration['status'], checkedInAt: null, checkedInByName: null } : r)));
       showToast('Check-in reverted', 'success');
     } catch {

@@ -373,26 +373,7 @@ export const JCIKLApp: React.FC = () => {
 
   const unreadNotifications = allNotifications.filter(n => !n.read && !n.id.startsWith('birthday-'));
 
-  // Background trigger for daily 1 PM birthday notifications
-  React.useEffect(() => {
-    // Only admins or board members trigger the system-wide check to minimize overhead
-    if (!member || !['ADMIN', 'BOARD', 'MEMBER'].includes(member.role)) return;
-
-    const checkBirthdays = async () => {
-      try {
-        await CommunicationService.processDailyBirthdays();
-      } catch (error) {
-        console.error('Background birthday check failed:', error);
-      }
-    };
-
-    // Run once on mount
-    checkBirthdays();
-
-    // Then every 15 minutes
-    const interval = setInterval(checkBirthdays, 15 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [member]);
+  // Birthday notifications handled by Netlify Function cron job — client-side trigger removed
 
   // Sync document.title for accessibility (WCAG 2.4.2)
   React.useEffect(() => {

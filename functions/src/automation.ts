@@ -240,6 +240,9 @@ const AUTOMATION_SIDE_EFFECT_COLLECTIONS = [
   'workflow_executions',
   'automationLogs',
   'tasks',
+  // P0 self-trigger guard: the rule-fired handler updates lastTriggeredAt/triggerCount
+  // on automationRules documents, which would re-fire this same function → infinite loop.
+  'automationRules',
 ];
 
 // TODO: Scheduled automation rules (triggerType: 'schedule') require a Cloud

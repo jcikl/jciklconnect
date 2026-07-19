@@ -271,17 +271,22 @@ export class EventsService {
           // registration cleanup so both succeed or fail together.
           const BATCH_SIZE = 490;
           const regDocs = regSnap.docs;
+          const budgetRef = doc(db, COLLECTIONS.EVENT_BUDGETS, eventId);
           if (regDocs.length === 0) {
-            // No registrations — single batch containing only the event doc.
+            // No registrations — single batch containing only the event doc and its budget.
             const batch = writeBatch(db);
             batch.delete(eventRef);
+            batch.delete(budgetRef);
             await batch.commit();
           } else {
             for (let i = 0; i < regDocs.length; i += BATCH_SIZE) {
               const batch = writeBatch(db);
               regDocs.slice(i, i + BATCH_SIZE).forEach(d => batch.delete(d.ref));
-              // Include the event doc delete in the first batch chunk.
-              if (i === 0) batch.delete(eventRef);
+              // Include the event doc and budget doc delete in the first batch chunk.
+              if (i === 0) {
+                batch.delete(eventRef);
+                batch.delete(budgetRef);
+              }
               await batch.commit();
             }
           }

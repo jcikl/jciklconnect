@@ -837,6 +837,10 @@ export class PaymentRequestService {
         devPaymentRequests = devPaymentRequests.filter(p => p.id !== id);
       },
       async () => {
+        // Fetch the PR first so we can check its status and restore the bank balance if needed.
+        const prSnap = await getDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id));
+        const pr = prSnap.exists() ? ({ id: prSnap.id, ...prSnap.data() } as PaymentRequest) : null;
+
         const linkedQ = query(
           collection(db, COLLECTIONS.TRANSACTIONS),
           where('paymentRequestId', '==', id),
@@ -853,7 +857,20 @@ export class PaymentRequestService {
           batch.delete(txDoc.ref);
         }
         batch.delete(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id));
+
+        // P1-fix: if the PR was already Paid, the bank account balance was decremented when the
+        // PR was approved. Restore it now so the stored balance stays accurate after hard deletion.
+        if (pr && pr.status === 'paid' && pr.claimFromBankAccountId) {
+          const amount = pr.totalAmount ?? pr.amount ?? 0;
+          if (amount > 0) {
+            batch.update(doc(db, COLLECTIONS.BANK_ACCOUNTS, pr.claimFromBankAccountId), {
+              currentBalance: increment(amount),
+            });
+          }
+        }
+
         await batch.commit();
+        invalidateFinanceCache();
       }
     );
   }

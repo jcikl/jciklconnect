@@ -29,7 +29,7 @@ export const EventBudgetEditModal: React.FC<EventBudgetEditModalProps> = ({
         allocatedBudget,
         spent: budget?.spent || 0,
         income: budget?.income || 0,
-        currency: 'USD',
+        currency: 'MYR',
         budgetItems,
         status: budget?.status || 'Draft',
       });

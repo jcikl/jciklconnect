@@ -136,12 +136,21 @@ service cloud.firestore {
       );
 
       // 2. Create/Update/Delete Access
+      // Self-registration (GUEST): field whitelist prevents self-assigning elevated role or
+      // writing sensitive fields (jciCareer, points, transactionId, etc.) on creation.
+      // Board/Admin-created members: isBoard() bypass allows all fields.
       allow create: if isAuthenticated() &&
                        (request.auth.uid == memberId || isBoard()) &&
                        request.resource.data.name is string &&
                        request.resource.data.email is string &&
                        request.resource.data.role is string &&
-                       (isBoard() || request.resource.data.get('role', 'GUEST') == 'GUEST');
+                       (isBoard() ||
+                        (request.resource.data.get('role', 'GUEST') == 'GUEST' &&
+                         request.resource.data.keys().hasOnly([
+                           'email', 'name', 'displayName', 'photoURL', 'photoUrl',
+                           'createdAt', 'role', 'status', 'loId',
+                           'general', 'contact', 'membership'
+                         ])));
 
       // Self-write: members may update any profile field EXCEPT the locked list below.
       // GUEST may also set nationality/dob/idNumber; once promoted to MEMBER+ those three are locked.
@@ -250,11 +259,12 @@ service cloud.firestore {
     // Project tasks collection (Kanban, Gantt)
     match /tasks/{taskId} {
       // FIX 12: any authenticated user (including GUEST) was previously able to create and delete tasks
+      // FIX 21: restrict create to Board/Admin — members should not create tasks on arbitrary projects
       allow read: if isMember();
-      allow create: if isMember() &&
-                       request.resource.data.keys().hasAll(['title', 'assignedTo', 'projectId', 'createdAt']);
+      allow create: if isBoard() || isAdmin();
+      // Assignee can update their own task (e.g. mark complete); board/admin unrestricted
       allow update: if isBoard() || isAdmin() ||
-                       (isMember() && resource.data.assignedTo == request.auth.uid);
+                       (isAuthenticated() && resource.data.get('assigneeId', resource.data.get('assignedTo', '')) == request.auth.uid);
       allow delete: if isBoard() || isAdmin();
     }
     
@@ -303,6 +313,7 @@ service cloud.firestore {
            'status', 'reconciliationId', 'reconciledAt', 'reconciledBy',
            'prevStatus', 'paidAt', 'paidBy', 'updatedAt', 'updatedBy', 'notes', 'category',
            'isSplit', 'splitIds', 'originalCategory', 'projectId', 'purpose', 'projectTransactionIds',
+           'projectTransactionId',
            'description', 'amount', 'type', 'date', 'reference', 'bankAccountId', 'attachments',
            'paymentRequestId', 'inventoryLinkId', 'inventoryVariant', 'inventoryQuantity', 'tags',
            'matchStatus', 'matchedBankTxIds',
@@ -398,10 +409,10 @@ service cloud.firestore {
         (isAdmin() ||
          resource.data.get('applicantId', null) == request.auth.uid ||
          (canAccessFinance() && paymentRequestInMyScope()));
-      // allow list: isAdmin/finance as before; authenticated members may also query
-      // scoped by activityRef (committee access) — service layer enforces filtering.
+      // allow list: isAdmin/finance only — resource.data is null in list queries so per-member
+      // ownership cannot be enforced at rules layer; service layer MUST add where('applicantId', '==', uid).
       allow list: if isAuthenticated() &&
-        (isAdmin() || canAccessFinance() || isAuthenticated());
+        (isAdmin() || canAccessFinance());
       allow create: if isAuthenticated() &&
         request.resource.data.get('applicantId', null) == request.auth.uid &&
         request.resource.data.get('loId', null) is string &&
@@ -503,10 +514,8 @@ service cloud.firestore {
       // where('memberId', '==', uid) in every list query — this prevents unfiltered reads from
       // returning useful data even if rules pass. A compound index on (memberId ASC, timestamp DESC)
       // must exist so Firestore rejects queries that omit the memberId equality filter.
-      allow list: if isAuthenticated() &&
-                     (isMember() ||
-                      (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN']));
+      // Tightened from isMember() to isAdmin()||isBoard() to prevent members from querying all notifications.
+      allow list: if isAuthenticated() && (isAdmin() || isBoard());
       
       // PR-C: MEMBER cancel/submit notifications need create rights; N-8: require all fields present
       // isBoard() for general notifications; isMember() for specific self-service action types only
@@ -516,7 +525,7 @@ service cloud.firestore {
          request.resource.data.get('type', '') in [
            'payment_request_cancelled', 'payment_request_submitted',
            'payment_request_updated', 'event_registration_cancelled',
-           'info'
+           'info', 'success', 'warning', 'error'
          ]));
 
       // Users can mark their own notifications as read; board/admin can update any field
@@ -565,7 +574,10 @@ service cloud.firestore {
       allow get: if isAuthenticated() &&
                     (resource.data.memberId == request.auth.uid || isBoard() || isAdmin());
       allow list: if isActiveMember();
-      allow create: if isAuthenticated() && request.resource.data.memberId == request.auth.uid;
+      // FIX: added required field validation to prevent partial/malformed responses
+      allow create: if isAuthenticated() &&
+                      request.resource.data.memberId == request.auth.uid &&
+                      request.resource.data.keys().hasAll(['surveyId', 'memberId', 'responses', 'submittedAt']);
       allow update, delete: if isBoard() || isAdmin();
     }
 
@@ -658,7 +670,8 @@ service cloud.firestore {
            'minQuantity', 'category', 'purchasePrice', 'depreciatedValue', 'notes',
            'lastCheckedAt', 'checkedOutTo', 'checkedOutDate', 'expectedReturnDate',
            'updatedAt', 'updatedBy', 'tags', 'serialNumber', 'condition',
-           'returnedDate', 'lastSaleDate', 'purchaseDate', 'currentValue', 'lastDepreciationUpdate'
+           'returnedDate', 'lastSaleDate', 'purchaseDate', 'currentValue', 'lastDepreciationUpdate',
+           'nextMaintenanceDate', 'resolved', 'resolvedAt'
          ]));
     }
 
@@ -867,11 +880,15 @@ service cloud.firestore {
     }
     
     // Event Budgets collection
+    // FIX 5: restrict read to Board/Admin or budget creator; add field whitelist on update for non-Admin
     match /eventBudgets/{budgetId} {
-      allow read: if isAuthenticated();
-      allow create, update, delete: if isAuthenticated() && 
-                                       exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+      allow read: if isAuthenticated() && (isBoard() || isAdmin() || request.auth.uid == resource.data.createdBy);
+      allow create, delete: if isBoard() || isAdmin();
+      allow update: if isAdmin() ||
+                      (isBoard() &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                         'actualAmount', 'items', 'notes', 'status', 'updatedAt', 'updatedBy'
+                       ]));
     }
     
     // Event Feedback collection
@@ -941,11 +958,19 @@ service cloud.firestore {
                      (getUserRole() in ['BOARD', 'ADMIN'] ||
                       request.resource.data.mentorId == request.auth.uid ||
                       request.resource.data.menteeId == request.auth.uid);
-      allow update, delete: if isAuthenticated() &&
+      // FIX 22: split update/delete; add hasOnly whitelist so mentor/mentee can only change safe fields
+      allow update: if isAuthenticated() &&
+                     (
+                       (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                        getUserRole() in ['BOARD', 'ADMIN']) ||
+                       ((resource.data.mentorId == request.auth.uid ||
+                         resource.data.menteeId == request.auth.uid) &&
+                        request.resource.data.diff(resource.data).affectedKeys()
+                          .hasOnly(['status', 'acceptedAt', 'completedAt', 'updatedAt', 'notes']))
+                     );
+      allow delete: if isAuthenticated() &&
                      exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                     (getUserRole() in ['BOARD', 'ADMIN'] ||
-                      resource.data.mentorId == request.auth.uid ||
-                      resource.data.menteeId == request.auth.uid);
+                     getUserRole() in ['BOARD', 'ADMIN'];
     }
     match /mentorshipFeedback/{docId} {
       allow read: if isAuthenticated() && 
@@ -1034,10 +1059,11 @@ service cloud.firestore {
       allow create: if isMember();
       // Members may only update their own signature fields; board/admin unrestricted
       // FIX 4: restrict status values members can set — prevent self-escalation to 'active'/'completed'
+      // FIX 18: added 'signedAt', 'signedBy' — service writes these alongside status on signing
       allow update: if isAdmin() || isBoard() ||
                        (isMember() &&
                         request.resource.data.diff(resource.data).affectedKeys()
-                          .hasOnly(['signerIds', 'status', 'proofUrl', 'updatedAt']) &&
+                          .hasOnly(['signerIds', 'signedAt', 'signedBy', 'status', 'proofUrl', 'updatedAt']) &&
                         (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']) ||
                          request.resource.data.get('status', '') in ['pending_signature', 'signed', 'verifying']));
       allow delete: if isAdmin();
@@ -1199,7 +1225,11 @@ service cloud.firestore {
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(
           ['resolved', 'resolvedAt', 'resolvedBy', 'updatedAt']
         );
-      allow create: if false;
+      // FA-C: Board/Admin can create finance alerts manually (e.g. flagging suspicious transaction).
+      // Required fields enforced; resolved must be false on creation (unresolved alert).
+      allow create: if (isBoard() || isAdmin()) &&
+        request.resource.data.keys().hasAll(['type', 'message', 'createdAt']) &&
+        request.resource.data.get('resolved', true) == false;
       // FA-5: Admin can delete invalid/stale alerts that can't be resolved
       allow delete: if isAuthenticated() && isAdmin();
     }
@@ -1230,15 +1260,11 @@ service cloud.firestore {
     }
 
     // Member email dedup slots — one document per sanitised email address to enforce uniqueness
-    // Members can read their own slot (to check status); only the service layer (Admin-level) writes
+    // Members can read their own slot (to check status); only the service layer (Admin SDK) writes
     match /memberEmails/{email} {
       allow read: if isAuthenticated() && canReadOrgMembers();
-      // P1 Fix: require document ID to match the authenticated user's own email so no user can
-      // claim another person's email slot. Bulk import uses admin context (isAdmin()) which bypasses this.
-      allow create: if isAdmin() || (isAuthenticated() &&
-                    !exists(/databases/$(database)/documents/memberEmails/$(email)) &&
-                    request.resource.data.memberId == request.auth.uid &&
-                    email == request.auth.token.email);
+      // FIX 4: slot creation must only happen via Admin SDK — any client create is blocked
+      allow create: if false;
       allow update, delete: if isAdmin();
     }
 
@@ -1264,10 +1290,31 @@ service cloud.firestore {
 
     // Achievement Progress collection (tracks per-member progress toward achievements)
     // FIX 14: collection had ZERO rules — unauthenticated users could read all achievement progress
-    // FIX 6: tighten read — exclude GUEST and INACTIVE roles, consistent with other gamification collections
+    // FIX 6: tighten read — owner-only for members; Admin can read any record
     match /achievementProgress/{id} {
-      allow read: if isMember() || isBoard() || isAdmin();
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.memberId || isAdmin());
       allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ToyyibPay webhook payload mirror — written exclusively by Admin SDK in Netlify Functions
+    // No client (browser) access needed; all reads/writes go through server-side code
+    match /toyyibpay_webhooks/{docId} {
+      allow read, write: if false;
+    }
+
+    // Birthday notification dedup log — written exclusively by Admin SDK / Cloud Function
+    // No client access needed
+    match /birthdayNotificationsSent/{docId} {
+      allow read, write: if false;
+    }
+
+    // Bounties collection (peer-to-peer reward pledges)
+    // FIX: no match block existed — all access silently denied by catch-all
+    match /bounties/{bountyId} {
+      allow read: if isAuthenticated();
+      allow create: if isBoard() || isAdmin();
+      allow update: if isBoard() || isAdmin();
       allow delete: if isAdmin();
     }
 

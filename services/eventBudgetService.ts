@@ -61,7 +61,7 @@ export class EventBudgetService {
         allocatedBudget: 5000,
         spent: 3200,
         income: 1500,
-        currency: 'USD',
+        currency: 'MYR',
         budgetItems: [
           {
             id: 'bi1',
