@@ -6,7 +6,8 @@ import {
   CheckSquare, Heart, BookOpen, LayoutDashboard, Building2,
   Flame, Trophy, Coins, Timer, ArrowUpRight, Crown, RefreshCw, ChevronRight
 } from 'lucide-react';
-import { Card, StatCard, StatCardsContainer, Badge, Button, useToast, Modal, Skeleton } from '../ui/Common';
+import { Card, StatCard, StatCardsContainer, Badge, Button, useToast, Modal, Skeleton, Drawer } from '../ui/Common';
+import { Input, Select, Textarea } from '../ui/Form';
 import { MembersOnlyOverlay } from '../ui/MembersOnlyOverlay';
 import { useAuth } from '../../hooks/useAuth';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -102,6 +103,9 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const [selectedAdForDetail, setSelectedAdForDetail] = useState<Advertisement | null>(null);
   const [showBirthdayDrawer, setShowBirthdayDrawer] = useState(false);
   const [expandedJourneySteps, setExpandedJourneySteps] = useState<Set<string>>(new Set());
+  const [showProfileDrawer, setShowProfileDrawer] = useState(false);
+  const [profileDraft, setProfileDraft] = useState<Record<string, string>>({});
+  const [profileSaving, setProfileSaving] = useState(false);
 
 
   const profileCompleteness = React.useMemo(() => {
@@ -115,8 +119,11 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       { label: 'Business categories', done: Array.isArray(member.businessCategory) && member.businessCategory.length > 0 },
       { label: 'Company description', done: !!(member.business?.companyDescription ?? member.companyDescription) },
       { label: 'Ideal referral', done: !!(member.idealReferralIndustry || member.idealReferral) },
-      { label: 'Social media link', done: !!(member.linkedin || member.facebook || member.instagram || member.wechat) },
       { label: 'Special member offer', done: !!(member.business?.specialOffer ?? (member as any).specialOffer) },
+      { label: 'Address', done: !!(member.contact?.address ?? member.address) },
+      { label: 'Emergency contact', done: !!(member.contact?.emergency?.name ?? member.emergencyContactName ?? member.emergencyContact) },
+      { label: 'Apparel & Items', done: !!(member.others?.tshirtSize && member.others?.shirtStyle) || !!(member.tshirtSize && member.shirtStyle) },
+      { label: 'Business info', done: !!(member.business?.companyWebsite && member.business?.acceptInternationalBusiness && member.business?.levelOfManagement) },
     ];
     const done = checks.filter(c => c.done).length;
     const pct = Math.round((done / checks.length) * 100);
@@ -525,7 +532,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         return (
           <div
             className="relative overflow-hidden rounded-2xl shadow-md cursor-pointer group"
-            onClick={() => onNavigate?.('MEMBERS', member?.id)}
+            onClick={() => { setProfileDraft({}); setShowProfileDrawer(true); }}
           >
             {/* gradient bg */}
             <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(217,119,6,0.92) 0%, rgba(194,65,12,0.88) 60%, rgba(153,27,27,0.85) 100%)' }} />
@@ -1380,6 +1387,144 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
           );
         })()}
       </Modal>
+
+      {/* Profile Completion Drawer */}
+      {profileCompleteness && (
+        <Drawer
+          isOpen={showProfileDrawer}
+          onClose={() => setShowProfileDrawer(false)}
+          title="Complete Your Profile"
+          position="bottom"
+          size="xl"
+          footer={
+            <div className="flex gap-3 justify-end">
+              <Button variant="secondary" onClick={() => setShowProfileDrawer(false)}>Cancel</Button>
+              <Button
+                variant="primary"
+                disabled={profileSaving || Object.keys(profileDraft).length === 0}
+                onClick={async () => {
+                  if (!member?.id || Object.keys(profileDraft).length === 0) return;
+                  setProfileSaving(true);
+                  try {
+                    const updates: Record<string, unknown> = {};
+                    if ('companyDescription' in profileDraft) updates.companyDescription = profileDraft.companyDescription;
+                    if ('idealReferral' in profileDraft) updates.idealReferral = profileDraft.idealReferral;
+                    if ('specialOffer' in profileDraft || 'companyWebsite' in profileDraft || 'acceptInternationalBusiness' in profileDraft || 'levelOfManagement' in profileDraft) {
+                      updates.business = {
+                        ...(member.business ?? {}),
+                        ...(profileDraft.specialOffer !== undefined ? { specialOffer: profileDraft.specialOffer } : {}),
+                        ...(profileDraft.companyWebsite !== undefined ? { companyWebsite: profileDraft.companyWebsite } : {}),
+                        ...(profileDraft.acceptInternationalBusiness !== undefined ? { acceptInternationalBusiness: profileDraft.acceptInternationalBusiness } : {}),
+                        ...(profileDraft.levelOfManagement !== undefined ? { levelOfManagement: profileDraft.levelOfManagement } : {}),
+                      };
+                    }
+                    if ('address' in profileDraft) updates.address = profileDraft.address;
+                    if ('emergencyContactName' in profileDraft) updates.emergencyContactName = profileDraft.emergencyContactName;
+                    if ('emergencyContactRelationship' in profileDraft) updates.emergencyContactRelationship = profileDraft.emergencyContactRelationship;
+                    if ('emergencyContact' in profileDraft) updates.emergencyContact = profileDraft.emergencyContact;
+                    if ('shirtStyle' in profileDraft) updates.shirtStyle = profileDraft.shirtStyle;
+                    if ('tshirtSize' in profileDraft) updates.tshirtSize = profileDraft.tshirtSize;
+                    if ('jacketSize' in profileDraft) updates.jacketSize = profileDraft.jacketSize;
+                    await MembersService.updateMember(member.id, updates as Parameters<typeof MembersService.updateMember>[1]);
+                    showToast('Profile updated!', 'success');
+                    setShowProfileDrawer(false);
+                    setProfileDraft({});
+                  } catch (err) {
+                    showToast('Failed to save. Please try again.', 'error');
+                  } finally {
+                    setProfileSaving(false);
+                  }
+                }}
+              >
+                {profileSaving ? 'Saving…' : 'Save'}
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-6">
+            {/* Progress summary */}
+            <div className="flex items-center gap-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-700/40">
+              <div className="flex-1">
+                <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">{profileCompleteness.done} of {profileCompleteness.total} fields filled — {profileCompleteness.pct}% complete</p>
+                <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5">Fill in the missing fields below to complete your profile.</p>
+              </div>
+            </div>
+
+            {profileCompleteness.missing.map(field => {
+              const set = (key: string, val: string) => setProfileDraft(d => ({ ...d, [key]: val }));
+              const val = (key: string, fallback = '') => profileDraft[key] ?? fallback;
+
+              if (field.label === 'Company description') return (
+                <Textarea key={field.label} label="Company Description" rows={3}
+                  value={val('companyDescription', member?.companyDescription ?? '')}
+                  onChange={e => set('companyDescription', e.target.value)} />
+              );
+              if (field.label === 'Ideal referral') return (
+                <Input key={field.label} label="Ideal Referral" placeholder="e.g. SME owners in F&B industry"
+                  value={val('idealReferral', member?.idealReferral ?? '')}
+                  onChange={e => set('idealReferral', e.target.value)} />
+              );
+              if (field.label === 'Special member offer') return (
+                <Textarea key={field.label} label="Special Member Offer" rows={2} placeholder="e.g. 10% discount for JCI KL members"
+                  value={val('specialOffer', member?.business?.specialOffer ?? '')}
+                  onChange={e => set('specialOffer', e.target.value)} />
+              );
+              if (field.label === 'Address') return (
+                <Input key={field.label} label="Address"
+                  value={val('address', member?.address ?? '')}
+                  onChange={e => set('address', e.target.value)} />
+              );
+              if (field.label === 'Emergency contact') return (
+                <div key={field.label} className="space-y-3">
+                  <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Emergency Contact</p>
+                  <Input label="Name"
+                    value={val('emergencyContactName', member?.emergencyContactName ?? '')}
+                    onChange={e => set('emergencyContactName', e.target.value)} />
+                  <Input label="Relationship"
+                    value={val('emergencyContactRelationship', member?.emergencyContactRelationship ?? '')}
+                    onChange={e => set('emergencyContactRelationship', e.target.value)} />
+                  <Input label="Phone" type="tel"
+                    value={val('emergencyContact', member?.emergencyContact ?? '')}
+                    onChange={e => set('emergencyContact', e.target.value)} />
+                </div>
+              );
+              if (field.label === 'Apparel & Items') return (
+                <div key={field.label} className="space-y-3">
+                  <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Apparel & Items</p>
+                  <Select label="Shirt Style"
+                    value={val('shirtStyle', member?.shirtStyle ?? '')}
+                    onChange={e => set('shirtStyle', e.target.value)}
+                    options={[{ value: '', label: 'Select…' }, { value: 'Unisex', label: 'Unisex' }, { value: 'Lady Cut', label: 'Lady Cut' }]} />
+                  <Select label="T-Shirt Size"
+                    value={val('tshirtSize', member?.tshirtSize ?? '')}
+                    onChange={e => set('tshirtSize', e.target.value)}
+                    options={[{ value: '', label: 'Select…' }, ...['XS','S','M','L','XL','2XL','3XL','5XL','7XL'].map(s => ({ value: s, label: s }))]} />
+                  <Select label="Jacket Size"
+                    value={val('jacketSize', member?.jacketSize ?? '')}
+                    onChange={e => set('jacketSize', e.target.value)}
+                    options={[{ value: '', label: 'Select…' }, ...['XS','S','M','L','XL','2XL','3XL','5XL','7XL'].map(s => ({ value: s, label: s }))]} />
+                </div>
+              );
+              if (field.label === 'Business info') return (
+                <div key={field.label} className="space-y-3">
+                  <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Business Info</p>
+                  <Input label="Company Website" type="url" placeholder="https://"
+                    value={val('companyWebsite', member?.business?.companyWebsite ?? '')}
+                    onChange={e => set('companyWebsite', e.target.value)} />
+                  <Select label="Accept International Business"
+                    value={val('acceptInternationalBusiness', member?.business?.acceptInternationalBusiness ?? '')}
+                    onChange={e => set('acceptInternationalBusiness', e.target.value)}
+                    options={[{ value: '', label: 'Select…' }, { value: 'Yes', label: 'Yes' }, { value: 'No', label: 'No' }, { value: 'Willing to Explore', label: 'Willing to Explore' }]} />
+                  <Input label="Level of Management" placeholder="e.g. Senior Management"
+                    value={val('levelOfManagement', member?.business?.levelOfManagement ?? '')}
+                    onChange={e => set('levelOfManagement', e.target.value)} />
+                </div>
+              );
+              return null;
+            })}
+          </div>
+        </Drawer>
+      )}
     </div>
   );
 };
