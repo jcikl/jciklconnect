@@ -424,7 +424,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
               tabs={[{id: 'local', label: 'Local Businesses'}, {id: 'international', label: 'International Network'}]}
               activeTab={activeTab}
               onTabChange={(tab) => setActiveTab(tab as typeof activeTab)}
-              mobileFallback="select"
+              mobileFallback="pill"
               className="border-none"
             />
           </div>
