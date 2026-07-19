@@ -1449,7 +1449,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         return (
           <>
             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" aria-hidden="true" onClick={() => setShowProfileDrawer(false)} />
-            <div className="fixed z-50 bg-white flex flex-col bottom-0 left-0 right-0 rounded-t-2xl max-h-[88vh] md:bottom-0 md:top-0 md:left-auto md:right-0 md:rounded-none md:rounded-l-2xl md:max-h-none md:w-[460px] shadow-2xl">
+            <div className="fixed z-50 bg-white flex flex-col bottom-[86px] left-0 right-0 rounded-t-2xl max-h-[calc(100vh-86px)] md:bottom-0 md:top-0 md:left-auto md:right-0 md:rounded-none md:rounded-l-2xl md:max-h-none md:w-[460px] shadow-2xl">
               {/* Gradient header — drag handle integrated inside (matches journey drawer pattern) */}
               <div className="flex-none px-5 pt-3 pb-4 flex flex-col rounded-t-2xl md:rounded-none md:rounded-tl-2xl" style={{ background: 'linear-gradient(135deg, rgba(217,119,6,0.96) 0%, rgba(194,65,12,0.93) 55%, rgba(153,27,27,0.90) 100%)' }}>
                 <div className="flex justify-center pb-2 md:hidden" aria-hidden="true">
