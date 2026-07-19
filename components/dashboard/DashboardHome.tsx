@@ -123,7 +123,9 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       { label: 'Address', done: !!(member.contact?.address ?? member.address) },
       { label: 'Emergency contact', done: !!(member.contact?.emergency?.name ?? member.emergencyContactName ?? member.emergencyContact) },
       { label: 'Apparel & Items', done: !!(member.others?.tshirtSize && member.others?.shirtStyle) || !!(member.tshirtSize && member.shirtStyle) },
-      { label: 'Business info', done: !!(member.business?.companyWebsite && member.business?.acceptInternationalBusiness && member.business?.levelOfManagement) },
+      { label: 'Company website', done: !!(member.business?.companyWebsite ?? (member as any).companyWebsite) },
+      { label: 'International business', done: !!(member.business?.acceptInternationalBusiness ?? (member as any).acceptInternationalBusiness) },
+      { label: 'Level of management', done: !!(member.business?.levelOfManagement ?? (member as any).levelOfManagement) },
     ];
     const done = checks.filter(c => c.done).length;
     const pct = Math.round((done / checks.length) * 100);
@@ -1393,7 +1395,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         const { done, total, pct, missing } = profileCompleteness;
         const set = (key: string, v: string) => setProfileDraft(d => ({ ...d, [key]: v }));
         const val = (key: string, fallback = '') => profileDraft[key] ?? fallback;
-        const hasBiz = missing.some(f => ['Company description','Ideal referral','Special member offer','Business info'].includes(f.label));
+        const hasBiz = missing.some(f => ['Company description','Ideal referral','Special member offer','Company website','International business','Level of management'].includes(f.label));
         const hasPersonal = missing.some(f => f.label === 'Address');
         const hasEmergency = missing.some(f => f.label === 'Emergency contact');
         const hasApparel = missing.some(f => f.label === 'Apparel & Items');
@@ -1487,20 +1489,22 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                           value={val('specialOffer', member?.business?.specialOffer ?? '')}
                           onChange={e => set('specialOffer', e.target.value)} />
                       )}
-                      {missing.find(f => f.label === 'Business info') && (<>
+                      {missing.find(f => f.label === 'Company website') && (
                         <Input label="Company Website" type="url" placeholder="https://"
                           value={val('companyWebsite', member?.business?.companyWebsite ?? '')}
                           onChange={e => set('companyWebsite', e.target.value)} />
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <Select label="International Business"
-                            value={val('acceptInternationalBusiness', member?.business?.acceptInternationalBusiness ?? '')}
-                            onChange={e => set('acceptInternationalBusiness', e.target.value)}
-                            options={[{ value: '', label: 'Select…' }, { value: 'Yes', label: 'Yes' }, { value: 'No', label: 'No' }, { value: 'Willing to Explore', label: 'Willing to Explore' }]} />
-                          <Input label="Level of Management" placeholder="e.g. Senior Management"
-                            value={val('levelOfManagement', member?.business?.levelOfManagement ?? '')}
-                            onChange={e => set('levelOfManagement', e.target.value)} />
-                        </div>
-                      </>)}
+                      )}
+                      {missing.find(f => f.label === 'International business') && (
+                        <Select label="International Business"
+                          value={val('acceptInternationalBusiness', member?.business?.acceptInternationalBusiness ?? '')}
+                          onChange={e => set('acceptInternationalBusiness', e.target.value)}
+                          options={[{ value: '', label: 'Select…' }, { value: 'Yes', label: 'Yes' }, { value: 'No', label: 'No' }, { value: 'Willing to Explore', label: 'Willing to Explore' }]} />
+                      )}
+                      {missing.find(f => f.label === 'Level of management') && (
+                        <Input label="Level of Management" placeholder="e.g. Senior Management"
+                          value={val('levelOfManagement', member?.business?.levelOfManagement ?? '')}
+                          onChange={e => set('levelOfManagement', e.target.value)} />
+                      )}
                     </div>
                   </div>
                 )}
