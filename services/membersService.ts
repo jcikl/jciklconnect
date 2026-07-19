@@ -1051,10 +1051,12 @@ export class MembersService {
       this.invalidateMembersCache();
     } catch (error) {
       console.error('Error recalculating attendance:', error);
+      throw error;
     }
   }
 
   static async updateMemberRole(memberId: string, newRole: UserRole): Promise<void> {
+    if (isDevMode()) return;
     try {
       // Promoting to ADMIN / SUPER_ADMIN requires the caller to also be ADMIN+ (E13 fix)
       const adminOnlyRoles: UserRole[] = [UserRole.ADMIN, UserRole.SUPER_ADMIN];

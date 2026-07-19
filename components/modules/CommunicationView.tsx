@@ -151,14 +151,10 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
                     <p className="text-slate-500">Stay connected with announcements and discussions.</p>
                 </div>
                 <div className="flex gap-2">
-                    {(canManageAnnouncements || activeTab !== 'Announcements') && (
-                        <Button onClick={() => {
-                            if (activeTab === 'Announcements' && canManageAnnouncements) {
-                                setIsAnnouncementModalOpen(true);
-                            }
-                        }}>
+                    {canManageAnnouncements && activeTab === 'Announcements' && (
+                        <Button onClick={() => setIsAnnouncementModalOpen(true)}>
                             <Megaphone size={16} className="mr-2" />
-                            {activeTab === 'Announcements' ? 'New Announcement' : 'New Post'}
+                            New Announcement
                         </Button>
                     )}
                 </div>
@@ -189,8 +185,6 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
                                         />
                                         <div className="flex justify-between items-center mt-2">
                                             <div className="flex gap-2 text-slate-400 text-xs">
-                                                <button className="hover:text-jci-blue">Attach Image</button>
-                                                <button className="hover:text-jci-blue">Add Poll</button>
                                             </div>
                                             <Button
                                                 size="sm"

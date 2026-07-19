@@ -639,7 +639,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
       await updateMember(member.id, updates);
       setShowEditModal(false);
     } catch (err) {
-      // Error is handled in the hook
+      showToast('Failed to save changes. Please try again.', 'error');
     }
   };
 
@@ -710,9 +710,9 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
     try {
       setIsDeleting(true);
       await deleteMember(member.id);
-      onBack(); // Go back to directory
+      onBack();
     } catch (err) {
-      // Error is handled in the hook
+      showToast('Failed to delete member. Please try again.', 'error');
     } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);

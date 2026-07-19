@@ -1427,6 +1427,7 @@ export class PointsService {
 
       // Fallback for anonymous submissions (no memberId) — addDoc is acceptable here
       const docRef = await addDoc(collection(db, COLLECTIONS.INCENTIVE_SUBMISSIONS), submission);
+      PointsService.invalidateIncentiveCache();
       return docRef.id;
     } catch (error) {
       console.error('Error submitting incentive claim:', error);

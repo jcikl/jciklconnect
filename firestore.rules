@@ -192,11 +192,16 @@ service cloud.firestore {
                        request.resource.data.keys().hasAll(['author', 'content', 'createdAt']) &&
                        request.resource.data.author.id == request.auth.uid;
       
-      // Allow update: post author or board/admin/super_admin (if member doc exists)
+      // Allow update: post author may edit content/tags only; BOARD+ may moderate (no field restriction).
+      // hasOnly prevents any user from overwriting author.id to impersonate another member.
       allow update: if isAuthenticated() &&
-                       (resource.data.author.id == request.auth.uid ||
-                        (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                         get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN', 'SUPER_ADMIN']));
+                       (
+                         (resource.data.author.id == request.auth.uid &&
+                          request.resource.data.diff(resource.data).affectedKeys()
+                            .hasOnly(['content', 'tags', 'updatedAt', 'likes', 'likedBy'])) ||
+                         (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+                          get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN', 'SUPER_ADMIN'])
+                       );
 
       // Allow delete: post author or board/admin/super_admin (if member doc exists)
       allow delete: if isAuthenticated() &&
@@ -907,8 +912,12 @@ service cloud.firestore {
     // Board of Directors: boardMembers, boardTransitions (public read for guest About page)
     match /boardMembers/{docId} {
       allow read: if true;
-      allow create, update, delete: if isBoard();
-    }
+      allow create, delete: if isBoard();
+      // hasOnly prevents a BOARD member from overwriting memberId (hijacking another person's slot)
+      allow update: if isBoard() &&
+                       request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['role', 'displayRole', 'term', 'startDate', 'endDate',
+                                   'updatedAt', 'photoUrl', 'description', 'isActive']);
     match /boardTransitions/{docId} {
       allow read: if true;
       allow create, update, delete: if isBoard();
@@ -1120,10 +1129,12 @@ service cloud.firestore {
       );
     }
     
-    // Client crash reports (web + APK) — anyone may create; Board reads; Admin deletes
+    // Client crash reports (web + APK) — authenticated users may create; Board reads; Admin deletes.
+    // isAuthenticated() prevents anonymous bots from flooding the collection.
+    // Unauthenticated APK crashes are lost, which is an acceptable trade-off vs spam.
     match /errorLogs/{docId} {
       allow read: if isBoard();
-      allow create: if true;
+      allow create: if isAuthenticated();
       allow update: if isBoard();
       allow delete: if isAdmin();
     }

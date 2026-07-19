@@ -880,6 +880,7 @@ export class PromotionService {
   }
 
   private static async saveManualPromotionRequest(request: ManualPromotionRequest): Promise<string> {
+    if (isDevMode()) return 'dev-mock-request-id';
     const docRef = await addDoc(collection(db, COLLECTIONS.MANUAL_PROMOTION_REQUESTS), {
       ...request,
       requestedAt: serverTimestamp()
