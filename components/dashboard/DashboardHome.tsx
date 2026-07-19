@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Card, StatCard, StatCardsContainer, Badge, Button, useToast, Modal, Skeleton, Drawer } from '../ui/Common';
 import { Input, Select, Textarea } from '../ui/Form';
+import { Tabs } from '../ui/Tabs';
 import { MembersOnlyOverlay } from '../ui/MembersOnlyOverlay';
 import { useAuth } from '../../hooks/useAuth';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -106,6 +107,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const [showProfileDrawer, setShowProfileDrawer] = useState(false);
   const [profileDraft, setProfileDraft] = useState<Record<string, string>>({});
   const [profileSaving, setProfileSaving] = useState(false);
+  const [profileTab, setProfileTab] = useState('basic');
 
 
   const profileCompleteness = React.useMemo(() => {
@@ -1395,27 +1397,28 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         const { done, total, pct, missing } = profileCompleteness;
         const set = (key: string, v: string) => setProfileDraft(d => ({ ...d, [key]: v }));
         const val = (key: string, fallback = '') => profileDraft[key] ?? fallback;
-        const hasBiz = missing.some(f => ['Company description','Ideal referral','Special member offer','Company website','International business','Level of management'].includes(f.label));
-        const hasPersonal = missing.some(f => f.label === 'Address');
-        const hasEmergency = missing.some(f => f.label === 'Emergency contact');
-        const hasApparel = missing.some(f => f.label === 'Apparel & Items');
+        const basicLabels = ['Phone number','Company name','Industry','Apparel & Items'];
+        const contactLabels = ['Address','Emergency contact'];
+        const professionalLabels = ['Position / title','Business categories','Company description','Ideal referral','Special member offer','Company website','International business','Level of management'];
+        const basicCount = missing.filter(f => basicLabels.includes(f.label)).length;
+        const contactCount = missing.filter(f => contactLabels.includes(f.label)).length;
+        const professionalCount = missing.filter(f => professionalLabels.includes(f.label)).length;
+        const profileTabs = [
+          { id: 'basic', label: 'Basic Info', badge: basicCount > 0 ? <span className="ml-1 bg-amber-500 text-white text-[9px] font-black rounded-full px-1.5 py-0.5 leading-none">{basicCount}</span> : undefined },
+          { id: 'contact', label: 'Contact', badge: contactCount > 0 ? <span className="ml-1 bg-amber-500 text-white text-[9px] font-black rounded-full px-1.5 py-0.5 leading-none">{contactCount}</span> : undefined },
+          { id: 'professional', label: 'Professional', badge: professionalCount > 0 ? <span className="ml-1 bg-amber-500 text-white text-[9px] font-black rounded-full px-1.5 py-0.5 leading-none">{professionalCount}</span> : undefined },
+        ];
         const r = 26, circ = 2 * Math.PI * r;
         const handleSave = async () => {
           if (!member?.id || Object.keys(profileDraft).length === 0) return;
           setProfileSaving(true);
           try {
             const updates: Record<string, unknown> = {};
+            if ('phone' in profileDraft) updates.phone = profileDraft.phone;
+            if ('companyName' in profileDraft) updates.companyName = profileDraft.companyName;
+            if ('industry' in profileDraft) updates.industry = profileDraft.industry;
             if ('companyDescription' in profileDraft) updates.companyDescription = profileDraft.companyDescription;
             if ('idealReferral' in profileDraft) updates.idealReferral = profileDraft.idealReferral;
-            if ('specialOffer' in profileDraft || 'companyWebsite' in profileDraft || 'acceptInternationalBusiness' in profileDraft || 'levelOfManagement' in profileDraft) {
-              updates.business = {
-                ...(member.business ?? {}),
-                ...(profileDraft.specialOffer !== undefined ? { specialOffer: profileDraft.specialOffer } : {}),
-                ...(profileDraft.companyWebsite !== undefined ? { companyWebsite: profileDraft.companyWebsite } : {}),
-                ...(profileDraft.acceptInternationalBusiness !== undefined ? { acceptInternationalBusiness: profileDraft.acceptInternationalBusiness } : {}),
-                ...(profileDraft.levelOfManagement !== undefined ? { levelOfManagement: profileDraft.levelOfManagement } : {}),
-              };
-            }
             if ('address' in profileDraft) updates.address = profileDraft.address;
             if ('emergencyContactName' in profileDraft) updates.emergencyContactName = profileDraft.emergencyContactName;
             if ('emergencyContactRelationship' in profileDraft) updates.emergencyContactRelationship = profileDraft.emergencyContactRelationship;
@@ -1423,6 +1426,16 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
             if ('shirtStyle' in profileDraft) updates.shirtStyle = profileDraft.shirtStyle;
             if ('tshirtSize' in profileDraft) updates.tshirtSize = profileDraft.tshirtSize;
             if ('jacketSize' in profileDraft) updates.jacketSize = profileDraft.jacketSize;
+            if ('specialOffer' in profileDraft || 'companyWebsite' in profileDraft || 'acceptInternationalBusiness' in profileDraft || 'levelOfManagement' in profileDraft || 'departmentAndPosition' in profileDraft) {
+              updates.business = {
+                ...(member.business ?? {}),
+                ...(profileDraft.departmentAndPosition !== undefined ? { departmentAndPosition: profileDraft.departmentAndPosition } : {}),
+                ...(profileDraft.specialOffer !== undefined ? { specialOffer: profileDraft.specialOffer } : {}),
+                ...(profileDraft.companyWebsite !== undefined ? { companyWebsite: profileDraft.companyWebsite } : {}),
+                ...(profileDraft.acceptInternationalBusiness !== undefined ? { acceptInternationalBusiness: profileDraft.acceptInternationalBusiness } : {}),
+                ...(profileDraft.levelOfManagement !== undefined ? { levelOfManagement: profileDraft.levelOfManagement } : {}),
+              };
+            }
             await MembersService.updateMember(member.id, updates as Parameters<typeof MembersService.updateMember>[1]);
             showToast('Profile updated!', 'success');
             setShowProfileDrawer(false);
@@ -1465,106 +1478,120 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                 </button>
                 </div>
               </div>
-              {/* Scrollable sections */}
+              {/* Tabs */}
+              <div className="flex-none px-4 pt-3 border-b border-slate-100">
+                <Tabs tabs={profileTabs} activeTab={profileTab} onTabChange={setProfileTab} fullWidth />
+              </div>
+              {/* Tab content */}
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                {hasBiz && (
-                  <div className="rounded-xl border border-slate-200 overflow-hidden">
-                    <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-50 border-b border-slate-200">
-                      <span className="text-sm" aria-hidden="true">🏢</span>
-                      <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Business Profile</span>
-                    </div>
-                    <div className="p-4 space-y-3">
-                      {missing.find(f => f.label === 'Company description') && (
-                        <Textarea label="Company Description" rows={2}
-                          value={val('companyDescription', member?.companyDescription ?? '')}
-                          onChange={e => set('companyDescription', e.target.value)} />
-                      )}
-                      {missing.find(f => f.label === 'Ideal referral') && (
-                        <Input label="Ideal Referral" placeholder="e.g. SME owners in F&B industry"
-                          value={val('idealReferral', member?.idealReferral ?? '')}
-                          onChange={e => set('idealReferral', e.target.value)} />
-                      )}
-                      {missing.find(f => f.label === 'Special member offer') && (
-                        <Textarea label="Special Member Offer" rows={2} placeholder="e.g. 10% discount for JCI KL members"
-                          value={val('specialOffer', member?.business?.specialOffer ?? '')}
-                          onChange={e => set('specialOffer', e.target.value)} />
-                      )}
-                      {missing.find(f => f.label === 'Company website') && (
-                        <Input label="Company Website" type="url" placeholder="https://"
-                          value={val('companyWebsite', member?.business?.companyWebsite ?? '')}
-                          onChange={e => set('companyWebsite', e.target.value)} />
-                      )}
-                      {missing.find(f => f.label === 'International business') && (
-                        <Select label="International Business"
-                          value={val('acceptInternationalBusiness', member?.business?.acceptInternationalBusiness ?? '')}
-                          onChange={e => set('acceptInternationalBusiness', e.target.value)}
-                          options={[{ value: '', label: 'Select…' }, { value: 'Yes', label: 'Yes' }, { value: 'No', label: 'No' }, { value: 'Willing to Explore', label: 'Willing to Explore' }]} />
-                      )}
-                      {missing.find(f => f.label === 'Level of management') && (
-                        <Input label="Level of Management" placeholder="e.g. Senior Management"
-                          value={val('levelOfManagement', member?.business?.levelOfManagement ?? '')}
-                          onChange={e => set('levelOfManagement', e.target.value)} />
-                      )}
-                    </div>
-                  </div>
-                )}
-                {hasPersonal && (
-                  <div className="rounded-xl border border-slate-200 overflow-hidden">
-                    <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-50 border-b border-slate-200">
-                      <span className="text-sm" aria-hidden="true">🏠</span>
-                      <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Personal Details</span>
-                    </div>
-                    <div className="p-4">
-                      <Input label="Address"
-                        value={val('address', member?.address ?? '')}
-                        onChange={e => set('address', e.target.value)} />
-                    </div>
-                  </div>
-                )}
-                {hasEmergency && (
-                  <div className="rounded-xl border border-slate-200 overflow-hidden">
-                    <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-50 border-b border-slate-200">
-                      <span className="text-sm" aria-hidden="true">🚨</span>
-                      <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Emergency Contact</span>
-                    </div>
-                    <div className="p-4 space-y-3">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <Input label="Name"
-                          value={val('emergencyContactName', member?.emergencyContactName ?? '')}
-                          onChange={e => set('emergencyContactName', e.target.value)} />
-                        <Input label="Relationship"
-                          value={val('emergencyContactRelationship', member?.emergencyContactRelationship ?? '')}
-                          onChange={e => set('emergencyContactRelationship', e.target.value)} />
+                {profileTab === 'basic' && (
+                  basicCount === 0
+                    ? <p className="text-sm text-slate-400 text-center py-8">✓ All basic info filled</p>
+                    : <div className="space-y-3">
+                        {missing.find(f => f.label === 'Phone number') && (
+                          <Input label="Phone Number" type="tel"
+                            value={val('phone', member?.phone ?? '')}
+                            onChange={e => set('phone', e.target.value)} />
+                        )}
+                        {missing.find(f => f.label === 'Company name') && (
+                          <Input label="Company Name"
+                            value={val('companyName', member?.companyName ?? '')}
+                            onChange={e => set('companyName', e.target.value)} />
+                        )}
+                        {missing.find(f => f.label === 'Industry') && (
+                          <Input label="Industry"
+                            value={val('industry', member?.industry ?? '')}
+                            onChange={e => set('industry', e.target.value)} />
+                        )}
+                        {missing.find(f => f.label === 'Apparel & Items') && (
+                          <div className="space-y-3">
+                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Apparel & Items</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              <Select label="Shirt Style"
+                                value={val('shirtStyle', member?.shirtStyle ?? '')}
+                                onChange={e => set('shirtStyle', e.target.value)}
+                                options={[{ value: '', label: 'Select…' }, { value: 'Unisex', label: 'Unisex' }, { value: 'Lady Cut', label: 'Lady Cut' }]} />
+                              <Select label="T-Shirt Size"
+                                value={val('tshirtSize', member?.tshirtSize ?? '')}
+                                onChange={e => set('tshirtSize', e.target.value)}
+                                options={[{ value: '', label: 'Select…' }, ...['XS','S','M','L','XL','2XL','3XL','5XL','7XL'].map(s => ({ value: s, label: s }))]} />
+                              <Select label="Jacket Size"
+                                value={val('jacketSize', member?.jacketSize ?? '')}
+                                onChange={e => set('jacketSize', e.target.value)}
+                                options={[{ value: '', label: 'Select…' }, ...['XS','S','M','L','XL','2XL','3XL','5XL','7XL'].map(s => ({ value: s, label: s }))]} />
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <Input label="Phone" type="tel"
-                        value={val('emergencyContact', member?.emergencyContact ?? '')}
-                        onChange={e => set('emergencyContact', e.target.value)} />
-                    </div>
-                  </div>
                 )}
-                {hasApparel && (
-                  <div className="rounded-xl border border-slate-200 overflow-hidden">
-                    <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-50 border-b border-slate-200">
-                      <span className="text-sm" aria-hidden="true">👕</span>
-                      <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Apparel & Items</span>
-                    </div>
-                    <div className="p-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <Select label="Shirt Style"
-                          value={val('shirtStyle', member?.shirtStyle ?? '')}
-                          onChange={e => set('shirtStyle', e.target.value)}
-                          options={[{ value: '', label: 'Select…' }, { value: 'Unisex', label: 'Unisex' }, { value: 'Lady Cut', label: 'Lady Cut' }]} />
-                        <Select label="T-Shirt Size"
-                          value={val('tshirtSize', member?.tshirtSize ?? '')}
-                          onChange={e => set('tshirtSize', e.target.value)}
-                          options={[{ value: '', label: 'Select…' }, ...['XS','S','M','L','XL','2XL','3XL','5XL','7XL'].map(s => ({ value: s, label: s }))]} />
-                        <Select label="Jacket Size"
-                          value={val('jacketSize', member?.jacketSize ?? '')}
-                          onChange={e => set('jacketSize', e.target.value)}
-                          options={[{ value: '', label: 'Select…' }, ...['XS','S','M','L','XL','2XL','3XL','5XL','7XL'].map(s => ({ value: s, label: s }))]} />
+                {profileTab === 'contact' && (
+                  contactCount === 0
+                    ? <p className="text-sm text-slate-400 text-center py-8">✓ All contact info filled</p>
+                    : <div className="space-y-3">
+                        {missing.find(f => f.label === 'Address') && (
+                          <Input label="Address"
+                            value={val('address', member?.address ?? '')}
+                            onChange={e => set('address', e.target.value)} />
+                        )}
+                        {missing.find(f => f.label === 'Emergency contact') && (
+                          <div className="space-y-3">
+                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Emergency Contact</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <Input label="Name"
+                                value={val('emergencyContactName', member?.emergencyContactName ?? '')}
+                                onChange={e => set('emergencyContactName', e.target.value)} />
+                              <Input label="Relationship"
+                                value={val('emergencyContactRelationship', member?.emergencyContactRelationship ?? '')}
+                                onChange={e => set('emergencyContactRelationship', e.target.value)} />
+                            </div>
+                            <Input label="Phone" type="tel"
+                              value={val('emergencyContact', member?.emergencyContact ?? '')}
+                              onChange={e => set('emergencyContact', e.target.value)} />
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  </div>
+                )}
+                {profileTab === 'professional' && (
+                  professionalCount === 0
+                    ? <p className="text-sm text-slate-400 text-center py-8">✓ All professional info filled</p>
+                    : <div className="space-y-3">
+                        {missing.find(f => f.label === 'Position / title') && (
+                          <Input label="Position / Title"
+                            value={val('departmentAndPosition', member?.business?.departmentAndPosition ?? member?.departmentAndPosition ?? '')}
+                            onChange={e => set('departmentAndPosition', e.target.value)} />
+                        )}
+                        {missing.find(f => f.label === 'Company description') && (
+                          <Textarea label="Company Description" rows={2}
+                            value={val('companyDescription', member?.companyDescription ?? '')}
+                            onChange={e => set('companyDescription', e.target.value)} />
+                        )}
+                        {missing.find(f => f.label === 'Ideal referral') && (
+                          <Input label="Ideal Referral" placeholder="e.g. SME owners in F&B industry"
+                            value={val('idealReferral', member?.idealReferral ?? '')}
+                            onChange={e => set('idealReferral', e.target.value)} />
+                        )}
+                        {missing.find(f => f.label === 'Special member offer') && (
+                          <Textarea label="Special Member Offer" rows={2} placeholder="e.g. 10% discount for JCI KL members"
+                            value={val('specialOffer', member?.business?.specialOffer ?? '')}
+                            onChange={e => set('specialOffer', e.target.value)} />
+                        )}
+                        {missing.find(f => f.label === 'Company website') && (
+                          <Input label="Company Website" type="url" placeholder="https://"
+                            value={val('companyWebsite', member?.business?.companyWebsite ?? '')}
+                            onChange={e => set('companyWebsite', e.target.value)} />
+                        )}
+                        {missing.find(f => f.label === 'International business') && (
+                          <Select label="International Business"
+                            value={val('acceptInternationalBusiness', member?.business?.acceptInternationalBusiness ?? '')}
+                            onChange={e => set('acceptInternationalBusiness', e.target.value)}
+                            options={[{ value: '', label: 'Select…' }, { value: 'Yes', label: 'Yes' }, { value: 'No', label: 'No' }, { value: 'Willing to Explore', label: 'Willing to Explore' }]} />
+                        )}
+                        {missing.find(f => f.label === 'Level of management') && (
+                          <Input label="Level of Management" placeholder="e.g. Senior Management"
+                            value={val('levelOfManagement', member?.business?.levelOfManagement ?? '')}
+                            onChange={e => set('levelOfManagement', e.target.value)} />
+                        )}
+                      </div>
                 )}
               </div>
               {/* Footer */}
