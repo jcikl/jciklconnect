@@ -82,7 +82,7 @@ export interface SurveyResponse {
   id: string;
   surveyId: string;
   memberId: string;
-  answers: Record<string, any>;
+  responses: Record<string, any>; // P0 fix: Firestore rules require field named 'responses'
   submittedAt: string;
 }
 
@@ -186,8 +186,11 @@ export class SurveysService {
   }
 
   // Delete survey — also batch-deletes all associated responses
+  // P1 fix: chunk deletes in batches of 400 to stay well under Firestore's 500-op limit
   static async deleteSurvey(surveyId: string): Promise<void> {
     if (isDevMode()) return;
+
+    const BATCH_CHUNK_SIZE = 400;
 
     try {
       // Fetch all responses for this survey
@@ -195,13 +198,21 @@ export class SurveysService {
         query(collection(db, COLLECTIONS.SURVEY_RESPONSES), where('surveyId', '==', surveyId))
       );
 
-      const batch = writeBatch(db);
-      // Delete all child response documents
-      responsesSnap.docs.forEach(responseDoc => batch.delete(responseDoc.ref));
-      // Delete the survey document itself
-      batch.delete(doc(db, COLLECTIONS.SURVEYS, surveyId));
+      const responseDocs = responsesSnap.docs;
 
-      await batch.commit();
+      // Delete responses in chunks of BATCH_CHUNK_SIZE
+      for (let i = 0; i < responseDocs.length; i += BATCH_CHUNK_SIZE) {
+        const chunk = responseDocs.slice(i, i + BATCH_CHUNK_SIZE);
+        const batch = writeBatch(db);
+        chunk.forEach(responseDoc => batch.delete(responseDoc.ref));
+        await batch.commit();
+      }
+
+      // Delete the survey document itself in a final single-op batch
+      const surveyBatch = writeBatch(db);
+      surveyBatch.delete(doc(db, COLLECTIONS.SURVEYS, surveyId));
+      await surveyBatch.commit();
+
       invalidateSurveysCache(surveyId);
     } catch (error) {
       errorLoggingService.logError(error as Error, { component: 'SurveysService', action: 'deleteSurvey' });
@@ -287,6 +298,37 @@ export class SurveysService {
       },
       CACHE_TTL_MS,
       'SurveysService.getSurveyResponses'
+    );
+  }
+
+  // Get survey responses submitted by a specific member (P0 fix: non-admin owner-scoped listing)
+  // Always adds where('memberId','==',memberId) so Firestore rules' allow list condition is satisfied
+  static async getMemberResponses(memberId: string): Promise<SurveyResponse[]> {
+    if (isDevMode()) return [];
+
+    const cacheKey = `surveyResponses:member:${memberId}`;
+    return apiCache.getOrSet(
+      cacheKey,
+      async () => {
+        try {
+          const q = query(
+            collection(db, COLLECTIONS.SURVEY_RESPONSES),
+            where('memberId', '==', memberId),
+            orderBy('submittedAt', 'desc')
+          );
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(d => ({
+            id: d.id,
+            ...d.data(),
+            submittedAt: d.data().submittedAt?.toDate?.()?.toISOString() || d.data().submittedAt,
+          } as SurveyResponse));
+        } catch (error) {
+          errorLoggingService.logError(error as Error, { component: 'SurveysService', action: 'getMemberResponses' });
+          throw error;
+        }
+      },
+      CACHE_TTL_MS,
+      'SurveysService.getMemberResponses'
     );
   }
 

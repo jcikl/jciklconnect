@@ -17,6 +17,7 @@ import { FlagshipProject } from '../types';
 import { withDevMode } from '../utils/devMode';
 import { MOCK_FLAGSHIP_PROJECTS } from './mockData';
 import { errorLoggingService } from './errorLoggingService';
+import { deleteFromCloudinary } from './cloudinaryService';
 
 // Local in-memory store for Dev Mode simulation
 let devFlagshipProjects: FlagshipProject[] = [...MOCK_FLAGSHIP_PROJECTS];
@@ -124,6 +125,7 @@ export class FlagshipProjectsService {
   }
 
   // Delete flagship project
+  // P1-fix: also deletes all Cloudinary images — both galleryUrls and galleryByYear entries.
   static async deleteProject(id: string): Promise<void> {
     return withDevMode(
       () => {
@@ -131,7 +133,21 @@ export class FlagshipProjectsService {
       },
       async () => {
         try {
+          // Fetch the project first so we can clean up all associated Cloudinary assets.
+          const project = await this.getProjectById(id);
           await deleteDoc(doc(db, COLLECTIONS.FLAGSHIP_PROJECTS, id));
+
+          if (project) {
+            // Collect ALL image URLs: flat galleryUrls + all galleryByYear folder arrays.
+            // P2-fix: galleryUrls may be empty/absent when a project uses only galleryByYear.
+            const flatUrls: string[] = project.galleryUrls ?? [];
+            const byYearUrls: string[] = Object.values(project.galleryByYear ?? {}).flat();
+            const logoUrl: string[] = project.logoUrl ? [project.logoUrl] : [];
+            const allUrls = [...new Set([...flatUrls, ...byYearUrls, ...logoUrl])];
+
+            // Delete from Cloudinary in parallel; failures are non-fatal (Firestore doc already gone).
+            await Promise.allSettled(allUrls.map(url => deleteFromCloudinary(url)));
+          }
         } catch (error) {
           console.error('Error deleting flagship project:', error);
           await errorLoggingService.logError(error, { component: 'FlagshipProjectsService' });

@@ -12,7 +12,7 @@ import {
   Timestamp,
   runTransaction,
 } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { db, auth } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { HobbyClub, ClubActivity } from '../types';
 import { isDevMode, withDevMode } from '../utils/devMode';
@@ -44,8 +44,14 @@ export class HobbyClubsService {
       CACHE_ALL_CLUBS,
       async () => {
         try {
+          // P1 fix: filter out soft-deleted clubs so they never appear in the UI.
           const snapshot = await getDocs(
-            query(collection(db, COLLECTIONS.HOBBY_CLUBS), orderBy('name', 'asc'))
+            query(
+              collection(db, COLLECTIONS.HOBBY_CLUBS),
+              where('isDeleted', '!=', true),
+              orderBy('isDeleted'),
+              orderBy('name', 'asc')
+            )
           );
           return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as HobbyClub));
         } catch (error) {
@@ -92,8 +98,11 @@ export class HobbyClubsService {
       () => `mock-club-${Date.now()}`,
       async () => {
         try {
+          // P0 fix: always persist leadId so leaveClub can guard against the lead leaving.
+          const currentUid = auth?.currentUser?.uid ?? null;
           const newClub = {
             ...clubData,
+            leadId: currentUid,
             membersCount: 1, // Creator is first member
             createdAt: Timestamp.now(),
             updatedAt: Timestamp.now(),
@@ -267,33 +276,40 @@ export class HobbyClubsService {
     return next ? `${next.date.replace('T', ' ')} — ${next.description}` : '';
   }
 
-  private static async writeActivities(clubId: string, activities: ClubActivity[]): Promise<void> {
-    const clubRef = doc(db, COLLECTIONS.HOBBY_CLUBS, clubId);
-    await updateDoc(clubRef, {
-      activities,
-      nextActivity: this.computeNextActivity(activities),
-      updatedAt: Timestamp.now(),
-    });
-    this.invalidateClubsCache(clubId);
-  }
-
-  // Read a club's activities
+  // Read a club's activities (non-transactional convenience helper)
   static async getActivities(clubId: string): Promise<ClubActivity[]> {
     const club = await this.getClubById(clubId);
     return club?.activities || [];
   }
 
-  // Add a club activity
+  /**
+   * P1 fix: Add a club activity.
+   * Uses runTransaction so the read → modify → write is atomic; concurrent
+   * modifications cannot interleave and lose each other's changes.
+   */
   static async addActivity(clubId: string, date: string, description: string): Promise<void> {
     if (isDevMode()) return;
     try {
-      const activities = await this.getActivities(clubId);
-      activities.push({
-        id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        date,
-        description,
+      const clubRef = doc(db, COLLECTIONS.HOBBY_CLUBS, clubId);
+      await runTransaction(db, async (txn) => {
+        const snap = await txn.get(clubRef);
+        if (!snap.exists()) throw new Error('Club not found');
+        const current: ClubActivity[] = snap.data().activities ?? [];
+        const updated = [
+          ...current,
+          {
+            id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            date,
+            description,
+          },
+        ];
+        txn.update(clubRef, {
+          activities: updated,
+          nextActivity: this.computeNextActivity(updated),
+          updatedAt: Timestamp.now(),
+        });
       });
-      await this.writeActivities(clubId, activities);
+      this.invalidateClubsCache(clubId);
     } catch (error) {
       errorLoggingService.logError(error as Error, {
         component: 'HobbyClubsService',
@@ -304,15 +320,29 @@ export class HobbyClubsService {
     }
   }
 
-  // Update a club activity
+  /**
+   * P1 fix: Update a club activity.
+   * Uses runTransaction to prevent read/write races.
+   */
   static async updateActivity(clubId: string, activityId: string, updates: Partial<Omit<ClubActivity, 'id'>>): Promise<void> {
     if (isDevMode()) return;
     try {
-      const activities = await this.getActivities(clubId);
-      const idx = activities.findIndex(a => a.id === activityId);
-      if (idx === -1) throw new Error('Activity not found');
-      activities[idx] = { ...activities[idx], ...updates };
-      await this.writeActivities(clubId, activities);
+      const clubRef = doc(db, COLLECTIONS.HOBBY_CLUBS, clubId);
+      await runTransaction(db, async (txn) => {
+        const snap = await txn.get(clubRef);
+        if (!snap.exists()) throw new Error('Club not found');
+        const current: ClubActivity[] = snap.data().activities ?? [];
+        const idx = current.findIndex(a => a.id === activityId);
+        if (idx === -1) throw new Error('Activity not found');
+        const updated = [...current];
+        updated[idx] = { ...updated[idx], ...updates };
+        txn.update(clubRef, {
+          activities: updated,
+          nextActivity: this.computeNextActivity(updated),
+          updatedAt: Timestamp.now(),
+        });
+      });
+      this.invalidateClubsCache(clubId);
     } catch (error) {
       errorLoggingService.logError(error as Error, {
         component: 'HobbyClubsService',
@@ -323,12 +353,26 @@ export class HobbyClubsService {
     }
   }
 
-  // Delete a club activity
+  /**
+   * P1 fix: Delete a club activity.
+   * Uses runTransaction to prevent read/write races.
+   */
   static async deleteActivity(clubId: string, activityId: string): Promise<void> {
     if (isDevMode()) return;
     try {
-      const activities = await this.getActivities(clubId);
-      await this.writeActivities(clubId, activities.filter(a => a.id !== activityId));
+      const clubRef = doc(db, COLLECTIONS.HOBBY_CLUBS, clubId);
+      await runTransaction(db, async (txn) => {
+        const snap = await txn.get(clubRef);
+        if (!snap.exists()) throw new Error('Club not found');
+        const current: ClubActivity[] = snap.data().activities ?? [];
+        const updated = current.filter(a => a.id !== activityId);
+        txn.update(clubRef, {
+          activities: updated,
+          nextActivity: this.computeNextActivity(updated),
+          updatedAt: Timestamp.now(),
+        });
+      });
+      this.invalidateClubsCache(clubId);
     } catch (error) {
       errorLoggingService.logError(error as Error, {
         component: 'HobbyClubsService',

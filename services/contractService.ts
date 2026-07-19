@@ -4,14 +4,12 @@ import {
   addDoc,
   getDoc,
   getDocs,
-  updateDoc,
   query,
   where,
   orderBy,
   serverTimestamp,
   writeBatch,
   runTransaction,
-  increment,
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -104,7 +102,7 @@ export class ContractService {
         console.error('ContractService.signContract: rollback releaseEscrow failed', releaseErr);
         // P1 — write a finance_alert so an admin can manually release the locked points
         try {
-          await addDoc(collection(db, 'finance_alerts'), {
+          await addDoc(collection(db, COLLECTIONS.FINANCE_ALERTS), {
             type: 'escrow_orphan',
             message: '托管已锁定但合约未创建，请手动释放',
             escrowId,
@@ -112,7 +110,7 @@ export class ContractService {
             createdAt: serverTimestamp(),
           });
         } catch (alertErr) {
-          console.error('[contractService] Failed to write finance_alert for stuck escrow:', alertErr);
+          await errorLoggingService.logError(alertErr instanceof Error ? alertErr : new Error(String(alertErr)), { component: 'ContractService', action: 'signContract.writeFinanceAlert' });
         }
       }
       throw err;
@@ -229,7 +227,14 @@ export class ContractService {
   /**
    * Fulfill evaluation (The reward)
    *
-   * FIX P1-E: After releasing escrow, set releasedBy on the escrow record.
+   * P1 FIX: Steps are reordered so the escrow-release + contract-status-FULFILLED update
+   * happen in a single writeBatch (atomic). The bonus award (PointsService.awardPoints)
+   * runs first so that a bonus failure does NOT prevent the contract reaching FULFILLED.
+   *
+   * Ordering:
+   *   1. Award bonus points — fire-and-forget with alerting; failure does not block steps 2+3.
+   *   2. writeBatch: escrow.status=Released + escrow.releasedBy + contract.status=FULFILLED
+   *      This is the atomic commit — both happen together or neither does.
    */
   static async fulfillContract(contractId: string, currentUserId?: string): Promise<void> {
     const contractRef = doc(db, COLLECTIONS.CONTRACTS, contractId);
@@ -237,70 +242,95 @@ export class ContractService {
     if (!contractDoc.exists()) return;
     const data = contractDoc.data() as CommitmentContract;
 
-    // 1. Release original stake back to member.
-    //    Pass releasedBy via metadata so the escrow update and the release happen
-    //    atomically inside releaseEscrow's runTransaction — no separate updateDoc needed.
-    await PointsService.releaseEscrow(data.escrowId!, data.memberId, {
-      releasedBy: currentUserId || 'system'
-    });
+    if (data.status === CONTRACT_STATUS.FULFILLED) return; // idempotency guard
 
-    // 2. Award bonus points (The 20% "Greed" reward)
+    // 1. Award bonus points (The 20% "Greed" reward) — runs first so a failure does NOT
+    //    block the escrow-release + status-update batch from committing.
     const bonus = Math.floor(data.stakedPoints * (data.multiplier - 1));
     if (bonus > 0) {
       try {
-        await PointsService.awardPoints(data.memberId, 'ROLE_FULFILLMENT', bonus, `Commitment Bonus: ${data.goalTitle}`, contractId, 'contract');
+        await PointsService.awardPoints(
+          data.memberId,
+          'ROLE_FULFILLMENT',
+          bonus,
+          `Commitment Bonus: ${data.goalTitle}`,
+          contractId,
+          'contract'
+        );
       } catch (bonusErr) {
-        // P1 Fix: Do NOT rethrow — rethrowing here prevents step 3 from running, leaving
-        // the contract permanently stuck in "Verifying" with no admin alert. Instead, log the
-        // error and write a financeAlert so an admin can manually award the bonus; the contract
-        // status update (step 3) is allowed to proceed so it moves to FULFILLED.
-        await errorLoggingService.logError(bonusErr instanceof Error ? bonusErr : new Error(String(bonusErr)), { component: 'ContractService', action: 'fulfillContract.awardBonus', additionalData: { contractId, memberId: data.memberId, bonus } });
+        await errorLoggingService.logError(
+          bonusErr instanceof Error ? bonusErr : new Error(String(bonusErr)),
+          { component: 'ContractService', action: 'fulfillContract.awardBonus', additionalData: { contractId, memberId: data.memberId, bonus } }
+        );
         try {
-          await addDoc(collection(db, 'finance_alerts'), {
+          await addDoc(collection(db, COLLECTIONS.FINANCE_ALERTS), {
             type: 'CONTRACT_BONUS_FAILED',
             contractId,
             memberId: data.memberId,
             escrowAmount: data.stakedPoints,
             bonusAmount: bonus,
+            resolved: false,
             message:
-              `Contract ${contractId}: escrow was released but bonus of ${bonus} points could not be awarded. ` +
-              'Escrow released OK. Manual admin action needed to award bonus.',
+              `Contract ${contractId}: bonus of ${bonus} points could not be awarded. ` +
+              'Manual admin action needed to award bonus.',
             error: bonusErr instanceof Error ? bonusErr.message : String(bonusErr),
             createdAt: serverTimestamp(),
           });
-        } catch (_alertErr) { /* best-effort alert write */ }
-        // Do NOT rethrow — fall through to step 3 so contract reaches FULFILLED state.
+        } catch (alertErr) {
+          await errorLoggingService.logError(alertErr instanceof Error ? alertErr : new Error(String(alertErr)), { component: 'ContractService', action: 'fulfillContract.writeFinanceAlert' });
+        }
+        // Do NOT rethrow — proceed to batch commit so contract reaches FULFILLED state.
       }
     }
 
-    // 3. Update status — wrapped in try/catch (E3 safety net):
-    // Steps 1+2 cannot be atomically rolled back if this write fails, so log a
-    // finance_alert so an admin can detect and manually mark the contract Fulfilled.
-    try {
-      await updateDoc(contractRef, {
-        status: CONTRACT_STATUS.FULFILLED,
-        updatedAt: serverTimestamp()
-      });
-    } catch (fulfillErr) {
-      console.error(
-        `ContractService.fulfillContract: step 3 (status=FULFILLED) failed for contract ${contractId}. ` +
-        'Escrow released and bonus awarded but contract remains in Verifying. Admin action required.',
-        fulfillErr
-      );
-      try {
-        await addDoc(collection(db, 'finance_alerts'), {
-          type: 'CONTRACT_FULFILL_STUCK',
-          contractId,
-          memberId: data.memberId,
-          message:
-            `Contract ${contractId} escrow was released and bonus awarded but status was not updated to FULFILLED. ` +
-            'Manual admin fix required.',
-          createdAt: serverTimestamp(),
+    // 2. Atomic batch: release escrow + mark contract FULFILLED
+    //    Both writes succeed or both fail — the contract can never be stuck in Verifying
+    //    with a permanently locked escrow after this commit.
+    const escrowRef = doc(db, COLLECTIONS.POINT_ESCROW, data.escrowId!);
+    const fulfillBatch = writeBatch(db);
+    fulfillBatch.update(escrowRef, {
+      status: 'Released',
+      releasedBy: currentUserId || 'system',
+      releasedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    fulfillBatch.update(contractRef, {
+      status: CONTRACT_STATUS.FULFILLED,
+      updatedAt: serverTimestamp(),
+    });
+    await fulfillBatch.commit();
+  }
+
+  /**
+   * Admin delete of a contract — cascades to release (or close) any linked pointEscrow record
+   * so points are never permanently locked after the contract document is removed.
+   *
+   * P1 FIX: cascade escrow release added; all writes in one writeBatch.
+   */
+  static async deleteContract(contractId: string, adminId: string): Promise<void> {
+    const contractRef = doc(db, COLLECTIONS.CONTRACTS, contractId);
+    const contractSnap = await getDoc(contractRef);
+    if (!contractSnap.exists()) return;
+
+    const data = contractSnap.data() as CommitmentContract;
+    const deleteBatch = writeBatch(db);
+
+    // Cascade: if there is a linked escrow that is still locked, release it first so the
+    // member's staked points are returned before the contract record disappears.
+    if (data.escrowId) {
+      const escrowRef = doc(db, COLLECTIONS.POINT_ESCROW, data.escrowId);
+      const escrowSnap = await getDoc(escrowRef);
+      if (escrowSnap.exists() && escrowSnap.data().status === 'Locked') {
+        deleteBatch.update(escrowRef, {
+          status: 'Released',
+          releasedBy: adminId,
+          releasedAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
         });
-      } catch (alertErr) {
-        console.error('ContractService.fulfillContract: failed to write finance_alert', alertErr);
       }
-      throw fulfillErr;
     }
+
+    deleteBatch.delete(contractRef);
+    await deleteBatch.commit();
   }
 }

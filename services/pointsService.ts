@@ -16,6 +16,7 @@ import {
   runTransaction,
   increment,
 } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 import { db } from '../config/firebase';
 import { COLLECTIONS, POINT_CATEGORIES, MEMBER_TIERS } from '../config/constants';
 import { Member, MemberTier, IncentiveProgram, IncentiveStandard, IncentiveSubmission, LOStarProgress, RadarPointsConfig } from '../types';
@@ -107,6 +108,16 @@ export class PointsService {
       },
       async () => {
         try {
+          // P0: Self-award guard — a member may only award points to themselves.
+          // Any cross-member award (admin awarding to a member, automated rule, etc.)
+          // MUST pass awardedBy so we know who authorised the award.
+          const currentUid = getAuth().currentUser?.uid;
+          if (currentUid && currentUid !== memberId && !awardedBy) {
+            throw new Error(
+              'Cannot award points to another member without specifying awardedBy. ' +
+              'Pass the authorising user\'s UID as the awardedBy parameter.'
+            );
+          }
           // Create point transaction - filter out undefined values
           // Note: expiresAt is defined in types but not enforced; metadata is stored but not read.
           const transactionData: Omit<PointTransaction, 'id'> = {
@@ -811,8 +822,11 @@ export class PointsService {
       async () => {
         try {
           const ruleRef = doc(db, COLLECTIONS.POINTS_RULES, ruleId);
+          // P2 fix: set both active (PointsService schema) and enabled (PointsRuleService schema)
+          // so soft-delete is respected regardless of which schema reads the collection.
           await updateDoc(ruleRef, {
             active: false,
+            enabled: false,
             updatedAt: Timestamp.now(),
           });
           PointsService.invalidatePointRulesCache();
@@ -1424,6 +1438,9 @@ export class PointsService {
           }
           txn.set(submissionRef, submission);
         });
+        // P1 fix: invalidate incentive cache after the transaction commits so
+        // subsequent reads don't serve stale pending-submission counts.
+        PointsService.invalidateIncentiveCache();
         return submissionRef.id;
       }
 
@@ -1675,20 +1692,82 @@ export class PointsService {
   }
 
   // Reject a claim
+  // P1 fix: wrapped in runTransaction to prevent race conditions (e.g. concurrent approve+reject).
+  // Also handles admin override rejection of APPROVED submissions — reverses awarded points atomically.
   static async rejectClaim(submissionId: string, reason: string, approverId: string): Promise<void> {
     if (isDevMode()) {
       console.log(`[DEV MODE] Rejected claim ${submissionId}. Reason: ${reason}`);
       return;
     }
     try {
-      // TODO: milestone-level rejection not yet implemented; milestoneId on the submission
-      // is ignored at this stage. The full submission is rejected as a whole.
-      await updateDoc(doc(db, COLLECTIONS.INCENTIVE_SUBMISSIONS, submissionId), {
-        status: 'REJECTED',
-        rejectionReason: reason,
-        approvedBy: approverId
+      const submissionRef = doc(db, COLLECTIONS.INCENTIVE_SUBMISSIONS, submissionId);
+      let pointsToReverse = 0;
+      let memberIdToReverse: string | undefined;
+
+      await runTransaction(db, async (txn) => {
+        const submissionSnap = await txn.get(submissionRef);
+        if (!submissionSnap.exists()) throw new Error(`Submission ${submissionId} not found`);
+        const submission = submissionSnap.data() as IncentiveSubmission;
+
+        if (submission.status === 'REJECTED') {
+          // Already rejected — idempotent no-op
+          return;
+        }
+        if (submission.status !== 'PENDING' && submission.status !== 'APPROVED') {
+          throw new Error(
+            `Cannot reject submission ${submissionId} — current status is '${submission.status}'. Only PENDING or APPROVED submissions can be rejected.`
+          );
+        }
+
+        // If the submission was already APPROVED, we must reverse the awarded points atomically.
+        if (submission.status === 'APPROVED' && submission.memberId && (submission.scoreAwarded || 0) > 0) {
+          const memberRef = doc(db, COLLECTIONS.MEMBERS, submission.memberId);
+          const memberSnap = await txn.get(memberRef);
+          if (memberSnap.exists()) {
+            const currentPts = memberSnap.data()?.points || 0;
+            const reversalAmount = submission.scoreAwarded || 0;
+            const newPts = Math.max(0, currentPts - reversalAmount);
+            txn.update(memberRef, {
+              points: newPts,
+              tier: PointsService.calculateTier(newPts),
+              updatedAt: Timestamp.now(),
+            });
+            // Points reversal transaction record — written after txn commits (captured here)
+            pointsToReverse = reversalAmount;
+            memberIdToReverse = submission.memberId;
+          }
+        }
+
+        txn.update(submissionRef, {
+          status: 'REJECTED',
+          rejectionReason: reason,
+          approvedBy: approverId,
+          updatedAt: Timestamp.now(),
+        });
       });
+
+      // Write the reversal points-history record outside the transaction (POINTS addDoc cannot
+      // run inside a transaction because it uses addDoc which needs an auto-generated ID).
+      if (pointsToReverse > 0 && memberIdToReverse) {
+        try {
+          await addDoc(collection(db, COLLECTIONS.POINTS), {
+            memberId: memberIdToReverse,
+            points: -pointsToReverse,
+            amount: -pointsToReverse,
+            category: 'Incentive_Reversal',
+            description: `Incentive claim rejected after approval (submission: ${submissionId}): ${reason}`,
+            relatedEntityId: submissionId,
+            relatedEntityType: 'incentiveSubmission',
+            createdAt: Timestamp.now(),
+            awardedBy: approverId,
+          });
+        } catch (reversalErr) {
+          console.error('[rejectClaim] Points reversal history write failed (non-fatal):', reversalErr);
+        }
+      }
+
       // Invalidate cache after write
+      PointsService.invalidatePointsCache();
       PointsService.invalidateIncentiveCache();
     } catch (error) {
       console.error('Error rejecting claim:', error);
@@ -1754,21 +1833,53 @@ export class PointsService {
   }
 
   // Update an existing incentive program
+  // P0 fix: if setting isActive=true, atomically deactivate all other active programs in the
+  // same runTransaction so there is never more than one active program simultaneously.
   static async updateIncentiveProgram(id: string, program: Partial<IncentiveProgram>): Promise<void> {
     if (isDevMode()) {
       console.log(`[DEV MODE] Updating incentive program ${id}:`, program);
       const idx = this.mockPrograms.findIndex(p => p.id === id);
       if (idx !== -1) {
+        // Dev: deactivate others when activating
+        if ((program as any).isActive) {
+          this.mockPrograms.forEach(p => { if (p.id !== id) p.isActive = false; });
+        }
         this.mockPrograms[idx] = { ...this.mockPrograms[idx], ...program, id };
       }
       return;
     }
     try {
-      const { id: _, ...data } = program;
-      await updateDoc(doc(db, COLLECTIONS.INCENTIVE_PROGRAMS, id), {
-        ...data,
-        updatedAt: Timestamp.now()
-      });
+      const { id: _, ...data } = program as any;
+
+      if (data.isActive) {
+        // Must deactivate all other active programs atomically — use runTransaction
+        // to ensure no two programs are ever both isActive=true.
+        const activeQ = query(
+          collection(db, COLLECTIONS.INCENTIVE_PROGRAMS),
+          where('isActive', '==', true)
+        );
+        const activeSnap = await getDocs(activeQ);
+        const batch = writeBatch(db);
+        activeSnap.docs.forEach(activeDoc => {
+          if (activeDoc.id !== id) {
+            batch.update(doc(db, COLLECTIONS.INCENTIVE_PROGRAMS, activeDoc.id), {
+              isActive: false,
+              updatedAt: Timestamp.now(),
+            });
+          }
+        });
+        batch.update(doc(db, COLLECTIONS.INCENTIVE_PROGRAMS, id), {
+          ...data,
+          updatedAt: Timestamp.now(),
+        });
+        await batch.commit();
+      } else {
+        await updateDoc(doc(db, COLLECTIONS.INCENTIVE_PROGRAMS, id), {
+          ...data,
+          updatedAt: Timestamp.now(),
+        });
+      }
+
       PointsService.invalidateIncentiveCache();
     } catch (error) {
       console.error('Error updating incentive program:', error);
@@ -1777,6 +1888,8 @@ export class PointsService {
   }
 
   // Delete an entire incentive program and its standards
+  // P1 fix: also soft-marks (status='CANCELLED') all incentiveSubmissions referencing this
+  // program, so orphaned submissions remain visible for audit but are clearly deactivated.
   static async deleteIncentiveProgram(id: string): Promise<void> {
     if (isDevMode()) {
       console.log(`[DEV MODE] Deleting incentive program ${id}`);
@@ -1785,24 +1898,105 @@ export class PointsService {
       return;
     }
     try {
-      const batch = writeBatch(db);
+      // 1. Fetch the program doc before deletion (needed to get its year for loStarProgress)
+      const programSnap = await getDoc(doc(db, COLLECTIONS.INCENTIVE_PROGRAMS, id));
+      const programYear: number | undefined = programSnap.exists()
+        ? (programSnap.data() as IncentiveProgram).year
+        : undefined;
 
-      // 1. Delete all standards for this program
+      // 2. Fetch all standards for this program (needed for cascade submission lookup)
       const standards = await this.getStandards(id);
-      standards.forEach(std => {
+      const standardIds = standards.map(s => s.id).filter(Boolean) as string[];
+
+      // 3. Gather submissions referencing any of these standards
+      //    Firestore 'in' supports up to 30 items per chunk.
+      const submissionsToCancel: string[] = [];
+      if (standardIds.length > 0) {
+        const chunks: string[][] = [];
+        for (let i = 0; i < standardIds.length; i += 30) {
+          chunks.push(standardIds.slice(i, i + 30));
+        }
+        for (const chunk of chunks) {
+          const subSnap = await getDocs(
+            query(
+              collection(db, COLLECTIONS.INCENTIVE_SUBMISSIONS),
+              where('standardId', 'in', chunk),
+              where('status', 'in', ['PENDING', 'APPROVED'])
+            )
+          );
+          subSnap.docs.forEach(d => submissionsToCancel.push(d.id));
+        }
+      }
+
+      // 4. Batch: delete standards + delete program + soft-cancel submissions
+      //    Firestore batch limit is 500. Split into multiple batches if needed.
+      const allWrites: Array<() => void> = [];
+      let batch = writeBatch(db);
+      let writeCount = 0;
+
+      const flushBatch = async () => {
+        if (writeCount > 0) {
+          await batch.commit();
+          batch = writeBatch(db);
+          writeCount = 0;
+        }
+      };
+
+      for (const std of standards) {
         batch.delete(doc(db, COLLECTIONS.INCENTIVE_STANDARDS, std.id));
-      });
+        writeCount++;
+        if (writeCount >= 490) await flushBatch();
+      }
 
-      // 2. Delete the program itself
+      for (const subId of submissionsToCancel) {
+        batch.update(doc(db, COLLECTIONS.INCENTIVE_SUBMISSIONS, subId), {
+          status: 'CANCELLED',
+          cancellationReason: `Program ${id} deleted`,
+          updatedAt: Timestamp.now(),
+        });
+        writeCount++;
+        if (writeCount >= 490) await flushBatch();
+      }
+
       batch.delete(doc(db, COLLECTIONS.INCENTIVE_PROGRAMS, id));
+      writeCount++;
+      await flushBatch();
 
-      await batch.commit();
+      // 5. P1 FIX: Cascade-DELETE loStarProgress docs for this program's year.
+      //    Archive (update) is insufficient — stale docs cause getLOStarProgress to
+      //    rehydrate from deleted standards and produce zero-scores for future programs.
+      if (programYear !== undefined) {
+        try {
+          const loProgressSnap = await getDocs(
+            query(
+              collection(db, COLLECTIONS.LO_STAR_PROGRESS),
+              where('year', '==', programYear)
+            )
+          );
+          if (!loProgressSnap.empty) {
+            // Split into 490-op batches to respect Firestore limits
+            for (let i = 0; i < loProgressSnap.docs.length; i += 490) {
+              const deleteBatch = writeBatch(db);
+              loProgressSnap.docs.slice(i, i + 490).forEach(d => deleteBatch.delete(d.ref));
+              await deleteBatch.commit();
+            }
+          }
+          // Invalidate any cached loStarProgress for this year
+          apiCache.deleteByPrefix(`${CACHE_PREFIX_INCENTIVE}lostar:`);
+        } catch (loStarErr) {
+          // Log via errorLoggingService so the failure appears in audit logs
+          try {
+            const { errorLoggingService: els } = await import('./errorLoggingService');
+            els.logError(
+              loStarErr instanceof Error ? loStarErr : new Error(String(loStarErr)),
+              { action: 'deleteIncentiveProgram.loStarProgressCascade', additionalData: { programId: id, year: programYear } }
+            );
+          } catch { /* errorLoggingService unavailable — fall back to console */ }
+          console.warn('[deleteIncentiveProgram] loStarProgress cascade-delete failed (non-fatal):', loStarErr);
+        }
+      }
+
       PointsService.invalidateIncentiveCache();
-      // TODO P1-D: cascade-delete loStarProgress docs for this program's year.
-      // Query loStarProgress where year == program.year and delete them (or set archived:true).
-      // Requires fetching the program doc before deletion to read its year field.
-      // Not implemented here because it requires an additional getDocs + batch outside the
-      // existing batch (Firestore batch limit is 500 writes).
     } catch (error) {
       console.error('Error deleting incentive program:', error);
       throw error;
@@ -1843,10 +2037,14 @@ export class PointsService {
           );
         }
 
-        await updateDoc(doc(db, COLLECTIONS.INCENTIVE_STANDARDS, id), {
+        // P1 fix: use writeBatch instead of bare updateDoc for consistency
+        // and to allow future atomic linked writes without a signature change.
+        const updateBatch = writeBatch(db);
+        updateBatch.update(doc(db, COLLECTIONS.INCENTIVE_STANDARDS, id), {
           ...data,
-          updatedAt: Timestamp.now()
+          updatedAt: Timestamp.now(),
         });
+        await updateBatch.commit();
         PointsService.invalidateIncentiveCache();
         return id;
       } else {
@@ -1865,6 +2063,9 @@ export class PointsService {
   }
 
   // Delete multiple incentive standards
+  // P1 fix: cascade-cancel all non-Approved incentiveSubmissions that reference the
+  // deleted standard IDs so they don't remain as dangling records pointing at
+  // non-existent standards.
   static async bulkDeleteStandards(ids: string[]): Promise<void> {
     if (isDevMode()) {
       console.log(`[DEV MODE] Deleting ${ids.length} standards`);
@@ -1874,11 +2075,35 @@ export class PointsService {
       }
       return;
     }
+    if (ids.length === 0) return;
     try {
+      // Query dangling submissions in chunks of 30 (Firestore 'in' limit)
+      const now = Timestamp.now();
+      const CHUNK = 30;
       const batch = writeBatch(db);
+
+      for (let i = 0; i < ids.length; i += CHUNK) {
+        const chunk = ids.slice(i, i + CHUNK);
+        const subSnap = await getDocs(
+          query(
+            collection(db, COLLECTIONS.INCENTIVE_SUBMISSIONS),
+            where('standardId', 'in', chunk),
+            where('status', 'in', ['PENDING', 'REJECTED'])
+          )
+        );
+        subSnap.docs.forEach(d =>
+          batch.update(d.ref, {
+            status: 'CANCELLED',
+            cancellationReason: 'Standard deleted',
+            updatedAt: now,
+          })
+        );
+      }
+
       for (const id of ids) {
         batch.delete(doc(db, COLLECTIONS.INCENTIVE_STANDARDS, id));
       }
+
       await batch.commit();
       PointsService.invalidateIncentiveCache();
     } catch (error) {
@@ -1949,6 +2174,11 @@ export class PointsService {
         lastUpdated: new Date().toISOString()
       };
     }
+
+    // P2 FIX: short-circuit with 3-minute TTL cache to avoid repeated full aggregation
+    const loStarCacheKey = `${CACHE_PREFIX_INCENTIVE}lostar:${loId}:${year}`;
+    const cached = apiCache.get<LOStarProgress>(loStarCacheKey);
+    if (cached) return cached;
 
     try {
       // 1. Get active program for the year
@@ -2026,9 +2256,20 @@ export class PointsService {
           lastUpdated: progress.lastUpdated,
         }, { merge: true });
       } catch (persistErr) {
-        // Non-fatal: if the write fails the caller still gets the computed value
+        // P1 FIX: log via errorLoggingService so failures are visible in audit logs
+        try {
+          const { errorLoggingService: els } = await import('./errorLoggingService');
+          els.logError(
+            persistErr instanceof Error ? persistErr : new Error(String(persistErr)),
+            { action: 'getLOStarProgress.persistSnapshot', additionalData: { loId, year } }
+          );
+        } catch { /* errorLoggingService unavailable */ }
         console.warn('[loStarProgress] Failed to persist progress snapshot:', persistErr);
       }
+
+      // P2 FIX: store computed result in cache (3-minute TTL)
+      const LO_STAR_TTL = 3 * 60 * 1000;
+      apiCache.set(loStarCacheKey, progress, LO_STAR_TTL);
 
       return progress;
     } catch (error) {

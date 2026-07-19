@@ -234,19 +234,97 @@ export class EmailService {
     return this.sendViaProxy(message, 'resend');
   }
 
-  // Log email to database
+  /**
+   * Log email to Firestore via the server-side proxy.
+   *
+   * P0 fix: Firestore rules require isAdmin() for writes to emailLogs, so a
+   * direct client-SDK addDoc would fail with PERMISSION_DENIED for regular
+   * members. We route the write through /.netlify/functions/log-email which
+   * uses the Firebase Admin SDK and therefore bypasses client-side rules.
+   *
+   * Failure is non-fatal — a failed log must never break the email send path.
+   */
   private static async logEmail(log: Omit<EmailLog, 'id' | 'createdAt'>): Promise<string> {
     try {
-      const docRef = await addDoc(collection(db, COLLECTIONS.EMAIL_LOGS || 'emailLogs'), {
-        ...log,
-        createdAt: Timestamp.now(),
-      });
-      return docRef.id;
+      const token = await getAuth().currentUser?.getIdToken();
+      // If there's no authenticated user (e.g. public forms), fall back silently.
+      if (!token) return '';
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      let response: Response;
+      try {
+        response = await fetch('/.netlify/functions/log-email', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ ...log, createdAt: new Date().toISOString() }),
+          signal: controller.signal,
+        });
+      } catch {
+        // Network error or abort — non-fatal
+        return '';
+      } finally {
+        clearTimeout(timeoutId);
+      }
+
+      if (!response.ok) return '';
+      const data = await response.json() as { id?: string };
+      return data.id ?? '';
     } catch (error) {
-      // Don't throw - email logging failure shouldn't break email sending
-      // Log silently via errorLoggingService so failures are traceable without crashing
+      // Don't throw — email logging failure must never break email sending
       try { errorLoggingService.logError(error as Error, { component: 'EmailService', action: 'logEmail' }); } catch { /* ignore */ }
       return '';
+    }
+  }
+
+  /**
+   * P1 fix: Update delivery/open/click status fields on an existing email log.
+   * Called by webhook handlers (e.g. SendGrid event webhooks via Netlify Function)
+   * when delivery, open, or click events arrive.
+   */
+  static async updateEmailLogStatus(
+    logId: string,
+    status: EmailLog['status'],
+    timestamp: string
+  ): Promise<void> {
+    if (isDevMode()) {
+      console.log(`[Dev Mode] Would update email log ${logId} → status=${status}`);
+      return;
+    }
+    try {
+      const token = await getAuth().currentUser?.getIdToken();
+      if (!token) throw new Error('User is not authenticated');
+
+      const statusField: Record<string, string> = {
+        delivered: 'deliveredAt',
+        opened: 'openedAt',
+        clicked: 'clickedAt',
+      };
+      const fieldName = statusField[status];
+      const updatePayload: Record<string, string> = { status };
+      if (fieldName) updatePayload[fieldName] = timestamp;
+
+      const response = await fetch('/.netlify/functions/log-email', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ logId, ...updatePayload }),
+      });
+      if (!response.ok) {
+        throw new Error(`log-email function returned ${response.status}`);
+      }
+    } catch (error) {
+      errorLoggingService.logError(error as Error, {
+        component: 'EmailService',
+        action: 'updateEmailLogStatus',
+        additionalData: { logId, status },
+      });
+      throw error;
     }
   }
 

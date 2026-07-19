@@ -63,7 +63,7 @@ export class SurveyAnalyticsService {
       // Analyze each question
       const questionAnalytics: QuestionAnalytics[] = survey.questions.map(question => {
         const questionResponses = responses
-          .map(r => r.answers[question.id])
+          .map(r => r.responses[question.id])
           .filter(a => a !== undefined && a !== null);
 
         const analytics: QuestionAnalytics['analytics'] = {};

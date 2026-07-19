@@ -102,6 +102,7 @@ export class EventsService {
             return db - da;
           });
         } catch (error) {
+          errorLoggingService.logError(error as Error, { component: 'EventsService', action: 'getAllEvents' });
           console.error('Error fetching events:', error);
           throw error;
         }
@@ -138,6 +139,7 @@ export class EventsService {
           }
           return eventData;
         } catch (error) {
+          errorLoggingService.logError(error as Error, { component: 'EventsService', action: 'getEventById', additionalData: { eventId } });
           console.error('Error fetching event:', error);
           throw error;
         }
@@ -192,6 +194,7 @@ export class EventsService {
           this.invalidateEventsCache();
           return docRef.id;
         } catch (error) {
+          errorLoggingService.logError(error as Error, { component: 'EventsService', action: 'createEvent' });
           console.error('Error creating event:', error);
           throw error;
         }
@@ -226,6 +229,7 @@ export class EventsService {
           await updateDoc(eventRef, updateData);
           this.invalidateEventsCache();
         } catch (error) {
+          errorLoggingService.logError(error as Error, { component: 'EventsService', action: 'updateEvent', additionalData: { eventId } });
           console.error('Error updating event:', error);
           throw error;
         }
@@ -267,10 +271,12 @@ export class EventsService {
             }
           }
 
-          // P1 FIX: fetch eventFeedback and eventId-referenced notifications for cleanup.
-          const [feedbackSnap, notifSnap] = await Promise.all([
+          // P1 FIX: fetch eventFeedback, notifications, and points records for cleanup.
+          const [feedbackSnap, notifSnap, pointsSnap] = await Promise.all([
             getDocs(query(collection(db, COLLECTIONS.EVENT_FEEDBACK), where('eventId', '==', eventId))),
             getDocs(query(collection(db, COLLECTIONS.NOTIFICATIONS), where('eventId', '==', eventId))),
+            // P1: delete all points records referencing this event so no orphan gamification data remains
+            getDocs(query(collection(db, COLLECTIONS.POINTS), where('relatedEntityId', '==', eventId))),
           ]);
 
           // P0 FIX: include the event doc deletion in the same writeBatch as the
@@ -278,8 +284,8 @@ export class EventsService {
           const BATCH_SIZE = 490;
           const regDocs = regSnap.docs;
           const budgetRef = doc(db, COLLECTIONS.EVENT_BUDGETS, eventId);
-          // Collect all orphan docs (feedback + notifications) to delete alongside registrations.
-          const orphanDocs = [...feedbackSnap.docs, ...notifSnap.docs];
+          // Collect all orphan docs (feedback + notifications + points) to delete alongside registrations.
+          const orphanDocs = [...feedbackSnap.docs, ...notifSnap.docs, ...pointsSnap.docs];
           // All docs to delete in chunks (registrations + feedback + notifications).
           const allDocsToDelete = [...regDocs, ...orphanDocs];
           if (allDocsToDelete.length === 0) {
@@ -303,6 +309,7 @@ export class EventsService {
 
           this.invalidateEventsCache();
         } catch (error) {
+          errorLoggingService.logError(error as Error, { component: 'EventsService', action: 'deleteEvent', additionalData: { eventId } });
           console.error('Error deleting event:', error);
           throw error;
         }
@@ -396,6 +403,7 @@ export class EventsService {
 
           this.invalidateEventsCache(); // P1-C: invalidate after attendee count changes
         } catch (error) {
+          errorLoggingService.logError(error as Error, { component: 'EventsService', action: 'registerForEvent', additionalData: { eventId, memberId } });
           console.error('Error registering for event:', error);
           throw error;
         }
@@ -421,6 +429,7 @@ export class EventsService {
           const regRef = doc(db, COLLECTIONS.EVENT_REGISTRATIONS, deterministicRegId);
 
           let financeTransactionId: string | undefined;
+          let wasCheckedIn = false; // P1: track if member was checked_in so we can reverse points
 
           // P0 Fix 5: wrap status check + write in runTransaction so two concurrent
           // cancels cannot both read 'registered' and both decrement the counter.
@@ -430,6 +439,7 @@ export class EventsService {
               return; // idempotent — already cancelled or never existed
             }
             financeTransactionId = regSnap.data()?.financeTransactionId ?? undefined;
+            wasCheckedIn = regSnap.data()?.status === 'checked_in'; // P1: capture before overwrite
             txn.update(regRef, {
               status: 'cancelled',
               cancelledAt: Timestamp.now(),
@@ -458,8 +468,47 @@ export class EventsService {
               // Non-fatal: registration is already cancelled; finance team can void manually.
             }
           }
+          // P1: if member was checked_in, reverse their attendance points
+          if (wasCheckedIn) {
+            try {
+              const { PointsService } = await import('./pointsService');
+              const pointSnap = await getDocs(
+                query(
+                  collection(db, COLLECTIONS.POINTS),
+                  where('memberId', '==', memberId),
+                  where('relatedEntityId', '==', eventId)
+                )
+              );
+              const total = pointSnap.docs.reduce(
+                (sum, d) => sum + (d.data().amount ?? d.data().points ?? 0),
+                0
+              );
+              if (total > 0) {
+                await PointsService.awardPoints(
+                  memberId,
+                  -total,
+                  'EVENT_ATTENDANCE',
+                  'Reversed: registration cancelled while checked in',
+                  eventId,
+                  'event'
+                );
+              }
+            } catch (pointsErr) {
+              errorLoggingService.logError(pointsErr as Error, {
+                component: 'EventsService',
+                action: 'cancelRegistration-reversePoints',
+                additionalData: { memberId, eventId },
+              });
+              console.warn('[EventsService.cancelRegistration] Could not reverse attendance points for', memberId, pointsErr);
+            }
+          }
           this.invalidateEventsCache();
         } catch (error) {
+          errorLoggingService.logError(error as Error, {
+            component: 'EventsService',
+            action: 'cancelRegistration',
+            additionalData: { eventId, memberId },
+          });
           console.error('Error canceling registration:', error);
           throw error;
         }
@@ -669,15 +718,22 @@ export class EventsService {
   }
 
   // Mark attendance (check-in)
+  // P0 guard: only BOARD+ or ADMIN callers should mark attendance; MEMBER/GUEST are blocked
+  // because the event doc's attendanceList field is not in the member-level hasOnly whitelist.
   static async markAttendance(
     eventId: string,
     memberId: string,
-    checkInTime?: Date
+    checkInTime?: Date,
+    callerRole?: string
   ): Promise<void> {
     return withDevMode(
       () => {},
       async () => {
         try {
+          const RESTRICTED_ROLES = ['MEMBER', 'GUEST', 'INACTIVE'];
+          if (callerRole && RESTRICTED_ROLES.includes(callerRole.toUpperCase())) {
+            throw new Error('Only board members or administrators can mark attendance');
+          }
           const eventRef = doc(db, COLLECTIONS.PROJECTS, eventId);
           const event = await this.getEventById(eventId);
 
@@ -719,6 +775,7 @@ export class EventsService {
           const { MembersService } = await import('./membersService');
           MembersService.recalculateAttendance(memberId).catch(err => errorLoggingService.logError(err, { action: 'recalculate-attendance', additionalData: { memberId } }));
         } catch (error) {
+          errorLoggingService.logError(error as Error, { component: 'EventsService', action: 'markAttendance', additionalData: { eventId, memberId } });
           console.error('Error marking attendance:', error);
           throw error;
         }
@@ -727,14 +784,20 @@ export class EventsService {
   }
 
   // Undo attendance (un-check-in) — FIX E3
+  // P0 guard: only BOARD+ or ADMIN callers should undo attendance.
   static async undoAttendance(
     eventId: string,
-    memberId: string
+    memberId: string,
+    callerRole?: string
   ): Promise<void> {
     return withDevMode(
       () => {},
       async () => {
         try {
+          const RESTRICTED_ROLES = ['MEMBER', 'GUEST', 'INACTIVE'];
+          if (callerRole && RESTRICTED_ROLES.includes(callerRole.toUpperCase())) {
+            throw new Error('Only board members or administrators can undo attendance');
+          }
           const eventRef = doc(db, COLLECTIONS.PROJECTS, eventId);
 
           const reg = await EventRegistrationService.getByEventAndMember(eventId, memberId);
@@ -811,6 +874,7 @@ export class EventsService {
           const { MembersService } = await import('./membersService');
           MembersService.recalculateAttendance(memberId).catch(err => errorLoggingService.logError(err, { action: 'recalculate-attendance', additionalData: { memberId } }));
         } catch (error) {
+          errorLoggingService.logError(error as Error, { component: 'EventsService', action: 'undoAttendance', additionalData: { eventId, memberId } });
           console.error('Error undoing attendance:', error);
           throw error;
         }
@@ -928,7 +992,11 @@ export class EventsService {
           const snap = await getDocs(
             query(col, where('eventId', '==', eventId), orderBy('registeredAt', 'desc'))
           );
-          return snap.docs.map(d => ({ id: d.id, ...d.data() } as Record<string, unknown>));
+          // P0 FIX: filter out phone-index sentinel docs — they have _indexFor='phone'
+          // and no registeredAt field, so they must not be counted as participants.
+          return snap.docs
+            .filter(d => !d.data()['_indexFor'])
+            .map(d => ({ id: d.id, ...d.data() } as Record<string, unknown>));
         } catch (error) {
           errorLoggingService.logError(error as Error, {
             component: 'EventsService',
@@ -940,5 +1008,38 @@ export class EventsService {
       },
       3 * 60 * 1000
     );
+  }
+
+  /**
+   * Cancel a guest registration.
+   * P1 FIX: also updates the phone-index sentinel doc so the phone number is
+   * freed for future registrations (duplicate-check uses status !== 'Cancelled').
+   */
+  static async cancelGuestRegistration(
+    eventId: string,
+    email: string,
+    phone: string
+  ): Promise<void> {
+    if (isDevMode()) return;
+    try {
+      const emailKey = email.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      const phoneKey = phone.replace(/[^0-9]/g, '');
+      const mainDocRef = doc(db, COLLECTIONS.GUEST_REGISTRATIONS, `${eventId}_${emailKey}`);
+      const phoneIndexRef = doc(db, COLLECTIONS.GUEST_REGISTRATIONS, `${eventId}_phone_${phoneKey}`);
+
+      const batch = writeBatch(db);
+      batch.update(mainDocRef, { status: 'Cancelled', cancelledAt: Timestamp.now() });
+      // P1 FIX: mark the phone-index sentinel as Cancelled so the phone can be re-used
+      batch.update(phoneIndexRef, { status: 'Cancelled' });
+      await batch.commit();
+      apiCache.delete(`guestRegistrations:event:${eventId}`);
+    } catch (error) {
+      errorLoggingService.logError(error as Error, {
+        component: 'EventsService',
+        action: 'cancelGuestRegistration',
+        additionalData: { eventId },
+      });
+      throw error;
+    }
   }
 }

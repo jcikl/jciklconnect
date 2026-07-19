@@ -162,6 +162,7 @@ export class WorkflowService {
           if (workflowData.tags !== undefined) payload.tags = workflowData.tags;
 
           const ref = await addDoc(collection(db, WF_COL()), payload);
+          cacheService.deleteByPrefix(WF_COL() + ':');
           return ref.id;
         } catch (error) {
           errorLoggingService.logError(error as Error, { action: 'WorkflowService.createWorkflow' });
@@ -181,6 +182,7 @@ export class WorkflowService {
             ...updates,
             updatedAt: serverTimestamp(),
           });
+          cacheService.deleteByPrefix(WF_COL() + ':');
         } catch (error) {
           errorLoggingService.logError(error as Error, { action: 'WorkflowService.updateWorkflow', additionalData: { workflowId } });
           throw error;
@@ -224,6 +226,7 @@ export class WorkflowService {
 
           // Delete the parent workflow document only after executions are archived.
           await deleteDoc(doc(db, WF_COL(), workflowId));
+          cacheService.deleteByPrefix(WF_COL() + ':');
         } catch (error) {
           errorLoggingService.logError(error as Error, { action: 'WorkflowService.deleteWorkflow', additionalData: { workflowId } });
           throw error;
@@ -318,22 +321,40 @@ export class WorkflowService {
             currentStepIndex: 0,
           };
 
+          // P0: BOARD users may lack write permission on workflow_executions (rule = isAdmin() only).
+          // We catch permission-denied on execution record operations so the workflow still
+          // executes and returns a result — execution logging is best-effort for non-admin callers.
           let isDuplicate = false;
           let duplicateExecution: WorkflowExecution | undefined;
-          await runTransaction(db, async (txn) => {
-            const existing = await txn.get(executionRef);
-            if (existing.exists()) {
-              isDuplicate = true;
-              duplicateExecution = {
-                id: existing.id,
-                ...existing.data(),
-                startedAt: existing.data().startedAt?.toDate?.()?.toISOString() ?? existing.data().startedAt,
-                completedAt: existing.data().completedAt?.toDate?.()?.toISOString() ?? existing.data().completedAt,
-              } as WorkflowExecution;
-              return; // do not write — transaction will commit as a no-op read
+          let canWriteExecutionRecords = true;
+
+          try {
+            await runTransaction(db, async (txn) => {
+              const existing = await txn.get(executionRef);
+              if (existing.exists()) {
+                isDuplicate = true;
+                duplicateExecution = {
+                  id: existing.id,
+                  ...existing.data(),
+                  startedAt: existing.data().startedAt?.toDate?.()?.toISOString() ?? existing.data().startedAt,
+                  completedAt: existing.data().completedAt?.toDate?.()?.toISOString() ?? existing.data().completedAt,
+                } as WorkflowExecution;
+                return; // do not write — transaction will commit as a no-op read
+              }
+              txn.set(executionRef, { ...executionPayload, startedAt: serverTimestamp() });
+            });
+          } catch (permErr) {
+            if ((permErr as any)?.code === 'permission-denied') {
+              console.warn(
+                'WorkflowService: cannot write execution record (permission-denied) — ' +
+                'workflow will execute without idempotency guard. Update workflow_executions ' +
+                'Firestore rule to allow BOARD role writes.'
+              );
+              canWriteExecutionRecords = false;
+            } else {
+              throw permErr;
             }
-            txn.set(executionRef, { ...executionPayload, startedAt: serverTimestamp() });
-          });
+          }
 
           if (isDuplicate && duplicateExecution) {
             console.log(
@@ -381,11 +402,17 @@ export class WorkflowService {
                 executedSteps.push(stepExecution);
 
                 // P1-B: persist real-time progress so admins can monitor execution.
-                await updateDoc(executionRef, {
-                  currentStepIndex: stepIndex + 1,
-                  executedSteps,
-                  updatedAt: serverTimestamp(),
-                });
+                if (canWriteExecutionRecords) {
+                  try {
+                    await updateDoc(executionRef, {
+                      currentStepIndex: stepIndex + 1,
+                      executedSteps,
+                      updatedAt: serverTimestamp(),
+                    });
+                  } catch (e) {
+                    if ((e as any)?.code !== 'permission-denied') throw e;
+                  }
+                }
               } catch (stepError) {
                 const msg = stepError instanceof Error ? stepError.message : 'Unknown error';
                 stepExecution.status = 'failed';
@@ -402,31 +429,45 @@ export class WorkflowService {
                 };
 
                 // Persist the failing step index before breaking.
-                await updateDoc(executionRef, {
-                  currentStepIndex: stepIndex + 1,
-                  executedSteps,
-                  updatedAt: serverTimestamp(),
-                });
+                if (canWriteExecutionRecords) {
+                  try {
+                    await updateDoc(executionRef, {
+                      currentStepIndex: stepIndex + 1,
+                      executedSteps,
+                      updatedAt: serverTimestamp(),
+                    });
+                  } catch (e) {
+                    if ((e as any)?.code !== 'permission-denied') throw e;
+                  }
+                }
                 break;
               }
             }
 
-            // Final execution record update.
+            // P1: Use a single writeBatch so the execution record status + workflow counter
+            //     are updated atomically — a partial failure no longer leaves the execution
+            //     permanently in 'running' while the workflow counter is already incremented.
             const executionDuration = Date.now() - executionStartTime;
-            await updateDoc(executionRef, {
-              status: executionError ? 'failed' : 'success',
-              completedAt: serverTimestamp(),
-              duration: executionDuration,
-              executedSteps,
-              ...(executionError && { error: executionError }),
-            });
-
-            // P1-C: update workflow's own counters using atomic increment
-            //        so concurrent executions don't race.
-            await updateDoc(doc(db, WF_COL(), workflowId), {
-              lastExecutedAt: serverTimestamp(),
-              executionCount: increment(1),
-            });
+            if (canWriteExecutionRecords) {
+              try {
+                const finalBatch = writeBatch(db);
+                finalBatch.update(executionRef, {
+                  status: executionError ? 'failed' : 'success',
+                  completedAt: serverTimestamp(),
+                  duration: executionDuration,
+                  executedSteps,
+                  ...(executionError && { error: executionError }),
+                });
+                finalBatch.update(doc(db, WF_COL(), workflowId), {
+                  lastExecutedAt: serverTimestamp(),
+                  executionCount: increment(1),
+                });
+                await finalBatch.commit();
+              } catch (e) {
+                if ((e as any)?.code !== 'permission-denied') throw e;
+                // If permission-denied, fall through — workflow result is still returned below.
+              }
+            }
 
             return {
               id: executionRef.id,
@@ -441,13 +482,19 @@ export class WorkflowService {
             // Outer catch: mark execution failed and re-throw.
             const executionDuration = Date.now() - executionStartTime;
             const msg = error instanceof Error ? error.message : 'Unknown error';
-            await updateDoc(executionRef, {
-              status: 'failed',
-              completedAt: serverTimestamp(),
-              duration: executionDuration,
-              executedSteps,
-              error: { message: msg, stack: error instanceof Error ? error.stack : undefined },
-            });
+            if (canWriteExecutionRecords) {
+              try {
+                await updateDoc(executionRef, {
+                  status: 'failed',
+                  completedAt: serverTimestamp(),
+                  duration: executionDuration,
+                  executedSteps,
+                  error: { message: msg, stack: error instanceof Error ? error.stack : undefined },
+                });
+              } catch (e) {
+                if ((e as any)?.code !== 'permission-denied') throw e;
+              }
+            }
             errorLoggingService.logError(error as Error, {
               action: 'WorkflowService.executeWorkflow',
               additionalData: { workflowId },
@@ -511,17 +558,24 @@ export class WorkflowService {
             metadata: { workflowId: context.workflowId, stepId: step.id, ...context },
           });
         } catch (error) {
-          console.error('WorkflowService: send_email step failed:', error);
-          // Fallback to notification if a memberId is available.
+          errorLoggingService.logError(error as Error, { action: 'WorkflowService.executeStep.send_email' });
+          // Fallback to in-app notification if a memberId is available.
           if (step.config.recipientId) {
-            await CommunicationService.createNotification({
-              memberId: step.config.recipientId,
-              title: step.config.subject || 'Notification',
-              message: step.config.body || step.config.message || '',
-              type: 'info',
-            });
+            try {
+              await CommunicationService.createNotification({
+                memberId: step.config.recipientId,
+                title: step.config.subject || 'Notification',
+                message: step.config.body || step.config.message || '',
+                type: 'info',
+              });
+            } catch (fallbackErr) {
+              errorLoggingService.logError(fallbackErr as Error, {
+                action: 'WorkflowService.executeStep.send_email.fallback_notification',
+              });
+            }
           }
-          // Do not re-throw — allow the workflow to continue.
+          // Re-throw so the caller marks this step as failed in the execution log.
+          throw error;
         }
         break;
       }

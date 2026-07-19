@@ -21,6 +21,11 @@ export const COLLECTIONS = {
   DOCUMENTS: 'documents',
   TRAINING_MODULES: 'trainingModules',
   HOBBY_CLUBS: 'hobbyClubs',
+  // TODO(P0): BUSINESS_PROFILES collection has Firestore rules and indexes but NO
+  // service, hook, or UI component. It is currently dead code. Before using this
+  // constant, implement basic CRUD in a new businessProfilesService.ts and a
+  // useBusinessProfiles hook, or delete the Firestore rules / indexes if this
+  // feature has been superseded by businessDirectoryService.
   BUSINESS_PROFILES: 'businessProfiles',
   PUBLIC_BUSINESS_LISTINGS: 'publicBusinessListings',
   SURVEYS: 'surveys',

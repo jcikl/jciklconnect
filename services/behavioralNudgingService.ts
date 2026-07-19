@@ -147,6 +147,52 @@ export class BehavioralNudgingService {
         });
       }
 
+      // P1 FIX: evaluate stored NudgeRules from Firestore and generate nudges from them
+      try {
+        const storedRules = await BehavioralNudgingService.getAllNudgeRules();
+        const activeRules = storedRules.filter(r => r.isActive);
+        const existingNudgeIds = new Set(nudges.map(n => n.id));
+
+        for (const rule of activeRules) {
+          const { type, value, operator } = rule.condition;
+          let memberValue: number | undefined;
+          if (type === 'points_threshold') memberValue = member.points;
+          else if (type === 'attendance_rate') memberValue = member.attendanceRate;
+          else if (type === 'days_inactive') {
+            const lastActive = (member as unknown as Record<string, unknown>)['lastActivityDate'];
+            if (lastActive) {
+              const ms = Date.now() - new Date(lastActive as string).getTime();
+              memberValue = Math.floor(ms / (1000 * 60 * 60 * 24));
+            }
+          }
+          if (memberValue === undefined) continue;
+
+          const conditionMet =
+            (operator === 'greater_than' && memberValue > value) ||
+            (operator === 'less_than' && memberValue < value) ||
+            (operator === 'equals' && memberValue === value);
+          if (!conditionMet) continue;
+
+          const nudgeId = `nudge-${memberId}-rule-${rule.id}`;
+          if (existingNudgeIds.has(nudgeId)) continue;
+          existingNudgeIds.add(nudgeId);
+
+          nudges.push({
+            id: nudgeId,
+            memberId,
+            type: rule.nudgeType,
+            title: rule.title,
+            message: rule.message,
+            priority: rule.priority,
+            createdAt: new Date(),
+            dismissed: false,
+          });
+        }
+      } catch (ruleError) {
+        // Rule evaluation failure must not suppress already-generated nudges
+        errorLoggingService.logError(ruleError as Error, { action: 'BehavioralNudgingService.checkAndGenerateNudges:storedRules', additionalData: { memberId } });
+      }
+
           return nudges;
         } catch (error) {
           errorLoggingService.logError(error as Error, { action: 'BehavioralNudgingService.checkAndGenerateNudges', additionalData: { memberId } });
@@ -169,12 +215,30 @@ export class BehavioralNudgingService {
   }
 
   // Dismiss a nudge
+  // P1 FIX: implemented actual Firestore dismissal (writes to 'nudges' collection)
   static async dismissNudge(nudgeId: string, memberId: string): Promise<void> {
     return withDevMode(
       () => { console.log('[Dev Mode] Would dismiss nudge:', nudgeId); },
       async () => {
-        // In production, update the nudge in Firestore
-        // For now, this is handled client-side
+        try {
+          const { doc, setDoc } = await import('firebase/firestore');
+          const { db } = await import('../config/firebase');
+          // Store dismissal state with deterministic ID: memberId_nudgeId
+          const dismissKey = `${memberId}_${nudgeId}`;
+          await setDoc(
+            doc(db, 'nudges', dismissKey),
+            {
+              nudgeId,
+              memberId,
+              dismissed: true,
+              dismissedAt: new Date().toISOString(),
+            },
+            { merge: true }
+          );
+        } catch (error) {
+          errorLoggingService.logError(error as Error, { action: 'BehavioralNudgingService.dismissNudge', additionalData: { nudgeId, memberId } });
+          throw error;
+        }
       }
     );
   }
@@ -367,8 +431,9 @@ export class BehavioralNudgingService {
           const { db } = await import('../config/firebase');
           const { COLLECTIONS } = await import('../config/constants');
 
+          // P0 FIX: was writing to NUDGE_RULES — corrected to GUEST_PAGE_STATS
           // pageViews always increments by exactly 1 per call (enforced here, not by caller)
-          await updateDoc(doc(db, COLLECTIONS.NUDGE_RULES, pageId), {
+          await updateDoc(doc(db, COLLECTIONS.GUEST_PAGE_STATS, pageId), {
             pageViews: increment(1),
             totalDwellTime: increment(dwellTimeSeconds),
             updatedAt: new Date(),

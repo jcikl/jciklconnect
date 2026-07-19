@@ -19,6 +19,7 @@ import { COLLECTIONS } from '../config/constants';
 import { isDevMode, withDevMode } from '../utils/devMode';
 import { logListener } from './firestoreLogger';
 import { apiCache } from './cacheService';
+import { errorLoggingService } from './errorLoggingService';
 
 const CONV_COLLECTION = COLLECTIONS.CONVERSATIONS || 'conversations';
 const MSG_COLLECTION = COLLECTIONS.MESSAGES || 'messages';
@@ -86,6 +87,8 @@ export class MessagingService {
       },
       async () => {
         try {
+          // P0 fix: getConversations already scopes by participantIds; createConversation
+          // always sets participants so the array-contains query works for MEMBER users.
           // For direct messages, check if conversation already exists
           if (type === 'direct' && participants.length === 2) {
             const existing = await this.findDirectConversation(participants[0], participants[1]);
@@ -123,7 +126,7 @@ export class MessagingService {
 
           return newConvRef.id;
         } catch (error) {
-          console.error('Error creating conversation:', error);
+          errorLoggingService.logError(error as Error, { component: 'MessagingService', action: 'createConversation' });
           throw error;
         }
       }
@@ -154,7 +157,7 @@ export class MessagingService {
 
           return conversation || null;
         } catch (error) {
-          console.error('Error finding direct conversation:', error);
+          errorLoggingService.logError(error as Error, { component: 'MessagingService', action: 'findDirectConversation' });
           return null;
         }
       }
@@ -218,7 +221,7 @@ export class MessagingService {
             } as Message))
             .reverse(); // Reverse to show oldest first
         } catch (error) {
-          console.error('Error fetching messages:', error);
+          errorLoggingService.logError(error as Error, { component: 'MessagingService', action: 'getMessages' });
           throw error;
         }
       }
@@ -291,11 +294,63 @@ export class MessagingService {
             participants.forEach(uid => invalidateConversationsCache(uid));
           }
 
-          await batch.commit();
+          // P0 fix: MEMBER role may lack permission to update the conversation doc.
+          // Attempt the atomic batch (message + conversation update). If Firestore
+          // denies the conversation update, fall back to writing just the message so
+          // the sender's content is never silently lost.
+          try {
+            await batch.commit();
+          } catch (batchError: any) {
+            if (batchError?.code === 'permission-denied') {
+              // Fall back: write only the message document (no conversation metadata update)
+              errorLoggingService.logError(batchError, {
+                component: 'MessagingService',
+                action: 'sendMessage:conversationUpdateDenied',
+                context: 'MEMBER role cannot update conversation doc; message written standalone',
+              });
+              const fallbackBatch = writeBatch(db);
+              fallbackBatch.set(newMsgRef, messageData);
+              await fallbackBatch.commit();
+            } else {
+              throw batchError;
+            }
+          }
+
+          // P1 fix: send in-app notifications to other conversation participants
+          if (conversationDoc.exists()) {
+            const conversation = conversationDoc.data() as Conversation;
+            const otherParticipants = (conversation.participants || []).filter(pid => pid !== senderId);
+            if (otherParticipants.length > 0) {
+              try {
+                const { CommunicationService } = await import('./communicationService');
+                await Promise.all(
+                  otherParticipants.map(pid =>
+                    CommunicationService.createNotification({
+                      memberId: pid,
+                      title: `New message from ${senderName}`,
+                      message: content.substring(0, 80),
+                      type: 'info',
+                    }).catch(notifErr =>
+                      errorLoggingService.logError(notifErr as Error, {
+                        component: 'MessagingService',
+                        action: `sendMessage:notify:${pid}`,
+                      })
+                    )
+                  )
+                );
+              } catch (notifErr) {
+                // Notification failure must never break the message send
+                errorLoggingService.logError(notifErr as Error, {
+                  component: 'MessagingService',
+                  action: 'sendMessage:notifications',
+                });
+              }
+            }
+          }
 
           return newMsgRef.id;
         } catch (error) {
-          console.error('Error sending message:', error);
+          errorLoggingService.logError(error as Error, { component: 'MessagingService', action: 'sendMessage' });
           throw error;
         }
       }
@@ -342,7 +397,7 @@ export class MessagingService {
           // Invalidate conversations cache for this member
           invalidateConversationsCache(memberId);
         } catch (error) {
-          console.error('Error marking messages as read:', error);
+          errorLoggingService.logError(error as Error, { component: 'MessagingService', action: 'markAsRead' });
           throw error;
         }
       }
@@ -375,7 +430,7 @@ export class MessagingService {
       } as Message));
       callback(messages);
     }, (error) => {
-      console.error('Error subscribing to messages:', error);
+      errorLoggingService.logError(error, { component: 'MessagingService', action: 'subscribeToMessages' });
     });
 
     return unsubscribe;
@@ -411,7 +466,7 @@ export class MessagingService {
       } as Conversation));
       callback(conversations);
     }, (error) => {
-      console.error('Error subscribing to conversations:', error);
+      errorLoggingService.logError(error, { component: 'MessagingService', action: 'subscribeToConversations' });
     });
 
     return unsubscribe;

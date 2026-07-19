@@ -225,6 +225,8 @@ export interface SponsorshipRecord {
   amount: number;
   date: string;
   description?: string;
+  /** P2: optional link to a finance Transaction document for cross-reference */
+  transactionId?: string;
   createdAt?: any;
   updatedAt?: any;
 }

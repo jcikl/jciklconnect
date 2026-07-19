@@ -23,6 +23,7 @@ import { isDevMode, withDevMode } from '../utils/devMode';
 import { MOCK_POSTS, MOCK_NOTIFICATIONS } from './mockData';
 import { EmailService, EmailMessage } from './emailService';
 import { errorLoggingService } from './errorLoggingService';
+import { apiCache as cacheService } from './cacheService';
 
 export class CommunicationService {
   // Get all posts
@@ -40,12 +41,11 @@ export class CommunicationService {
             timestamp: doc.data().timestamp?.toDate?.()?.toISOString() || doc.data().timestamp,
           } as NewsPost));
         } catch (error) {
-          // If error occurs and we're in dev mode, return mock data instead
           if (isDevMode()) {
             console.log('[DEV MODE] getAllPosts: Error occurred, returning mock posts');
             return MOCK_POSTS;
           }
-          console.error('Error fetching posts:', error);
+          errorLoggingService.logError(error as Error, { action: 'CommunicationService.getAllPosts' });
           throw error;
         }
       }
@@ -58,17 +58,22 @@ export class CommunicationService {
       () => `mock-post-${Date.now()}`,
       async () => {
         try {
+          // P1 fix: write authorId as a dedicated top-level field so Firestore rules
+          // can evaluate resource.data.authorId == request.auth.uid for self-delete.
           const newPost = {
             ...postData,
+            authorId: postData.author?.id || '',
             timestamp: Timestamp.now(),
             createdAt: Timestamp.now(),
             updatedAt: Timestamp.now(),
           };
 
           const docRef = await addDoc(collection(db, COLLECTIONS.COMMUNICATION), newPost);
+          // P2 fix: invalidate communication cache after write
+          cacheService.deleteByPrefix(COLLECTIONS.COMMUNICATION + ':');
           return docRef.id;
         } catch (error) {
-          console.error('Error creating post:', error);
+          errorLoggingService.logError(error as Error, { action: 'CommunicationService.createPost' });
           throw error;
         }
       }
@@ -87,8 +92,10 @@ export class CommunicationService {
             ...updates,
             updatedAt: Timestamp.now(),
           });
+          // P2 fix: invalidate communication cache after write
+          cacheService.deleteByPrefix(COLLECTIONS.COMMUNICATION + ':');
         } catch (error) {
-          console.error('Error updating post:', error);
+          errorLoggingService.logError(error as Error, { action: 'CommunicationService.updatePost' });
           throw error;
         }
       }
@@ -97,12 +104,19 @@ export class CommunicationService {
 
   // Delete post
   static async deletePost(postId: string): Promise<void> {
-    try {
-      await deleteDoc(doc(db, COLLECTIONS.COMMUNICATION, postId));
-    } catch (error) {
-      console.error('Error deleting post:', error);
-      throw error;
-    }
+    return withDevMode(
+      () => { console.log(`[DEV MODE] deletePost: Simulating delete for post ${postId}`); },
+      async () => {
+        try {
+          await deleteDoc(doc(db, COLLECTIONS.COMMUNICATION, postId));
+          // P2 fix: invalidate communication cache after write
+          cacheService.deleteByPrefix(COLLECTIONS.COMMUNICATION + ':');
+        } catch (error) {
+          errorLoggingService.logError(error as Error, { action: 'CommunicationService.deletePost' });
+          throw error;
+        }
+      }
+    );
   }
 
   // Like post
@@ -118,7 +132,7 @@ export class CommunicationService {
             likedBy: arrayUnion(memberId),
           });
         } catch (error) {
-          console.error('Error liking post:', error);
+          errorLoggingService.logError(error as Error, { action: 'CommunicationService.likePost' });
           throw error;
         }
       }
@@ -145,7 +159,7 @@ export class CommunicationService {
             timestamp: doc.data().timestamp?.toDate?.()?.toISOString() || doc.data().timestamp,
           } as Notification));
         } catch (error) {
-          console.error('Error fetching notifications:', error);
+          errorLoggingService.logError(error as Error, { action: 'CommunicationService.getNotifications' });
           throw error;
         }
       }
@@ -163,8 +177,9 @@ export class CommunicationService {
             read: true,
             readAt: Timestamp.now(),
           });
+          cacheService.deleteByPrefix(COLLECTIONS.NOTIFICATIONS + ':');
         } catch (error) {
-          console.error('Error marking notification as read:', error);
+          errorLoggingService.logError(error as Error, { action: 'CommunicationService.markNotificationAsRead' });
           throw error;
         }
       }
@@ -186,8 +201,9 @@ export class CommunicationService {
             }
           }
           await deleteDoc(notifRef);
+          cacheService.deleteByPrefix(COLLECTIONS.NOTIFICATIONS + ':');
         } catch (error) {
-          console.error('Error deleting notification:', error);
+          errorLoggingService.logError(error as Error, { action: 'CommunicationService.deleteNotification' });
           throw error;
         }
       }
@@ -214,8 +230,9 @@ export class CommunicationService {
             batch.update(d.ref, { read: true, readAt: now });
           });
           await batch.commit();
+          cacheService.deleteByPrefix(COLLECTIONS.NOTIFICATIONS + ':');
         } catch (error) {
-          console.error('Error marking all notifications as read:', error);
+          errorLoggingService.logError(error as Error, { action: 'CommunicationService.markAllAsRead' });
           throw error;
         }
       }
@@ -236,9 +253,40 @@ export class CommunicationService {
           };
 
           const docRef = await addDoc(collection(db, COLLECTIONS.NOTIFICATIONS), newNotification);
+          cacheService.deleteByPrefix(COLLECTIONS.NOTIFICATIONS + ':');
           return docRef.id;
         } catch (error) {
-          console.error('Error creating notification:', error);
+          errorLoggingService.logError(error as Error, { action: 'CommunicationService.createNotification' });
+          throw error;
+        }
+      }
+    );
+  }
+
+  // Bulk create notifications using writeBatch for atomic delivery.
+  // Chunks into pages of 499 to stay under the Firestore 500-operation limit.
+  static async bulkCreateNotifications(
+    notifications: Array<Omit<Notification, 'id' | 'timestamp' | 'read'> & { isDismissible?: boolean }>
+  ): Promise<void> {
+    return withDevMode(
+      () => { console.log(`[DEV MODE] bulkCreateNotifications: ${notifications.length} notifications`); },
+      async () => {
+        if (notifications.length === 0) return;
+        const now = Timestamp.now();
+        const CHUNK = 499;
+        try {
+          for (let i = 0; i < notifications.length; i += CHUNK) {
+            const chunk = notifications.slice(i, i + CHUNK);
+            const batch = writeBatch(db);
+            chunk.forEach(n => {
+              const ref = doc(collection(db, COLLECTIONS.NOTIFICATIONS));
+              batch.set(ref, { ...n, timestamp: now, read: false, createdAt: now });
+            });
+            await batch.commit();
+          }
+          cacheService.deleteByPrefix(COLLECTIONS.NOTIFICATIONS + ':');
+        } catch (error) {
+          errorLoggingService.logError(error as Error, { action: 'CommunicationService.bulkCreateNotifications' });
           throw error;
         }
       }
@@ -454,32 +502,28 @@ export class CommunicationService {
         }
       }
 
-      // Send in-app notifications if requested
+      // Send in-app notifications if requested — use writeBatch for atomic delivery
       if (announcementData.sendNotification) {
         const notifiableMembers = targetMembers.filter(m => m?.id);
-        const results = await Promise.allSettled(
-          notifiableMembers.map(member =>
-            this.createNotification({
-              memberId: member.id,
-              title: announcementData.title,
-              message: announcementData.content.substring(0, 200),
-              type: announcementData.priority === 'Urgent' ? 'error' : announcementData.priority === 'High' ? 'warning' : 'info',
-            })
-          )
-        );
-        const failedNotifications: Array<{ memberId: string; reason: string }> = [];
-        results.forEach((result, i) => {
-          if (result.status === 'fulfilled') {
-            notificationsSent++;
-          } else {
-            const memberId = notifiableMembers[i].id;
-            const reason = result.reason instanceof Error ? result.reason.message : String(result.reason);
-            failedNotifications.push({ memberId, reason });
-            console.error(`Error sending notification to member ${memberId}:`, result.reason);
+        if (notifiableMembers.length > 0) {
+          const notifType: 'info' | 'warning' | 'error' =
+            announcementData.priority === 'Urgent' ? 'error' :
+            announcementData.priority === 'High' ? 'warning' : 'info';
+          try {
+            await this.bulkCreateNotifications(
+              notifiableMembers.map(member => ({
+                memberId: member.id as string,
+                title: announcementData.title,
+                message: announcementData.content.substring(0, 200),
+                type: notifType,
+              }))
+            );
+            notificationsSent = notifiableMembers.length;
+          } catch (error) {
+            errorLoggingService.logError(error as Error, {
+              action: 'CommunicationService.createAnnouncement.sendNotification',
+            });
           }
-        });
-        if (failedNotifications.length > 0) {
-          console.error(`Failed to send notifications to ${failedNotifications.length} member(s).`);
         }
       }
 

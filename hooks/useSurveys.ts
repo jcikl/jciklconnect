@@ -68,7 +68,7 @@ export const useSurveys = () => {
     if (isSubmittingRef.current) return;
     isSubmittingRef.current = true;
     try {
-      await SurveysService.submitResponse({ surveyId, memberId: member.id, answers });
+      await SurveysService.submitResponse({ surveyId, memberId: member.id, responses: answers });
       await loadSurveys();
       showToast('Survey response submitted successfully', 'success');
     } catch (err) {

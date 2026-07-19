@@ -22,18 +22,31 @@ import { db } from '../config/firebase';
 import { COLLECTIONS, DEFAULT_LO_ID } from '../config/constants';
 import type { EventRegistration, EventRegistrationStatus } from '../types';
 import { withDevMode } from '../utils/devMode';
+import { errorLoggingService } from './errorLoggingService';
 
 const MOCK_REGISTRATIONS: EventRegistration[] = [];
 
 export const EventRegistrationService = {
-  async listByEvent(eventId: string, loId?: string): Promise<EventRegistration[]> {
+  /**
+   * List registrations for an event.
+   * P0 fix: Firestore `allow list` requires BOARD+ for full event lists. Non-board callers
+   * (e.g. members checking their own registration) must pass `viewerMemberId` so the query is
+   * scoped to `memberId == viewerMemberId` — matching the member-scoped rules path.
+   */
+  async listByEvent(eventId: string, loId?: string, viewerMemberId?: string): Promise<EventRegistration[]> {
     return withDevMode(
-      () => MOCK_REGISTRATIONS.filter((r) => r.eventId === eventId),
+      () => {
+        const filtered = MOCK_REGISTRATIONS.filter((r) => r.eventId === eventId);
+        return viewerMemberId ? filtered.filter((r) => r.memberId === viewerMemberId) : filtered;
+      },
       async () => {
-        // E2 fix: filter by loId so multi-LO deployments don't leak cross-LO registrations
-        const constraints = loId
-          ? [where('eventId', '==', eventId), where('loId', '==', loId), orderBy('createdAt', 'desc')]
-          : [where('eventId', '==', eventId), orderBy('createdAt', 'desc')];
+        // E2 fix: filter by loId so multi-LO deployments don't leak cross-LO registrations.
+        // P0 fix: when viewerMemberId is provided (non-board caller), scope query to that member only.
+        const constraints = viewerMemberId
+          ? [where('eventId', '==', eventId), where('memberId', '==', viewerMemberId), orderBy('createdAt', 'desc')]
+          : loId
+            ? [where('eventId', '==', eventId), where('loId', '==', loId), orderBy('createdAt', 'desc')]
+            : [where('eventId', '==', eventId), orderBy('createdAt', 'desc')];
         const q = query(collection(db, COLLECTIONS.EVENT_REGISTRATIONS), ...constraints);
         const snapshot = await getDocs(q);
         return snapshot.docs.map((d) => {
@@ -360,8 +373,16 @@ export const EventRegistrationService = {
               // Reconciled/Partially Reconciled — leave for finance to void manually.
             }
           } catch (err) {
-            // Non-fatal: registration is cancelled; warn so finance can clean up manually.
+            // P1 fix: log and re-throw so the caller knows the finance cleanup failed.
+            // The registration cancellation itself already committed, but the linked transaction
+            // could not be removed — finance team must void it manually.
+            errorLoggingService.logError(err as Error, {
+              component: 'EventRegistrationService',
+              action: 'cancel-financeCleanup',
+              additionalData: { registrationId, financeTransactionId },
+            });
             console.warn('[EventRegistrationService.cancel] Could not clean up income tx:', err);
+            throw err;
           }
         }
       }

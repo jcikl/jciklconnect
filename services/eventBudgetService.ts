@@ -23,6 +23,10 @@ import { withDevMode } from '../utils/devMode';
 import { FinanceService } from './financeService';
 import { EventsService } from './eventsService';
 import { Transaction } from '../types';
+import { errorLoggingService } from './errorLoggingService';
+import { apiCache } from './cacheService';
+
+const EVENT_BUDGET_TTL = 3 * 60 * 1000;
 
 export interface EventBudget {
   id?: string;
@@ -51,6 +55,16 @@ export interface BudgetItem {
 }
 
 export class EventBudgetService {
+  // P2: dedicated cache invalidation for event budgets
+  static invalidateEventBudgetCache(eventId?: string): void {
+    if (eventId) {
+      apiCache.delete(`eventBudget:${eventId}`);
+    } else {
+      apiCache.deleteByPrefix('eventBudget:');
+    }
+    EventsService.invalidateEventsCache();
+  }
+
   // Get budget for an event
   static async getEventBudget(eventId: string): Promise<EventBudget | null> {
     return withDevMode<EventBudget | null>(
@@ -92,30 +106,25 @@ export class EventBudgetService {
         updatedAt: new Date(),
       }),
       async () => {
-        try {
-          const budgetQuery = query(
-            collection(db, COLLECTIONS.EVENT_BUDGETS),
-            where('eventId', '==', eventId),
-            limit(1)
-          );
-          const snapshot = await getDocs(budgetQuery);
-
-          if (snapshot.empty) {
-            return null;
+        return apiCache.getOrSet(`eventBudget:${eventId}`, async () => {
+          try {
+            // P2: use deterministic doc ID (eventId) for direct read instead of query
+            const budgetDocRef = doc(db, COLLECTIONS.EVENT_BUDGETS, eventId);
+            const snap = await getDoc(budgetDocRef);
+            if (!snap.exists()) return null;
+            return {
+              id: snap.id,
+              ...snap.data(),
+              approvedAt: snap.data().approvedAt?.toDate(),
+              createdAt: snap.data().createdAt?.toDate() || new Date(),
+              updatedAt: snap.data().updatedAt?.toDate() || new Date(),
+            } as EventBudget;
+          } catch (error) {
+            errorLoggingService.logError(error as Error, { component: 'EventBudgetService', action: 'getEventBudget', additionalData: { eventId } });
+            console.error('Error fetching event budget:', error);
+            throw error;
           }
-
-          const doc = snapshot.docs[0];
-          return {
-            id: doc.id,
-            ...doc.data(),
-            approvedAt: doc.data().approvedAt?.toDate(),
-            createdAt: doc.data().createdAt?.toDate() || new Date(),
-            updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-          } as EventBudget;
-        } catch (error) {
-          console.error('Error fetching event budget:', error);
-          throw error;
-        }
+        }, EVENT_BUDGET_TTL, 'eventBudgetService.getEventBudget');
       }
     );
   }
@@ -147,9 +156,10 @@ export class EventBudgetService {
             payload.approvedAt = Timestamp.fromDate(budgetData.approvedAt as Date);
           }
           await setDoc(budgetRef, payload, { merge: true });
-          EventsService.invalidateEventsCache();
+          EventBudgetService.invalidateEventBudgetCache(budgetData.eventId);
           return budgetData.eventId;
         } catch (error) {
+          errorLoggingService.logError(error as Error, { component: 'EventBudgetService', action: 'saveEventBudget', additionalData: { eventId: budgetData.eventId } });
           console.error('Error saving event budget:', error);
           throw error;
         }
@@ -172,7 +182,7 @@ export class EventBudgetService {
           budgetItems: arrayUnion(newItem),
           updatedAt: Timestamp.now(),
         });
-        EventsService.invalidateEventsCache();
+        EventBudgetService.invalidateEventBudgetCache(eventId);
       }
     );
   }
@@ -193,7 +203,7 @@ export class EventBudgetService {
           );
           txn.update(budgetRef, { budgetItems: updatedItems, updatedAt: Timestamp.now() });
         });
-        EventsService.invalidateEventsCache();
+        EventBudgetService.invalidateEventBudgetCache(eventId);
       }
     );
   }
@@ -218,7 +228,7 @@ export class EventBudgetService {
             });
           }
         });
-        EventsService.invalidateEventsCache();
+        EventBudgetService.invalidateEventBudgetCache(eventId);
       }
     );
   }
@@ -263,6 +273,7 @@ export class EventBudgetService {
         transactions: eventTransactions,
       };
     } catch (error) {
+      errorLoggingService.logError(error as Error, { component: 'EventBudgetService', action: 'reconcileEventBudget', additionalData: { eventId } });
       console.error('Error reconciling event budget:', error);
       throw error;
     }
@@ -289,7 +300,7 @@ export class EventBudgetService {
             updatedAt: Timestamp.now(),
           });
         });
-        EventsService.invalidateEventsCache();
+        EventBudgetService.invalidateEventBudgetCache(eventId);
       }
     );
   }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, orderBy, limit, getDocs, deleteDoc, doc, Timestamp } from 'firebase/firestore';
+import { collection, query, orderBy, limit, getDocs, doc, Timestamp, writeBatch } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { COLLECTIONS } from '../../config/constants';
 import { Activity, RefreshCw, Database, Wifi, Trash2, PenLine, Copy, Check, AlertTriangle, Zap, XCircle } from 'lucide-react';
@@ -78,8 +78,20 @@ export const SystemLogsView: React.FC = () => {
     setClearing(true);
     setConfirmClear(false);
     try {
-      const snap = await getDocs(query(collection(db, COLLECTIONS.SYSTEM_LOGS), limit(500)));
-      await Promise.all(snap.docs.map(d => deleteDoc(doc(db, COLLECTIONS.SYSTEM_LOGS, d.id))));
+      // P1 fix: use chunked writeBatch instead of Promise.all(deleteDoc) to stay
+      // within Firestore's 500-op-per-batch limit and avoid hammering the network
+      // with hundreds of parallel requests.
+      let remaining = true;
+      while (remaining) {
+        const snap = await getDocs(
+          query(collection(db, COLLECTIONS.SYSTEM_LOGS), limit(400))
+        );
+        if (snap.empty) break;
+        const batch = writeBatch(db);
+        snap.docs.forEach(d => batch.delete(doc(db, COLLECTIONS.SYSTEM_LOGS, d.id)));
+        await batch.commit();
+        remaining = snap.size === 400; // if fewer than 400 returned, we're done
+      }
       setLogs([]);
     } catch (e: any) {
       setError(e.message ?? 'Failed to clear logs');

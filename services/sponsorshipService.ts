@@ -31,6 +31,15 @@ const MOCK_SPONSORSHIPS: SponsorshipRecord[] = [
   { id: 'mock-s2', memberId: 'm2', memberName: 'Sarah Jenkins', sponsorName: 'Beverages Inc', amount: 1200, date: '2026-06-01', description: 'Sports day hydration' }
 ];
 
+// P1 TODO (rules): Firestore rules currently restrict create/update/delete to isBoard().
+// ADMIN and SUPER_ADMIN writes are silently rejected because their roles are not included
+// in the isBoard() helper. Fix: update firestore.rules to add isAdmin() || isBoard() for
+// the sponsorships collection write rules. No service-layer change needed.
+
+// P1 TODO (denormalization): memberName is written once at creation and never synced when
+// a member's display name changes. To fix, membersService.updateMember should query
+// sponsorships by memberId and batch-update memberName whenever member.name changes.
+
 export class SponsorshipsService {
   static async getAllSponsorships(): Promise<SponsorshipRecord[]> {
     return withDevMode(
@@ -104,6 +113,12 @@ export class SponsorshipsService {
 });
   }
 
+  /**
+   * P2: pass transactionId in data to link the sponsorship to a finance transaction.
+   * If a transactionId is provided it is stored on the document for cross-reference;
+   * no automatic transaction creation is performed here — callers must create the
+   * matching finance transaction separately and pass its ID.
+   */
   static async createSponsorship(data: Omit<SponsorshipRecord, 'id'>): Promise<string> {
     return withDevMode(
       async () => {

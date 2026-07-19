@@ -570,8 +570,18 @@ export class FinanceService {
             }
           }
 
-          // Sync with inventory AFTER the transaction is committed so the tx ID is available
-          await this.syncTransactionWithInventory({ ...transactionData, id: txRef.id });
+          // Sync with inventory AFTER the transaction is committed so the tx ID is available.
+          // P1-fix: wrapped in try/catch so an inventory-sync failure does not mask the
+          // successfully committed transaction (the tx exists in Firestore regardless).
+          try {
+            await this.syncTransactionWithInventory({ ...transactionData, id: txRef.id });
+          } catch (inventorySyncErr) {
+            console.error('createTransaction: inventory post-sync failed (non-blocking):', inventorySyncErr);
+            errorLoggingService.logError(
+              inventorySyncErr instanceof Error ? inventorySyncErr : new Error(String(inventorySyncErr)),
+              { component: 'financeService', action: 'createTransaction:inventorySync' }
+            );
+          }
 
           invalidateFinanceCache();
           return txRef.id;
@@ -957,9 +967,19 @@ export class FinanceService {
       // T6: invalidate cache after successful split write
       invalidateFinanceCache();
 
+      // P1-fix: each membership sync is non-blocking — a sync failure must not roll back the
+      // already-committed splits. Wrap individually so one failed sync does not prevent others.
       for (const [key, projectId] of membershipSyncTargets.entries()) {
         const [memberId] = key.split(':');
-        await this.syncMemberMembership(memberId, projectId);
+        try {
+          await this.syncMemberMembership(memberId, projectId);
+        } catch (syncErr) {
+          console.error('createTransactionSplit: membership sync failed (non-blocking):', syncErr);
+          errorLoggingService.logError(
+            syncErr instanceof Error ? syncErr : new Error(String(syncErr)),
+            { component: 'financeService', action: 'createTransactionSplit:membershipSync' }
+          );
+        }
       }
 
       return splitIds;
@@ -1233,15 +1253,34 @@ export class FinanceService {
 
           const split = capturedSplit!;
 
+          // P1-fix: side effects are non-blocking — wrap each individually so a failure here
+          // does not mask the successfully committed split deletion.
+
           // Inventory cleanup runs after the Firestore transaction succeeds
           if (split.inventoryLinkId && split.inventoryQuantity) {
-            const { InventoryService } = await import('./inventoryService');
-            await InventoryService.deleteStockMovementForRef(splitId);
+            try {
+              const { InventoryService } = await import('./inventoryService');
+              await InventoryService.deleteStockMovementForRef(splitId);
+            } catch (invErr) {
+              console.error('deleteTransactionSplit: inventory cleanup failed (non-blocking):', invErr);
+              errorLoggingService.logError(
+                invErr instanceof Error ? invErr : new Error(String(invErr)),
+                { component: 'financeService', action: 'deleteTransactionSplit:inventoryCleanup' }
+              );
+            }
           }
 
           // Sync member membership if deleted split was Membership category
           if (split.category === 'Membership' && split.memberId && split.year) {
-            await this.syncMemberMembership(split.memberId, `${split.year} membership`);
+            try {
+              await this.syncMemberMembership(split.memberId, `${split.year} membership`);
+            } catch (syncErr) {
+              console.error('deleteTransactionSplit: membership sync failed (non-blocking):', syncErr);
+              errorLoggingService.logError(
+                syncErr instanceof Error ? syncErr : new Error(String(syncErr)),
+                { component: 'financeService', action: 'deleteTransactionSplit:membershipSync' }
+              );
+            }
           }
         } catch (error) {
           console.error('Error deleting transaction split:', error);
@@ -1735,7 +1774,14 @@ export class FinanceService {
     };
     const plans: SplitPlan[] = [];
 
-    // Phase 1: read all docs in parallel
+    // Phase 1: read all docs in parallel.
+    // WARNING (P1 race condition): these reads happen outside a transaction. A concurrent write
+    // to any split between the read here and writeBatch.commit() in Phase 2 could result in the
+    // stale read being overwritten. runTransaction does not support getDocs queries, so there is
+    // no straightforward Firestore-native fix for bulk batch operations. For low-frequency bulk
+    // category edits this is an acceptable trade-off — last writer wins and data is not lost,
+    // but the category update applied here may be missed if a concurrent edit races it. Callers
+    // should refresh the UI after the operation to confirm the final state.
     await Promise.all(
       splitIds.map(async (splitId) => {
         try {
@@ -1794,21 +1840,38 @@ export class FinanceService {
       await batch.commit();
     }
 
-    // Phase 3: membership side-effects after successful commit
+    // Phase 3: membership side-effects after successful commit.
+    // P1-fix: each sync is non-blocking — wrap individually so one failure does not prevent others.
     for (const { currentSplit, nextSplit } of plans) {
       if (nextSplit.category === 'Membership' && nextSplit.memberId) {
         const projectId = this.getMembershipProjectIdFromYear(nextSplit.year || categoryUpdates.year);
-        await this.syncMemberMembership(nextSplit.memberId, projectId);
+        try {
+          await this.syncMemberMembership(nextSplit.memberId, projectId);
+        } catch (syncErr) {
+          console.error('batchUpdateSplitCategory: membership sync failed (non-blocking):', syncErr);
+          errorLoggingService.logError(
+            syncErr instanceof Error ? syncErr : new Error(String(syncErr)),
+            { component: 'financeService', action: 'batchUpdateSplitCategory:membershipSync' }
+          );
+        }
       }
       if (
         currentSplit?.category === 'Membership' &&
         currentSplit.memberId &&
         (currentSplit.memberId !== nextSplit.memberId || currentSplit.year !== nextSplit.year)
       ) {
-        await this.syncMemberMembership(
-          currentSplit.memberId,
-          this.getMembershipProjectIdFromYear(currentSplit.year)
-        );
+        try {
+          await this.syncMemberMembership(
+            currentSplit.memberId,
+            this.getMembershipProjectIdFromYear(currentSplit.year)
+          );
+        } catch (syncErr) {
+          console.error('batchUpdateSplitCategory: old-member membership sync failed (non-blocking):', syncErr);
+          errorLoggingService.logError(
+            syncErr instanceof Error ? syncErr : new Error(String(syncErr)),
+            { component: 'financeService', action: 'batchUpdateSplitCategory:membershipSyncOld' }
+          );
+        }
       }
     }
 
@@ -1884,20 +1947,22 @@ export class FinanceService {
             await this.syncTransactionWithInventory(transaction, true);
           }
 
-          if (transaction?.projectTransactionIds?.length) {
-            const ptBatch = writeBatch(db);
-            for (const ptId of transaction.projectTransactionIds) {
-              ptBatch.delete(doc(db, COLLECTIONS.PROJECT_TRANSACTIONS, ptId));
-            }
-            await ptBatch.commit();
-          }
-
-          // TX-W1 (atomic): revert PR status + delete splits + delete transaction in ONE batch.
-          // Previously revertPaid was a separate updateDoc call before the deletion batch, so a
-          // crash between those two steps left the PR permanently 'paid' with no linked transaction.
-          // Now all three writes commit together — they all succeed or all fail.
+          // P1-fix: fetch child splits FIRST so project-tx deletions, split deletions, PR revert,
+          // main transaction deletion and balance reversal all land in ONE atomic batch.
+          // Previously project transactions were committed in a separate ptBatch before deletionBatch;
+          // a crash between the two left orphaned project transaction records.
           const childSplits = await this.getTransactionSplits(transactionId);
+
+          // TX-W1 (atomic): delete project txs + revert PR status + delete splits + delete
+          // transaction + reverse balance — all in ONE batch (they all succeed or all fail).
           const deletionBatch = writeBatch(db);
+
+          // Delete linked project transactions in the same batch
+          if (transaction?.projectTransactionIds?.length) {
+            for (const ptId of transaction.projectTransactionIds) {
+              deletionBatch.delete(doc(db, COLLECTIONS.PROJECT_TRANSACTIONS, ptId));
+            }
+          }
 
           // Include PR status revert in the same batch if applicable
           if (transaction?.paymentRequestId) {
@@ -2536,15 +2601,24 @@ export class FinanceService {
   }
 
   // Get all bank accounts with dynamic balance
-  static async getAllBankAccounts(includeBalance: boolean = true): Promise<BankAccount[]> {
+  /**
+   * P0-fix: added `loId` parameter. When provided (non-admin callers) the query is
+   * scoped to that LO's accounts. When omitted (admin callers) all accounts are returned.
+   */
+  static async getAllBankAccounts(includeBalance: boolean = true, loId?: string): Promise<BankAccount[]> {
     return withDevMode(
       () => MOCK_ACCOUNTS,
       () => apiCache.getOrSet(
-        `${FINANCE_CACHE_PREFIX}bankAccounts:${includeBalance ? 'withBalance' : 'noBalance'}`,
+        `${FINANCE_CACHE_PREFIX}bankAccounts:${includeBalance ? 'withBalance' : 'noBalance'}:${loId ?? 'all'}`,
         async () => {
           try {
+            const baseCollection = collection(db, COLLECTIONS.BANK_ACCOUNTS);
+            const accountsQuery = loId
+              ? query(baseCollection, where('loId', '==', loId))
+              : baseCollection;
+
             if (!includeBalance) {
-              const accountsSnapshot = await getDocs(collection(db, COLLECTIONS.BANK_ACCOUNTS));
+              const accountsSnapshot = await getDocs(accountsQuery);
               return accountsSnapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data(),
@@ -2555,7 +2629,7 @@ export class FinanceService {
             // SYNC-002: fetch accounts first; only scan transactions for accounts that
             // predate the currentBalance field (migration fallback). Once all accounts
             // have currentBalance stored, the transaction scan never runs.
-            const accountsSnapshot = await getDocs(collection(db, COLLECTIONS.BANK_ACCOUNTS));
+            const accountsSnapshot = await getDocs(accountsQuery);
             const accounts = accountsSnapshot.docs.map(doc => ({
               id: doc.id,
               ...doc.data(),
@@ -2611,10 +2685,11 @@ export class FinanceService {
             throw new Error(`Invalid account type: "${accountData.accountType}". Valid values: ${validAccountTypes.join(', ')}`);
           }
 
-          // P1-A: Ensure loId is captured; warn if missing (breaks LO-scoped filtering)
+          // P1-fix: loId is required for LO-scoped filtering (getAllBankAccounts P0-fix).
+          // Reject creation rather than silently allowing an un-filterable account.
           const loId = accountData.loId || null;
           if (!loId) {
-            console.warn('BankAccount created without loId — LO filtering will not work for this account');
+            throw new Error('loId is required when creating a bank account. Set the LO identifier before saving.');
           }
 
           const newAccount = {
@@ -2667,12 +2742,13 @@ export class FinanceService {
     );
   }
 
-  // Delete bank account — guarded: refuses if linked transactions or reconciliation records exist (E03)
+  // Delete bank account — guarded: refuses if linked transactions, reconciliation records,
+  // or payment requests exist (P1-fix: added paymentRequests.claimFromBankAccountId check).
   static async deleteBankAccount(accountId: string): Promise<void> {
     return withDevMode(
       () => { console.log(`[Dev Mode] Mocking delete for bank account ${accountId}`); },
       async () => {
-        const [txSnap, reconcSnap] = await Promise.all([
+        const [txSnap, reconcSnap, prSnap] = await Promise.all([
           getDocs(query(
             collection(db, COLLECTIONS.TRANSACTIONS),
             where('bankAccountId', '==', accountId),
@@ -2683,12 +2759,21 @@ export class FinanceService {
             where('bankAccountId', '==', accountId),
             limit(1)
           )),
+          // P1-fix: also block deletion if any payment requests claim from this account
+          getDocs(query(
+            collection(db, COLLECTIONS.PAYMENT_REQUESTS),
+            where('claimFromBankAccountId', '==', accountId),
+            limit(1)
+          )),
         ]);
         if (!txSnap.empty) {
           throw new Error('Cannot delete a bank account that has linked transactions. Reassign or delete the transactions first.');
         }
         if (!reconcSnap.empty) {
           throw new Error('Cannot delete a bank account that has reconciliation records. Please archive the account instead.');
+        }
+        if (!prSnap.empty) {
+          throw new Error('Cannot delete a bank account that has linked payment requests. Reassign or close those payment requests first.');
         }
         await deleteDoc(doc(db, COLLECTIONS.BANK_ACCOUNTS, accountId));
         invalidateFinanceCache();
@@ -3660,8 +3745,11 @@ export class FinanceService {
               const splits = splitsMap.get(transaction.id!) ?? [];
               for (const split of splits) {
                 markBatch.update(doc(db, COLLECTIONS.TRANSACTION_SPLITS, split.id), {
-                  // E4: persist prevStatus so deleteReconciliation can restore the correct status
-                  prevStatus: split.status,
+                  // E4: persist originalStatus (not prevStatus) so deleteReconciliation can restore
+                  // the correct status. 'prevStatus' is absent from the TRANSACTION_SPLITS hasOnly
+                  // whitelist in firestore.rules — using 'originalStatus' avoids a rules-level block
+                  // (P0-fix for transactionSplits hasOnly whitelist gap).
+                  originalStatus: split.status,
                   status: 'Reconciled',
                   reconciledAt: Timestamp.now(),
                   reconciledBy,
@@ -3746,6 +3834,12 @@ export class FinanceService {
       },
       async () => {
         try {
+          // Fetch the reconciliation doc first to get bankAccountId for field clearing.
+          const reconDocSnap = await getDoc(doc(db, COLLECTIONS.RECONCILIATIONS, reconciliationId));
+          const bankAccountId: string | undefined = reconDocSnap.exists()
+            ? (reconDocSnap.data() as ReconciliationRecord).bankAccountId
+            : undefined;
+
           // E1: roll back transaction statuses FIRST before deleting the reconciliation doc.
           // If rollback fails, the reconciliation doc remains and the user can retry safely.
           const txSnap = await getDocs(
@@ -3755,17 +3849,25 @@ export class FinanceService {
             )
           );
 
+          const BATCH_LIMIT = 500;
+          let rollbackBatch = writeBatch(db);
+          let batchCount = 0;
+          const flushBatch = async () => {
+            if (batchCount > 0) {
+              await rollbackBatch.commit();
+              rollbackBatch = writeBatch(db);
+              batchCount = 0;
+            }
+          };
+
+          // TODO (P2 inter-chunk compensation): if rollback spans >500 transactions, each
+          // intermediate chunk is committed before the reconciliation doc and bankAccount are
+          // cleared. A crash between chunks would leave some transactions rolled back while
+          // others remain 'Reconciled' with no doc to retry from. Full fix requires a two-phase
+          // saga: stamp a 'deleting' sentinel on the reconciliation doc in phase-1, then roll
+          // back transactions in chunks in phase-2 using the sentinel as a restart marker.
+
           if (!txSnap.empty) {
-            const BATCH_LIMIT = 500;
-            let rollbackBatch = writeBatch(db);
-            let batchCount = 0;
-            const flushBatch = async () => {
-              if (batchCount > 0) {
-                await rollbackBatch.commit();
-                rollbackBatch = writeBatch(db);
-                batchCount = 0;
-              }
-            };
             const affectedTxIds: string[] = [];
             for (const txDoc of txSnap.docs) {
               rollbackBatch.update(doc(db, COLLECTIONS.TRANSACTIONS, txDoc.id), {
@@ -3793,7 +3895,9 @@ export class FinanceService {
                 );
                 for (const splitDoc of splitsSnap.docs) {
                   rollbackBatch.update(doc(db, COLLECTIONS.TRANSACTION_SPLITS, splitDoc.id), {
-                    status: splitDoc.data().prevStatus ?? 'Cleared',
+                    // P0-fix: read originalStatus first (written by fixed reconcileBankAccount),
+                    // fall back to prevStatus for documents written by older code versions.
+                    status: splitDoc.data().originalStatus ?? splitDoc.data().prevStatus ?? 'Cleared',
                     reconciliationId: null,
                     reconciledAt: null,
                     reconciledBy: null,
@@ -3803,17 +3907,33 @@ export class FinanceService {
                 }
               }
             }
-
-            // Commit all rollbacks. If this throws, we abort before deleting the reconciliation doc.
-            await flushBatch();
           }
 
-          // All transaction statuses restored — now safe to delete the reconciliation record.
-          await deleteDoc(doc(db, COLLECTIONS.RECONCILIATIONS, reconciliationId));
+          // P1-fix: include reconciliation deletion and bankAccount field clearing in the SAME
+          // final batch as the last chunk of transaction rollbacks — no separate deleteDoc call.
+          rollbackBatch.delete(doc(db, COLLECTIONS.RECONCILIATIONS, reconciliationId));
+          batchCount++;
+          // P1-fix: clear lastReconciled* fields so the account no longer shows a stale date.
+          if (bankAccountId) {
+            rollbackBatch.update(doc(db, COLLECTIONS.BANK_ACCOUNTS, bankAccountId), {
+              lastReconciled: null,
+              lastReconciledAt: null,
+              lastReconciledBy: null,
+              updatedAt: Timestamp.now(),
+            });
+            batchCount++;
+          }
+
+          // Commit all rollbacks + reconciliation deletion atomically.
+          await flushBatch();
 
           invalidateFinanceCache();
         } catch (error) {
           console.error('Error deleting reconciliation:', error);
+          errorLoggingService.logError(
+            error instanceof Error ? error : new Error(String(error)),
+            { component: 'financeService', action: 'deleteReconciliation' }
+          );
           throw error;
         }
       }

@@ -30,8 +30,24 @@ import {
     Badge as UserBadge
 } from '../types';
 import { PointsService } from './pointsService';
+import { apiCache } from './cacheService';
+import { errorLoggingService } from './errorLoggingService';
+
+const BADGES_CACHE_PREFIX = 'gamification:badges:';
+const BADGES_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
 
 export class GamificationService {
+    // === Cache helpers ===
+
+    static invalidateBadgesCache(): void {
+        apiCache.deleteByPrefix(BADGES_CACHE_PREFIX);
+    }
+
+    static invalidateAchievementsCache(): void {
+        // achievements are stored in the same badges collection
+        this.invalidateBadgesCache();
+    }
+
     // === Unified Award Methods ===
 
     /**
@@ -52,6 +68,7 @@ export class GamificationService {
                         updatedAt: Timestamp.now()
                     };
                     const docRef = await addDoc(collection(db, COLLECTIONS.BADGES), data);
+                    GamificationService.invalidateBadgesCache();
                     return docRef.id;
                 } catch (error) {
                     console.error('Error creating award:', error);
@@ -74,6 +91,51 @@ export class GamificationService {
                         updatedAt: Timestamp.now()
                     };
                     await updateDoc(doc(db, COLLECTIONS.BADGES, awardId), data);
+                    GamificationService.invalidateBadgesCache();
+
+                    // P2 fix: when name or icon changes, sync the denormalised UserBadge
+                    // objects stored in each member's badges[] array.
+                    if (awardData.name !== undefined || awardData.icon !== undefined) {
+                        try {
+                            // Find all members who have been awarded this badge
+                            const awardsSnap = await getDocs(
+                                query(
+                                    collection(db, COLLECTIONS.BADGE_AWARDS),
+                                    where('awardId', '==', awardId)
+                                )
+                            );
+                            if (!awardsSnap.empty) {
+                                const memberIds = [...new Set(awardsSnap.docs.map(d => d.data().memberId as string))];
+                                // Batch update member.badges[] — replace old entry with updated one.
+                                // Firestore does not support arrayRemove + arrayUnion by partial match,
+                                // so we read each member doc and rewrite the badges[] array.
+                                const batch = writeBatch(db);
+                                const memberDocs = await Promise.all(
+                                    memberIds.map(mid => getDoc(doc(db, COLLECTIONS.MEMBERS, mid)))
+                                );
+                                for (const memberSnap of memberDocs) {
+                                    if (!memberSnap.exists()) continue;
+                                    const existing: UserBadge[] = memberSnap.data().badges || [];
+                                    const updated = existing.map(b => {
+                                        if (b.id !== awardId) return b;
+                                        return {
+                                            ...b,
+                                            ...(awardData.name !== undefined ? { name: awardData.name } : {}),
+                                            ...(awardData.icon !== undefined ? { icon: awardData.icon } : {}),
+                                        };
+                                    });
+                                    batch.update(memberSnap.ref, { badges: updated, updatedAt: Timestamp.now() });
+                                }
+                                await batch.commit();
+                            }
+                        } catch (syncErr) {
+                            // Non-fatal: log but don't roll back the definition update
+                            errorLoggingService.logError(syncErr as Error, {
+                                action: 'GamificationService.updateAward → sync member badges[]',
+                                additionalData: { awardId },
+                            });
+                        }
+                    }
                 } catch (error) {
                     console.error('Error updating award:', error);
                     throw error;
@@ -94,6 +156,7 @@ export class GamificationService {
                         active: false,
                         updatedAt: Timestamp.now()
                     });
+                    GamificationService.invalidateBadgesCache();
                 } catch (error) {
                     console.error('Error deleting award:', error);
                     throw error;
@@ -110,6 +173,9 @@ export class GamificationService {
         return withDevMode(
             () => this.getMockAwards(),
             async () => {
+                const cacheKey = `${BADGES_CACHE_PREFIX}all`;
+                const cached = apiCache.get<AwardDefinition[]>(cacheKey);
+                if (cached) return cached;
                 try {
                     // We'll use the 'badges' collection as the unified source for all Awards
                     const snapshot = await getDocs(
@@ -120,12 +186,14 @@ export class GamificationService {
                             orderBy('name', 'asc')
                         )
                     );
-                    return snapshot.docs.map(doc => ({
-                        id: doc.id,
-                        ...doc.data(),
-                        createdAt: doc.data().createdAt?.toDate?.() || doc.data().createdAt,
-                        updatedAt: doc.data().updatedAt?.toDate?.() || doc.data().updatedAt,
+                    const result = snapshot.docs.map(d => ({
+                        id: d.id,
+                        ...d.data(),
+                        createdAt: d.data().createdAt?.toDate?.() || d.data().createdAt,
+                        updatedAt: d.data().updatedAt?.toDate?.() || d.data().updatedAt,
                     } as AwardDefinition));
+                    apiCache.set(cacheKey, result, BADGES_CACHE_TTL);
+                    return result;
                 } catch (error) {
                     console.error('Error fetching awards:', error);
                     throw error;
@@ -177,13 +245,16 @@ export class GamificationService {
                         earnedDate: new Date().toISOString()
                     };
 
-                    // P1 Fix: Move the alreadyAwarded check inside a runTransaction so that
-                    // two concurrent calls cannot both see alreadyAwarded=false, build separate
-                    // userBadge objects with different earnedDate values, and both arrayUnion
-                    // them into member.badges — producing duplicate badge entries.
+                    // P1 fix: single runTransaction covers badge-grant + member.badges update
+                    // + points increment, so all three are atomically consistent.
+                    // Previously two separate transactions left a window where the badge
+                    // was committed but points had not yet been credited.
                     let isNewAward = false;
                     await runTransaction(db, async (txn) => {
-                        const existing = await txn.get(badgeAwardRef);
+                        const [existing, memberSnap] = await Promise.all([
+                            txn.get(badgeAwardRef),
+                            txn.get(memberRef),
+                        ]);
                         if (existing.exists()) {
                             // Already awarded — idempotent no-op.
                             return;
@@ -191,16 +262,10 @@ export class GamificationService {
                         isNewAward = true;
                         txn.set(badgeAwardRef, awardData);
                         txn.update(memberRef, { badges: arrayUnion(userBadge), updatedAt: Timestamp.now() });
-                    });
 
-                    // Points reward: use runTransaction so tier is computed from a fresh
-                    // member read AFTER the badge transaction commits, preventing stale-tier
-                    // from a concurrent awardPoints call. (P1 fix)
-                    if (isNewAward && award.pointsReward > 0) {
-                        await runTransaction(db, async (txn) => {
-                            const freshMemberSnap = await txn.get(memberRef);
-                            const currentPoints = freshMemberSnap.exists()
-                                ? (freshMemberSnap.data()?.points || 0)
+                        if (award.pointsReward > 0) {
+                            const currentPoints = memberSnap.exists()
+                                ? (memberSnap.data()?.points || 0)
                                 : 0;
                             const newTier = PointsService.calculateTier(currentPoints + award.pointsReward);
                             txn.update(memberRef, {
@@ -218,7 +283,11 @@ export class GamificationService {
                                 relatedEntityType: 'award',
                                 createdAt: Timestamp.now(),
                             });
-                        });
+                        }
+                    });
+
+                    if (isNewAward) {
+                        GamificationService.invalidateBadgesCache();
                     }
 
                     // Best-effort notification — must not roll back the committed badge
@@ -303,6 +372,20 @@ export class GamificationService {
                 try {
                     await GamificationService.awardAward(award.id, memberId, 'system');
                 } catch (err) {
+                    // P0 fix: when auto-badge award is called from a non-board client,
+                    // Firestore may reject the BADGE_AWARDS write with PERMISSION_DENIED.
+                    // Log with errorLoggingService so failures are visible in the audit log
+                    // rather than silently dropped. Long-term fix: route through a Cloud
+                    // Function with admin SDK so client permissions are irrelevant.
+                    const isPermissionError =
+                        err instanceof Error &&
+                        (err.message.includes('PERMISSION_DENIED') || err.message.includes('Missing or insufficient permissions'));
+                    errorLoggingService.logError(err as Error, {
+                        action: isPermissionError
+                            ? 'checkEligibleBadgesForMember → PERMISSION_DENIED (route through Cloud Function)'
+                            : 'checkEligibleBadgesForMember → awardAward failed',
+                        additionalData: { awardId: award.id, memberId },
+                    });
                     console.error('[checkEligibleBadgesForMember] Failed to award badge', award.id, err);
                 }
             }

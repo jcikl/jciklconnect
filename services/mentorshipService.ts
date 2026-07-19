@@ -18,6 +18,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { MembersService } from './membersService';
+import { apiCache } from './cacheService';
 import { CommunicationService } from './communicationService';
 import { Member, MentorMatch, UserRole } from '../types';
 import { isDevMode, withDevMode } from '../utils/devMode';
@@ -47,7 +48,15 @@ export interface MentorshipStats {
   successRate: number;
 }
 
+const CACHE_PREFIX_MENTOR_MATCHES = 'mentorMatches:';
+
 export class MentorshipService {
+  /** Invalidate all mentorMatches cache entries after any write. */
+  static invalidateMentorMatchesCache(matchId?: string): void {
+    apiCache.deleteByPrefix(CACHE_PREFIX_MENTOR_MATCHES);
+    if (matchId) apiCache.delete(`${CACHE_PREFIX_MENTOR_MATCHES}${matchId}`);
+  }
+
   // Enhanced mentor matching with sophisticated algorithm
   static async findPotentialMentors(
     menteeId: string,
@@ -273,6 +282,10 @@ export class MentorshipService {
           });
           await batch.commit();
 
+          // P1 fix: invalidate caches so stale member data is not served after the write.
+          MembersService.invalidateMembersCache();
+          this.invalidateMentorMatchesCache(matchId);
+
           // Send notifications (fire-and-forget side effect after atomic commit)
           await this.sendMatchNotifications(match, approvedBy);
 
@@ -418,6 +431,10 @@ export class MentorshipService {
             mentorId: deleteField(),
           });
           await batch.commit();
+
+          // P1 fix: invalidate caches after member cross-references are updated.
+          MembersService.invalidateMembersCache();
+          this.invalidateMentorMatchesCache(matchId);
         } catch (error) {
           console.error('Error completing mentorship:', error);
           throw error;
@@ -531,8 +548,54 @@ export class MentorshipService {
             });
           }
           await batch.commit();
+
+          MembersService.invalidateMembersCache();
+          this.invalidateMentorMatchesCache(matchId);
         } catch (error) {
           console.error('Error cancelling mentorship:', error);
+          throw error;
+        }
+      }
+    );
+  }
+
+  /**
+   * P1 fix: Delete a mentor match document and clean up member cross-references atomically.
+   * Firestore rules allow BOARD+ users to delete; the service mirrors that guard via the
+   * batch so member.menteeIds / member.mentorId are always cleaned up in sync.
+   */
+  static async deleteMentorMatch(matchId: string): Promise<void> {
+    return withDevMode(
+      () => { console.log(`[Dev Mode] Would delete mentor match: ${matchId}`); },
+      async () => {
+        try {
+          const matchRef = doc(db, 'mentorMatches', matchId);
+          const matchDoc = await getDoc(matchRef);
+          if (!matchDoc.exists()) {
+            throw new Error('Mentor match not found');
+          }
+          const match = { id: matchDoc.id, ...matchDoc.data() } as MentorMatch;
+
+          const batch = writeBatch(db);
+          // Remove the match document
+          batch.delete(matchRef);
+          // Clean up member cross-references if the match was ever active
+          if (match.mentorId) {
+            batch.update(doc(db, 'members', match.mentorId), {
+              menteeIds: arrayRemove(match.menteeId),
+            });
+          }
+          if (match.menteeId) {
+            batch.update(doc(db, 'members', match.menteeId), {
+              mentorId: deleteField(),
+            });
+          }
+          await batch.commit();
+
+          MembersService.invalidateMembersCache();
+          this.invalidateMentorMatchesCache(matchId);
+        } catch (error) {
+          console.error('Error deleting mentor match:', error);
           throw error;
         }
       }

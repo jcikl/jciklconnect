@@ -25,6 +25,7 @@ import { COLLECTIONS } from '../config/constants';
 import { isDevMode, withDevMode } from '../utils/devMode';
 import { apiCache } from './cacheService';
 import { errorLoggingService } from './errorLoggingService';
+import { PointsService } from './pointsService';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -323,28 +324,26 @@ export class LearningPathsService {
   // ── Write: Progress ─────────────────────────────────────────────────────────
 
   /**
-   * P1 fix: use runTransaction to prevent duplicate progress records
-   * if the user double-clicks "Start". Returns existing doc ID if already started.
+   * P1 fix: use a deterministic doc ID (memberId_pathId) so startLearningPath
+   * can use tx.get() on a single document reference inside the transaction,
+   * giving proper optimistic-lock isolation. The previous approach used
+   * getDocs (a collection query) inside the transaction, which does NOT
+   * participate in Firestore's transaction conflict detection — two concurrent
+   * calls could both observe "no record" and both create duplicate progress docs.
    */
   static async startLearningPath(memberId: string, pathId: string): Promise<string> {
     if (isDevMode()) return 'mock-progress-id';
+    // Deterministic ID: one progress record per (member, path) pair
+    const progressId = `${memberId}_${pathId}`;
+    const progressRef = doc(db, COLLECTIONS.LEARNING_PROGRESS, progressId);
     try {
-      return await runTransaction(db, async (tx) => {
-        // Check for existing progress record
-        const existing = await getDocs(
-          query(
-            collection(db, COLLECTIONS.LEARNING_PROGRESS),
-            where('memberId', '==', memberId),
-            where('pathId', '==', pathId)
-          )
-        );
-        if (!existing.empty) {
-          // Already started — return existing ID
-          return existing.docs[0].id;
+      await runTransaction(db, async (tx) => {
+        const existing = await tx.get(progressRef);
+        if (existing.exists()) {
+          // Already started — idempotent no-op inside the transaction
+          return;
         }
-
-        const newRef = doc(collection(db, COLLECTIONS.LEARNING_PROGRESS));
-        tx.set(newRef, {
+        tx.set(progressRef, {
           memberId,
           pathId,
           currentModuleIndex: 0,
@@ -353,8 +352,8 @@ export class LearningPathsService {
           progress: 0,
           certificateIssued: false,
         });
-        return newRef.id;
       });
+      return progressId;
     } catch (error) {
       errorLoggingService.logError(error as Error, { action: 'LearningPathsService.startLearningPath', userId: memberId, additionalData: { pathId } });
       throw error;
@@ -428,6 +427,28 @@ export class LearningPathsService {
       batch.update(progressRef, updates);
       await batch.commit();
 
+      // P1 fix: award points when the path is completed. This was displayed in the UI
+      // (pointsReward field) but never actually credited to the member.
+      // Runs after the batch so a points failure does not roll back the completion record.
+      if (isCompleted && path.pointsReward > 0) {
+        try {
+          await PointsService.awardPoints(
+            progress.memberId,
+            path.pointsReward,
+            'training',
+            `Completed learning path: ${path.name}`,
+            progressId,
+            'learning_path'
+          );
+        } catch (pointsErr) {
+          errorLoggingService.logError(pointsErr as Error, {
+            action: 'LearningPathsService.updateProgress → awardPoints',
+            userId: progress.memberId,
+            additionalData: { progressId, pathId: progress.pathId },
+          });
+        }
+      }
+
       // Invalidate caches for the member
       this.invalidateProgressCache(progress.memberId);
       if (isCompleted) this.invalidateCertificatesCache(progress.memberId);
@@ -447,6 +468,12 @@ export class LearningPathsService {
    * NOTE: When called from updateProgress the cert doc is written inside the
    * shared writeBatch above — this standalone method is for admin/manual re-issue
    * only and writes its own single-doc batch.
+   *
+   * TODO (P0): Firestore rules restrict CERTIFICATES create to isAdmin() only.
+   * When issueCertificate is called from a member client (via updateProgress writeBatch)
+   * the write is silently rejected. Route certificate creation through a Netlify Function
+   * or Cloud Function that uses the Admin SDK so client permissions are bypassed.
+   * Ref: analysis batch 3 — certificates P0, 2026-07-17.
    */
   static async issueCertificate(memberId: string, pathId: string, pathName: string): Promise<string> {
     if (isDevMode()) return 'mock-cert-id';

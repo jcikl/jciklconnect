@@ -747,6 +747,7 @@ export class AutomationService {
           };
 
           const docRef = await addDoc(collection(db, COLLECTIONS.AUTOMATION_RULES), newRule);
+          cacheService.deleteByPrefix(COLLECTIONS.AUTOMATION_RULES + ':');
           return docRef.id;
         } catch (error) {
           errorLoggingService.logError(error as Error, { action: 'AutomationService.createAutomationRule' });
@@ -762,7 +763,11 @@ export class AutomationService {
       () => { if (process.env.NODE_ENV === 'development') { console.log(`[DEV MODE] Simulating update of automation rule ${ruleId} with updates:`, updates); } },
       async () => {
         try {
-          await updateDoc(doc(db, COLLECTIONS.AUTOMATION_RULES, ruleId), updates);
+          await updateDoc(doc(db, COLLECTIONS.AUTOMATION_RULES, ruleId), {
+            ...updates,
+            updatedAt: serverTimestamp(),
+          });
+          cacheService.deleteByPrefix(COLLECTIONS.AUTOMATION_RULES + ':');
         } catch (error) {
           errorLoggingService.logError(error as Error, { action: 'AutomationService.updateAutomationRule' });
           throw error;

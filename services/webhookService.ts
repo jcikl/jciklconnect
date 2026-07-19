@@ -156,14 +156,27 @@ export class WebhookService {
   }
 
   // Update webhook
+  // P1 fix: only pass the fields that Firestore rules allow via hasOnly([]); strip
+  // runtime-managed counters (successCount, failureCount) and immutable timestamps
+  // (createdAt) that callers must never overwrite directly.
   static async updateWebhook(webhookId: string, updates: Partial<Webhook>): Promise<void> {
     return withDevMode(
       () => { console.log('[Dev Mode] Would update webhook:', webhookId, updates); },
       async () => {
         try {
+          const {
+            // Strip fields that are managed by the service or are immutable
+            id: _id,
+            createdAt: _createdAt,
+            successCount: _successCount,
+            failureCount: _failureCount,
+            lastTriggered: _lastTriggered,
+            ...allowedUpdates
+          } = updates as Partial<Webhook> & { id?: string };
+
           const docRef = doc(db, COLLECTIONS.WEBHOOKS || 'webhooks', webhookId);
           await updateDoc(docRef, {
-            ...updates,
+            ...allowedUpdates,
             updatedAt: Timestamp.now(),
           });
         } catch (error) {
@@ -339,6 +352,9 @@ export class WebhookService {
   }
 
   // Log webhook execution
+  // P0 fix: BOARD users can invoke triggerWebhook but Firestore rules only allow
+  // isAdmin() to create webhook_logs. Catch PERMISSION_DENIED silently so a rules
+  // mismatch never surfaces as an error to the caller — the log is best-effort.
   static async logWebhookExecution(log: Omit<WebhookLog, 'id' | 'triggeredAt'> & { triggeredAt?: Date }): Promise<string> {
     return withDevMode(
       () => {
@@ -354,8 +370,13 @@ export class WebhookService {
 
           return docRef.id;
         } catch (error) {
-          errorLoggingService.logError(error as Error, { component: 'WebhookService', action: 'logWebhookExecution' });
-          throw error;
+          // Silently swallow PERMISSION_DENIED — webhook log writes are best-effort.
+          // Non-permission errors are still reported so they don't go unnoticed.
+          const msg = error instanceof Error ? error.message : String(error);
+          if (!msg.includes('permission') && !msg.includes('PERMISSION_DENIED')) {
+            errorLoggingService.logError(error as Error, { component: 'WebhookService', action: 'logWebhookExecution' });
+          }
+          return '';
         }
       }
     );

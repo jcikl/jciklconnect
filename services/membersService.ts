@@ -42,6 +42,7 @@ import { isDevMode } from '../utils/devMode';
 import { getMYTYear } from '../utils/dateUtils';
 import { apiCache } from './cacheService';
 import { MOCK_MEMBERS } from './mockData';
+import { AuditLogService } from './auditLogService';
 
 const CACHE_KEY_ALL_MEMBERS = 'members:all';
 const CACHE_KEY_LO = (loId: string) => `members:lo:${loId}`;
@@ -881,60 +882,61 @@ export class MembersService {
         throw e;
       }
 
-      // Soft-delete: mark INACTIVE + clean up mentor's menteeIds in one batch (E4 fix)
+      // P1 fix: read ALL dependent docs in parallel BEFORE any writes so the primary write
+      // is a single batch covering soft-delete + mentor cleanup + email release + boardMembers +
+      // bizListings (was previously 3 sequential batches: delete → cleanup → cascade).
       const mentorId: string | undefined = targetDoc.exists()
         ? (targetDoc.data() as Omit<Member, 'id'>).mentorId
         : undefined;
-      // FIX: release the memberEmails uniqueness slot in the same batch as the soft-delete so
-      // the email can be reused (e.g. re-registration) and the old slot does not stay locked forever.
       const targetEmailRaw: string | undefined = targetDoc.exists()
         ? ((targetDoc.data() as any)?.contact?.email || (targetDoc.data() as any)?.email)
         : undefined;
-      const deleteBatch = writeBatch(db);
-      deleteBatch.update(doc(db, COLLECTIONS.MEMBERS, memberId), {
+      const [boardSnap, bizSnap, regSnap, prSnap, notifSnap] = await Promise.all([
+        getDocs(query(collection(db, 'boardMembers'), where('memberId', '==', memberId))),
+        getDocs(query(collection(db, COLLECTIONS.PUBLIC_BUSINESS_LISTINGS), where('memberId', '==', memberId))),
+        getDocs(query(collection(db, COLLECTIONS.EVENT_REGISTRATIONS), where('memberId', '==', memberId))),
+        getDocs(query(collection(db, COLLECTIONS.PAYMENT_REQUESTS), where('memberId', '==', memberId), where('status', 'in', ['pending', 'submitted', 'approved']))),
+        getDocs(query(collection(db, COLLECTIONS.NOTIFICATIONS), where('memberId', '==', memberId))),
+      ]);
+
+      // Primary batch: soft-delete + mentor cleanup + email release + boardMembers + bizListings
+      const primaryBatch = writeBatch(db);
+      primaryBatch.update(doc(db, COLLECTIONS.MEMBERS, memberId), {
         role: 'INACTIVE',
         deletedAt: Timestamp.now(),
         deletedBy: currentUid,
         updatedAt: Timestamp.now(),
       });
       if (mentorId) {
-        deleteBatch.update(doc(db, COLLECTIONS.MEMBERS, mentorId), {
+        primaryBatch.update(doc(db, COLLECTIONS.MEMBERS, mentorId), {
           menteeIds: arrayRemove(memberId),
           updatedAt: Timestamp.now(),
         });
       }
       if (targetEmailRaw) {
         const sanitizedDelEmail = targetEmailRaw.toLowerCase().replace(/[^a-z0-9@.]/g, '_');
-        deleteBatch.delete(doc(db, 'memberEmails', sanitizedDelEmail));
+        primaryBatch.delete(doc(db, 'memberEmails', sanitizedDelEmail));
       }
-      await this.commitWithRetry(deleteBatch);
+      boardSnap.docs.forEach(d => primaryBatch.delete(d.ref));
+      bizSnap.docs.forEach(d => primaryBatch.delete(d.ref));
+      await this.commitWithRetry(primaryBatch);
 
-      const [boardSnap, bizSnap] = await Promise.all([
-        getDocs(query(collection(db, 'boardMembers'), where('memberId', '==', memberId))),
-        getDocs(query(collection(db, COLLECTIONS.PUBLIC_BUSINESS_LISTINGS), where('memberId', '==', memberId))),
-      ]);
-      if (!boardSnap.empty || !bizSnap.empty) {
-        const cleanupBatch = writeBatch(db);
-        boardSnap.docs.forEach(d => cleanupBatch.delete(d.ref));
-        bizSnap.docs.forEach(d => cleanupBatch.delete(d.ref));
-        await this.commitWithRetry(cleanupBatch);
-      }
-
-      // Cascade: soft-cancel eventRegistrations and open paymentRequests (E5 fix)
-      const [regSnap, prSnap] = await Promise.all([
-        getDocs(query(collection(db, COLLECTIONS.EVENT_REGISTRATIONS), where('memberId', '==', memberId))),
-        getDocs(query(collection(db, COLLECTIONS.PAYMENT_REQUESTS), where('memberId', '==', memberId), where('status', 'in', ['pending', 'submitted', 'approved']))),
-      ]);
-      if (!regSnap.empty || !prSnap.empty) {
-        const cascadeOps = [
-          ...regSnap.docs.map(d => ({ ref: d.ref, data: { status: 'cancelled', updatedAt: Timestamp.now() } })),
-          ...prSnap.docs.map(d => ({ ref: d.ref, data: { status: 'memberDeleted', updatedAt: Timestamp.now() } })),
-        ];
-        for (let i = 0; i < cascadeOps.length; i += 400) {
-          const cascadeBatch = writeBatch(db);
-          cascadeOps.slice(i, i + 400).forEach(({ ref, data }) => cascadeBatch.update(ref, data));
-          await this.commitWithRetry(cascadeBatch);
-        }
+      // Cascade batch: soft-cancel eventRegistrations + paymentRequests, delete notifications (P1 fix).
+      // Points, transactions, achievements, badgeAwards, loStarProgress are kept as historical
+      // records — safe because this is a soft-delete (INACTIVE member still exists in Firestore so
+      // memberId references continue to resolve; no orphan risk for read-only history collections).
+      const cascadeOps: Array<{ ref: ReturnType<typeof doc>; data: Record<string, unknown>; op: 'update' | 'delete' }> = [
+        ...regSnap.docs.map(d => ({ ref: d.ref, data: { status: 'cancelled', updatedAt: Timestamp.now() }, op: 'update' as const })),
+        ...prSnap.docs.map(d => ({ ref: d.ref, data: { status: 'memberDeleted', updatedAt: Timestamp.now() }, op: 'update' as const })),
+        ...notifSnap.docs.map(d => ({ ref: d.ref, data: {}, op: 'delete' as const })),
+      ];
+      for (let i = 0; i < cascadeOps.length; i += 400) {
+        const cascadeBatch = writeBatch(db);
+        cascadeOps.slice(i, i + 400).forEach(({ ref, data, op }) => {
+          if (op === 'delete') { cascadeBatch.delete(ref); }
+          else { cascadeBatch.update(ref, data); }
+        });
+        await this.commitWithRetry(cascadeBatch);
       }
 
       logDelete(CACHE_KEY_ALL_MEMBERS, 'membersService.deleteMember');
@@ -1133,6 +1135,14 @@ export class MembersService {
       );
       await this.commitWithRetry(roleBatch);
       this.invalidateMembersCache();
+      // P1-fix: audit role changes — these are high-sensitivity operations.
+      AuditLogService.writeAuditEntry({
+        action: 'UPDATE_MEMBER_ROLE',
+        performedBy: auth?.currentUser?.uid ?? 'unknown',
+        targetCollection: COLLECTIONS.MEMBERS,
+        targetId: memberId,
+        after: { role: newRole },
+      }).catch(err => console.warn('[updateMemberRole] Audit write failed:', err));
     } catch (error) {
       console.error('Error updating member role:', error);
       throw error;

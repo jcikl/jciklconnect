@@ -286,15 +286,22 @@ export class ToyyibService {
 
     let codes: string[] = snap.docs.map(d => d.id);
 
-    // Always include the configured default category code
+    // Always include the configured default category code.
     if (TOYYIB_CONFIG.CATEGORY_CODE && !codes.includes(TOYYIB_CONFIG.CATEGORY_CODE)) {
       codes = [TOYYIB_CONFIG.CATEGORY_CODE, ...codes];
-      // Persist it so future calls don't need to re-seed
-      await ToyyibService.saveCategoryToFirestore({
-        categoryCode: TOYYIB_CONFIG.CATEGORY_CODE,
-        categoryName: 'Default',
-        categoryDescription: '',
-      });
+      // P2 fix: only attempt to seed the default category when the caller has write
+      // access (BOARD/ADMIN). Non-board users cannot write to toyyibCategories per
+      // Firestore rules, so the setDoc would silently fail. We catch + ignore the
+      // error here so non-board users can still read categories.
+      try {
+        await ToyyibService.saveCategoryToFirestore({
+          categoryCode: TOYYIB_CONFIG.CATEGORY_CODE,
+          categoryName: 'Default',
+          categoryDescription: '',
+        });
+      } catch (_seedErr) {
+        // Seed is best-effort; caller may lack write permission — not an error.
+      }
     }
 
     if (codes.length === 0) return [];
@@ -346,7 +353,8 @@ export class ToyyibService {
   static async createCategory(catname: string, catdescription: string, currentUserId?: string): Promise<ToyyibApiCategoryRaw[]> {
     // TODO: Add 'description' field to the ToyyibCategory creation form in UI.
     const result = await proxyCall('createCategory', { catname, catdescription });
-    // Save the new category code to Firestore so getCategories can find it
+    // P1 fix: if the ToyyibPay API succeeds but the Firestore write fails, log the
+    // orphaned category code so it can be manually recovered via importCategory().
     if (Array.isArray(result) && result[0]?.CategoryCode) {
       const cat: Omit<ToyyibCategory, 'createdAt'> & { createdBy?: string } = {
         categoryCode: result[0].CategoryCode,
@@ -354,7 +362,20 @@ export class ToyyibService {
         categoryDescription: catdescription,
       };
       if (currentUserId) cat.createdBy = currentUserId;
-      await ToyyibService.saveCategoryToFirestore(cat);
+      try {
+        await ToyyibService.saveCategoryToFirestore(cat);
+      } catch (firestoreError) {
+        // ToyyibPay category already created — log orphan code for manual recovery.
+        // Use importCategory(categoryCode) to re-link it to Firestore.
+        errorLoggingService.logError(firestoreError as Error, {
+          action: 'ToyyibService.createCategory.saveCategoryToFirestore',
+          additionalData: {
+            orphanedCategoryCode: result[0].CategoryCode,
+            recovery: `Call ToyyibService.importCategory("${result[0].CategoryCode}") to re-link`,
+          },
+        });
+        // Still return the API result so the UI can show the new category code
+      }
     }
     return result;
   }
@@ -386,6 +407,23 @@ export class ToyyibService {
   }
 
   static async deleteCategory(categoryCode: string): Promise<void> {
+    // P1 fix: block deletion if active (non-failed) bills still reference this category.
+    // Deleting a category while bills are in flight would make those payment records
+    // unrecoverable — the category name and details would be permanently lost.
+    const activeBillsSnap = await getDocs(
+      query(
+        collection(db, COLLECTIONS.TOYYIB_BILLS),
+        where('categoryCode', '==', categoryCode),
+        where('billpaymentStatus', '!=', '3'), // 3 = failed/cancelled
+        limit(1)
+      )
+    );
+    if (!activeBillsSnap.empty) {
+      throw new Error(
+        `Cannot delete category "${categoryCode}": it has active bills. ` +
+        'Wait for all bills to be settled or cancelled first.'
+      );
+    }
     await deleteDoc(doc(db, COLLECTIONS.TOYYIB_CATEGORIES, categoryCode));
   }
 
@@ -484,16 +522,32 @@ export class ToyyibService {
     }
     if (match) {
       const billRef = doc(db, COLLECTIONS.TOYYIB_BILLS, match.id);
-      await runTransaction(db, async (txn) => {
-        const freshSnap = await txn.get(billRef);
-        if (!freshSnap.exists()) return;
-        const existingStatus = String(freshSnap.data().billpaymentStatus ?? '2');
-        const existingPriority = STATUS_PRIORITY[existingStatus] ?? 0;
-        const incomingPriority = STATUS_PRIORITY[billpaymentStatus] ?? 0;
-        if (incomingPriority >= existingPriority) {
-          txn.update(billRef, { billpaymentStatus, billPaymentDate });
+      // P1 FIX: allow update on toyyibBills is Board-only in Firestore rules.
+      // Non-board callers (members checking their own bill status) would get a permission-denied
+      // error from the runTransaction.  We catch the error and degrade gracefully — the status
+      // has already been read from the ToyyibPay API and is returned to the caller regardless.
+      // Board/admin callers (and the Netlify webhook) succeed as before and persist the update.
+      try {
+        await runTransaction(db, async (txn) => {
+          const freshSnap = await txn.get(billRef);
+          if (!freshSnap.exists()) return;
+          const existingStatus = String(freshSnap.data().billpaymentStatus ?? '2');
+          const existingPriority = STATUS_PRIORITY[existingStatus] ?? 0;
+          const incomingPriority = STATUS_PRIORITY[billpaymentStatus] ?? 0;
+          if (incomingPriority >= existingPriority) {
+            txn.update(billRef, { billpaymentStatus, billPaymentDate, updatedAt: serverTimestamp() });
+          }
+        });
+      } catch (updateErr: any) {
+        // permission-denied is expected for non-board users — silently skip the write.
+        // Any other error is unexpected and should be logged.
+        if (updateErr?.code !== 'permission-denied') {
+          errorLoggingService.logError(
+            updateErr instanceof Error ? updateErr : new Error(String(updateErr)),
+            { component: 'toyyibService', action: 'syncBillStatus.update', additionalData: { billCode } }
+          );
         }
-      });
+      }
     }
     return { billpaymentStatus, billPaymentDate };
   }
@@ -724,5 +778,43 @@ export class ToyyibService {
       orderId: data.order_id,
       message: data.msg
     };
+  }
+
+  /**
+   * P1 FIX: Atomic rollback path for payment reversals (billpaymentStatus='3').
+   *
+   * Previously the webhook handler wrote the bill's refundTransactionId and the
+   * transaction reversal as two separate awaits — if the second write failed the bill
+   * would show refundTransactionId but the income transaction would remain active.
+   *
+   * This helper combines both writes in a single writeBatch so they succeed or fail
+   * together.  Call it from the Netlify callback function instead of two separate
+   * updateDoc/update calls.
+   *
+   * @param billDocId      Firestore document ID of the toyyibBills record
+   * @param transactionRef Firestore DocumentReference of the income Transaction to void
+   * @param refundTransactionId  ID of the new reversal transaction (already created)
+   */
+  static async commitWebhookRollback(
+    billDocId: string,
+    transactionDocId: string,
+    refundTransactionId: string
+  ): Promise<void> {
+    const rollbackBatch = writeBatch(db);
+
+    rollbackBatch.update(doc(db, COLLECTIONS.TOYYIB_BILLS, billDocId), {
+      billpaymentStatus: '3',
+      refundTransactionId,
+      refundedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    rollbackBatch.update(doc(db, COLLECTIONS.TRANSACTIONS, transactionDocId), {
+      status: 'voided',
+      voidedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    await rollbackBatch.commit();
   }
 }

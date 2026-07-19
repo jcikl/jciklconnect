@@ -195,6 +195,8 @@ export class InventoryService {
       await batch.commit();
       InventoryService.invalidateInventoryCache(itemId);
       InventoryService.invalidateMovementsCache(itemId);
+      InventoryService.invalidateAlertsCache(); // P2 FIX: alerts and schedules deleted in cascade batch
+      InventoryService.invalidateMaintenanceCache();
     } catch (error) {
       errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'deleteItem' });
       throw error;
@@ -349,10 +351,17 @@ export class InventoryService {
   }
 
   // Generate alerts for low stock and maintenance
-  static async generateAlerts(): Promise<void> {
+  // P0 FIX: restrict to BOARD+ callers; callerRole is required in production
+  static async generateAlerts(callerRole?: string): Promise<void> {
     return withDevMode(
       () => { console.log('[DEV MODE] Generating inventory alerts'); },
       async () => {
+    // P0 FIX: only BOARD, ADMIN, or SUPER_ADMIN may generate alerts
+    const ALLOWED_ROLES = ['BOARD', 'ADMIN', 'SUPER_ADMIN'];
+    if (!callerRole || !ALLOWED_ROLES.includes(callerRole.toUpperCase())) {
+      throw new Error('Only board members or administrators can generate inventory alerts');
+    }
+
     type NewAlert = { itemId: string; type: string; severity: string; message: string };
     const newAlerts: NewAlert[] = [];
 
@@ -937,8 +946,8 @@ export class InventoryService {
       const scheduleRef = doc(collection(db, COLLECTIONS.MAINTENANCE_SCHEDULES));
       batch.set(scheduleRef, {
         ...schedule,
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       });
       // Sync nextMaintenanceDate on the inventory item so it stays current
       if (schedule.itemId && schedule.scheduledDate) {
@@ -968,18 +977,28 @@ export class InventoryService {
       async () => {
     try {
       const docRef = doc(db, COLLECTIONS.MAINTENANCE_SCHEDULES, scheduleId);
-      // Read the schedule first so we can invalidate the linked item's cache
+      // Read the schedule first so we can sync nextMaintenanceDate and invalidate caches
       const scheduleSnap = await getDoc(docRef);
-      const existingItemId = scheduleSnap.exists()
-        ? (scheduleSnap.data() as MaintenanceSchedule).itemId
-        : updates.itemId;
-      await updateDoc(docRef, {
+      const existingData = scheduleSnap.exists() ? (scheduleSnap.data() as MaintenanceSchedule) : null;
+      const itemId = existingData?.itemId ?? updates.itemId;
+
+      // P1 FIX: use writeBatch to atomically sync inventoryItems.nextMaintenanceDate when scheduledDate changes
+      const batch = writeBatch(db);
+      batch.update(docRef, {
         ...updates,
-        updatedAt: Timestamp.now()
+        updatedAt: Timestamp.now(),
       });
+      if (itemId && updates.scheduledDate !== undefined) {
+        const inventoryItemRef = doc(db, COLLECTIONS.INVENTORY, itemId);
+        batch.update(inventoryItemRef, {
+          nextMaintenanceDate: updates.scheduledDate,
+          updatedAt: serverTimestamp(),
+        });
+      }
+      await batch.commit();
       InventoryService.invalidateMaintenanceCache();
-      if (existingItemId) {
-        InventoryService.invalidateInventoryCache(existingItemId);
+      if (itemId) {
+        InventoryService.invalidateInventoryCache(itemId);
       }
     } catch (error) {
       errorLoggingService.logError(error as Error, { component: 'InventoryService', action: 'updateMaintenanceSchedule' });
@@ -1001,45 +1020,47 @@ export class InventoryService {
       }
       const schedule = scheduleSnap.data() as MaintenanceSchedule;
       const now = Timestamp.now();
-      const completedDate = new Date().toISOString();
+      // P1 FIX: renamed completedDate → completedAt to match Firestore rules hasOnly whitelist
+      const completedAt = now;
 
-      // Query open maintenance alerts for this item before starting the batch
+      // Query open (unacknowledged) maintenance alerts for this item before starting the batch
+      // P1 FIX: query on 'acknowledged' field only (Firestore rules hasOnly allows acknowledged/acknowledgedBy/acknowledgedAt)
       const openAlertsSnap = await getDocs(query(
         collection(db, COLLECTIONS.INVENTORY_ALERTS),
         where('itemId', '==', schedule.itemId),
         where('type', '==', 'Maintenance Due'),
-        where('resolved', '==', false),
-      )).catch(() =>
-        // If the resolved field doesn't exist on old docs, fall back to unacknowledged alerts
-        getDocs(query(
-          collection(db, COLLECTIONS.INVENTORY_ALERTS),
-          where('itemId', '==', schedule.itemId),
-          where('type', '==', 'Maintenance Due'),
-          where('acknowledged', '==', false),
-        ))
-      );
+        where('acknowledged', '==', false),
+      ));
 
       const batch = writeBatch(db);
       batch.update(scheduleRef, {
         status: 'Completed',
-        completedDate,
+        completedAt,
         notes: notes ?? deleteField(),
         updatedAt: now,
       });
       // Sync lastCheckedAt on the inventory item so it reflects the latest maintenance
       const itemRef = doc(db, COLLECTIONS.INVENTORY, schedule.itemId);
       batch.update(itemRef, {
-        lastCheckedAt: completedDate,
+        lastCheckedAt: completedAt,
         updatedAt: now,
       });
-      // Resolve related maintenance alerts atomically in the same batch
-      openAlertsSnap.docs.forEach(alertDoc => {
-        batch.update(alertDoc.ref, {
-          resolved: true,
-          resolvedAt: serverTimestamp(),
-        });
-      });
       await batch.commit();
+
+      // P1 FIX: resolve related maintenance alerts in a SEPARATE batch using only
+      // acknowledged/acknowledgedBy/acknowledgedAt fields (the hasOnly whitelist for alerts).
+      // This must not be in the same batch as schedule/item updates to avoid whitelist conflicts.
+      if (openAlertsSnap.docs.length > 0) {
+        const alertBatch = writeBatch(db);
+        openAlertsSnap.docs.forEach(alertDoc => {
+          alertBatch.update(alertDoc.ref, {
+            acknowledged: true,
+            acknowledgedBy: 'system',
+            acknowledgedAt: serverTimestamp(),
+          });
+        });
+        await alertBatch.commit();
+      }
       InventoryService.invalidateMaintenanceCache();
       InventoryService.invalidateInventoryCache(schedule.itemId);
       if (openAlertsSnap.docs.length > 0) {
@@ -1073,8 +1094,8 @@ export class InventoryService {
   }
 
   // Check and generate alerts
-  static async checkAndGenerateAlerts(): Promise<void> {
-    return await this.generateAlerts();
+  static async checkAndGenerateAlerts(callerRole?: string): Promise<void> {
+    return await this.generateAlerts(callerRole);
   }
 
   // Update item depreciation

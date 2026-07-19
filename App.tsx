@@ -66,6 +66,7 @@ const KnowledgeView = lazy(() => import('./components/modules/KnowledgeView').th
 const CommunicationView = lazy(() => import('./components/modules/CommunicationView').then(m => ({ default: m.CommunicationView })));
 const HobbyClubsView = lazy(() => import('./components/modules/HobbyClubsView').then(m => ({ default: m.HobbyClubsView })));
 const SurveysView = lazy(() => import('./components/modules/SurveysView').then(m => ({ default: m.SurveysView })));
+const ElectionsView = lazy(() => import('./components/modules/ElectionsView').then(m => ({ default: m.ElectionsView })));
 const MemberBenefitsView = lazy(() => import('./components/modules/MemberBenefitsView').then(m => ({ default: m.MemberBenefitsView })));
 const DataImportExportView = lazy(() => import('./components/modules/DataImportExportView').then(m => ({ default: m.DataImportExportView })));
 const AdvertisementsView = lazy(() => import('./components/modules/AdvertisementsView').then(m => ({ default: m.AdvertisementsView })));
@@ -768,6 +769,9 @@ export const JCIKLApp: React.FC = () => {
       case 'SURVEYS':
         if (member?.role === UserRole.INACTIVE) return dashboardFallback;
         return wrapEB(<SurveysView searchQuery={searchQuery} />, '问卷');
+      case 'ELECTIONS':
+        if (member?.role === UserRole.INACTIVE) return dashboardFallback;
+        return wrapEB(<ElectionsView searchQuery={searchQuery} />, '选举');
       case 'BENEFITS':
         // GUEST sees Benefits with MembersOnlyOverlay mask; INACTIVE is a hard block.
         if (member?.role === UserRole.INACTIVE) return dashboardFallback;

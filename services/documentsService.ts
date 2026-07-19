@@ -4,18 +4,20 @@ import {
   doc,
   getDoc,
   getDocs,
-  addDoc,
   updateDoc,
   query,
   where,
   orderBy,
   Timestamp,
   writeBatch,
+  runTransaction,
 } from 'firebase/firestore';
+import { getStorage, ref as storageRef, deleteObject } from 'firebase/storage';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { withDevMode } from '../utils/devMode';
 import { apiCache } from './cacheService';
+import { errorLoggingService } from './errorLoggingService';
 import { Document } from '../types';
 
 const CACHE_KEY_ALL_DOCUMENTS = 'documents:all';
@@ -197,35 +199,41 @@ export class DocumentsService {
       () => Promise.resolve('mock-doc-id'),
       async () => {
         const now = Timestamp.now();
-        const batch = writeBatch(db);
+        try {
+          const batch = writeBatch(db);
 
-        // New document ref
-        const docRef = doc(collection(db, COLLECTIONS.DOCUMENTS));
-        batch.set(docRef, {
-          ...documentData,
-          uploadedDate: now,
-          createdAt: now,
-          updatedAt: now,
-        });
+          // New document ref
+          const docRef = doc(collection(db, COLLECTIONS.DOCUMENTS));
+          batch.set(docRef, {
+            ...documentData,
+            uploadedDate: now,
+            createdAt: now,
+            updatedAt: now,
+            latestVersionNumber: 1, // initialise atomic version counter
+          });
 
-        // Initial version ref
-        const versionRef = doc(collection(db, COLLECTIONS.DOCUMENT_VERSIONS));
-        batch.set(versionRef, {
-          documentId: docRef.id,
-          version: 1,
-          fileName,
-          fileUrl,
-          fileSize,
-          mimeType,
-          uploadedBy,
-          changeLog: changeLog || 'Initial version',
-          isCurrent: true,
-          uploadedAt: now,
-        });
+          // Initial version ref
+          const versionRef = doc(collection(db, COLLECTIONS.DOCUMENT_VERSIONS));
+          batch.set(versionRef, {
+            documentId: docRef.id,
+            version: 1,
+            fileName,
+            fileUrl,
+            fileSize,
+            mimeType,
+            uploadedBy,
+            changeLog: changeLog || 'Initial version',
+            isCurrent: true,
+            uploadedAt: now,
+          });
 
-        await batch.commit();
-        this.invalidateDocumentsCache(docRef.id);
-        return docRef.id;
+          await batch.commit();
+          this.invalidateDocumentsCache(docRef.id);
+          return docRef.id;
+        } catch (error) {
+          errorLoggingService.logError(error as Error, { component: 'DocumentsService', action: 'createDocument' });
+          throw error;
+        }
       }
     );
   }
@@ -238,31 +246,36 @@ export class DocumentsService {
     return withDevMode<string>(
       () => Promise.resolve('mock-version-id'),
       async () => {
-        const existingVersions = await this.getDocumentVersions(documentId);
-        const now = Timestamp.now();
-        const batch = writeBatch(db);
+        try {
+          const existingVersions = await this.getDocumentVersions(documentId);
+          const now = Timestamp.now();
+          const batch = writeBatch(db);
 
-        // Mark all current versions as not current
-        for (const v of existingVersions) {
-          if (v.isCurrent && v.id) {
-            batch.update(doc(db, COLLECTIONS.DOCUMENT_VERSIONS, v.id), { isCurrent: false });
+          // Mark all current versions as not current
+          for (const v of existingVersions) {
+            if (v.isCurrent && v.id) {
+              batch.update(doc(db, COLLECTIONS.DOCUMENT_VERSIONS, v.id), { isCurrent: false });
+            }
           }
+
+          // New version doc
+          const versionRef = doc(collection(db, COLLECTIONS.DOCUMENT_VERSIONS));
+          batch.set(versionRef, {
+            ...versionData,
+            documentId,
+            uploadedAt: now,
+          });
+
+          // Update parent updatedAt
+          batch.update(doc(db, COLLECTIONS.DOCUMENTS, documentId), { updatedAt: now });
+
+          await batch.commit();
+          this.invalidateDocumentsCache(documentId);
+          return versionRef.id;
+        } catch (error) {
+          errorLoggingService.logError(error as Error, { component: 'DocumentsService', action: 'createDocumentVersion' });
+          throw error;
         }
-
-        // New version doc
-        const versionRef = doc(collection(db, COLLECTIONS.DOCUMENT_VERSIONS));
-        batch.set(versionRef, {
-          ...versionData,
-          documentId,
-          uploadedAt: now,
-        });
-
-        // Update parent updatedAt
-        batch.update(doc(db, COLLECTIONS.DOCUMENTS, documentId), { updatedAt: now });
-
-        await batch.commit();
-        this.invalidateDocumentsCache(documentId);
-        return versionRef.id;
       }
     );
   }
@@ -272,38 +285,69 @@ export class DocumentsService {
     return withDevMode<void>(
       () => Promise.resolve(),
       async () => {
-        const docRef = doc(db, COLLECTIONS.DOCUMENTS, documentId);
-        await updateDoc(docRef, {
-          ...updates,
-          updatedAt: Timestamp.now(),
-        });
-        this.invalidateDocumentsCache(documentId);
+        try {
+          const docRef = doc(db, COLLECTIONS.DOCUMENTS, documentId);
+          await updateDoc(docRef, {
+            ...updates,
+            updatedAt: Timestamp.now(),
+          });
+          this.invalidateDocumentsCache(documentId);
+        } catch (error) {
+          errorLoggingService.logError(error as Error, { component: 'DocumentsService', action: 'updateDocument' });
+          throw error;
+        }
       }
     );
   }
 
   // Delete document — batch-delete all versions + parent in one commit
+  // P1 fix: also delete Storage files for each version before removing Firestore docs
   static async deleteDocument(documentId: string): Promise<void> {
     return withDevMode<void>(
       () => Promise.resolve(),
       async () => {
-        const versions = await this.getDocumentVersions(documentId);
-        const batch = writeBatch(db);
+        try {
+          const versions = await this.getDocumentVersions(documentId);
 
-        for (const version of versions) {
-          if (version.id) {
-            batch.delete(doc(db, COLLECTIONS.DOCUMENT_VERSIONS, version.id));
+          // Delete Storage files first (failures are logged but do not abort Firestore cleanup)
+          const storage = getStorage();
+          await Promise.all(
+            versions
+              .filter(v => v.fileUrl)
+              .map(v =>
+                deleteObject(storageRef(storage, v.fileUrl)).catch(storageErr =>
+                  errorLoggingService.logError(storageErr as Error, {
+                    component: 'DocumentsService',
+                    action: 'deleteDocument:storage',
+                    context: `fileUrl=${v.fileUrl}`,
+                  })
+                )
+              )
+          );
+
+          // Batch-delete all Firestore version docs + the parent document
+          const batch = writeBatch(db);
+          for (const version of versions) {
+            if (version.id) {
+              batch.delete(doc(db, COLLECTIONS.DOCUMENT_VERSIONS, version.id));
+            }
           }
-        }
-        batch.delete(doc(db, COLLECTIONS.DOCUMENTS, documentId));
+          batch.delete(doc(db, COLLECTIONS.DOCUMENTS, documentId));
 
-        await batch.commit();
-        this.invalidateDocumentsCache(documentId);
+          await batch.commit();
+          this.invalidateDocumentsCache(documentId);
+        } catch (error) {
+          errorLoggingService.logError(error as Error, { component: 'DocumentsService', action: 'deleteDocument' });
+          throw error;
+        }
       }
     );
   }
 
   // Restore previous version — delegates to createDocumentVersion (already batched)
+  // P1 fix: use runTransaction to atomically claim the next version number via a
+  // latestVersionNumber counter on the parent document, preventing duplicate version
+  // numbers when two restoreVersion calls race concurrently.
   static async restoreVersion(
     documentId: string,
     versionId: string,
@@ -313,25 +357,48 @@ export class DocumentsService {
     return withDevMode<string>(
       () => Promise.resolve('mock-version-id'),
       async () => {
-        const versionDoc = await getDoc(doc(db, COLLECTIONS.DOCUMENT_VERSIONS, versionId));
-        if (!versionDoc.exists()) {
-          throw new Error('Version not found');
+        try {
+          const docRef = doc(db, COLLECTIONS.DOCUMENTS, documentId);
+          const versionDocRef = doc(db, COLLECTIONS.DOCUMENT_VERSIONS, versionId);
+
+          let nextVersion = 1;
+          let versionData: DocumentVersion;
+
+          // Atomically claim the next version slot on the parent document
+          await runTransaction(db, async (tx) => {
+            const [parentSnap, versionSnap] = await Promise.all([
+              tx.get(docRef),
+              tx.get(versionDocRef),
+            ]);
+
+            if (!parentSnap.exists()) throw new Error('Document not found');
+            if (!versionSnap.exists()) throw new Error('Version not found');
+
+            versionData = versionSnap.data() as DocumentVersion;
+
+            // latestVersionNumber is an atomic counter we maintain for races like this.
+            // Fall back to 0 for legacy documents that pre-date this field.
+            const currentMax: number = parentSnap.data().latestVersionNumber || 0;
+            nextVersion = currentMax + 1;
+
+            // Reserve the slot — createDocumentVersion will write the actual version doc
+            tx.update(docRef, { latestVersionNumber: nextVersion });
+          });
+
+          return this.createDocumentVersion(documentId, {
+            version: nextVersion,
+            fileName: versionData!.fileName,
+            fileUrl: versionData!.fileUrl,
+            fileSize: versionData!.fileSize,
+            mimeType: versionData!.mimeType,
+            uploadedBy,
+            changeLog: changeLog || `Restored from version ${versionData!.version}`,
+            isCurrent: true,
+          });
+        } catch (error) {
+          errorLoggingService.logError(error as Error, { component: 'DocumentsService', action: 'restoreVersion' });
+          throw error;
         }
-
-        const versionData = versionDoc.data() as DocumentVersion;
-        const existingVersions = await this.getDocumentVersions(documentId);
-        const nextVersion = Math.max(...existingVersions.map(v => v.version)) + 1;
-
-        return this.createDocumentVersion(documentId, {
-          version: nextVersion,
-          fileName: versionData.fileName,
-          fileUrl: versionData.fileUrl,
-          fileSize: versionData.fileSize,
-          mimeType: versionData.mimeType,
-          uploadedBy,
-          changeLog: changeLog || `Restored from version ${versionData.version}`,
-          isCurrent: true,
-        });
       }
     );
   }

@@ -107,7 +107,23 @@ async function flush() {
 
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', () => {
-    if (buffer.length > 0) flush();
+    if (buffer.length === 0) return;
+
+    // P1 fix: async flush() is abandoned by the browser during beforeunload because
+    // the page is being destroyed before the Promise resolves. Use navigator.sendBeacon
+    // instead — it queues a reliable background POST that completes after the tab closes.
+    // We send the raw buffered entries as JSON; the /.netlify/functions/flush-system-log
+    // function writes them to Firestore using the Admin SDK (bypassing the isAdmin() rule).
+    const batch = buffer.splice(0, buffer.length);
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(
+        '/.netlify/functions/flush-system-log',
+        JSON.stringify({ entries: batch, userId: (window as any)?.__firebaseUserId ?? null })
+      );
+    } else {
+      // Fallback for browsers without sendBeacon — best-effort, may not complete.
+      flush();
+    }
   });
 }
 

@@ -27,6 +27,7 @@ import { MOCK_PAYMENT_REQUESTS } from './mockData';
 import { FinanceService, invalidateFinanceCache } from './financeService';
 import { projectFinancialService } from './projectFinancialService';
 import { errorLoggingService } from './errorLoggingService';
+import { AuditLogService } from './auditLogService';
 
 /** Board positions authorised to approve/reject PRs (情景 25) */
 const APPROVER_BOARD_TITLES = ['President', 'Secretary', 'Honorary Treasurer'];
@@ -462,6 +463,15 @@ export class PaymentRequestService {
           const pr = { id: snap2.id, ...snap2.data() } as PaymentRequest;
           await this._notifyApplicant(pr, status, rejectionReason);
         }
+
+        // P1-fix: audit approve/reject — these are finance-critical operations.
+        AuditLogService.writeAuditEntry({
+          action: status === 'approved' ? 'APPROVE_PAYMENT_REQUEST' : 'REJECT_PAYMENT_REQUEST',
+          performedBy: reviewedBy,
+          targetCollection: COLLECTIONS.PAYMENT_REQUESTS,
+          targetId: id,
+          after: { status, ...(rejectionReason ? { rejectionReason } : {}) },
+        }).catch(err => console.warn('[updateStatus] Audit write failed:', err));
       }
     );
   }

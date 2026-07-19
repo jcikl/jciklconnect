@@ -32,6 +32,7 @@ export interface ErrorContext {
   component?: string;
   action?: string;
   userId?: string;
+  context?: string;
   additionalData?: Record<string, any>;
 }
 

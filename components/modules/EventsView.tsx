@@ -399,7 +399,8 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
         getDocs(query(collection(db, COLLECTIONS.GUEST_REGISTRATIONS), where('eventId', '==', event.id))),
       ]);
       // Map guestRegistrations docs → EventRegistration shape
-      const guestEntries: EventRegistration[] = guestSnap.docs.map((d) => {
+      // P0 FIX: exclude phone-index sentinel docs (they have _indexFor field and are not real registrations)
+      const guestEntries: EventRegistration[] = guestSnap.docs.filter(d => !d.data()['_indexFor']).map((d) => {
         const data = d.data();
         return {
           id: `guest-${d.id}`,

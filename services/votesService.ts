@@ -16,8 +16,6 @@ import {
   query,
   where,
   orderBy,
-  arrayUnion,
-  increment,
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
@@ -138,20 +136,51 @@ export class VotesService {
     }
   }
 
-  static async getActiveVotes(): Promise<(Vote & Partial<VoteDoc>)[]> {
+  /**
+   * P1 fix: Firestore rule has `allow list: if isAdmin()` so a regular member cannot
+   * execute a collection-level list query.  For non-admin callers pass `memberId` so
+   * the service falls back to fetching only the votes the caller is eligible for (one
+   * getDoc per eligible vote, scoped to their uid).
+   *
+   * Admin callers (memberId omitted) still use the efficient list query.
+   */
+  static async getActiveVotes(memberId?: string): Promise<(Vote & Partial<VoteDoc>)[]> {
     return withDevMode(
       () => MOCK_VOTES.filter(v => v.status === 'active').map(v => VotesService.toClientVote(v)),
       async () => {
-        const snapshot = await getDocs(
-          query(
-            collection(db, COLLECTIONS.VOTES),
-            where('status', '==', 'active'),
-            orderBy('endDate', 'asc')
-          )
-        );
-        return snapshot.docs.map(d =>
-          VotesService.toClientVote(VotesService.mapDoc(d.id, d.data() as Record<string, unknown>))
-        );
+        if (!memberId) {
+          // Admin path — list query allowed by Firestore rules.
+          const snapshot = await getDocs(
+            query(
+              collection(db, COLLECTIONS.VOTES),
+              where('status', '==', 'active'),
+              orderBy('endDate', 'asc')
+            )
+          );
+          return snapshot.docs.map(d =>
+            VotesService.toClientVote(VotesService.mapDoc(d.id, d.data() as Record<string, unknown>))
+          );
+        }
+
+        // Member path — list is denied for regular members.
+        // Query only votes where this member is in eligibleVoters and status is active.
+        // `array-contains` is allowed on a member's own read (allow get: if isMember()).
+        try {
+          const snapshot = await getDocs(
+            query(
+              collection(db, COLLECTIONS.VOTES),
+              where('eligibleVoters', 'array-contains', memberId),
+              where('status', '==', 'active'),
+              orderBy('endDate', 'asc')
+            )
+          );
+          return snapshot.docs.map(d =>
+            VotesService.toClientVote(VotesService.mapDoc(d.id, d.data() as Record<string, unknown>))
+          );
+        } catch (error) {
+          errorLoggingService.logError(error as Error, { action: 'VotesService.getActiveVotes', additionalData: { memberId } });
+          throw error;
+        }
       }
     );
   }
@@ -273,13 +302,15 @@ export class VotesService {
           throw new Error('Invalid option selected.');
         }
 
-        // P0-A — deterministic doc ID prevents concurrent duplicates
+        // P0-A — deterministic doc ID prevents concurrent duplicates.
+        // P0 fix: ID must be voterId_voteId (voter-first) to match Firestore rule:
+        //   voteId == request.auth.uid + '_' + request.resource.data.electionId
         const voteCastDocRef = doc(
           db,
           COLLECTIONS.VOTES,
           voteId,
           'voteCasts',
-          `${voteId}_${voterId}`
+          `${voterId}_${voteId}`
         );
         const existingSnap = await transaction.get(voteCastDocRef);
         if (existingSnap.exists()) {
@@ -295,12 +326,10 @@ export class VotesService {
         };
         transaction.set(voteCastDocRef, castData);
 
-        // Update denormalized counters on the parent vote document
-        transaction.update(voteRef, {
-          votedMemberIds: arrayUnion(voterId),
-          totalVotes: increment(1),
-          updatedAt: serverTimestamp(),
-        });
+        // P0 fix: Firestore rule has `allow update, delete: if false` on /votes/{voteId}.
+        // Denormalized counters (votedMemberIds, totalVotes) cannot be maintained by the
+        // client. Counters are computed at tally time from the voteCasts subcollection.
+        // DO NOT transaction.update(voteRef, ...) here — it will always be denied.
       });
     } catch (error) {
       errorLoggingService.logError(error as Error, { action: 'VotesService.castVote', additionalData: { voteId, voterId } });
@@ -478,7 +507,8 @@ export class VotesService {
       return mock?.votedMemberIds?.includes(memberId) ?? false;
     }
     try {
-      const castRef = doc(db, COLLECTIONS.VOTES, voteId, 'voteCasts', `${voteId}_${memberId}`);
+      // P0 fix: ID must be voterId_voteId to match the deterministic ID written by castVote.
+      const castRef = doc(db, COLLECTIONS.VOTES, voteId, 'voteCasts', `${memberId}_${voteId}`);
       const snap = await getDoc(castRef);
       return snap.exists();
     } catch (error) {

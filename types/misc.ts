@@ -106,10 +106,13 @@ export interface HobbyClub {
   nextActivity?: string;
   activities?: ClubActivity[];
   lead: string;
+  leadId?: string;  // UID of the club lead — written on creation, used to guard leaveClub
   image: string;
   memberIds?: string[];
   description?: string;
   whatsappUrl?: string;
+  capacity?: number;   // Optional maximum member count enforced by joinClub
+  isDeleted?: boolean; // Soft-delete flag; getAllClubs filters these out
 }
 
 export interface TrainingModule {

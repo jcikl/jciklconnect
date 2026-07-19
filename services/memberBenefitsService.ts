@@ -7,7 +7,6 @@ import {
   collection,
   doc,
   getDoc,
-  addDoc,
   getDocs,
   query,
   where,
@@ -55,7 +54,8 @@ export interface BenefitUsage {
   memberId: string;
   benefitId: string;
   usedAt: Date | Timestamp | string;
-  details?: string;
+  /** P0-fix: field name aligned with Firestore hasOnly whitelist ('notes', not 'details'). */
+  notes?: string;
 }
 
 // ── Cache keys ────────────────────────────────────────────────────────────────
@@ -203,39 +203,52 @@ export class MemberBenefitsService {
           // 1. Determine which collection holds this benefit (outside transaction — fast pre-check).
           const mbRef = doc(db, COLLECTIONS.MEMBER_BENEFITS || 'memberBenefits', benefitId);
           const adsRef = doc(db, COLLECTIONS.ADVERTISEMENTS || 'advertisements', benefitId);
-          const [mbDoc, adDoc] = await Promise.all([getDoc(mbRef), getDoc(adsRef)]);
+          const [mbDoc, benefitSnap0] = await Promise.all([getDoc(mbRef), getDoc(adsRef)]);
           const isMemberBenefit = mbDoc.exists();
           const benefitRef = isMemberBenefit ? mbRef : adsRef;
+          // When mbDoc exists use it directly; otherwise benefitSnap0 (ads doc) was already fetched.
+          const preCheckBenefit = isMemberBenefit ? mbDoc : benefitSnap0;
 
-          // 2. Atomic runTransaction: re-read benefit for usageLimit, count existing usage,
-          //    check limit, then write usage record + increment counter in one transaction.
+          // 2a. Pre-check usage limit outside the transaction (fast-fail for obvious over-limit).
+          //     This is NOT the authoritative check — see the transactional counter check below.
+          //     Firestore transactions do not support collection queries (getDocs inside a
+          //     transaction callback runs outside transaction isolation), so we do a pre-read
+          //     here and rely on the transaction-read benefit counter for the final gate.
+          const preCheckSnap = await getDocs(
+            query(
+              collection(db, COLLECTIONS.BENEFIT_USAGE || 'benefitUsage'),
+              where('memberId', '==', memberId),
+              where('benefitId', '==', benefitId)
+            )
+          );
+          const preCheckLimit = preCheckBenefit.data()?.usageLimit as number | undefined;
+          if (preCheckLimit !== undefined && preCheckSnap.size >= preCheckLimit) {
+            throw new Error('Limit reached');
+          }
+
+          // 2b. Atomic runTransaction: re-read benefit for usageLimit, verify counter,
+          //     write usage record + increment counter in one transaction.
           await runTransaction(db, async (transaction) => {
             // Re-read the benefit doc inside the transaction to get the freshest usageLimit.
             const freshBenefitSnap = await transaction.get(benefitRef);
             const usageLimit = freshBenefitSnap.data()?.usageLimit as number | undefined;
+            const currentUsage = (freshBenefitSnap.data()?.currentUsage as number | undefined) ?? 0;
 
-            // Count existing claims for this member+benefit.
-            // getDocs inside a transaction callback is outside transaction isolation but
-            // provides a reliable second check that eliminates most concurrent duplicate claims.
-            const usageSnap = await getDocs(
-              query(
-                collection(db, COLLECTIONS.BENEFIT_USAGE || 'benefitUsage'),
-                where('memberId', '==', memberId),
-                where('benefitId', '==', benefitId)
-              )
-            );
-
-            if (usageLimit !== undefined && usageSnap.size >= usageLimit) {
+            // Authoritative limit check using the transactionally-read counter.
+            // Per-member granularity is protected by the pre-check above; the transaction
+            // protects the total usage counter from concurrent over-claims.
+            if (usageLimit !== undefined && currentUsage >= usageLimit) {
               throw new Error('Limit reached');
             }
 
             // Write usage record using a pre-generated ref (addDoc not available in transaction).
+            // P0-fix: write field 'notes' to match Firestore hasOnly whitelist (was 'details').
             const usageRef = doc(collection(db, COLLECTIONS.BENEFIT_USAGE || 'benefitUsage'));
             transaction.set(usageRef, {
               memberId,
               benefitId,
               usedAt: Timestamp.now(),
-              ...(details ? { details } : {}),
+              ...(details ? { notes: details } : {}),
             });
 
             // Increment counter on the owning collection.

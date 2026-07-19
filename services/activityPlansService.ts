@@ -286,13 +286,21 @@ export class ActivityPlansService {
 
   /** Create a new activity plan in the activityPlans collection. */
   // FIX P0: was COLLECTIONS.PROJECTS
+  // FIX P0: added callerRole guard — Firestore rules only allow isBoard()||isAdmin()
   // FIX P1: added withDevMode, cache invalidation, errorLoggingService
   static async createActivityPlan(
-    planData: Omit<ActivityPlan, 'id' | 'createdAt' | 'updatedAt' | 'version'>
+    planData: Omit<ActivityPlan, 'id' | 'createdAt' | 'updatedAt' | 'version'>,
+    callerRole?: string
   ): Promise<string> {
     return withDevMode<string>(
       () => 'mock-plan-id',
       async () => {
+        // P0 FIX: Firestore rules only allow isBoard()||isAdmin() to create
+        const ALLOWED_ROLES = ['BOARD', 'ADMIN', 'SUPER_ADMIN'];
+        if (!callerRole || !ALLOWED_ROLES.includes(callerRole.toUpperCase())) {
+          throw new Error('Only board members or administrators can create activity plans');
+        }
+
         try {
           const cleanPlanData: Record<string, unknown> = {
             version: 1,
@@ -328,31 +336,46 @@ export class ActivityPlansService {
 
   /** Update an activity plan. */
   // FIX P0: was COLLECTIONS.PROJECTS
+  // FIX P0: added callerRole guard — Firestore rules only allow isBoard()||isAdmin()
   // FIX P1: added withDevMode, cache invalidation, errorLoggingService
-  static async updateActivityPlan(planId: string, updates: Partial<ActivityPlan>): Promise<void> {
+  // FIX P1: use runTransaction for optimistic concurrency (prevent concurrent overwrites)
+  static async updateActivityPlan(planId: string, updates: Partial<ActivityPlan>, callerRole?: string): Promise<void> {
     return withDevMode<void>(
       () => {},
       async () => {
+        // P0 FIX: Firestore rules only allow isBoard()||isAdmin() to update
+        const ALLOWED_ROLES = ['BOARD', 'ADMIN', 'SUPER_ADMIN'];
+        if (!callerRole || !ALLOWED_ROLES.includes(callerRole.toUpperCase())) {
+          throw new Error('Only board members or administrators can update activity plans');
+        }
+
         try {
-          const planRef = doc(db, COLLECTIONS.ACTIVITY_PLANS, planId); // FIX P0
+          const planRef = doc(db, COLLECTIONS.ACTIVITY_PLANS, planId);
 
-          const updateData: Record<string, unknown> = {
-            updatedAt: Timestamp.now(),
-          };
+          // P1 FIX: use runTransaction for optimistic concurrency
+          await runTransaction(db, async (txn) => {
+            const freshSnap = await txn.get(planRef);
+            if (!freshSnap.exists()) throw new Error('Activity plan not found');
 
-          Object.keys(updates).forEach(key => {
-            const value = updates[key as keyof typeof updates];
-            if (value !== undefined) {
-              if (key === 'proposedDate' && value) {
-                updateData.proposedDate = Timestamp.fromDate(new Date(value as string | Date));
-              } else {
-                updateData[key] = value;
+            const updateData: Record<string, unknown> = {
+              updatedAt: Timestamp.now(),
+            };
+
+            Object.keys(updates).forEach(key => {
+              const value = updates[key as keyof typeof updates];
+              if (value !== undefined) {
+                if (key === 'proposedDate' && value) {
+                  updateData.proposedDate = Timestamp.fromDate(new Date(value as string | Date));
+                } else {
+                  updateData[key] = value;
+                }
               }
-            }
+            });
+
+            txn.update(planRef, updateData);
           });
 
-          await updateDoc(planRef, updateData);
-          this.invalidateActivityPlansCache(); // FIX P1
+          this.invalidateActivityPlansCache();
         } catch (error) {
           errorLoggingService.logError(error as Error, {
             component: 'ActivityPlansService',

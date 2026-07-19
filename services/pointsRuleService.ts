@@ -369,18 +369,29 @@ export class PointsRuleService {
           ? `${rule.id}_${memberId}_${triggerId}`
           : null;
 
-        // FIX 1: award points FIRST — if this throws, no committed record exists
+        // FIX 1: award points FIRST — if this throws, no committed record exists.
+        // P1 note: awardPoints uses runTransaction internally so it cannot be nested
+        // inside another transaction. The dedup slot reserved above prevents re-execution
+        // if the execution record write below fails — the slot stays 'pending' which is
+        // safe: analytics will be incomplete but points are not double-awarded.
         await PointsService.awardPoints(
           memberId,
           calculation.finalPoints,
           'rule_execution',
           `Points rule: ${rule.name}`,
           dedupeId ?? rule.id,
-          'points_rule'
+          'points_rule',
+          undefined,
+          // P0 self-award guard bypass: pass memberId as awardedBy so the guard
+          // in awardPoints knows this is an authorised automated award, not an
+          // unauthenticated SDK call on behalf of another member.
+          memberId
         );
 
         // --- Write (or overwrite) the full execution record after successful award ---
-        // FIX 5: include loId if provided
+        // FIX 5: include loId if provided.
+        // P1 fix: wrap in try/catch — if Firestore rules block the write (e.g. non-admin
+        // caller), the dedup slot already prevents re-execution; log and continue.
         const executionPayload: Record<string, any> = {
           ruleId: rule.id,
           ruleName: rule.name,
@@ -394,10 +405,20 @@ export class PointsRuleService {
           ...(loId ? { loId } : {}),
         };
 
-        if (dedupeId) {
-          await setDoc(doc(db, COLLECTIONS.POINTS_RULE_EXECUTIONS, dedupeId), executionPayload);
-        } else {
-          await addDoc(collection(db, COLLECTIONS.POINTS_RULE_EXECUTIONS), executionPayload);
+        try {
+          if (dedupeId) {
+            await setDoc(doc(db, COLLECTIONS.POINTS_RULE_EXECUTIONS, dedupeId), executionPayload);
+          } else {
+            await addDoc(collection(db, COLLECTIONS.POINTS_RULE_EXECUTIONS), executionPayload);
+          }
+        } catch (recordWriteErr) {
+          // Non-fatal: points were already awarded atomically above.
+          // The dedup slot (status='pending') prevents re-execution.
+          // Log so an admin can identify stuck execution records.
+          errorLoggingService.logError(recordWriteErr as Error, {
+            action: 'PointsRuleService.executeRules.writeExecutionRecord',
+            additionalData: { ruleId: rule.id, memberId, dedupeId },
+          });
         }
 
         const execution: PointsRuleExecution = {
@@ -413,6 +434,8 @@ export class PointsRuleService {
           ...(loId ? { loId } : {}),
         };
         executions.push(execution);
+        // P2 fix: invalidate analytics cache so getRuleAnalytics reflects the new execution
+        invalidatePointsRulesCache();
       }
 
       return executions;

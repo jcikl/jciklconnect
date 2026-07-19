@@ -313,19 +313,22 @@ export class ProjectsService {
           }
 
           // P1 FIX: fetch orphan collections linked to this project.
-          const [txSnap, tasksSnap, reportsSnap, plansSnap] = await Promise.all([
+          const [txSnap, tasksSnap, reportsSnap, plansSnap, projectTrxSnap] = await Promise.all([
             // Clear projectId from bank transactions (unlink, not delete)
             getDocs(query(collection(db, COLLECTIONS.TRANSACTIONS), where('projectId', '==', projectId))),
             // Hard-delete tasks, projectReports, and activityPlans that belong to this project.
             getDocs(query(collection(db, COLLECTIONS.TASKS), where('projectId', '==', projectId))),
             getDocs(query(collection(db, COLLECTIONS.PROJECT_REPORTS), where('projectId', '==', projectId))),
-            getDocs(query(collection(db, COLLECTIONS.ACTIVITY_PLANS), where('projectId', '==', projectId))),
+            // P1 FIX: ActivityPlan uses parentProjectId (not projectId) for its project link
+            getDocs(query(collection(db, COLLECTIONS.ACTIVITY_PLANS), where('parentProjectId', '==', projectId))),
+            // P1 FIX: hard-delete projectTrx (project financial ledger) entries
+            getDocs(query(collection(db, COLLECTIONS.PROJECT_TRANSACTIONS), where('projectId', '==', projectId))),
           ]);
 
           // Atomically delete the project, unlink transactions, and remove orphan docs.
           const BATCH_SIZE = 490;
           const now = Timestamp.now();
-          const orphanDeleteDocs = [...tasksSnap.docs, ...reportsSnap.docs, ...plansSnap.docs];
+          const orphanDeleteDocs = [...tasksSnap.docs, ...reportsSnap.docs, ...plansSnap.docs, ...projectTrxSnap.docs];
           const allBatchOps: Array<{ type: 'delete' | 'update'; ref: import('firebase/firestore').DocumentReference; data?: Record<string, unknown> }> = [
             { type: 'delete', ref: projectRef },
             ...txSnap.docs.map(d => ({ type: 'update' as const, ref: d.ref, data: { projectId: null, updatedAt: now } })),
@@ -688,8 +691,53 @@ export class ProjectsService {
           } else {
             await updateDoc(taskRef, updateData);
           }
+
+          // P1 FIX: always invalidate project cache after any task update
+          this.invalidateProjectsCache();
+
+          // P1 FIX: after any status change, recalculate project completion percentage
+          if (updates.status !== undefined && mergedTask.projectId) {
+            try {
+              await this.updateProjectCompletion(mergedTask.projectId);
+            } catch (completionErr) {
+              // Non-fatal: completion percentage is derived data; log but don't fail the task update
+              console.warn('[updateTask] updateProjectCompletion failed (non-fatal):', completionErr);
+            }
+          }
         } catch (error) {
           console.error('Error updating task:', error);
+          throw error;
+        }
+      }
+    );
+  }
+
+  // Delete a task by ID and update project completion
+  static async deleteTask(taskId: string, projectId?: string): Promise<void> {
+    return withDevMode(
+      () => {},
+      async () => {
+        try {
+          const taskRef = doc(db, COLLECTIONS.TASKS, taskId);
+          // Fetch task to get projectId if not provided
+          if (!projectId) {
+            const snap = await getDoc(taskRef);
+            if (snap.exists()) {
+              projectId = (snap.data() as Task).projectId;
+            }
+          }
+          await deleteDoc(taskRef);
+          this.invalidateProjectsCache();
+          // P1 FIX: update project completion after task deletion
+          if (projectId) {
+            try {
+              await this.updateProjectCompletion(projectId);
+            } catch (completionErr) {
+              console.warn('[deleteTask] updateProjectCompletion failed (non-fatal):', completionErr);
+            }
+          }
+        } catch (error) {
+          console.error('Error deleting task:', error);
           throw error;
         }
       }

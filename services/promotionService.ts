@@ -581,8 +581,14 @@ export class PromotionService {
 
     // Fix 10 (P1): notification failure must not make the caller believe the promotion failed —
     // the batch already committed successfully above.
+    // P2 fix: update notificationSent=true on the promotionHistory doc after success.
     try {
       await this.sendPromotionNotification(promotion);
+      if (!isDevMode()) {
+        await updateDoc(promotionRef, { notificationSent: true }).catch(err =>
+          console.warn('[promoteToOfficialMember] Failed to set notificationSent=true:', err)
+        );
+      }
     } catch (notificationErr) {
       errorLoggingService.logError(
         notificationErr instanceof Error ? notificationErr : new Error(String(notificationErr)),
@@ -972,6 +978,12 @@ export class PromotionService {
       if (!snap.exists()) throw new Error(`Manual promotion request ${requestId} not found`);
       const requestData = { ...snap.data(), id: requestId } as ManualPromotionRequest;
 
+      // P0 fix: validate status is 'pending' before approving — prevents double-approval and
+      // re-promoting an already-promoted member when the same request is submitted twice.
+      if (requestData.status !== 'pending') {
+        throw new Error(`Cannot approve request with status '${requestData.status}' — only 'pending' requests can be approved`);
+      }
+
       // Pass requestId so the request status update is included in the same writeBatch
       // inside promoteToOfficialMember — making member promotion and request approval atomic.
       await this.promoteToOfficialMember(requestData.memberId, approvedBy, 'manual', undefined, requestId);
@@ -984,17 +996,33 @@ export class PromotionService {
   /**
    * Reject a manual promotion request with a reason.
    */
-  static async rejectManualPromotionRequest(requestId: string, reason: string): Promise<void> {
+  static async rejectManualPromotionRequest(requestId: string, reason: string, rejectedBy?: string): Promise<void> {
     if (isDevMode()) {
       console.log('Dev: rejectManualPromotionRequest skipped');
       return;
     }
     try {
       const requestRef = doc(db, COLLECTIONS.MANUAL_PROMOTION_REQUESTS, requestId);
-      await updateDoc(requestRef, {
+
+      // P1 fix: pre-check status so we don't reject an already-actioned request
+      const snap = await getDoc(requestRef);
+      if (!snap.exists()) throw new Error(`Manual promotion request ${requestId} not found`);
+      const currentStatus = (snap.data() as ManualPromotionRequest).status;
+      if (currentStatus !== 'pending') {
+        throw new Error(`Cannot reject request with status '${currentStatus}' — only 'pending' requests can be rejected`);
+      }
+
+      // P1 fix: write rejectedBy + rejectedAt alongside status + rejectionReason
+      const now = Timestamp.now();
+      const rejectBatch = writeBatch(db);
+      rejectBatch.update(requestRef, {
         status: 'rejected',
         rejectionReason: reason,
+        ...(rejectedBy ? { rejectedBy } : {}),
+        rejectedAt: now,
+        updatedAt: now,
       });
+      await rejectBatch.commit();
     } catch (error) {
       errorLoggingService.logError(error as Error, { component: 'rejectManualPromotionRequest', additionalData: { requestId } });
       throw error;

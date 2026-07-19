@@ -17,6 +17,7 @@ import {
   orderBy,
   Timestamp,
   writeBatch,
+  arrayRemove,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
@@ -52,10 +53,12 @@ export class KnowledgeService {
             const snapshot = await getDocs(
               query(collection(db, COLLECTIONS.TRAINING_MODULES), orderBy('title', 'asc'))
             );
-            return snapshot.docs.map(d => ({
-              id: d.id,
-              ...d.data(),
-            } as TrainingModule));
+            return snapshot.docs
+              .filter(d => !d.data().isDeleted)
+              .map(d => ({
+                id: d.id,
+                ...d.data(),
+              } as TrainingModule));
           } catch (error) {
             errorLoggingService.logError(error as Error, { action: 'KnowledgeService.getAllTrainingModules' });
             throw error;
@@ -126,6 +129,52 @@ export class KnowledgeService {
   }
 
   /**
+   * Soft-delete a training module and remove its ID from any learning paths that
+   * reference it. Hard-deleting would leave learningPaths.modules arrays with
+   * stale IDs, causing progress calculations to break.
+   *
+   * P1 fix: method was entirely missing — added here.
+   */
+  static async deleteTrainingModule(moduleId: string): Promise<void> {
+    if (isDevMode()) {
+      console.log(`[DEV MODE] deleteTrainingModule: ${moduleId}`);
+      return;
+    }
+    try {
+      // Find all learning paths that include this module
+      const pathsSnap = await getDocs(
+        query(
+          collection(db, COLLECTIONS.LEARNING_PATHS),
+          where('modules', 'array-contains', moduleId)
+        )
+      );
+
+      const batch = writeBatch(db);
+
+      // Soft-delete the module document
+      batch.update(doc(db, COLLECTIONS.TRAINING_MODULES, moduleId), {
+        isDeleted: true,
+        deletedAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      });
+
+      // Remove the module ID from every referencing learning path
+      pathsSnap.docs.forEach(d =>
+        batch.update(d.ref, {
+          modules: arrayRemove(moduleId),
+          updatedAt: Timestamp.now(),
+        })
+      );
+
+      await batch.commit();
+      this.invalidateTrainingModulesCache();
+    } catch (error) {
+      errorLoggingService.logError(error as Error, { action: 'KnowledgeService.deleteTrainingModule', additionalData: { moduleId } });
+      throw error;
+    }
+  }
+
+  /**
    * Mark a specific module as complete for a member.
    *
    * Completion state is per-member — it is stored in LEARNING_PROGRESS, NOT on the
@@ -142,6 +191,11 @@ export class KnowledgeService {
         COLLECTIONS.LEARNING_PROGRESS,
         `${memberId}_modules_${moduleId}`
       );
+
+      // Guard: skip if already marked complete to prevent double-awarding points
+      const existing = await getDoc(progressRef);
+      if (existing.exists() && existing.data().completionStatus === 'Completed') return;
+
       const batch = writeBatch(db);
       batch.set(progressRef, {
         memberId,
@@ -152,6 +206,67 @@ export class KnowledgeService {
       }, { merge: true });
       await batch.commit();
       // No training-modules cache to invalidate — this is in LEARNING_PROGRESS
+
+      // P1 fix: award points if module has a pointsReward > 0
+      const moduleSnap = await getDoc(doc(db, COLLECTIONS.TRAINING_MODULES, moduleId));
+      if (moduleSnap.exists()) {
+        const moduleData = moduleSnap.data() as TrainingModule;
+        if (moduleData.pointsReward && moduleData.pointsReward > 0) {
+          const { PointsService } = await import('./pointsService');
+          await PointsService.awardPoints(
+            memberId,
+            moduleData.pointsReward,
+            'training',
+            `Completed training module: ${moduleData.title}`,
+            moduleId,
+            'trainingModule'
+          ).catch(err =>
+            errorLoggingService.logError(err as Error, {
+              action: 'KnowledgeService.markModuleComplete.awardPoints',
+              additionalData: { memberId, moduleId },
+            })
+          );
+        }
+      }
+
+      // P1 fix: check if all modules in any learning path containing this module are
+      // now complete, and trigger certificate issuance if so.
+      const pathsSnap = await getDocs(
+        query(
+          collection(db, COLLECTIONS.LEARNING_PATHS),
+          where('modules', 'array-contains', moduleId),
+          where('status', '==', 'Active')
+        )
+      );
+
+      if (!pathsSnap.empty) {
+        const completions = await this.getMemberModuleCompletions(
+          memberId,
+          // Gather all unique module IDs across matching paths
+          [...new Set(pathsSnap.docs.flatMap(d => (d.data().modules || []) as string[]))]
+        );
+
+        for (const pathDoc of pathsSnap.docs) {
+          const path = pathDoc.data();
+          const pathModules: string[] = path.modules || [];
+          const allDone = pathModules.length > 0 &&
+            pathModules.every(id => completions[id] === 'Completed');
+
+          if (allDone && path.certificateIssued) {
+            const { LearningPathsService } = await import('./learningPathsService');
+            await LearningPathsService.issueCertificate(
+              memberId,
+              pathDoc.id,
+              path.name || ''
+            ).catch(err =>
+              errorLoggingService.logError(err as Error, {
+                action: 'KnowledgeService.markModuleComplete.issueCertificate',
+                additionalData: { memberId, pathId: pathDoc.id },
+              })
+            );
+          }
+        }
+      }
     } catch (error) {
       errorLoggingService.logError(error as Error, { action: 'KnowledgeService.markModuleComplete', additionalData: { memberId, moduleId } });
       throw error;
