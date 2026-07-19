@@ -136,16 +136,20 @@ service cloud.firestore {
       );
 
       // 2. Create/Update/Delete Access
-      // Self-registration (GUEST): field whitelist prevents self-assigning elevated role or
-      // writing sensitive fields (jciCareer, points, transactionId, etc.) on creation.
-      // Board/Admin-created members: isBoard() bypass allows all fields.
+      // Self-registration (GUEST): only new users (doc must not already exist) may self-create
+      // with a GUEST-role doc and a strict field whitelist. This prevents existing MEMBER/INACTIVE
+      // users from overwriting their own doc to reset their role.
+      // Board/Admin-created members: isBoard() bypass allows all fields (including bulk import).
+      // Bulk import (ADMIN+ in UI) is additionally restricted at the service/function layer since
+      // Firestore rules cannot distinguish a single write from a batch loop.
       allow create: if isAuthenticated() &&
-                       (request.auth.uid == memberId || isBoard()) &&
                        request.resource.data.name is string &&
                        request.resource.data.email is string &&
                        request.resource.data.role is string &&
                        (isBoard() ||
-                        (request.resource.data.get('role', 'GUEST') == 'GUEST' &&
+                        (request.auth.uid == memberId &&
+                         !exists(/databases/$(database)/documents/members/$(memberId)) &&
+                         request.resource.data.get('role', 'GUEST') == 'GUEST' &&
                          request.resource.data.keys().hasOnly([
                            'email', 'name', 'displayName', 'photoURL', 'photoUrl',
                            'createdAt', 'role', 'status', 'loId',
@@ -153,10 +157,12 @@ service cloud.firestore {
                          ])));
 
       // Self-write: members may update any profile field EXCEPT the locked list below.
+      // INACTIVE users are blocked from self-write at the rules layer (not just service layer).
       // GUEST may also set nationality/dob/idNumber; once promoted to MEMBER+ those three are locked.
       // BOARD+ edits: senatorshipId is immutable once board-validated; only Admin can override (E2 fix).
       allow update: if isAuthenticated() && (
         (request.auth.uid == memberId &&
+         resource.data.get('role', 'GUEST') != 'INACTIVE' &&
          // E8 fix: require required fields are always present so self-write cannot delete name/email
          request.resource.data.keys().hasAll(['name', 'email']) &&
          !request.resource.data.diff(resource.data).affectedKeys().hasAny([
