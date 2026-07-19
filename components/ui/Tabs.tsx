@@ -68,7 +68,7 @@ export const Tabs: React.FC<TabsProps> = ({
     </div>
   ) : mobileFallback === 'pill' ? (
     <div className="md:hidden mb-3">
-      <div className="inline-flex bg-slate-100 rounded-full p-1 gap-1 w-full" role="tablist">
+      <div className="flex bg-slate-100 border border-slate-200/50 rounded-xl p-1 gap-1.5 w-full" role="tablist">
         {normalized.map(t => (
           <button
             key={t.id}
@@ -76,7 +76,7 @@ export const Tabs: React.FC<TabsProps> = ({
             role="tab"
             aria-selected={activeTab === t.id}
             onClick={() => onTabChange(t.id)}
-            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${activeTab === t.id ? 'bg-jci-blue text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all duration-200 ${activeTab === t.id ? 'bg-jci-blue text-white shadow-sm border border-slate-200/20' : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'}`}
           >
             {t.icon && <span className="shrink-0">{t.icon}</span>}
             {t.shortLabel ?? t.label}
