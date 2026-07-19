@@ -123,9 +123,9 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       { label: 'Address', done: !!(member.contact?.address ?? member.address) },
       { label: 'Emergency contact', done: !!(member.contact?.emergency?.name ?? member.emergencyContactName ?? member.emergencyContact) },
       { label: 'Apparel & Items', done: !!(member.others?.tshirtSize && member.others?.shirtStyle) || !!(member.tshirtSize && member.shirtStyle) },
-      { label: 'Company website', done: !!(member.business?.companyWebsite ?? (member as any).companyWebsite) },
-      { label: 'International business', done: !!(member.business?.acceptInternationalBusiness ?? (member as any).acceptInternationalBusiness) },
-      { label: 'Level of management', done: !!(member.business?.levelOfManagement ?? (member as any).levelOfManagement) },
+      { label: 'Company website', done: !!member.business?.companyWebsite },
+      { label: 'International business', done: !!member.business?.acceptInternationalBusiness },
+      { label: 'Level of management', done: !!member.business?.levelOfManagement },
     ];
     const done = checks.filter(c => c.done).length;
     const pct = Math.round((done / checks.length) * 100);
