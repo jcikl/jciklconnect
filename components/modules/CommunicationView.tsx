@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Send, Megaphone, Edit, Trash2, Bell, ChevronDown, ChevronUp } from 'lucide-react';
+import { Send, Megaphone, Edit, Trash2, Bell } from 'lucide-react';
 import { Card, Button, Badge, Modal, useToast, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
 import type { ConfirmState } from '../ui/Common';
 import { LoadingState } from '../ui/Loading';
@@ -26,7 +26,7 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
     const [isPosting, setIsPosting] = useState(false);
     const [isAnnouncementModalOpen, setIsAnnouncementModalOpen] = useState(false);
     const [selectedAnnouncement, setSelectedAnnouncement] = useState<NewsPost | null>(null);
-    const [notifExpanded, setNotifExpanded] = useState(false);
+    const [mobileTab, setMobileTab] = useState<'announcements' | 'notifications'>('announcements');
 
     const { posts, notifications, loading, error, createPost, markNotificationAsRead } = useCommunication();
     const { member } = useAuth();
@@ -50,47 +50,46 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
     return (
         <div className="space-y-4 sm:space-y-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-2xl font-bold text-slate-900">Communication Hub</h2>
-                    <p className="text-slate-500 text-sm mt-0.5">Announcements from the board</p>
-                </div>
-                {unreadCount > 0 && (
-                    <Badge variant="error" className="text-xs">{unreadCount} unread</Badge>
-                )}
+            <div>
+                <h2 className="text-2xl font-bold text-slate-900">Communication Hub</h2>
+                <p className="text-slate-500 text-sm mt-0.5">Announcements from the board</p>
             </div>
 
-            {/* Mobile-only notifications panel */}
+            {/* Mobile pill tabs — hidden on desktop */}
             <div className="lg:hidden">
-                <button
-                    onClick={() => setNotifExpanded(v => !v)}
-                    className="w-full flex items-center justify-between px-4 py-3 bg-white border border-slate-200 rounded-xl shadow-sm text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-                >
-                    <div className="flex items-center gap-2">
-                        <Bell size={16} className="text-slate-500" />
-                        <span>Notifications</span>
+                <div className="inline-flex bg-slate-100 rounded-full p-1 gap-1 w-full">
+                    <button
+                        onClick={() => setMobileTab('announcements')}
+                        className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-4 rounded-full text-sm font-medium transition-all ${
+                            mobileTab === 'announcements'
+                                ? 'bg-white text-slate-900 shadow-sm'
+                                : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                    >
+                        <Megaphone size={14} />
+                        Announcements
+                    </button>
+                    <button
+                        onClick={() => setMobileTab('notifications')}
+                        className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-4 rounded-full text-sm font-medium transition-all ${
+                            mobileTab === 'notifications'
+                                ? 'bg-white text-slate-900 shadow-sm'
+                                : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                    >
+                        <Bell size={14} />
+                        Notifications
                         {unreadCount > 0 && (
-                            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-jci-blue text-white text-[10px] font-bold">{unreadCount}</span>
+                            <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-jci-blue text-white text-[9px] font-bold leading-none">{unreadCount}</span>
                         )}
-                    </div>
-                    {notifExpanded ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
-                </button>
-                {notifExpanded && (
-                    <div className="mt-2 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-                        <NotificationsList
-                            notifications={notifications}
-                            loading={loading}
-                            error={error}
-                            onRead={markNotificationAsRead}
-                        />
-                    </div>
-                )}
+                    </button>
+                </div>
             </div>
 
             {/* Main grid */}
             <div className="grid lg:grid-cols-3 gap-4 lg:gap-6">
-                {/* Announcements column */}
-                <div className="lg:col-span-2">
+                {/* Announcements column — always on desktop, tab-controlled on mobile */}
+                <div className={`lg:col-span-2 ${mobileTab !== 'announcements' ? 'hidden lg:block' : ''}`}>
                     <Card noPadding>
                         <div className="divide-y divide-slate-100">
                             {/* Compose */}
@@ -180,9 +179,9 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
                     </Card>
                 </div>
 
-                {/* Sidebar — desktop only */}
-                <div className="hidden lg:block">
-                    <div className="sticky top-4 space-y-4">
+                {/* Sidebar — mobile tab panel + desktop sticky sidebar */}
+                <div className={`lg:block ${mobileTab !== 'notifications' ? 'hidden lg:block' : ''}`}>
+                    <div className="lg:sticky lg:top-4 space-y-4">
                         <Card>
                             <div className="flex items-center justify-between mb-3">
                                 <h3 className="font-semibold text-slate-900 text-sm">Notifications</h3>
@@ -190,7 +189,7 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
                                     <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-jci-blue text-white text-[10px] font-bold">{unreadCount} new</span>
                                 )}
                             </div>
-                            <div className="max-h-96 overflow-y-auto -mx-4 px-4">
+                            <div className="max-h-[60vh] lg:max-h-96 overflow-y-auto -mx-4 px-4">
                                 <NotificationsList
                                     notifications={notifications}
                                     loading={loading}
