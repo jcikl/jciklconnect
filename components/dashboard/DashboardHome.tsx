@@ -1404,9 +1404,9 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         const contactCount = missing.filter(f => contactLabels.includes(f.label)).length;
         const professionalCount = missing.filter(f => professionalLabels.includes(f.label)).length;
         const profileTabs = [
-          { id: 'basic', label: 'Basic Info', badge: basicCount > 0 ? <span className="ml-1 bg-amber-500 text-white text-[9px] font-black rounded-full px-1.5 py-0.5 leading-none">{basicCount}</span> : undefined },
-          { id: 'contact', label: 'Contact', badge: contactCount > 0 ? <span className="ml-1 bg-amber-500 text-white text-[9px] font-black rounded-full px-1.5 py-0.5 leading-none">{contactCount}</span> : undefined },
-          { id: 'professional', label: 'Professional', badge: professionalCount > 0 ? <span className="ml-1 bg-amber-500 text-white text-[9px] font-black rounded-full px-1.5 py-0.5 leading-none">{professionalCount}</span> : undefined },
+          { id: 'basic', label: 'Basic Info', badge: basicCount > 0 ? <span className="inline-flex items-center justify-center w-4 h-4 bg-amber-500 text-white text-[9px] font-black rounded-full leading-none">{basicCount}</span> : undefined },
+          { id: 'contact', label: 'Contact', badge: contactCount > 0 ? <span className="inline-flex items-center justify-center w-4 h-4 bg-amber-500 text-white text-[9px] font-black rounded-full leading-none">{contactCount}</span> : undefined },
+          { id: 'professional', label: 'Professional', badge: professionalCount > 0 ? <span className="inline-flex items-center justify-center w-4 h-4 bg-amber-500 text-white text-[9px] font-black rounded-full leading-none">{professionalCount}</span> : undefined },
         ];
         const r = 26, circ = 2 * Math.PI * r;
         const handleSave = async () => {
