@@ -451,7 +451,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                   <Button
                     variant={activeFiltersCount > 0 ? "secondary" : "outline"}
                     size="sm"
-                    className="flex items-center gap-2 h-9 px-4 rounded-lg font-medium text-xs shadow-sm bg-white border-slate-200 shrink-0"
+                    className="flex items-center gap-2 !min-h-0 py-2 px-4 rounded-lg font-medium text-xs shadow-sm bg-white border-slate-200 shrink-0"
                     onClick={() => setIsFilterDrawerOpen(true)}
                   >
                     <SlidersHorizontal size={14} className={activeFiltersCount > 0 ? 'text-sky-600' : 'text-slate-500'} />
