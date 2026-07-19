@@ -76,7 +76,7 @@ export const Tabs: React.FC<TabsProps> = ({
             role="tab"
             aria-selected={activeTab === t.id}
             onClick={() => onTabChange(t.id)}
-            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${activeTab === t.id ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${activeTab === t.id ? 'bg-jci-blue text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
           >
             {t.icon && <span className="shrink-0">{t.icon}</span>}
             {t.shortLabel ?? t.label}
