@@ -1,5 +1,6 @@
 // Member Dashboard Home Component
 import React from 'react';
+import { createPortal } from 'react-dom';
 import {
   Calendar, Briefcase, Award, Sparkles, AlertTriangle, CheckCircle,
   TrendingUp, Users, Clock, Target, Zap, FileText, DollarSign, UserCog,
@@ -112,27 +113,47 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
   const profileCompleteness = React.useMemo(() => {
     if (!member) return null;
-    const checks = [
-      { label: 'Profile photo', done: !!(member.avatar || (member as any).general?.avatarUrl) },
-      { label: 'Phone number', done: !!member.phone },
-      { label: 'Company name', done: !!member.companyName },
-      { label: 'Industry', done: !!member.industry },
-      { label: 'Position / title', done: !!(member.business?.departmentAndPosition ?? member.departmentAndPosition) },
-      { label: 'Business categories', done: Array.isArray(member.businessCategory) && member.businessCategory.length > 0 },
-      { label: 'Company description', done: !!(member.business?.companyDescription ?? member.companyDescription) },
-      { label: 'Ideal referral', done: !!(member.idealReferralIndustry || member.idealReferral) },
-      { label: 'Special member offer', done: !!(member.business?.specialOffer ?? (member as any).specialOffer) },
-      { label: 'Address', done: !!(member.contact?.address ?? member.address) },
-      { label: 'Emergency contact', done: !!(member.contact?.emergency?.name ?? member.emergencyContactName ?? member.emergencyContact) },
-      { label: 'Apparel & Items', done: !!(member.others?.tshirtSize && member.others?.shirtStyle) || !!(member.tshirtSize && member.shirtStyle) },
-      { label: 'Company website', done: !!member.business?.companyWebsite },
-      { label: 'International business', done: !!member.business?.acceptInternationalBusiness },
-      { label: 'Level of management', done: !!member.business?.levelOfManagement },
+    const tabs = [
+      {
+        label: 'Basic', checks: [
+          { label: 'Profile photo', done: !!(member.avatar || (member as any).general?.avatarUrl) },
+          { label: 'Phone number', done: !!member.phone },
+          { label: 'Company name', done: !!member.companyName },
+          { label: 'Industry', done: !!member.industry },
+          { label: 'Apparel & Items', done: !!(member.others?.tshirtSize && member.others?.shirtStyle) || !!(member.tshirtSize && member.shirtStyle) },
+        ]
+      },
+      {
+        label: 'Contact', checks: [
+          { label: 'Address', done: !!(member.contact?.address ?? member.address) },
+          { label: 'Emergency contact', done: !!(member.contact?.emergency?.name ?? member.emergencyContactName ?? member.emergencyContact) },
+        ]
+      },
+      {
+        label: 'Professional', checks: [
+          { label: 'Position / title', done: !!(member.business?.departmentAndPosition ?? member.departmentAndPosition) },
+          { label: 'Business categories', done: Array.isArray(member.businessCategory) && member.businessCategory.length > 0 },
+          { label: 'Company description', done: !!(member.business?.companyDescription ?? member.companyDescription) },
+          { label: 'Ideal referral', done: !!(member.idealReferralIndustry || member.idealReferral) },
+          { label: 'Special member offer', done: !!(member.business?.specialOffer ?? (member as any).specialOffer) },
+          { label: 'Company website', done: !!member.business?.companyWebsite },
+          { label: 'International business', done: !!member.business?.acceptInternationalBusiness },
+          { label: 'Level of management', done: !!member.business?.levelOfManagement },
+        ]
+      },
     ];
-    const done = checks.filter(c => c.done).length;
-    const pct = Math.round((done / checks.length) * 100);
-    const missing = checks.filter(c => !c.done);
-    return pct < 100 ? { done, total: checks.length, pct, missing } : null;
+    const allChecks = tabs.flatMap(t => t.checks);
+    const done = allChecks.filter(c => c.done).length;
+    const total = allChecks.length;
+    const pct = Math.round((done / total) * 100);
+    const missing = allChecks.filter(c => !c.done);
+    const tabStats = tabs.map(t => ({
+      label: t.label,
+      done: t.checks.filter(c => c.done).length,
+      total: t.checks.length,
+      pct: Math.round((t.checks.filter(c => c.done).length / t.checks.length) * 100),
+    }));
+    return pct < 100 ? { done, total, pct, missing, tabStats } : null;
   }, [member]);
 
   const handleRestrictedAction = (viewType: string) => {
@@ -532,16 +553,13 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
       {/* Profile Completeness Widget */}
       {profileCompleteness && (() => {
-        const { done, total, pct, missing } = profileCompleteness;
+        const { done, total, pct, missing, tabStats } = profileCompleteness;
         return (
           <div
             className="relative overflow-hidden rounded-2xl shadow-md cursor-pointer group"
+            style={{ backgroundImage: 'linear-gradient(135deg, rgba(0,111,183,0.90) 0%, rgba(0,75,135,0.88) 55%, rgba(0,40,90,0.86) 100%), url(/background/birthday-background.webp)', backgroundSize: 'cover', backgroundPosition: 'center' }}
             onClick={() => { setProfileDraft({}); setShowProfileDrawer(true); }}
           >
-            {/* gradient bg */}
-            <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(217,119,6,0.92) 0%, rgba(194,65,12,0.88) 60%, rgba(153,27,27,0.85) 100%)' }} />
-            {/* subtle pattern */}
-            <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 80% 20%, white 1px, transparent 1px), radial-gradient(circle at 20% 80%, white 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
 
             <div className="relative z-10 p-4 space-y-3">
               {/* header row */}
@@ -549,46 +567,41 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                 <div className="flex items-center gap-2.5">
                   <span className="text-3xl leading-none select-none drop-shadow-md">📋</span>
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-200/80 leading-none mb-0.5">Your Profile</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-white/60 leading-none mb-0.5">Your Profile</p>
                     <h3 className="font-extrabold text-white text-lg leading-tight drop-shadow-sm">{pct}% Complete</h3>
                   </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-[11px] font-bold text-amber-200/90">{done} of {total}</span>
-                  <p className="text-[10px] text-amber-300/70 leading-none">fields filled</p>
+                <span className="text-[10px] font-black uppercase tracking-widest text-white bg-white/20 backdrop-blur-sm px-2.5 py-1 rounded-full border border-white/30">
+                  {done} of {total}
+                </span>
+              </div>
+
+              {/* segmented progress bars */}
+              <div className="mb-1 bg-white/15 backdrop-blur-sm border border-white/20 rounded-xl px-3 py-2">
+                <div className="flex items-start gap-1.5">
+                  {tabStats.map(tab => (
+                    <div key={tab.label} className="flex-1 min-w-0">
+                      <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${tab.pct}%` }}
+                          transition={{ duration: 0.8, ease: 'easeOut' }}
+                          className={`h-full rounded-full ${tab.pct >= 100 ? 'bg-green-300' : 'bg-white'}`}
+                        />
+                      </div>
+                      <p className="text-[8px] font-black uppercase tracking-wide text-white/60 text-center mt-1 truncate">{tab.label}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              {/* progress bar */}
-              <div className="relative h-1.5 rounded-full bg-white/20 overflow-hidden">
-                <motion.div
-                  className="absolute inset-y-0 left-0 rounded-full bg-white"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${pct}%` }}
-                  transition={{ duration: 0.7, ease: 'easeOut' }}
-                />
-              </div>
-
-              {/* missing chips */}
-              <div className="flex flex-wrap gap-1.5">
-                {missing.slice(0, 4).map(c => (
-                  <span key={c.label} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 text-[11px] font-medium text-white">
-                    <span className="w-1 h-1 rounded-full bg-amber-300 flex-shrink-0" />
-                    {c.label}
-                  </span>
-                ))}
-                {missing.length > 4 && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-white/15 border border-white/20 text-[11px] font-medium text-amber-200">
-                    +{missing.length - 4} more
-                  </span>
-                )}
-              </div>
-
               {/* CTA row */}
-              <div className="flex items-center justify-between pt-0.5">
-                <p className="text-[11px] text-amber-200/70">Tap to complete your profile</p>
-                <div className="w-7 h-7 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30 group-hover:bg-white/30 transition-all duration-200">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-white group-hover:translate-x-0.5 transition-transform duration-200"><path d="m9 18 6-6-6-6" /></svg>
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] text-white/60">
+                  {missing.length > 0 ? `${missing[0].label}${missing.length > 1 ? ` +${missing.length - 1} more` : ''} pending` : ''}
+                </p>
+                <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30 group-hover:bg-white/30 transition-all duration-200 flex-shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-white group-hover:translate-x-0.5 transition-transform duration-200"><path d="m9 18 6-6-6-6" /></svg>
                 </div>
               </div>
             </div>
@@ -796,8 +809,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         )}
       </div>
 
-      {showUpgradeModal && (
-        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+      {showUpgradeModal && createPortal(
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-fade-in">
             <div className="p-6 text-center">
               <div className="w-16 h-16 bg-blue-50 text-jci-blue rounded-full flex items-center justify-center mx-auto mb-4">
@@ -818,12 +831,12 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
             </div>
           </div>
         </div>
-      )}
+        , document.body)}
 
       {/* Membership Journey Modal — 3-tab: Probation / 1st Year / 2nd Year */}
-      {showJourneyModal && (
-        <div className="fixed inset-0 bg-black/60 z-[100] flex items-end md:items-center md:justify-center" onClick={() => setShowJourneyModal(false)}>
-          <div className="rounded-t-[32px] md:rounded-2xl w-full md:max-w-lg shadow-2xl overflow-hidden max-h-[90vh] flex flex-col md:mx-4 animate-slide-up md:animate-fade-in" style={{ background: '#0f172a' }} onClick={(e) => e.stopPropagation()}>
+      {showJourneyModal && createPortal(
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-end md:items-center md:justify-center" onClick={() => setShowJourneyModal(false)}>
+          <div className="rounded-t-[32px] md:rounded-2xl w-full md:max-w-lg shadow-2xl overflow-hidden max-h-[90vh] flex flex-col md:mx-4 animate-slide-up" style={{ background: '#0f172a' }} onClick={(e) => e.stopPropagation()}>
 
             {/* Header — matches journey card background (drag handle integrated) */}
             <div className="px-5 pt-3 pb-4 flex-shrink-0" style={{
@@ -835,18 +848,18 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                 <div className="w-10 h-1 rounded-full bg-white/30" />
               </div>
               <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-white border border-white/25">
-                  <TrendingUp size={18} />
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-white border border-white/25">
+                    <TrendingUp size={18} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-white">Membership Journey</h3>
+                    <p className="text-xs text-amber-200/80">Track your progress at each stage</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-bold text-white">Membership Journey</h3>
-                  <p className="text-xs text-amber-200/80">Track your progress at each stage</p>
-                </div>
-              </div>
-              <button onClick={() => setShowJourneyModal(false)} className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/20 transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-              </button>
+                <button onClick={() => setShowJourneyModal(false)} className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/20 transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                </button>
               </div>
             </div>
 
@@ -877,55 +890,55 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                 </button>
 
                 {showEngagementSteps && (<>
-                {/* Connector */}
-                <div className={`flex-1 h-0.5 mt-4 transition-colors ${isFullMember ? 'bg-emerald-500/60' : 'bg-white/15'}`} />
+                  {/* Connector */}
+                  <div className={`flex-1 h-0.5 mt-4 transition-colors ${isFullMember ? 'bg-emerald-500/60' : 'bg-white/15'}`} />
 
-                {/* 1st Year step */}
-                <button
-                  className="flex flex-col items-center gap-1.5 flex-1 focus:outline-none"
-                  onClick={() => setJourneyActiveTab('firstYear')}
-                >
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${engagementFirst?.isCompleted ? 'bg-emerald-500 text-white'
-                    : journeyActiveTab === 'firstYear' ? 'bg-sky-500 text-white'
-                      : 'bg-white/10 text-white/40'
-                    }`}>
-                    {engagementFirst?.isCompleted ? <CheckCircle size={14} /> : '1'}
-                  </div>
-                  <span className={`text-[10px] font-semibold whitespace-nowrap ${journeyActiveTab === 'firstYear' ? 'text-sky-400'
-                    : engagementFirst?.isCompleted ? 'text-emerald-400'
-                      : 'text-white/40'
-                    }`}>1st Year</span>
-                  {engagementFirst && (
-                    <span className={`text-[10px] ${engagementFirst.isCompleted ? 'text-emerald-400' : 'text-sky-400'}`}>
-                      {engagementFirst.overallProgress.toFixed(0)}%
-                    </span>
-                  )}
-                </button>
+                  {/* 1st Year step */}
+                  <button
+                    className="flex flex-col items-center gap-1.5 flex-1 focus:outline-none"
+                    onClick={() => setJourneyActiveTab('firstYear')}
+                  >
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${engagementFirst?.isCompleted ? 'bg-emerald-500 text-white'
+                      : journeyActiveTab === 'firstYear' ? 'bg-sky-500 text-white'
+                        : 'bg-white/10 text-white/40'
+                      }`}>
+                      {engagementFirst?.isCompleted ? <CheckCircle size={14} /> : '1'}
+                    </div>
+                    <span className={`text-[10px] font-semibold whitespace-nowrap ${journeyActiveTab === 'firstYear' ? 'text-sky-400'
+                      : engagementFirst?.isCompleted ? 'text-emerald-400'
+                        : 'text-white/40'
+                      }`}>1st Year</span>
+                    {engagementFirst && (
+                      <span className={`text-[10px] ${engagementFirst.isCompleted ? 'text-emerald-400' : 'text-sky-400'}`}>
+                        {engagementFirst.overallProgress.toFixed(0)}%
+                      </span>
+                    )}
+                  </button>
 
-                {/* Connector */}
-                <div className={`flex-1 h-0.5 mt-4 transition-colors ${engagementFirst?.isCompleted ? 'bg-emerald-500/60' : 'bg-white/15'}`} />
+                  {/* Connector */}
+                  <div className={`flex-1 h-0.5 mt-4 transition-colors ${engagementFirst?.isCompleted ? 'bg-emerald-500/60' : 'bg-white/15'}`} />
 
-                {/* 2nd Year step */}
-                <button
-                  className="flex flex-col items-center gap-1.5 flex-1 focus:outline-none"
-                  onClick={() => setJourneyActiveTab('secondYear')}
-                >
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${engagementSecond?.isCompleted ? 'bg-emerald-500 text-white'
-                    : journeyActiveTab === 'secondYear' ? 'bg-violet-500 text-white'
-                      : 'bg-white/10 text-white/40'
-                    }`}>
-                    {engagementSecond?.isCompleted ? <CheckCircle size={14} /> : '2'}
-                  </div>
-                  <span className={`text-[10px] font-semibold whitespace-nowrap ${journeyActiveTab === 'secondYear' ? 'text-violet-400'
-                    : engagementSecond?.isCompleted ? 'text-emerald-400'
-                      : 'text-white/40'
-                    }`}>2nd Year</span>
-                  {engagementSecond && (
-                    <span className={`text-[10px] ${engagementSecond.isCompleted ? 'text-emerald-400' : 'text-violet-400'}`}>
-                      {engagementSecond.overallProgress.toFixed(0)}%
-                    </span>
-                  )}
-                </button>
+                  {/* 2nd Year step */}
+                  <button
+                    className="flex flex-col items-center gap-1.5 flex-1 focus:outline-none"
+                    onClick={() => setJourneyActiveTab('secondYear')}
+                  >
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${engagementSecond?.isCompleted ? 'bg-emerald-500 text-white'
+                      : journeyActiveTab === 'secondYear' ? 'bg-violet-500 text-white'
+                        : 'bg-white/10 text-white/40'
+                      }`}>
+                      {engagementSecond?.isCompleted ? <CheckCircle size={14} /> : '2'}
+                    </div>
+                    <span className={`text-[10px] font-semibold whitespace-nowrap ${journeyActiveTab === 'secondYear' ? 'text-violet-400'
+                      : engagementSecond?.isCompleted ? 'text-emerald-400'
+                        : 'text-white/40'
+                      }`}>2nd Year</span>
+                    {engagementSecond && (
+                      <span className={`text-[10px] ${engagementSecond.isCompleted ? 'text-emerald-400' : 'text-violet-400'}`}>
+                        {engagementSecond.overallProgress.toFixed(0)}%
+                      </span>
+                    )}
+                  </button>
                 </>)}
 
                 {/* Connector */}
@@ -1222,7 +1235,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
             </div>
           </div>
         </div>
-      )}
+        , document.body)}
       {/* Event Detail Modal */}
       {selectedEventForDetail && (
         <EventDetailModal
@@ -1337,8 +1350,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                         title={m.whatsappGroup || m.whatsappgroup ? 'In WhatsApp group' : 'Not in WhatsApp group'}
                       >
                         <svg viewBox="0 0 24 24" fill="currentColor" className={`w-2.5 h-2.5 ${m.whatsappGroup || m.whatsappgroup ? 'text-slate-900' : 'text-white'}`}>
-                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
-                          <path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.528 5.85L.057 23.25a.75.75 0 0 0 .918.919l5.4-1.47A11.95 11.95 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.88 0-3.638-.502-5.153-1.378l-.37-.213-3.833 1.043 1.044-3.832-.214-.372A9.944 9.944 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
+                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
+                          <path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.528 5.85L.057 23.25a.75.75 0 0 0 .918.919l5.4-1.47A11.95 11.95 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.88 0-3.638-.502-5.153-1.378l-.37-.213-3.833 1.043 1.044-3.832-.214-.372A9.944 9.944 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z" />
                         </svg>
                       </span>
                       {isToday && (
@@ -1383,10 +1396,10 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                           <span className="text-base font-extrabold text-white leading-tight">{day}</span>
                         </div>
                       )}
-                </div>
-              </div>
-            );
-          })}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           );
         })()}
@@ -1397,9 +1410,9 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         const { done, total, pct, missing } = profileCompleteness;
         const set = (key: string, v: string) => setProfileDraft(d => ({ ...d, [key]: v }));
         const val = (key: string, fallback = '') => profileDraft[key] ?? fallback;
-        const basicLabels = ['Phone number','Company name','Industry','Apparel & Items'];
-        const contactLabels = ['Address','Emergency contact'];
-        const professionalLabels = ['Position / title','Business categories','Company description','Ideal referral','Special member offer','Company website','International business','Level of management'];
+        const basicLabels = ['Phone number', 'Company name', 'Industry', 'Apparel & Items'];
+        const contactLabels = ['Address', 'Emergency contact'];
+        const professionalLabels = ['Position / title', 'Business categories', 'Company description', 'Ideal referral', 'Special member offer', 'Company website', 'International business', 'Level of management'];
         const basicCount = missing.filter(f => basicLabels.includes(f.label)).length;
         const contactCount = missing.filter(f => contactLabels.includes(f.label)).length;
         const professionalCount = missing.filter(f => professionalLabels.includes(f.label)).length;
@@ -1446,168 +1459,205 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
             setProfileSaving(false);
           }
         };
-        return (
-            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-end md:items-stretch md:justify-end" onClick={() => setShowProfileDrawer(false)}>
-            <div className="bg-white flex flex-col w-full rounded-t-2xl max-h-[90vh] md:rounded-none md:rounded-l-2xl md:max-h-none md:h-full md:w-[460px] shadow-2xl" onClick={e => e.stopPropagation()}>
-              {/* Gradient header — drag handle integrated inside (matches journey drawer pattern) */}
-              <div className="flex-none px-5 pt-3 pb-4 flex flex-col rounded-t-2xl md:rounded-none md:rounded-tl-2xl" style={{ background: 'linear-gradient(135deg, rgba(217,119,6,0.96) 0%, rgba(194,65,12,0.93) 55%, rgba(153,27,27,0.90) 100%)' }}>
-                <div className="flex justify-center pb-2 md:hidden" aria-hidden="true">
-                  <div className="w-10 h-1 rounded-full bg-white/30" />
-                </div>
-                <div className="flex items-center gap-4">
-                <div className="relative flex-shrink-0 w-14 h-14">
-                  <svg width="56" height="56" viewBox="0 0 56 56" className="-rotate-90" aria-hidden="true">
-                    <circle cx="28" cy="28" r={r} fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="4.5" />
-                    <circle cx="28" cy="28" r={r} fill="none" stroke="white" strokeWidth="4.5"
-                      strokeDasharray={`${circ} ${circ}`} strokeDashoffset={circ * (1 - pct / 100)}
-                      strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.7s ease' }} />
-                  </svg>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-[13px] font-black text-white leading-none">{pct}%</span>
+        const tabDefs = [
+          { id: 'basic', label: 'Basic Info', count: basicCount },
+          { id: 'contact', label: 'Contact', count: contactCount },
+          { id: 'professional', label: 'Professional', count: professionalCount },
+        ];
+        return createPortal(
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-end md:items-center md:justify-center" onClick={() => setShowProfileDrawer(false)}>
+            <div className="rounded-t-[32px] md:rounded-2xl w-full md:max-w-lg shadow-2xl overflow-hidden max-h-[90vh] flex flex-col md:mx-4 animate-slide-up" style={{ background: '#0f172a' }} onClick={e => e.stopPropagation()}>
+
+              {/* Header */}
+              <div className="px-5 pt-3 pb-4 flex-shrink-0" style={{
+                backgroundImage: 'linear-gradient(135deg, rgba(0,111,183,0.92) 0%, rgba(0,75,135,0.90) 55%, rgba(0,40,90,0.88) 100%), url(/background/birthday-background.webp)',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              }}>
+                <div className="flex justify-center pb-2 md:hidden"><div className="w-10 h-1 rounded-full bg-white/30" /></div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="relative flex-shrink-0 w-10 h-10">
+                      <svg width="40" height="40" viewBox="0 0 40 40" className="-rotate-90" aria-hidden="true">
+                        <circle cx="20" cy="20" r="16" fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="3.5" />
+                        <circle cx="20" cy="20" r="16" fill="none" stroke="white" strokeWidth="3.5"
+                          strokeDasharray={`${2 * Math.PI * 16} ${2 * Math.PI * 16}`}
+                          strokeDashoffset={2 * Math.PI * 16 * (1 - pct / 100)}
+                          strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.7s ease' }} />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-[10px] font-black text-white leading-none">{pct}%</span>
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-white">{member?.name ?? 'Your Profile'}</h3>
+                      <p className="text-xs text-blue-200/80">{done} of {total} sections filled</p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-200/75 leading-none mb-0.5">Complete Your Profile</p>
-                  <h3 className="font-extrabold text-white text-base leading-snug truncate">{member?.name ?? 'Your Profile'}</h3>
-                  <p className="text-[11px] text-amber-200/70 mt-0.5">{done} of {total} sections filled</p>
-                </div>
-                <button onClick={() => setShowProfileDrawer(false)} aria-label="Close"
-                  className="flex-shrink-0 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-white" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                </button>
+                  <button onClick={() => setShowProfileDrawer(false)} aria-label="Close"
+                    className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/20 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                  </button>
                 </div>
               </div>
-              {/* Tabs */}
-              <div className="flex-none px-4 pt-3 border-b border-slate-100">
-                <Tabs tabs={profileTabs} activeTab={profileTab} onTabChange={setProfileTab} fullWidth />
+
+              {/* Tab stepper */}
+              <div className="px-5 py-4 flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                <div className="flex items-start">
+                  {tabDefs.map((tab, i) => (
+                    <React.Fragment key={tab.id}>
+                      {i > 0 && (
+                        <div className={`flex-1 h-0.5 mt-4 transition-colors ${tabDefs[i - 1].count === 0 ? 'bg-emerald-500/60' : 'bg-white/15'}`} />
+                      )}
+                      <button className="flex flex-col items-center gap-1.5 flex-1 focus:outline-none" onClick={() => setProfileTab(tab.id)}>
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${tab.count === 0 ? 'bg-emerald-500 text-white'
+                            : profileTab === tab.id ? 'bg-jci-blue text-white'
+                              : 'bg-white/10 text-white/40'
+                          }`}>
+                          {tab.count === 0 ? <CheckCircle size={14} /> : tab.count}
+                        </div>
+                        <span className={`text-[10px] font-semibold whitespace-nowrap ${tab.count === 0 ? 'text-emerald-400'
+                            : profileTab === tab.id ? 'text-blue-300'
+                              : 'text-white/40'
+                          }`}>{tab.label}</span>
+                        <span className={`text-[10px] ${tab.count === 0 ? 'text-emerald-400' : 'text-blue-300'}`}>
+                          {tab.count === 0 ? '100%' : `${Math.round(((tabDefs[i].count === basicCount ? 5 : tabDefs[i].count === contactCount ? 2 : 8) - tab.count) / (tabDefs[i].count === basicCount ? 5 : tabDefs[i].count === contactCount ? 2 : 8) * 100)}%`}
+                        </span>
+                      </button>
+                    </React.Fragment>
+                  ))}
+                </div>
               </div>
+
               {/* Tab content */}
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
                 {profileTab === 'basic' && (
                   basicCount === 0
-                    ? <p className="text-sm text-slate-400 text-center py-8">✓ All basic info filled</p>
+                    ? <div className="flex flex-col items-center py-10 gap-2"><CheckCircle size={32} className="text-emerald-400" /><p className="text-sm text-white/50">All basic info filled</p></div>
                     : <div className="space-y-3">
-                        {missing.find(f => f.label === 'Phone number') && (
-                          <Input label="Phone Number" type="tel"
-                            value={val('phone', member?.phone ?? '')}
-                            onChange={e => set('phone', e.target.value)} />
-                        )}
-                        {missing.find(f => f.label === 'Company name') && (
-                          <Input label="Company Name"
-                            value={val('companyName', member?.companyName ?? '')}
-                            onChange={e => set('companyName', e.target.value)} />
-                        )}
-                        {missing.find(f => f.label === 'Industry') && (
-                          <Input label="Industry"
-                            value={val('industry', member?.industry ?? '')}
-                            onChange={e => set('industry', e.target.value)} />
-                        )}
-                        {missing.find(f => f.label === 'Apparel & Items') && (
-                          <div className="space-y-3">
-                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Apparel & Items</p>
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                              <Select label="Shirt Style"
-                                value={val('shirtStyle', member?.shirtStyle ?? '')}
-                                onChange={e => set('shirtStyle', e.target.value)}
-                                options={[{ value: '', label: 'Select…' }, { value: 'Unisex', label: 'Unisex' }, { value: 'Lady Cut', label: 'Lady Cut' }]} />
-                              <Select label="T-Shirt Size"
-                                value={val('tshirtSize', member?.tshirtSize ?? '')}
-                                onChange={e => set('tshirtSize', e.target.value)}
-                                options={[{ value: '', label: 'Select…' }, ...['XS','S','M','L','XL','2XL','3XL','5XL','7XL'].map(s => ({ value: s, label: s }))]} />
-                              <Select label="Jacket Size"
-                                value={val('jacketSize', member?.jacketSize ?? '')}
-                                onChange={e => set('jacketSize', e.target.value)}
-                                options={[{ value: '', label: 'Select…' }, ...['XS','S','M','L','XL','2XL','3XL','5XL','7XL'].map(s => ({ value: s, label: s }))]} />
-                            </div>
+                      {missing.find(f => f.label === 'Phone number') && (
+                        <Input label="Phone Number" type="tel"
+                          value={val('phone', member?.phone ?? '')}
+                          onChange={e => set('phone', e.target.value)} />
+                      )}
+                      {missing.find(f => f.label === 'Company name') && (
+                        <Input label="Company Name"
+                          value={val('companyName', member?.companyName ?? '')}
+                          onChange={e => set('companyName', e.target.value)} />
+                      )}
+                      {missing.find(f => f.label === 'Industry') && (
+                        <Input label="Industry"
+                          value={val('industry', member?.industry ?? '')}
+                          onChange={e => set('industry', e.target.value)} />
+                      )}
+                      {missing.find(f => f.label === 'Apparel & Items') && (
+                        <div className="space-y-3">
+                          <p className="text-xs font-semibold text-white/40 uppercase tracking-wider">Apparel & Items</p>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <Select label="Shirt Style"
+                              value={val('shirtStyle', member?.shirtStyle ?? '')}
+                              onChange={e => set('shirtStyle', e.target.value)}
+                              options={[{ value: '', label: 'Select…' }, { value: 'Unisex', label: 'Unisex' }, { value: 'Lady Cut', label: 'Lady Cut' }]} />
+                            <Select label="T-Shirt Size"
+                              value={val('tshirtSize', member?.tshirtSize ?? '')}
+                              onChange={e => set('tshirtSize', e.target.value)}
+                              options={[{ value: '', label: 'Select…' }, ...['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '5XL', '7XL'].map(s => ({ value: s, label: s }))]} />
+                            <Select label="Jacket Size"
+                              value={val('jacketSize', member?.jacketSize ?? '')}
+                              onChange={e => set('jacketSize', e.target.value)}
+                              options={[{ value: '', label: 'Select…' }, ...['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '5XL', '7XL'].map(s => ({ value: s, label: s }))]} />
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
+                    </div>
                 )}
                 {profileTab === 'contact' && (
                   contactCount === 0
-                    ? <p className="text-sm text-slate-400 text-center py-8">✓ All contact info filled</p>
+                    ? <div className="flex flex-col items-center py-10 gap-2"><CheckCircle size={32} className="text-emerald-400" /><p className="text-sm text-white/50">All contact info filled</p></div>
                     : <div className="space-y-3">
-                        {missing.find(f => f.label === 'Address') && (
-                          <Input label="Address"
-                            value={val('address', member?.address ?? '')}
-                            onChange={e => set('address', e.target.value)} />
-                        )}
-                        {missing.find(f => f.label === 'Emergency contact') && (
-                          <div className="space-y-3">
-                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Emergency Contact</p>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              <Input label="Name"
-                                value={val('emergencyContactName', member?.emergencyContactName ?? '')}
-                                onChange={e => set('emergencyContactName', e.target.value)} />
-                              <Input label="Relationship"
-                                value={val('emergencyContactRelationship', member?.emergencyContactRelationship ?? '')}
-                                onChange={e => set('emergencyContactRelationship', e.target.value)} />
-                            </div>
-                            <Input label="Phone" type="tel"
-                              value={val('emergencyContact', member?.emergencyContact ?? '')}
-                              onChange={e => set('emergencyContact', e.target.value)} />
+                      {missing.find(f => f.label === 'Address') && (
+                        <Input label="Address"
+                          value={val('address', member?.address ?? '')}
+                          onChange={e => set('address', e.target.value)} />
+                      )}
+                      {missing.find(f => f.label === 'Emergency contact') && (
+                        <div className="space-y-3">
+                          <p className="text-xs font-semibold text-white/40 uppercase tracking-wider">Emergency Contact</p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <Input label="Name"
+                              value={val('emergencyContactName', member?.emergencyContactName ?? '')}
+                              onChange={e => set('emergencyContactName', e.target.value)} />
+                            <Input label="Relationship"
+                              value={val('emergencyContactRelationship', member?.emergencyContactRelationship ?? '')}
+                              onChange={e => set('emergencyContactRelationship', e.target.value)} />
                           </div>
-                        )}
-                      </div>
+                          <Input label="Phone" type="tel"
+                            value={val('emergencyContact', member?.emergencyContact ?? '')}
+                            onChange={e => set('emergencyContact', e.target.value)} />
+                        </div>
+                      )}
+                    </div>
                 )}
                 {profileTab === 'professional' && (
                   professionalCount === 0
-                    ? <p className="text-sm text-slate-400 text-center py-8">✓ All professional info filled</p>
+                    ? <div className="flex flex-col items-center py-10 gap-2"><CheckCircle size={32} className="text-emerald-400" /><p className="text-sm text-white/50">All professional info filled</p></div>
                     : <div className="space-y-3">
-                        {missing.find(f => f.label === 'Position / title') && (
-                          <Input label="Position / Title"
-                            value={val('departmentAndPosition', member?.business?.departmentAndPosition ?? member?.departmentAndPosition ?? '')}
-                            onChange={e => set('departmentAndPosition', e.target.value)} />
-                        )}
-                        {missing.find(f => f.label === 'Company description') && (
-                          <Textarea label="Company Description" rows={2}
-                            value={val('companyDescription', member?.companyDescription ?? '')}
-                            onChange={e => set('companyDescription', e.target.value)} />
-                        )}
-                        {missing.find(f => f.label === 'Ideal referral') && (
-                          <Input label="Ideal Referral" placeholder="e.g. SME owners in F&B industry"
-                            value={val('idealReferral', member?.idealReferral ?? '')}
-                            onChange={e => set('idealReferral', e.target.value)} />
-                        )}
-                        {missing.find(f => f.label === 'Special member offer') && (
-                          <Textarea label="Special Member Offer" rows={2} placeholder="e.g. 10% discount for JCI KL members"
-                            value={val('specialOffer', member?.business?.specialOffer ?? '')}
-                            onChange={e => set('specialOffer', e.target.value)} />
-                        )}
-                        {missing.find(f => f.label === 'Company website') && (
-                          <Input label="Company Website" type="url" placeholder="https://"
-                            value={val('companyWebsite', member?.business?.companyWebsite ?? '')}
-                            onChange={e => set('companyWebsite', e.target.value)} />
-                        )}
-                        {missing.find(f => f.label === 'International business') && (
-                          <Select label="International Business"
-                            value={val('acceptInternationalBusiness', member?.business?.acceptInternationalBusiness ?? '')}
-                            onChange={e => set('acceptInternationalBusiness', e.target.value)}
-                            options={[{ value: '', label: 'Select…' }, { value: 'Yes', label: 'Yes' }, { value: 'No', label: 'No' }, { value: 'Willing to Explore', label: 'Willing to Explore' }]} />
-                        )}
-                        {missing.find(f => f.label === 'Level of management') && (
-                          <Input label="Level of Management" placeholder="e.g. Senior Management"
-                            value={val('levelOfManagement', member?.business?.levelOfManagement ?? '')}
-                            onChange={e => set('levelOfManagement', e.target.value)} />
-                        )}
-                      </div>
+                      {missing.find(f => f.label === 'Position / title') && (
+                        <Input label="Position / Title"
+                          value={val('departmentAndPosition', member?.business?.departmentAndPosition ?? member?.departmentAndPosition ?? '')}
+                          onChange={e => set('departmentAndPosition', e.target.value)} />
+                      )}
+                      {missing.find(f => f.label === 'Company description') && (
+                        <Textarea label="Company Description" rows={2}
+                          value={val('companyDescription', member?.companyDescription ?? '')}
+                          onChange={e => set('companyDescription', e.target.value)} />
+                      )}
+                      {missing.find(f => f.label === 'Ideal referral') && (
+                        <Input label="Ideal Referral" placeholder="e.g. SME owners in F&B industry"
+                          value={val('idealReferral', member?.idealReferral ?? '')}
+                          onChange={e => set('idealReferral', e.target.value)} />
+                      )}
+                      {missing.find(f => f.label === 'Special member offer') && (
+                        <Textarea label="Special Member Offer" rows={2} placeholder="e.g. 10% discount for JCI KL members"
+                          value={val('specialOffer', member?.business?.specialOffer ?? '')}
+                          onChange={e => set('specialOffer', e.target.value)} />
+                      )}
+                      {missing.find(f => f.label === 'Company website') && (
+                        <Input label="Company Website" type="url" placeholder="https://"
+                          value={val('companyWebsite', member?.business?.companyWebsite ?? '')}
+                          onChange={e => set('companyWebsite', e.target.value)} />
+                      )}
+                      {missing.find(f => f.label === 'International business') && (
+                        <Select label="International Business"
+                          value={val('acceptInternationalBusiness', member?.business?.acceptInternationalBusiness ?? '')}
+                          onChange={e => set('acceptInternationalBusiness', e.target.value)}
+                          options={[{ value: '', label: 'Select…' }, { value: 'Yes', label: 'Yes' }, { value: 'No', label: 'No' }, { value: 'Willing to Explore', label: 'Willing to Explore' }]} />
+                      )}
+                      {missing.find(f => f.label === 'Level of management') && (
+                        <Input label="Level of Management" placeholder="e.g. Senior Management"
+                          value={val('levelOfManagement', member?.business?.levelOfManagement ?? '')}
+                          onChange={e => set('levelOfManagement', e.target.value)} />
+                      )}
+                    </div>
                 )}
               </div>
+
               {/* Footer */}
-              <div className="flex-none px-4 py-3 border-t border-slate-100 bg-white flex items-center gap-3">
+              <div className="flex-none px-4 py-3 flex items-center gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
                 <button onClick={() => setShowProfileDrawer(false)}
-                  className="flex-shrink-0 px-4 py-2.5 text-sm font-semibold text-slate-500 hover:text-slate-700 transition-colors rounded-xl hover:bg-slate-100">
+                  className="flex-shrink-0 px-4 py-2.5 text-sm font-semibold text-white/50 hover:text-white/80 transition-colors rounded-xl hover:bg-white/10">
                   Cancel
                 </button>
                 <button disabled={profileSaving || Object.keys(profileDraft).length === 0}
                   onClick={handleSave}
-                  className="flex-1 py-2.5 rounded-xl bg-jci-blue text-white text-sm font-bold disabled:opacity-40 hover:bg-opacity-90 transition-all active:scale-[0.98]">
+                  className="flex-1 py-2.5 rounded-xl bg-jci-blue text-white text-sm font-bold disabled:opacity-40 hover:bg-blue-600 transition-all active:scale-[0.98]">
                   {profileSaving ? 'Saving…' : 'Save Changes'}
                 </button>
               </div>
+
             </div>
-            </div>
-        );
+          </div>
+          , document.body);
       })()}
     </div>
   );

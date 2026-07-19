@@ -108,7 +108,7 @@ export const Tabs: React.FC<TabsProps> = ({
               role="tab"
               aria-selected={activeTab === tab.id}
               onClick={(e) => { e.preventDefault(); onTabChange(tab.id); }}
-              className={`whitespace-nowrap px-4 py-2 rounded-lg font-bold text-xs md:text-sm transition-all flex items-center gap-2 ${fullWidth ? 'flex-1 justify-center' : 'flex-shrink-0'} ${activeTab === tab.id ? 'bg-jci-blue text-white shadow-sm border border-slate-200/20' : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'}`}
+              className={`whitespace-nowrap px-4 h-9 rounded-lg font-bold text-xs md:text-sm transition-all flex items-center gap-2 ${fullWidth ? 'flex-1 justify-center' : 'flex-shrink-0'} ${activeTab === tab.id ? 'bg-jci-blue text-white shadow-sm border border-slate-200/20' : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'}`}
             >
               {tab.icon && <span className="shrink-0">{tab.icon}</span>}
               {tab.shortLabel ? (
