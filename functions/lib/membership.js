@@ -41,6 +41,7 @@ const db = admin.firestore();
 exports.checkMemberPromotion = functions.firestore
     .document('members/{memberId}')
     .onUpdate(async (change, context) => {
+    var _a, _b;
     const before = change.before.data();
     const after = change.after.data();
     const memberId = context.params.memberId;
@@ -60,28 +61,45 @@ exports.checkMemberPromotion = functions.firestore
         progress.eventParticipation &&
         progress.jciInspireCompleted;
     if (allRequirementsMet && !progress.promotedToFull) {
-        // Promote to Full Member
-        await db.collection('members').doc(memberId).update({
-            membershipType: 'full',
-            'promotionProgress.promotedToFull': true,
-            'promotionProgress.completedDate': admin.firestore.FieldValue.serverTimestamp(),
-            updatedAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-        // Create notification
-        await db.collection('notifications').add({
-            memberId: memberId,
-            type: 'promotion',
-            title: 'Congratulations! You have been promoted to Full Member',
-            message: 'You have successfully completed all requirements and have been promoted from Probation Member to Full Member. Your dues for next renewal will be RM300.',
-            read: false,
-            createdAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-        console.log(`Member ${memberId} promoted from Probation to Full Member`);
+        try {
+            // Idempotency: re-read the member to confirm not already promoted before committing.
+            // Retries triggered by a transient batch.commit() failure would otherwise double-promote.
+            const freshSnap = await db.collection('members').doc(memberId).get();
+            if (((_b = (_a = freshSnap.data()) === null || _a === void 0 ? void 0 : _a.promotionProgress) === null || _b === void 0 ? void 0 : _b.promotedToFull) === true) {
+                console.log(`Member ${memberId} already promoted — skipping (idempotent retry)`);
+                return null;
+            }
+            // Promote to Full Member — batch member update + notification atomically
+            const batch = db.batch();
+            batch.update(db.collection('members').doc(memberId), {
+                membershipType: 'full',
+                'promotionProgress.promotedToFull': true,
+                'promotionProgress.completedDate': admin.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            const notifRef = db.collection('notifications').doc();
+            batch.set(notifRef, {
+                memberId: memberId,
+                type: 'promotion',
+                title: 'Congratulations! You have been promoted to Full Member',
+                message: 'You have successfully completed all requirements and have been promoted from Probation Member to Full Member. Your dues for next renewal will be RM300.',
+                read: false,
+                createdAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            await batch.commit();
+            console.log(`Member ${memberId} promoted from Probation to Full Member`);
+        }
+        catch (error) {
+            console.error(`[checkMemberPromotion] Failed to promote member ${memberId}:`, error);
+            // Re-throw transient errors so Cloud Functions retries with backoff.
+            // The idempotency check above ensures retries are safe.
+            throw error;
+        }
     }
     return null;
 });
 // Function to handle annual dues renewal
-exports.generateDuesRenewal = functions.https.onCall(async (data, context) => {
+exports.generateDuesRenewal = functions.runWith({ timeoutSeconds: 300 }).https.onCall(async (data, context) => {
     var _a, _b, _c;
     // Verify admin permissions
     if (!context.auth) {
@@ -96,12 +114,21 @@ exports.generateDuesRenewal = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError('invalid-argument', 'Valid dues year is required');
     }
     const previousYear = duesYear - 1;
-    // Get members who paid dues in previous year
-    const previousYearDues = await db.collection('duesTransactions')
+    // CF-06 fix: dues records are written to 'transactions' (not the nonexistent 'duesTransactions'),
+    // with type='Income', category='Membership', status='Cleared', and a duesYear field.
+    const previousYearDues = await db.collection('transactions')
+        .where('type', '==', 'Income')
+        .where('category', '==', 'Membership')
+        .where('status', '==', 'Cleared')
         .where('duesYear', '==', previousYear)
-        .where('status', '==', 'paid')
         .get();
     const renewalMemberIds = new Set(previousYearDues.docs.map(doc => doc.data().memberId));
+    // Pre-fetch ALL dues transactions for targetYear in one query (avoids N+1 per-member queries)
+    const existingDuesTxns = await db.collection('transactions')
+        .where('type', '==', 'DUES')
+        .where('duesYear', '==', duesYear)
+        .get();
+    const membersWithDues = new Set(existingDuesTxns.docs.map(d => d.data().memberId));
     // Get all current members
     const membersSnapshot = await db.collection('members').get();
     const batch = db.batch();
@@ -109,12 +136,8 @@ exports.generateDuesRenewal = functions.https.onCall(async (data, context) => {
     for (const memberDoc of membersSnapshot.docs) {
         const member = memberDoc.data();
         const memberId = memberDoc.id;
-        // Skip if already has dues transaction for this year
-        const existingDues = await db.collection('duesTransactions')
-            .where('memberId', '==', memberId)
-            .where('duesYear', '==', duesYear)
-            .get();
-        if (!existingDues.empty) {
+        // Skip if already has dues transaction for this year (single-query idempotency check)
+        if (membersWithDues.has(memberId)) {
             continue;
         }
         // Determine dues amount based on membership type
@@ -154,11 +177,12 @@ exports.generateDuesRenewal = functions.https.onCall(async (data, context) => {
                 console.warn(`Unknown membership type for member ${memberId}: ${member.membershipType}`);
                 continue;
         }
-        // Create dues transaction
-        const duesTransactionRef = db.collection('duesTransactions').doc();
+        // Create dues transaction (type: 'DUES' + duesYear field enables single-query idempotency check)
+        const duesTransactionRef = db.collection('transactions').doc();
         batch.set(duesTransactionRef, {
             memberId: memberId,
             membershipType: member.membershipType,
+            type: 'DUES',
             duesYear: duesYear,
             amount: amount,
             status: amount === 0 ? 'paid' : 'pending', // Senators are automatically paid
@@ -181,7 +205,8 @@ exports.autoInitiateDuesRenewal = functions.pubsub
     .timeZone('Asia/Kuala_Lumpur')
     .onRun(async () => {
     var _a, _b, _c, _d;
-    const targetYear = new Date().getFullYear() + 1;
+    const nowMYT = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }));
+    const targetYear = nowMYT.getFullYear() + 1;
     const prevYear = targetYear - 1;
     console.log(`[autoInitiateDuesRenewal] Initiating dues renewal for ${targetYear}`);
     // Load membership config rules
@@ -202,21 +227,47 @@ exports.autoInitiateDuesRenewal = functions.pubsub
     const eligibleMemberIds = new Set();
     for (const doc of txSnap.docs) {
         const d = doc.data();
-        const txYear = d.projectId ? parseInt(d.projectId.split(' ')[0]) : 0;
+        // Use duesYear field when present; fall back to parsing projectId for historical docs
+        let txYear;
+        if (d.duesYear != null) {
+            txYear = d.duesYear;
+        }
+        else {
+            txYear = d.projectId ? parseInt(d.projectId.split(' ')[0]) : 0;
+            if (d.projectId)
+                console.warn(`[autoInitiateDuesRenewal] Doc ${doc.id} missing duesYear — fell back to projectId parse`);
+        }
         if (txYear === prevYear && d.memberId)
             eligibleMemberIds.add(d.memberId);
     }
-    // Find already-initiated transactions for targetYear (idempotency)
+    // Find already-initiated transactions for targetYear (idempotency via dedicated duesYear field)
     const existingSnap = await db.collection('transactions')
         .where('category', '==', 'Membership')
         .where('type', '==', 'Income')
+        .where('duesYear', '==', targetYear)
         .get();
     const alreadyInitiated = new Set();
     for (const doc of existingSnap.docs) {
         const d = doc.data();
-        const txYear = d.projectId ? parseInt(d.projectId.split(' ')[0]) : 0;
-        if (txYear === targetYear && d.memberId)
+        if (d.memberId)
             alreadyInitiated.add(d.memberId);
+    }
+    // Secondary fallback: catch historical docs that lack duesYear (written before this fix)
+    if (alreadyInitiated.size === 0) {
+        const fallbackSnap = await db.collection('transactions')
+            .where('category', '==', 'Membership')
+            .where('type', '==', 'Income')
+            .get();
+        for (const doc of fallbackSnap.docs) {
+            const d = doc.data();
+            if (d.duesYear != null)
+                continue; // already handled above
+            const txYear = d.projectId ? parseInt(d.projectId.split(' ')[0]) : 0;
+            if (txYear === targetYear && d.memberId) {
+                console.warn(`[autoInitiateDuesRenewal] Fallback idempotency: doc ${doc.id} matched via projectId parse`);
+                alreadyInitiated.add(d.memberId);
+            }
+        }
     }
     let created = 0;
     const batchLimit = 490;
@@ -245,6 +296,7 @@ exports.autoInitiateDuesRenewal = functions.pubsub
             category: 'Membership',
             status: 'Pending',
             amount: totalDues,
+            duesYear: targetYear,
             projectId: `${targetYear} membership`,
             transactionType: 'dues',
             description: `${targetYear} ${type} Dues Renewal`,
@@ -290,7 +342,8 @@ exports.sendAnnualDuesReminders = functions.pubsub
     .timeZone('Asia/Kuala_Lumpur')
     .onRun(async () => {
     var _a, _b, _c, _d, _e;
-    const year = new Date().getFullYear();
+    const nowMYT = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }));
+    const year = nowMYT.getFullYear();
     console.log(`[sendAnnualDuesReminders] Sending dues reminders for ${year}`);
     const membersSnap = await db.collection('members')
         .where('status', '==', 'Active')

@@ -46,34 +46,58 @@ exports.validateTransactionSplits = functions.firestore
     if (!change.after.exists) {
         return null;
     }
-    const transaction = change.after.data();
+    const afterData = change.after.data();
+    const beforeData = change.before.data();
+    // Self-trigger guard: skip if this write was our own validation write (prevents infinite loop)
+    if ((afterData === null || afterData === void 0 ? void 0 : afterData._validationSource) === 'validator')
+        return null;
+    // Skip if only _validationSource changed (extra safety net)
+    if (beforeData &&
+        afterData &&
+        beforeData._validationSource !== afterData._validationSource &&
+        beforeData.validationError === afterData.validationError &&
+        beforeData.validatedAt === afterData.validatedAt &&
+        beforeData.amount === afterData.amount &&
+        JSON.stringify(beforeData.splitIds) === JSON.stringify(afterData.splitIds)) {
+        return null;
+    }
+    const transaction = afterData;
     // Only validate if transaction has splitIds
     if (!transaction.splitIds || transaction.splitIds.length === 0) {
         return null;
     }
     // Fetch splits from TRANSACTION_SPLITS collection
-    const splitsSnapshot = await db.collection('transactionSplits')
-        .where('parentTransactionId', '==', transactionId)
-        .get();
-    const splits = splitsSnapshot.docs.map(doc => doc.data());
-    // Calculate sum of splits
-    const splitSum = splits.reduce((sum, split) => sum + split.amount, 0);
-    // Check if splits sum equals transaction amount (with small tolerance for floating point)
-    const tolerance = 0.01;
-    if (Math.abs(splitSum - transaction.amount) > tolerance) {
-        console.error(`Transaction ${transactionId} split sum (${splitSum}) does not equal transaction amount (${transaction.amount})`);
-        // Update transaction with validation error
-        await db.collection('transactions').doc(transactionId).update({
-            validationError: `Split amounts (${splitSum}) do not sum to transaction amount (${transaction.amount})`,
-            validatedAt: admin.firestore.FieldValue.serverTimestamp()
-        });
+    try {
+        const splitsSnapshot = await db.collection('transactionSplits')
+            .where('parentTransactionId', '==', transactionId)
+            .get();
+        const splits = splitsSnapshot.docs.map(doc => doc.data());
+        // Calculate sum of splits
+        const splitSum = splits.reduce((sum, split) => sum + split.amount, 0);
+        // Check if splits sum equals transaction amount (with small tolerance for floating point)
+        const tolerance = 0.01;
+        if (Math.abs(splitSum - transaction.amount) > tolerance) {
+            console.error(`Transaction ${transactionId} split sum (${splitSum}) does not equal transaction amount (${transaction.amount})`);
+            // Update transaction with validation error
+            await db.collection('transactions').doc(transactionId).update({
+                validationError: `Split amounts (${splitSum}) do not sum to transaction amount (${transaction.amount})`,
+                validatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                _validationSource: 'validator'
+            });
+        }
+        else {
+            // Clear any previous validation errors
+            await db.collection('transactions').doc(transactionId).update({
+                validationError: admin.firestore.FieldValue.delete(),
+                validatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                _validationSource: 'validator'
+            });
+        }
     }
-    else {
-        // Clear any previous validation errors
-        await db.collection('transactions').doc(transactionId).update({
-            validationError: admin.firestore.FieldValue.delete(),
-            validatedAt: admin.firestore.FieldValue.serverTimestamp()
-        });
+    catch (error) {
+        // Log and swallow to prevent unbounded retries on permanent failures (e.g. document deleted).
+        console.error(`[validateTransactionSplits] Error validating transaction ${transactionId}:`, error);
+        return null;
     }
     return null;
 });

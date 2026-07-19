@@ -39,8 +39,15 @@ const admin = __importStar(require("firebase-admin"));
 const db = admin.firestore();
 // Function to execute workflow
 exports.executeWorkflow = functions.https.onCall(async (data, context) => {
+    var _a;
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+    }
+    // Only BOARD, ADMIN, and SUPER_ADMIN may trigger workflows manually
+    const callerDoc = await db.collection('members').doc(context.auth.uid).get();
+    const callerRole = (_a = callerDoc.data()) === null || _a === void 0 ? void 0 : _a.role;
+    if (!['ADMIN', 'SUPER_ADMIN', 'BOARD'].includes(callerRole)) {
+        throw new functions.https.HttpsError('permission-denied', 'Insufficient role to execute workflows');
     }
     const { workflowId, inputData } = data;
     if (!workflowId) {
@@ -128,9 +135,10 @@ async function executeNode(node, data) {
         case 'action':
             return await executeAction(node.config, data);
         case 'delay':
-            const delayMs = node.config.delayMs || 1000;
-            await new Promise(resolve => setTimeout(resolve, delayMs));
-            return { delayed: delayMs };
+            // F10 FIX: blocking setTimeout ties up the Cloud Function and risks timeout.
+            // TODO: implement delay via Cloud Tasks for reliable deferred execution.
+            console.warn('Delay node skipped in Cloud Function context — use Cloud Tasks for deferred actions.');
+            return { delayed: 0, skipped: true };
         default:
             throw new Error(`Unknown node type: ${node.type}`);
     }
@@ -156,15 +164,24 @@ function evaluateCondition(config, data) {
 }
 // Helper function to execute actions
 async function executeAction(config, data) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     switch (config.type) {
         case 'send_email':
-            // In a real implementation, this would send an email
-            console.log(`Sending email to ${config.to}: ${config.subject}`);
+            // SEC-A-009: Do not log recipient email or subject — use a correlation reference only.
+            console.log(`send_email action triggered (type: ${(_a = config.notificationType) !== null && _a !== void 0 ? _a : 'email'})`);
             return { emailSent: true, to: config.to };
-        case 'update_field':
-            // Update a document field
+        case 'update_field': {
+            // Update a document field — restricted to an explicit allowlist to prevent
+            // workflows from writing to sensitive or unintended collections.
+            const ALLOWED_COLLECTIONS = [
+                'members', 'events', 'projects', 'tasks', 'notifications',
+                'workflows', 'activityPlans', 'eventRegistrations'
+            ];
             if (config.collection && config.documentId && config.field) {
+                if (!ALLOWED_COLLECTIONS.includes(config.collection)) {
+                    console.error(`executeAction: collection '${config.collection}' not in allowlist — update_field blocked`);
+                    return { fieldUpdated: false, blocked: true };
+                }
                 await db.collection(config.collection).doc(config.documentId).update({
                     [config.field]: config.value,
                     updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -172,6 +189,7 @@ async function executeAction(config, data) {
                 return { fieldUpdated: true };
             }
             throw new Error('Invalid update_field configuration');
+        }
         case 'create_record':
             // Create a new document
             if (config.collection && config.data) {
@@ -195,9 +213,9 @@ async function executeAction(config, data) {
         // this action type actually produce a task document instead of throwing.
         case 'create_task': {
             const taskRef = await db.collection('tasks').add({
-                title: ((_a = config.params) === null || _a === void 0 ? void 0 : _a.title) || config.title || 'Auto-created task',
-                assignedTo: ((_b = config.params) === null || _b === void 0 ? void 0 : _b.assignedTo) || config.assignedTo || '',
-                projectId: ((_c = config.params) === null || _c === void 0 ? void 0 : _c.projectId) || config.projectId || '',
+                title: ((_b = config.params) === null || _b === void 0 ? void 0 : _b.title) || config.title || 'Auto-created task',
+                assignedTo: ((_c = config.params) === null || _c === void 0 ? void 0 : _c.assignedTo) || config.assignedTo || '',
+                projectId: ((_d = config.params) === null || _d === void 0 ? void 0 : _d.projectId) || config.projectId || '',
                 status: 'pending',
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
                 _automationGenerated: true,
@@ -222,12 +240,18 @@ const AUTOMATION_SIDE_EFFECT_COLLECTIONS = [
     'workflow_executions',
     'automationLogs',
     'tasks',
+    // P0 self-trigger guard: the rule-fired handler updates lastTriggeredAt/triggerCount
+    // on automationRules documents, which would re-fire this same function → infinite loop.
+    'automationRules',
 ];
 // TODO: Scheduled automation rules (triggerType: 'schedule') require a Cloud
 // Scheduler / Cloud Tasks trigger — not yet implemented.  Rules with a
 // schedule field are currently ignored by this Firestore-triggered function.
 // Function to evaluate automation rules
-exports.evaluateAutomationRules = functions.firestore
+// F10 FIX: extend timeout to 300 s and raise memory to prevent OOM on large rule sets.
+exports.evaluateAutomationRules = functions
+    .runWith({ timeoutSeconds: 300, memory: '512MB' })
+    .firestore
     .document('{collection}/{documentId}')
     .onWrite(async (change, context) => {
     // P0-A: Bail out early when the write came from an automation side-effect
@@ -243,56 +267,65 @@ exports.evaluateAutomationRules = functions.firestore
         console.log('Skipping automation evaluation for _automationGenerated document:', context.resource.name);
         return null;
     }
-    // Get all active automation rules
-    const rulesSnapshot = await db.collection('automationRules')
-        .where('enabled', '==', true)
-        .get();
-    if (rulesSnapshot.empty) {
-        return null;
-    }
-    const document = change.after.exists ? change.after.data() : null;
-    const collection = context.params.collection;
-    const documentId = context.params.documentId;
-    // Evaluate each rule
-    for (const ruleDoc of rulesSnapshot.docs) {
-        const rule = ruleDoc.data();
-        // Check if rule applies to this collection
-        if (rule.trigger && rule.trigger !== collection) {
-            continue;
+    // CF-07: Outer try/catch prevents the wildcard trigger from retrying indefinitely
+    // when there is an infrastructure error (quota, network) fetching rules or writing
+    // execution logs. The inner per-rule try/catch already isolates bad rule configs.
+    try {
+        // Get all active automation rules
+        const rulesSnapshot = await db.collection('automationRules')
+            .where('enabled', '==', true)
+            .get();
+        if (rulesSnapshot.empty) {
+            return null;
         }
-        try {
-            // Evaluate rule conditions
-            const conditionsMet = evaluateRuleConditions(rule.conditions, rule.logicOperator, document);
-            if (conditionsMet) {
-                // Execute rule actions
-                await executeRuleActions(rule.actions, {
-                    collection,
-                    documentId,
-                    document,
-                    ruleId: ruleDoc.id
-                });
-                // P1-B: Increment triggerCount on the rule so we have an accurate
-                // count of how many times each rule has fired.
-                await ruleDoc.ref.update({
-                    lastTriggeredAt: admin.firestore.FieldValue.serverTimestamp(),
-                    triggerCount: admin.firestore.FieldValue.increment(1),
-                });
-                // Log rule execution
-                await db.collection('rule_executions').add({
-                    ruleId: ruleDoc.id,
-                    triggeredBy: {
+        const document = change.after.exists ? change.after.data() : null;
+        const collection = context.params.collection;
+        const documentId = context.params.documentId;
+        // Evaluate each rule
+        for (const ruleDoc of rulesSnapshot.docs) {
+            const rule = ruleDoc.data();
+            // Check if rule applies to this collection
+            if (rule.trigger && rule.trigger !== collection) {
+                continue;
+            }
+            try {
+                // Evaluate rule conditions
+                const conditionsMet = evaluateRuleConditions(rule.conditions, rule.logicOperator, document);
+                if (conditionsMet) {
+                    // Execute rule actions
+                    await executeRuleActions(rule.actions, {
                         collection,
-                        documentId
-                    },
-                    executedAt: admin.firestore.FieldValue.serverTimestamp(),
-                    conditionsEvaluated: rule.conditions,
-                    actionsExecuted: rule.actions
-                });
+                        documentId,
+                        document,
+                        ruleId: ruleDoc.id
+                    });
+                    // P1-B: Increment triggerCount on the rule so we have an accurate
+                    // count of how many times each rule has fired.
+                    await ruleDoc.ref.update({
+                        lastTriggeredAt: admin.firestore.FieldValue.serverTimestamp(),
+                        triggerCount: admin.firestore.FieldValue.increment(1),
+                    });
+                    // Log rule execution
+                    await db.collection('rule_executions').add({
+                        ruleId: ruleDoc.id,
+                        triggeredBy: {
+                            collection,
+                            documentId
+                        },
+                        executedAt: admin.firestore.FieldValue.serverTimestamp(),
+                        conditionsEvaluated: rule.conditions,
+                        actionsExecuted: rule.actions
+                    });
+                }
+            }
+            catch (error) {
+                console.error(`Error executing rule ${ruleDoc.id}:`, error);
             }
         }
-        catch (error) {
-            console.error(`Error executing rule ${ruleDoc.id}:`, error);
-        }
+    }
+    catch (error) {
+        console.error('[evaluateAutomationRules] Outer infrastructure error — aborting without retry:', error);
+        return null;
     }
     return null;
 });

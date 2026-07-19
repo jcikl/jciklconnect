@@ -453,6 +453,22 @@ Use this prompt to perform a full systematic analysis of any single Firestore co
 | `auditLog` | 2026-07-17 | 8（2/4/2）| 1 | 缺失 | AuditLogService 从未调用（死代码）；无 Firestore 规则→所有审计写入全部静默失败 |
 | `communication` | 2026-07-17 | 9（1/5/3）| 2 | 部分 | author.id 从未写入文档→会员永远无法自删自己的帖子 |
 
+**第五批扫描（2026-07-19，remaining-collections）— P0×7 P1×23 P2×9 Total×39**
+
+| 集合 | 分析日期 | 逻辑错误数（P0/P1/P2）| 变体不对称数 | 退回完整度 | 关键P0摘要 |
+|------|----------|-----------------------|------------|-----------|-----------|
+| `eventBudgets` | 2026-07-19 | 9（0/7/2）| 1 | 部分 | — |
+| `achievementProgress` | 2026-07-19 | 9（2/5/2）| 1 | 缺失 | calculateAchievementProgress仅处理participation类型→所有其他成就永远current=0；allow read无所有者过滤→任意会员可读所有人进度 |
+| `memberEmails` | 2026-07-19 | 8（1/5/2）| 0 | 部分 | updateMember允许修改邮箱但不更新memberEmails槽位→邮箱唯一性保障在编辑后彻底失效 |
+| `toyyibpay_webhooks` | 2026-07-19 | 12（3/6/3）| 0 | 部分 | firestore.rules无规则块→任意登录用户可读幂等记录；webhook失败.catch(warn)静默→membership更新失败但标为processed；集合名硬编码非常量 |
+| `birthdayNotificationsSent` | 2026-07-19 | 8（2/4/2）| 0 | 缺失 | 三套并行生日系统（Netlify+CF+客户端）互不协调→每位会员最多收3条重复通知；客户端每15分钟全量触发 |
+
+**v4 全库重分析（2026-07-19，修复5集合后）— P0×90 P1×312 P2×191 Total×593（vs v3: 616，净减23）**
+
+本次修复：callback.js P0×3、membersService.ts P0×1、App.tsx P0×1、eventsService.ts P1、firestore.rules 5集合。
+Top P0集合：transactions×3、pointsRuleExecutions×3、conversations×3；退回完整度：完整1个（guestPageStats）、部分60个、缺失13个。
+Firestore rules 5项修复已写入文件，**待执行 `firebase deploy --only firestore:rules` 生效**。
+
 ### 已分析集合（collection-deps）
 
 | 集合 | 分析日期 | 联动集合数 | 强耦合 | 中耦合 | 弱耦合 | P0风险数 | P0风险摘要 |

@@ -39,8 +39,15 @@ const admin = __importStar(require("firebase-admin"));
 const db = admin.firestore();
 // Function to send notification
 exports.sendNotification = functions.https.onCall(async (data, context) => {
+    var _a;
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+    }
+    // Only BOARD, ADMIN, and SUPER_ADMIN may send notifications to other members
+    const callerDoc = await db.collection('members').doc(context.auth.uid).get();
+    const callerRole = (_a = callerDoc.data()) === null || _a === void 0 ? void 0 : _a.role;
+    if (!['ADMIN', 'SUPER_ADMIN', 'BOARD'].includes(callerRole)) {
+        throw new functions.https.HttpsError('permission-denied', 'Insufficient role to send notifications');
     }
     const { memberId, type, title, message, data: notificationData } = data;
     if (!memberId || !type || !title || !message) {
@@ -145,96 +152,141 @@ exports.markNotificationRead = functions.https.onCall(async (data, context) => {
 exports.sendDuesRenewalReminders = functions.pubsub
     .schedule('0 9 * * 1') // Every Monday at 9 AM
     .onRun(async (context) => {
-    const now = new Date();
-    const reminderDate = new Date(now.getTime() + (7 * 24 * 60 * 60 * 1000)); // 7 days from now
-    // Get pending dues transactions that are due soon
-    const pendingDuesSnapshot = await db.collection('duesTransactions')
-        .where('status', '==', 'pending')
-        .where('dueDate', '<=', reminderDate)
-        .get();
-    if (pendingDuesSnapshot.empty) {
-        console.log('No pending dues requiring reminders');
+    var _a, _b;
+    try {
+        const now = new Date();
+        const reminderDate = new Date(now.getTime() + (7 * 24 * 60 * 60 * 1000)); // 7 days from now
+        const currentYear = now.getFullYear();
+        // Get pending dues transactions that are due soon
+        const pendingDuesSnapshot = await db.collection('duesTransactions')
+            .where('status', '==', 'pending')
+            .where('dueDate', '<=', reminderDate)
+            .get();
+        if (pendingDuesSnapshot.empty) {
+            console.log('No pending dues requiring reminders');
+            return null;
+        }
+        // Idempotency: fetch existing unread dues_reminder notifications for this year
+        // to avoid sending duplicates when Cloud Scheduler retries a failed invocation.
+        const existingRemindersSnap = await db.collection('notifications')
+            .where('type', '==', 'dues_reminder')
+            .where('read', '==', false)
+            .get();
+        const alreadyRemindedThisYear = new Set();
+        for (const doc of existingRemindersSnap.docs) {
+            const d = doc.data();
+            if (((_b = (_a = d.data) === null || _a === void 0 ? void 0 : _a.duesYear) !== null && _b !== void 0 ? _b : d.duesYear) === currentYear && d.memberId) {
+                alreadyRemindedThisYear.add(d.memberId);
+            }
+        }
+        const batch = db.batch();
+        let reminderCount = 0;
+        for (const duesDoc of pendingDuesSnapshot.docs) {
+            const dues = duesDoc.data();
+            // Skip senators (they don't pay dues)
+            if (dues.membershipType === 'senator') {
+                continue;
+            }
+            // Skip members who already have an unread dues_reminder this year (retry safety)
+            if (alreadyRemindedThisYear.has(dues.memberId)) {
+                continue;
+            }
+            // Create reminder notification
+            const notificationRef = db.collection('notifications').doc();
+            batch.set(notificationRef, {
+                memberId: dues.memberId,
+                type: 'dues_reminder',
+                title: 'Dues Payment Reminder',
+                message: `Your ${dues.duesYear} membership dues of RM${dues.amount} are due soon. Please make your payment to maintain your membership status.`,
+                data: {
+                    duesTransactionId: duesDoc.id,
+                    amount: dues.amount,
+                    duesYear: dues.duesYear,
+                    membershipType: dues.membershipType
+                },
+                read: false,
+                createdAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            reminderCount++;
+        }
+        if (reminderCount > 0) {
+            await batch.commit();
+            console.log(`Sent ${reminderCount} dues renewal reminders`);
+        }
         return null;
     }
-    const batch = db.batch();
-    let reminderCount = 0;
-    for (const duesDoc of pendingDuesSnapshot.docs) {
-        const dues = duesDoc.data();
-        // Skip senators (they don't pay dues)
-        if (dues.membershipType === 'senator') {
-            continue;
-        }
-        // Create reminder notification
-        const notificationRef = db.collection('notifications').doc();
-        batch.set(notificationRef, {
-            memberId: dues.memberId,
-            type: 'dues_reminder',
-            title: 'Dues Payment Reminder',
-            message: `Your ${dues.duesYear} membership dues of RM${dues.amount} are due soon. Please make your payment to maintain your membership status.`,
-            data: {
-                duesTransactionId: duesDoc.id,
-                amount: dues.amount,
-                duesYear: dues.duesYear,
-                membershipType: dues.membershipType
-            },
-            read: false,
-            createdAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-        reminderCount++;
+    catch (error) {
+        console.error('[sendDuesRenewalReminders] Fatal error — aborting run:', error);
+        return null;
     }
-    if (reminderCount > 0) {
-        await batch.commit();
-        console.log(`Sent ${reminderCount} dues renewal reminders`);
-    }
-    return null;
 });
 // Function to send event reminders
 exports.sendEventReminders = functions.pubsub
     .schedule('0 8 * * *') // Every day at 8 AM
     .onRun(async (context) => {
-    const now = new Date();
-    const tomorrow = new Date(now.getTime() + (24 * 60 * 60 * 1000));
-    const dayAfterTomorrow = new Date(now.getTime() + (48 * 60 * 60 * 1000));
-    // Get events happening tomorrow
-    const upcomingEventsSnapshot = await db.collection('events')
-        .where('startDate', '>=', tomorrow)
-        .where('startDate', '<', dayAfterTomorrow)
-        .get();
-    if (upcomingEventsSnapshot.empty) {
-        console.log('No events tomorrow requiring reminders');
-        return null;
-    }
-    const batch = db.batch();
-    let reminderCount = 0;
-    for (const eventDoc of upcomingEventsSnapshot.docs) {
-        const event = eventDoc.data();
-        // Send reminder to all registered attendees
-        if (event.attendees && Array.isArray(event.attendees)) {
-            for (const attendeeId of event.attendees) {
-                const notificationRef = db.collection('notifications').doc();
-                batch.set(notificationRef, {
-                    memberId: attendeeId,
-                    type: 'event_reminder',
-                    title: 'Event Reminder',
-                    message: `Don't forget about "${event.title}" tomorrow at ${event.startDate.toDate().toLocaleTimeString()}.`,
-                    data: {
-                        eventId: eventDoc.id,
-                        eventTitle: event.title,
-                        startDate: event.startDate,
-                        location: event.location
-                    },
-                    read: false,
-                    createdAt: admin.firestore.FieldValue.serverTimestamp()
-                });
-                reminderCount++;
+    try {
+        const now = new Date();
+        const tomorrow = new Date(now.getTime() + (24 * 60 * 60 * 1000));
+        const dayAfterTomorrow = new Date(now.getTime() + (48 * 60 * 60 * 1000));
+        // Get events happening tomorrow
+        const upcomingEventsSnapshot = await db.collection('events')
+            .where('startDate', '>=', tomorrow)
+            .where('startDate', '<', dayAfterTomorrow)
+            .get();
+        if (upcomingEventsSnapshot.empty) {
+            console.log('No events tomorrow requiring reminders');
+            return null;
+        }
+        // F08 fix: flush batches at BATCH_LIMIT to stay under the 500-op Firestore cap
+        const BATCH_LIMIT = 490;
+        let batch = db.batch();
+        let batchCount = 0;
+        let reminderCount = 0;
+        const flushBatch = async () => {
+            if (batchCount > 0) {
+                await batch.commit();
+                batch = db.batch();
+                batchCount = 0;
+            }
+        };
+        for (const eventDoc of upcomingEventsSnapshot.docs) {
+            const event = eventDoc.data();
+            // Send reminder to all registered attendees
+            if (event.attendees && Array.isArray(event.attendees)) {
+                for (const attendeeId of event.attendees) {
+                    const notificationRef = db.collection('notifications').doc();
+                    batch.set(notificationRef, {
+                        memberId: attendeeId,
+                        type: 'event_reminder',
+                        title: 'Event Reminder',
+                        message: `Don't forget about "${event.title}" tomorrow at ${event.startDate.toDate().toLocaleTimeString('en-MY', { timeZone: 'Asia/Kuala_Lumpur', hour: '2-digit', minute: '2-digit' })}.`,
+                        data: {
+                            eventId: eventDoc.id,
+                            eventTitle: event.title,
+                            startDate: event.startDate,
+                            location: event.location
+                        },
+                        read: false,
+                        createdAt: admin.firestore.FieldValue.serverTimestamp()
+                    });
+                    batchCount++;
+                    reminderCount++;
+                    if (batchCount >= BATCH_LIMIT) {
+                        await flushBatch();
+                    }
+                }
             }
         }
+        await flushBatch();
+        if (reminderCount > 0) {
+            console.log(`Sent ${reminderCount} event reminders`);
+        }
+        return null;
     }
-    if (reminderCount > 0) {
-        await batch.commit();
-        console.log(`Sent ${reminderCount} event reminders`);
+    catch (error) {
+        console.error('[sendEventReminders] Fatal error — aborting run:', error);
+        return null;
     }
-    return null;
 });
 // ─── Helper: send FCM push + create Firestore notification doc ───────────────
 async function sendFcmPush(memberId, title, body, type, data = {}) {
@@ -272,9 +324,9 @@ exports.sendBirthdayNotifications = functions.pubsub
     .schedule('0 0 * * *')
     .timeZone('Asia/Kuala_Lumpur')
     .onRun(async (_context) => {
-    const now = new Date();
-    const todayMonth = now.getMonth() + 1; // 1-12
-    const todayDay = now.getDate();
+    const nowMYT = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }));
+    const todayMonth = nowMYT.getMonth() + 1; // 1-12
+    const todayDay = nowMYT.getDate();
     // Fetch all active members
     const membersSnap = await db.collection('members')
         .where('status', '==', 'active')
@@ -302,9 +354,7 @@ exports.sendBirthdayNotifications = functions.pubsub
         return null;
     }
     console.log(`Birthdays today: ${birthdayMembers.map(m => m.name).join(', ')}`);
-    // 1. Send personal birthday wish to each birthday member
-    const personalWishes = birthdayMembers.map(({ id, name }) => sendFcmPush(id, `Happy Birthday, ${name}! 🎂`, 'Wishing you a wonderful day filled with joy! From everyone at JCI KL.', 'birthday_self', { type: 'birthday_self' }).catch(err => console.error(`Failed birthday push for ${id}:`, err)));
-    // 2. Announce to all other members
+    // 2. Determine other members for announcements
     const allMemberIds = membersSnap.docs.map(d => d.id);
     const birthdayIds = new Set(birthdayMembers.map(m => m.id));
     const otherMemberIds = allMemberIds.filter(id => !birthdayIds.has(id));
@@ -312,8 +362,75 @@ exports.sendBirthdayNotifications = functions.pubsub
     const announcementBody = birthdayMembers.length === 1
         ? `Today is ${birthdayNames}'s birthday! 🎉 Send them your wishes.`
         : `Today is ${birthdayNames}'s birthday! 🎉 Send them your wishes.`;
-    const announcements = otherMemberIds.map(id => sendFcmPush(id, 'Birthday Today! 🎂', announcementBody, 'birthday_announcement', { type: 'birthday_announcement', names: birthdayNames }).catch(err => console.error(`Failed announcement push for ${id}:`, err)));
-    await Promise.all([...personalWishes, ...announcements]);
+    // F12 fix: collect all Firestore notification objects first, then write in
+    // batches of 490 to avoid rate-limiting from hundreds of concurrent .add() calls.
+    // FCM sends remain as Promise.all (they cannot be Firestore-batched).
+    const BATCH_LIMIT = 490;
+    const now2 = admin.firestore.FieldValue.serverTimestamp();
+    const firestoreNotifs = [];
+    // Personal birthday wishes
+    for (const { id, name } of birthdayMembers) {
+        firestoreNotifs.push({
+            memberId: id,
+            type: 'birthday_self',
+            title: `Happy Birthday, ${name}! 🎂`,
+            message: 'Wishing you a wonderful day filled with joy! From everyone at JCI KL.',
+            data: { type: 'birthday_self' },
+            read: false,
+            createdAt: now2,
+            timestamp: now2,
+        });
+    }
+    // Announcements to other members
+    for (const id of otherMemberIds) {
+        firestoreNotifs.push({
+            memberId: id,
+            type: 'birthday_announcement',
+            title: 'Birthday Today! 🎂',
+            message: announcementBody,
+            data: { type: 'birthday_announcement', names: birthdayNames },
+            read: false,
+            createdAt: now2,
+            timestamp: now2,
+        });
+    }
+    // Write Firestore notifications in capped batches
+    let fsBatch = db.batch();
+    let fsCount = 0;
+    for (const payload of firestoreNotifs) {
+        fsBatch.set(db.collection('notifications').doc(), payload);
+        fsCount++;
+        if (fsCount >= BATCH_LIMIT) {
+            await fsBatch.commit();
+            fsBatch = db.batch();
+            fsCount = 0;
+        }
+    }
+    if (fsCount > 0)
+        await fsBatch.commit();
+    // Send FCM pushes concurrently (cannot be batched via Firestore)
+    // Look up FCM tokens and send — kept separate from Firestore writes above.
+    const sendFcmOnly = async (memberId, title, body, data) => {
+        var _a;
+        const userDoc = await db.collection('users').doc(memberId).get();
+        const fcmToken = (_a = userDoc.data()) === null || _a === void 0 ? void 0 : _a.fcmToken;
+        if (!fcmToken)
+            return;
+        await admin.messaging().send({
+            token: fcmToken,
+            notification: { title, body },
+            webpush: {
+                notification: {
+                    icon: '/favicon-128x128.png',
+                    badge: '/favicon-64x64.png',
+                },
+            },
+            data,
+        });
+    };
+    const personalFcm = birthdayMembers.map(({ id, name }) => sendFcmOnly(id, `Happy Birthday, ${name}! 🎂`, 'Wishing you a wonderful day filled with joy! From everyone at JCI KL.', { type: 'birthday_self' }).catch(err => console.error(`Failed birthday FCM for ${id}:`, err)));
+    const announcementFcm = otherMemberIds.map(id => sendFcmOnly(id, 'Birthday Today! 🎂', announcementBody, { type: 'birthday_announcement', names: birthdayNames }).catch(err => console.error(`Failed announcement FCM for ${id}:`, err)));
+    await Promise.all([...personalFcm, ...announcementFcm]);
     console.log(`Birthday notifications sent: ${birthdayMembers.length} personal, ${otherMemberIds.length} announcements.`);
     return null;
 });

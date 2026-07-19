@@ -44,12 +44,11 @@ const db = admin.firestore();
  */
 exports.onSubmissionApproved = functions.firestore
     .document('incentiveSubmissions/{submissionId}')
-    .onUpdate(async (change, context) => {
+    .onCreate(async (snap, context) => {
     var _a, _b;
-    const before = change.before.data();
-    const after = change.after.data();
-    // Only proceed if status changed from something else to APPROVED
-    if (before.status === 'APPROVED' || after.status !== 'APPROVED') {
+    const after = snap.data();
+    // Only proceed if the submission was created with APPROVED status
+    if (after.status !== 'APPROVED') {
         return null;
     }
     const standardId = after.standardId;
@@ -150,23 +149,66 @@ exports.onEventRegistrationUpdate = functions.firestore
     const { memberId, eventId, loId } = after;
     if (!memberId || !loId)
         return null;
-    // A real implementation would query `incentiveStandards` for the right standardId 
-    // linked to event attendance, perhaps `2026_NETWORK_01` (Attending an Event).
-    // Let's assume a hardcoded generic ID or find one with "verificationType: 'AUTO_SYSTEM'".
     try {
+        // 1. Find the active incentive program
+        const activeProgramSnap = await db.collection('incentivePrograms')
+            .where('isActive', '==', true)
+            .limit(1)
+            .get();
+        if (activeProgramSnap.empty) {
+            console.warn(`onEventRegistrationUpdate: No active incentive program found. Skipping auto-submission for ${memberId} / ${eventId}.`);
+            return null;
+        }
+        const activeProgramDoc = activeProgramSnap.docs[0];
+        const activeProgramId = activeProgramDoc.id;
+        // 2. Find the incentive standard with autoLogicId === 'NETWORK_EVENT_ATTENDANCE'
+        //    that belongs to the active program
+        const standardSnap = await db.collection('incentiveStandards')
+            .where('programId', '==', activeProgramId)
+            .where('autoLogicId', '==', 'NETWORK_EVENT_ATTENDANCE')
+            .limit(1)
+            .get();
+        if (standardSnap.empty) {
+            console.warn(`onEventRegistrationUpdate: No incentiveStandard with autoLogicId='NETWORK_EVENT_ATTENDANCE' ` +
+                `found for program '${activeProgramId}'. Skipping auto-submission for ${memberId} / ${eventId}.`);
+            return null;
+        }
+        const standardDoc = standardSnap.docs[0];
+        const standardId = standardDoc.id;
+        const standard = standardDoc.data();
+        // Derive score: use first milestone's points if available, otherwise pointCap, otherwise 10
+        const milestones = standard.milestones || [];
+        const scoreAwarded = milestones.length > 0 && milestones[0].points
+            ? milestones[0].points
+            : standard.pointCap || 10;
+        // 3. Duplicate-submission guard: skip if this member already has a submission
+        //    for this event under the NETWORK_EVENT_ATTENDANCE standard.
+        const existing = await db.collection('incentiveSubmissions')
+            .where('memberId', '==', memberId)
+            .where('eventId', '==', eventId)
+            .where('type', '==', 'NETWORK_EVENT_ATTENDANCE')
+            .limit(1)
+            .get();
+        if (!existing.empty) {
+            console.log(`Duplicate submission guard triggered for memberId=${memberId} eventId=${eventId}`);
+            return null;
+        }
+        // 4. Create the submission using the real standardId
         await db.collection('incentiveSubmissions').add({
             loId: loId,
             memberId: memberId,
-            standardId: 'AUTO_EVENT_ATTENDANCE', // This should be queried
+            eventId: eventId,
+            type: 'NETWORK_EVENT_ATTENDANCE',
+            standardId: standardId,
             quantity: 1,
             status: 'APPROVED',
-            scoreAwarded: 10,
+            scoreAwarded: scoreAwarded,
             evidenceText: `System auto-verified: Event check-in for ${eventId}`,
             evidenceFiles: [],
             submittedAt: admin.firestore.FieldValue.serverTimestamp(),
             approvedBy: 'SYSTEM'
         });
-        console.log(`Auto assigned points to Member ${memberId} of LO ${loId} for checking in to ${eventId}`);
+        console.log(`Auto assigned ${scoreAwarded} points (standard: ${standardId}) to Member ${memberId} of LO ${loId} for checking in to ${eventId}`);
         return null;
     }
     catch (err) {
