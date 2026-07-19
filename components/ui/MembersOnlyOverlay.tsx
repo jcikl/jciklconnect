@@ -31,9 +31,9 @@ export const MembersOnlyOverlay: React.FC<MembersOnlyOverlayProps> = ({
       </div>
       <h3 className={compact ? 'text-sm font-black text-slate-900 mb-1' : 'text-lg font-black text-slate-900 mb-2'}>{title}</h3>
       <p className={compact ? 'text-xs text-slate-500 leading-relaxed max-w-xs' : 'text-sm text-slate-500 leading-relaxed max-w-sm'}>{description}</p>
-      {member && !compact && (
-        <div className="mt-4">
-          <PaymentButton type="membership" member={member} year={year} label="开通会员" />
+      {member && (
+        <div className={compact ? 'mt-2' : 'mt-4'}>
+          <PaymentButton type="membership" member={member} year={year} label="开通会员" size={compact ? 'sm' : 'md'} />
         </div>
       )}
     </div>
