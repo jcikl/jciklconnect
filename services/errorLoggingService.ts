@@ -1,5 +1,6 @@
 import { ErrorInfo } from 'react';
 import { auth } from '../config/firebase';
+import { COLLECTIONS } from '../config/constants';
 
 function sanitizeContext(obj: unknown, depth = 0): unknown {
   if (depth > 3 || obj === null || typeof obj !== 'object') return obj;
@@ -231,7 +232,7 @@ class ErrorLoggingService {
       let attempts = 0;
       while (attempts < 3) {
         try {
-          await addDoc(collection(db, 'errorLogs'), payload);
+          await addDoc(collection(db, COLLECTIONS.ERROR_LOGS), payload);
           break;
         } catch (err) {
           attempts++;

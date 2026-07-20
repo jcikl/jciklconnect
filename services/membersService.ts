@@ -666,7 +666,7 @@ export class MembersService {
             throw new Error('This email is already used by another account. Email not updated.');
           }
           if (!res.ok) {
-            console.warn('update-auth-email failed with status', res.status, '— Firestore email updated without Auth sync');
+            errorLoggingService.logWarning(`update-auth-email returned ${res.status} — Firestore email updated without Auth sync`, { component: 'MembersService', action: 'updateMember' });
           }
         } catch (err) {
           if (err instanceof Error && err.message.includes('already used')) throw err;
@@ -687,8 +687,7 @@ export class MembersService {
       } catch (syncErr) {
         // Note: sync failure is intentionally non-fatal. The calling UI hook (useMemberMutations)
         // shows a toast on any error returned. Developer visibility is provided via console.warn.
-        console.warn('[updateMember] syncBoardMemberDisplayFields failed (non-fatal):', syncErr);
-        errorLoggingService.logError(syncErr as Error, { component: 'updateMember', additionalData: { action: 'syncBoardMemberDisplayFields', memberId } });
+        errorLoggingService.logError(syncErr as Error, { component: 'MembersService', action: 'syncBoardMemberDisplayFields', additionalData: { memberId } });
       }
 
       // TODO (SYNC-NAME-EVENTREG): When member name changes (general.name / fullName), the
@@ -819,12 +818,12 @@ export class MembersService {
       if (Object.keys(cleanDisplay).length === 0) return;
 
       const boardSnapshot = await getDocs(
-        query(collection(db, 'boardMembers'), where('memberId', '==', memberId))
+        query(collection(db, COLLECTIONS.BOARD_MEMBERS), where('memberId', '==', memberId))
       );
 
       const batch = writeBatch(db);
       boardSnapshot.docs.forEach((boardDoc) => {
-        batch.update(doc(db, 'boardMembers', boardDoc.id), {
+        batch.update(doc(db, COLLECTIONS.BOARD_MEMBERS, boardDoc.id), {
           ...cleanDisplay,
           updatedAt: new Date().toISOString(),
         });
@@ -865,7 +864,7 @@ export class MembersService {
       if (!['ADMIN', 'SUPER_ADMIN'].includes(currentRole)) {
         const e: any = new Error('User lacks ADMIN / SUPER_ADMIN role for deletion');
         e.code = 'permission-denied';
-        console.warn(`Delete blocked: user ${currentUid} with role=${currentRole} attempted to delete member ${memberId}`);
+        errorLoggingService.logWarning(`Delete blocked: user ${currentUid} (role=${currentRole}) attempted to delete member ${memberId}`, { component: 'MembersService', action: 'deleteMember' });
         throw e;
       }
 
@@ -892,7 +891,7 @@ export class MembersService {
         ? ((targetDoc.data() as any)?.contact?.email || (targetDoc.data() as any)?.email)
         : undefined;
       const [boardSnap, bizSnap, regSnap, prSnap, notifSnap] = await Promise.all([
-        getDocs(query(collection(db, 'boardMembers'), where('memberId', '==', memberId))),
+        getDocs(query(collection(db, COLLECTIONS.BOARD_MEMBERS), where('memberId', '==', memberId))),
         getDocs(query(collection(db, COLLECTIONS.PUBLIC_BUSINESS_LISTINGS), where('memberId', '==', memberId))),
         getDocs(query(collection(db, COLLECTIONS.EVENT_REGISTRATIONS), where('memberId', '==', memberId))),
         getDocs(query(collection(db, COLLECTIONS.PAYMENT_REQUESTS), where('memberId', '==', memberId), where('status', 'in', ['pending', 'submitted', 'approved']))),
@@ -1121,7 +1120,7 @@ export class MembersService {
       }
       // Query boardMembers first so we can include the displayRole update in the same batch (E-03)
       const boardSnap = await getDocs(
-        query(collection(db, 'boardMembers'), where('memberId', '==', memberId))
+        query(collection(db, COLLECTIONS.BOARD_MEMBERS), where('memberId', '==', memberId))
       );
       const roleBatch = writeBatch(db);
       roleBatch.update(doc(db, COLLECTIONS.MEMBERS, memberId), {
@@ -1425,14 +1424,14 @@ export class MembersService {
 
       // Clean up boardMembers and businessDirectory for all deleted members (E-01)
       const [boardSnaps, bizSnaps] = await Promise.all([
-        getDocs(query(collection(db, 'boardMembers'), where('memberId', 'in', memberIds.slice(0, 30)))),
+        getDocs(query(collection(db, COLLECTIONS.BOARD_MEMBERS), where('memberId', 'in', memberIds.slice(0, 30)))),
         getDocs(query(collection(db, COLLECTIONS.PUBLIC_BUSINESS_LISTINGS), where('memberId', 'in', memberIds.slice(0, 30)))),
       ]);
       // Handle batches > 30 (Firestore 'in' limit is 30)
       const extraBoardSnaps = memberIds.length > 30
         ? await Promise.all(
             Array.from({ length: Math.ceil((memberIds.length - 30) / 30) }, (_, i) =>
-              getDocs(query(collection(db, 'boardMembers'), where('memberId', 'in', memberIds.slice(30 + i * 30, 60 + i * 30))))
+              getDocs(query(collection(db, COLLECTIONS.BOARD_MEMBERS), where('memberId', 'in', memberIds.slice(30 + i * 30, 60 + i * 30))))
             )
           )
         : [];

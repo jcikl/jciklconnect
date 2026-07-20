@@ -78,6 +78,8 @@ export const COLLECTIONS = {
   BOARD_MEMBERS: 'boardMembers',
   BOARD_TRANSITIONS: 'boardTransitions',
   BOARD_TERM_SETTINGS: 'boardTermSettings',
+  MENTORSHIP_FEEDBACK: 'mentorshipFeedback',
+  ERROR_LOGS: 'errorLogs',
   INQUIRIES: 'inquiries',
   TOYYIB_CATEGORIES: 'toyyibCategories',
   TOYYIB_BILLS: 'toyyibBills',

@@ -239,7 +239,7 @@ export class MentorshipService {
             updatedAt: new Date().toISOString(),
           };
 
-          const mentorMatchesRef = collection(db, 'mentorMatches');
+          const mentorMatchesRef = collection(db, COLLECTIONS.MENTOR_MATCHES);
           const docRef = await addDoc(mentorMatchesRef, matchData);
 
           return {
@@ -260,7 +260,7 @@ export class MentorshipService {
       () => { console.log(`[Dev Mode] Would approve mentor match: ${matchId}`); },
       async () => {
         try {
-          const matchRef = doc(db, 'mentorMatches', matchId);
+          const matchRef = doc(db, COLLECTIONS.MENTOR_MATCHES, matchId);
           const matchDoc = await getDoc(matchRef);
 
           if (!matchDoc.exists()) {
@@ -360,7 +360,7 @@ export class MentorshipService {
       () => [],
       async () => {
         try {
-          const mentorMatchesRef = collection(db, 'mentorMatches');
+          const mentorMatchesRef = collection(db, COLLECTIONS.MENTOR_MATCHES);
           const q = query(
             mentorMatchesRef,
             where('mentorId', '==', memberId),
@@ -386,7 +386,7 @@ export class MentorshipService {
       () => [],
       async () => {
         try {
-          const mentorMatchesRef = collection(db, 'mentorMatches');
+          const mentorMatchesRef = collection(db, COLLECTIONS.MENTOR_MATCHES);
           const q = query(
             mentorMatchesRef,
             where('menteeId', '==', memberId),
@@ -412,7 +412,7 @@ export class MentorshipService {
       () => { console.log(`[Dev Mode] Would complete mentorship: ${matchId}`); },
       async () => {
         try {
-          const matchRef = doc(db, 'mentorMatches', matchId);
+          const matchRef = doc(db, COLLECTIONS.MENTOR_MATCHES, matchId);
           const matchDoc = await getDoc(matchRef);
           if (!matchDoc.exists()) {
             throw new Error('Mentor match not found');
@@ -463,7 +463,7 @@ export class MentorshipService {
 
       if (!isDevMode()) {
         try {
-          const mentorMatchesRef = collection(db, 'mentorMatches');
+          const mentorMatchesRef = collection(db, COLLECTIONS.MENTOR_MATCHES);
           const completedQuery = query(mentorMatchesRef, where('status', '==', 'completed'));
           const completedSnapshot = await getDocs(completedQuery);
           completedMentorships = completedSnapshot.size;
@@ -501,7 +501,7 @@ export class MentorshipService {
           if (hours <= 0) {
             throw new Error('Session hours must be a positive number');
           }
-          const matchRef = doc(db, 'mentorMatches', matchId);
+          const matchRef = doc(db, COLLECTIONS.MENTOR_MATCHES, matchId);
           await updateDoc(matchRef, {
             sessionCount: increment(1),
             totalHours: increment(hours),
@@ -522,7 +522,7 @@ export class MentorshipService {
       () => { console.log(`[Dev Mode] Would cancel mentorship: ${matchId}`); },
       async () => {
         try {
-          const matchRef = doc(db, 'mentorMatches', matchId);
+          const matchRef = doc(db, COLLECTIONS.MENTOR_MATCHES, matchId);
           const matchDoc = await getDoc(matchRef);
           if (!matchDoc.exists()) {
             throw new Error('Mentor match not found');
@@ -572,7 +572,7 @@ export class MentorshipService {
       () => { console.log(`[Dev Mode] Would delete mentor match: ${matchId}`); },
       async () => {
         try {
-          const matchRef = doc(db, 'mentorMatches', matchId);
+          const matchRef = doc(db, COLLECTIONS.MENTOR_MATCHES, matchId);
           const matchDoc = await getDoc(matchRef);
           if (!matchDoc.exists()) {
             throw new Error('Mentor match not found');
@@ -624,7 +624,7 @@ export class MentorshipService {
             createdAt: new Date().toISOString(),
           };
 
-          const feedbackRef = collection(db, 'mentorshipFeedback');
+          const feedbackRef = collection(db, COLLECTIONS.MENTORSHIP_FEEDBACK);
           await addDoc(feedbackRef, feedbackData);
         } catch (error) {
           errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MentorshipService.collectFeedback' });

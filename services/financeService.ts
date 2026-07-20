@@ -3140,14 +3140,14 @@ export class FinanceService {
       results.forEach((result, i) => {
         if (result.status === 'rejected') {
           const memberId = toNotify[i].transaction.memberId ?? 'unknown';
-          console.warn(`[sendDuesReminders] notification failed for ${memberId}:`, result.reason);
+          errorLoggingService.logError(result.reason instanceof Error ? result.reason : new Error(String(result.reason)), { component: 'FinanceService', action: 'sendDuesReminders', additionalData: { memberId } });
           failed.push(memberId);
         }
       });
 
       const sent = results.filter(r => r.status === 'fulfilled').length;
       if (failed.length > 0) {
-        console.warn(`[sendDuesReminders] ${failed.length} of ${toNotify.length} reminders failed for year ${year}`);
+        errorLoggingService.logWarning(`sendDuesReminders: ${failed.length} of ${toNotify.length} reminders failed for year ${year}`, { component: 'FinanceService', action: 'sendDuesReminders', additionalData: { year, failedCount: failed.length } });
       }
       return { sent, failed };
     } catch (error) {

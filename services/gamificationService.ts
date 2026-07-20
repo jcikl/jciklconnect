@@ -301,7 +301,7 @@ export class GamificationService {
                         });
                     } catch (notifErr) {
                         errorLoggingService.logError(notifErr as Error, { component: 'GamificationService', action: 'awardAward.notification', additionalData: { awardId, memberId } });
-                        console.warn('[awardAward] Notification failed after badge committed:', notifErr);
+                        // logError already called above; no additional action needed
                     }
 
                     return badgeAwardRef.id;
