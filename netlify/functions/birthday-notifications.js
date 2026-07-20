@@ -50,12 +50,6 @@ async function sendFcmPush(memberId, title, body, type, extraData = {}) {
 }
 
 exports.handler = async (_event) => {
-  // DISABLED: Birthday notifications are now sent exclusively by the Firebase Cloud Function
-  // `sendBirthdayNotifications` (functions/src/notifications.ts) which includes dedup via
-  // the birthdayNotificationsSent collection. This Netlify function is kept for reference only.
-  return { statusCode: 200, body: 'Birthday notifications are handled by the Cloud Function scheduler.' };
-
-  // --- dead code below --- (kept for reference)
   if (!_fbProjectId || !_fbClientEmail || !_fbPrivateKey) {
     return { statusCode: 500, body: JSON.stringify({ error: 'Missing Firebase Admin credentials' }) };
   }
@@ -125,5 +119,5 @@ exports.handler = async (_event) => {
   }
 };
 
-// Schedule removed — function is disabled. Birthday notifications run via Cloud Function only.
-// exports.config = { schedule: '0 0 * * *' };
+// Runs daily at midnight Malaysia time (UTC+8 = 16:00 UTC)
+exports.config = { schedule: '0 16 * * *' };
