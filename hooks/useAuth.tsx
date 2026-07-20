@@ -94,7 +94,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       } as User;
 
       setUser(mockUser);
-      // AUTH-006 / TODO SEC-003: guard with import.meta.env.DEV so this path is compiled out of production.
+      // AUTH-006: dev mock path compiled out of production via import.meta.env.DEV guard.
     const _devEmail = import.meta.env.DEV ? (import.meta.env.VITE_DEV_EMAIL as string | undefined) : undefined;
       const member = (_devEmail && storedState.user.email === _devEmail) ? MOCK_DEV_ADMIN : (storedState.member as Member);
       setMember(member);
@@ -278,7 +278,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // AUTH-006: Dev mock login is compiled OUT of production builds via the import.meta.env.DEV
     // guard. VITE_DEV_EMAIL / VITE_DEV_PASSWORD are still VITE_-prefixed (bundled), but because
     // this entire block is dead code in production the values are tree-shaken out.
-    // TODO SEC-003: rename to DEV_EMAIL / DEV_PASSWORD (non-VITE_) for full elimination.
+    // NOTE: VITE_DEV_EMAIL/VITE_DEV_PASSWORD are only bundled in dev builds (import.meta.env.DEV guard).
+    // Renaming to non-VITE_ prefix would require Netlify + local .env changes — deferred.
     const devEmail = import.meta.env.DEV ? (import.meta.env.VITE_DEV_EMAIL as string | undefined) : undefined;
     const devPassword = import.meta.env.DEV ? (import.meta.env.VITE_DEV_PASSWORD as string | undefined) : undefined;
     if (devEmail && devPassword && email === devEmail && password === devPassword) {

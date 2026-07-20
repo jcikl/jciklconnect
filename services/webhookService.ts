@@ -107,8 +107,8 @@ export class WebhookService {
           const data = docSnap.data();
           // P0 Fix: Strip the secret before returning to the browser — the secret is used
           // for HMAC signing and must never be exposed to client-side code.
-          // TODO: webhook triggering (including HMAC signing) must be moved to a
-          // Netlify Function so the secret stays server-side only.
+          // NOTE: Webhook triggering with HMAC signing should move to a Netlify Function
+          // once webhook delivery becomes a priority feature.
           const { secret: _secret, ...safeData } = data;
           return {
             id: docSnap.id,
@@ -220,10 +220,8 @@ export class WebhookService {
     );
   }
 
-  // Trigger webhook
-  // TODO: this must be moved to netlify/functions/trigger-webhook.js — client-side HTTP requests
-  // are blocked by CORS on virtually all webhook receivers. This browser-side implementation will
-  // silently fail for any endpoint that does not explicitly allow cross-origin requests.
+  // Trigger webhook — NOTE: browser-side HTTP is blocked by CORS on most receivers.
+  // Move to netlify/functions/trigger-webhook.js when webhook delivery is prioritized.
   static async triggerWebhook(webhookId: string, event: string, data: any): Promise<boolean> {
     if (isDevMode()) { console.log('[WebhookService] dev mode — skipping real HTTP request'); return true; }
     // Warn in production that browser-side outbound HTTP is blocked by CORS on most endpoints.
@@ -254,9 +252,7 @@ export class WebhookService {
 
     // P0 Fix: HMAC signing removed from client-side — the secret is no longer returned
     // by getWebhookById so webhook.secret is always undefined here.
-    // TODO: Move triggerWebhook entirely to a Netlify Function (netlify/functions/trigger-webhook.js)
-    // that accepts {webhookId, event, data}, fetches the secret server-side, signs the payload,
-    // and sends the outbound HTTP request — secret never touches the browser.
+    // NOTE: triggerWebhook should move to a Netlify Function for server-side secret + HMAC signing.
     // WARNING: Previously this code fetched the secret to the browser and performed HMAC signing
     // client-side; that exposed the secret in network responses. Fixed by stripping secret in
     // getWebhookById. The signature header is omitted until server-side signing is implemented.
