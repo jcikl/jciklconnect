@@ -1,6 +1,7 @@
 // Survey Analytics Service - Analyzes survey responses and generates statistics
 import { SurveysService, Survey, SurveyResponse, SurveyQuestion } from './surveysService';
 import { withDevMode } from '../utils/devMode';
+import { errorLoggingService } from './errorLoggingService';
 
 export interface QuestionAnalytics {
   questionId: string;
@@ -168,7 +169,7 @@ export class SurveyAnalyticsService {
         responseTrend,
       };
     } catch (error) {
-      console.error('Error generating survey analytics:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'SurveyAnalyticsService.generateAnalytics' });
       throw error;
     }
   });

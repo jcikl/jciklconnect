@@ -71,7 +71,7 @@ export class GamificationService {
                     GamificationService.invalidateBadgesCache();
                     return docRef.id;
                 } catch (error) {
-                    console.error('Error creating award:', error);
+                    errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'GamificationService.createAward' });
                     throw error;
                 }
             }
@@ -137,7 +137,7 @@ export class GamificationService {
                         }
                     }
                 } catch (error) {
-                    console.error('Error updating award:', error);
+                    errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'GamificationService.updateAward' });
                     throw error;
                 }
             }
@@ -158,7 +158,7 @@ export class GamificationService {
                     });
                     GamificationService.invalidateBadgesCache();
                 } catch (error) {
-                    console.error('Error deleting award:', error);
+                    errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'GamificationService.deleteAward' });
                     throw error;
                 }
             }
@@ -195,7 +195,7 @@ export class GamificationService {
                     apiCache.set(cacheKey, result, BADGES_CACHE_TTL);
                     return result;
                 } catch (error) {
-                    console.error('Error fetching awards:', error);
+                    errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'GamificationService.getAllAwards' });
                     throw error;
                 }
             }
@@ -306,7 +306,7 @@ export class GamificationService {
 
                     return badgeAwardRef.id;
                 } catch (error) {
-                    console.error('Error awarding recognition:', error);
+                    errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'GamificationService.awardAward' });
                     throw error;
                 }
             }

@@ -586,7 +586,7 @@ export class PromotionService {
       await this.sendPromotionNotification(promotion);
       if (!isDevMode()) {
         await updateDoc(promotionRef, { notificationSent: true }).catch(err =>
-          console.warn('[promoteToOfficialMember] Failed to set notificationSent=true:', err)
+          errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { context: 'PromotionService.promoteToOfficialMember.notificationSentUpdate', memberId })
         );
       }
     } catch (notificationErr) {
@@ -1071,7 +1071,7 @@ export class PromotionService {
           }
         } as unknown as Partial<Member>);
       } catch (err) {
-        console.warn(`[recordMemberActivity] Failed to persist ${activityType} for ${memberId}:`, err);
+        errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { context: 'PromotionService.recordMemberActivity', activityType, memberId });
       }
     } else {
       console.log(`Recorded ${activityType} activity for member ${memberId}`, activityData);
@@ -1101,7 +1101,7 @@ export class PromotionService {
       if (snap.exists()) return snap.data() as PromotionSettings;
     } catch (e) {
       // Fall through to defaults if Firestore is unavailable
-      console.warn('[getPromotionSettings] Could not read from Firestore, using defaults:', e);
+      errorLoggingService.logError(e instanceof Error ? e : new Error(String(e)), { context: 'PromotionService.getPromotionSettings' });
     }
     return defaults;
   }

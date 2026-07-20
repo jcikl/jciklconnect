@@ -854,8 +854,7 @@ export class ReconciliationService {
         txn.update(projectTxRef, updates);
       });
     } catch (err) {
-      console.warn('[ReconciliationService] removeProjectTxMatchEntry partially failed', err);
-      errorLoggingService.logError(err as Error, { component: 'ReconciliationService' });
+      errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { context: 'ReconciliationService.removeProjectTxMatchEntry' });
     }
   }
 }

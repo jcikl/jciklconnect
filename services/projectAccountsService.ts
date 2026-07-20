@@ -15,6 +15,7 @@ import {
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { withDevMode } from '../utils/devMode';
+import { errorLoggingService } from './errorLoggingService';
 import { FinanceService } from './financeService';
 import { ProjectsService } from './projectsService';
 import { Project } from '../types';
@@ -95,7 +96,7 @@ export class ProjectAccountsService {
       }
       return accounts;
     } catch (error) {
-      console.error('Error fetching project accounts:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'ProjectAccountsService.getAllProjectAccounts' });
       throw error;
     }
   });
@@ -145,7 +146,7 @@ export class ProjectAccountsService {
         updatedAt: new Date(),
       };
     } catch (error) {
-      console.error('Error fetching project account:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'ProjectAccountsService.getProjectAccountByProjectId', projectId });
       throw error;
     }
   });
@@ -226,7 +227,7 @@ export class ProjectAccountsService {
         reconciled: discrepancies.length === 0,
       };
     } catch (error) {
-      console.error('Error reconciling project account:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'ProjectAccountsService.reconcileProjectAccount', projectId });
       throw error;
     }
   }

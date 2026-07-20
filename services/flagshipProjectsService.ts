@@ -39,8 +39,7 @@ export class FlagshipProjectsService {
             updatedAt: doc.data().updatedAt?.toDate?.()?.toISOString?.() ?? doc.data().updatedAt,
           } as FlagshipProject));
         } catch (error) {
-          console.error('Error fetching flagship projects:', error);
-          await errorLoggingService.logError(error, { component: 'FlagshipProjectsService' });
+          await errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'FlagshipProjectsService.getAllProjects' });
           throw error;
         }
       }
@@ -60,8 +59,7 @@ export class FlagshipProjectsService {
           }
           return null;
         } catch (error) {
-          console.error('Error fetching flagship project:', error);
-          await errorLoggingService.logError(error, { component: 'FlagshipProjectsService' });
+          await errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'FlagshipProjectsService.getProjectById' });
           throw error;
         }
       }
@@ -92,8 +90,7 @@ export class FlagshipProjectsService {
           const docRef = await addDoc(collection(db, COLLECTIONS.FLAGSHIP_PROJECTS), payload);
           return docRef.id;
         } catch (error) {
-          console.error('Error creating flagship project:', error);
-          await errorLoggingService.logError(error, { component: 'FlagshipProjectsService' });
+          await errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'FlagshipProjectsService.createProject' });
           throw error;
         }
       }
@@ -116,8 +113,7 @@ export class FlagshipProjectsService {
             updatedAt: Timestamp.now(),
           });
         } catch (error) {
-          console.error('Error updating flagship project:', error);
-          await errorLoggingService.logError(error, { component: 'FlagshipProjectsService' });
+          await errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'FlagshipProjectsService.updateProject' });
           throw error;
         }
       }
@@ -149,8 +145,7 @@ export class FlagshipProjectsService {
             await Promise.allSettled(allUrls.map(url => deleteFromCloudinary(url)));
           }
         } catch (error) {
-          console.error('Error deleting flagship project:', error);
-          await errorLoggingService.logError(error, { component: 'FlagshipProjectsService' });
+          await errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'FlagshipProjectsService.deleteProject' });
           throw error;
         }
       }

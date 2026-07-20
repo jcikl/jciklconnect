@@ -1,4 +1,5 @@
 import { collection, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { errorLoggingService } from './errorLoggingService';
 import { db } from '../config/firebase';
 import { MembershipDues, MembershipRuleConfig, MembershipType, UserRole } from '../types';
 
@@ -290,7 +291,7 @@ export const MembershipConfigService = {
       }
     } catch (error: any) {
       if (error?.code !== 'permission-denied') {
-        console.warn('Membership settings not available from Firestore, using defaults.');
+        errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MembershipConfigService.getMembershipSettings' });
       }
     }
     return {

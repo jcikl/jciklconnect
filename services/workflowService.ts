@@ -654,7 +654,7 @@ export class WorkflowService {
               clearTimeout(timeoutId);
             }
           } catch (error) {
-            console.error('WorkflowService: call_webhook step failed:', error);
+            errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'WorkflowService.executeStep.call_webhook' });
             // Webhook failures are non-fatal by design.
           }
         } else {

@@ -101,7 +101,7 @@ export class ContractService {
       try {
         await PointsService.releaseEscrow(escrowId, memberId);
       } catch (releaseErr) {
-        console.error('ContractService.signContract: rollback releaseEscrow failed', releaseErr);
+        errorLoggingService.logError(releaseErr instanceof Error ? releaseErr : new Error(String(releaseErr)), { context: 'ContractService.signContract.rollbackReleaseEscrow' });
         // P1 — write a finance_alert so an admin can manually release the locked points
         try {
           await addDoc(collection(db, COLLECTIONS.FINANCE_ALERTS), {
@@ -223,7 +223,7 @@ export class ContractService {
           'contract'
         );
       } catch (penaltyErr) {
-        console.error('ContractService.enforcePenalty: penalty deduction failed', penaltyErr);
+        errorLoggingService.logError(penaltyErr instanceof Error ? penaltyErr : new Error(String(penaltyErr)), { context: 'ContractService.enforcePenalty.penaltyDeduction' });
         // Non-fatal: the contract is already marked Failed; log and continue
       }
     }

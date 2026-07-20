@@ -108,7 +108,7 @@ export class PointsRuleService {
       }
       return null;
     } catch (error) {
-      console.error('Error fetching points rule:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsRuleService.getPointsRuleById' });
       throw error;
     }
   });
@@ -268,7 +268,7 @@ export class PointsRuleService {
         passed: allConditionsPassed,
       };
     } catch (error) {
-      console.error('Error testing rule:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsRuleService.testRule' });
       return {
         ruleId: rule.id,
         ruleName: rule.name,
@@ -578,7 +578,7 @@ export class PointsRuleService {
         topTriggers,
       };
     } catch (error) {
-      console.error('Error getting rule analytics:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsRuleService.getRuleAnalytics' });
       throw error;
     }
       },

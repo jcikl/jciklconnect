@@ -4,6 +4,7 @@ import { EventsService } from './eventsService';
 import { ProjectsService } from './projectsService';
 import { MembersService } from './membersService';
 import { withDevMode } from '../utils/devMode';
+import { errorLoggingService } from './errorLoggingService';
 
 export interface EventDemandPrediction {
   eventId?: string;
@@ -190,7 +191,7 @@ export class AIPredictionService {
             optimalDate: proposedDate,
           };
         } catch (error) {
-          console.error('Error predicting event demand:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'AIPredictionService.predictEventDemand' });
           throw error;
         }
       }
@@ -313,7 +314,7 @@ export class AIPredictionService {
             recommendations,
           };
         } catch (error) {
-          console.error('Error predicting project success:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'AIPredictionService.predictProjectSuccess', projectId });
           throw error;
         }
       }
@@ -383,7 +384,7 @@ export class AIPredictionService {
           // Sort by match score (highest first)
           return matches.sort((a, b) => b.matchScore - a.matchScore);
         } catch (error) {
-          console.error('Error matching sponsors:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'AIPredictionService.matchSponsors', projectId });
           throw error;
         }
       }
@@ -473,7 +474,7 @@ export class AIPredictionService {
             actionableInsights,
           };
         } catch (error) {
-          console.error('Error analyzing sentiment:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'AIPredictionService.analyzeSentiment', sourceId });
           throw error;
         }
       }
@@ -679,7 +680,7 @@ export class AIPredictionService {
             interventionPriority,
           };
         } catch (error) {
-          console.error('Error predicting member churn:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'AIPredictionService.predictMemberChurn', memberId });
           throw error;
         }
       }
@@ -894,7 +895,7 @@ export class AIPredictionService {
 
           return recommendations.slice(0, limit);
         } catch (error) {
-          console.error('Error getting personalized recommendations:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'AIPredictionService.getPersonalizedRecommendations', memberId });
           throw error;
         }
       }

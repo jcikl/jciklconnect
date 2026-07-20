@@ -184,7 +184,7 @@ export class PointsService {
 
           return pointsDocRef.id;
         } catch (error) {
-          console.error('Error awarding points:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.awardPoints' });
           throw error;
         }
       }
@@ -460,7 +460,7 @@ export class PointsService {
             } as PointTransaction;
           });
         } catch (error) {
-          console.error('Error fetching point history:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.getMemberPointHistory' });
           throw error;
         }
       }
@@ -538,7 +538,7 @@ export class PointsService {
         .sort((a, b) => (b.points || 0) - (a.points || 0))
         .slice(0, limitCount);
     } catch (error) {
-      console.error('Error fetching leaderboard:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.getLeaderboard' });
       throw error;
     }
   }
@@ -579,7 +579,7 @@ export class PointsService {
           apiCache.deleteByPrefix('members:byRole:');
           PointsService.invalidatePointsCache();
         } catch (error) {
-          console.error('Error updating member points:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.updateMemberPoints' });
           throw error;
         }
       }
@@ -636,7 +636,7 @@ export class PointsService {
           // Invalidate members cache after write
           MembersService.invalidateMembersCache();
         } catch (error) {
-          console.error('Error updating leaderboard visibility:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.updateLeaderboardVisibility' });
           throw error;
         }
       }
@@ -694,7 +694,7 @@ export class PointsService {
                 updatedAt: data.updatedAt?.toDate?.() || data.updatedAt || new Date(),
               } as PointRule;
             } catch (error) {
-              console.error('Error fetching point rule:', error);
+              errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.getPointRule' });
               throw error;
             }
           },
@@ -760,7 +760,7 @@ export class PointsService {
             } as PointRule;
           });
         } catch (error) {
-          console.error('Error fetching all point rules:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.getPointRules' });
           throw error;
         }
           },
@@ -808,7 +808,7 @@ export class PointsService {
             return docRef.id;
           }
         } catch (error) {
-          console.error('Error saving point rule:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.savePointRule' });
           throw error;
         }
       }
@@ -833,7 +833,7 @@ export class PointsService {
           });
           PointsService.invalidatePointRulesCache();
         } catch (error) {
-          console.error('Error deleting point rule:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.deletePointRule' });
           throw error;
         }
       }
@@ -949,7 +949,7 @@ export class PointsService {
           PointsService.invalidatePointsCache();
           MembersService.invalidateMembersCache();
         } catch (error) {
-          console.error('Error during point transfer:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.transferPoints' });
           throw error;
         }
       }
@@ -1022,7 +1022,7 @@ export class PointsService {
           MembersService.invalidateMembersCache();
           return escrowId;
         } catch (error) {
-          console.error('Error locking points:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.lockPointsForEscrow' });
           throw error;
         }
       }
@@ -1089,7 +1089,7 @@ export class PointsService {
           PointsService.invalidatePointsCache();
           MembersService.invalidateMembersCache();
         } catch (error) {
-          console.error('Error releasing escrow:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.releaseEscrow' });
           throw error;
         }
       }
@@ -1149,12 +1149,12 @@ export class PointsService {
           MembersService.invalidateMembersCache();
           expired++;
         } catch (err) {
-          console.error('[cleanupExpiredEscrow] Failed to expire escrow', escrowDoc.id, err);
+          errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { context: 'PointsService.cleanupExpiredEscrow', escrowId: escrowDoc.id });
           errors++;
         }
       }
     } catch (error) {
-      console.error('[cleanupExpiredEscrow] Query failed:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.cleanupExpiredEscrow.query' });
       throw error;
     }
     return { expired, errors };
@@ -1219,7 +1219,7 @@ export class PointsService {
           if (snapshot.empty) return null;
           return { ...snapshot.docs[0].data(), id: snapshot.docs[0].id } as IncentiveProgram;
         } catch (error) {
-          console.error('Error fetching active program:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.getActiveProgram' });
           throw error;
         }
       }
@@ -1234,7 +1234,7 @@ export class PointsService {
       const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as IncentiveProgram));
     } catch (error) {
-      console.error('Error fetching programs:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.getIncentivePrograms' });
       throw error;
     }
   }
@@ -1248,7 +1248,7 @@ export class PointsService {
       if (snapshot.empty) return null;
       return { ...snapshot.docs[0].data(), id: snapshot.docs[0].id } as IncentiveProgram;
     } catch (error) {
-      console.error('Error fetching program by year:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.getProgramByYear' });
       throw error;
     }
   }
@@ -1334,7 +1334,7 @@ export class PointsService {
       PointsService.invalidateIncentiveCache();
       return newProgramRef.id;
     } catch (error) {
-      console.error('Error cloning program:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.cloneProgram' });
       throw error;
     }
   }
@@ -1356,7 +1356,7 @@ export class PointsService {
         const snapshot = await getDocs(q);
         return snapshot.docs.map(d => ({ ...d.data(), id: d.id }) as IncentiveStandard);
       } catch (error) {
-        console.error('Error fetching standards:', error);
+        errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.getStandards' });
         throw error;
       }
     }, 3 * 60 * 1000);
@@ -1451,7 +1451,7 @@ export class PointsService {
       PointsService.invalidateIncentiveCache();
       return docRef.id;
     } catch (error) {
-      console.error('Error submitting incentive claim:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.submitIncentiveClaim' });
       throw error;
     }
   }
@@ -1475,7 +1475,7 @@ export class PointsService {
         } as IncentiveSubmission;
       });
     } catch (error) {
-      console.error('Error fetching LO submissions:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.getLOSubmissions' });
       throw error;
     }
   }
@@ -1499,7 +1499,7 @@ export class PointsService {
         } as IncentiveSubmission;
       });
     } catch (error) {
-      console.error('Error fetching User submissions:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.getUserSubmissions' });
       throw error;
     }
   }
@@ -1523,7 +1523,7 @@ export class PointsService {
         } as IncentiveSubmission;
       });
     } catch (error) {
-      console.error('Error fetching pending submissions:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.getPendingSubmissions' });
       throw error;
     }
   }
@@ -1689,7 +1689,7 @@ export class PointsService {
       PointsService.invalidatePointsCache();
       PointsService.invalidateIncentiveCache();
     } catch (error) {
-      console.error('Error approving claim:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.approveClaim' });
       throw error;
     }
   }
@@ -1774,7 +1774,7 @@ export class PointsService {
       PointsService.invalidatePointsCache();
       PointsService.invalidateIncentiveCache();
     } catch (error) {
-      console.error('Error rejecting claim:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.rejectClaim' });
       throw error;
     }
   }
@@ -1831,7 +1831,7 @@ export class PointsService {
       // lazy initialiser on first dashboard load (see P1-A fix in getLOStarProgress).
       return newProgramRef.id;
     } catch (error) {
-      console.error('Error creating incentive program:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.createIncentiveProgram' });
       throw error;
     }
   }
@@ -1886,7 +1886,7 @@ export class PointsService {
 
       PointsService.invalidateIncentiveCache();
     } catch (error) {
-      console.error('Error updating incentive program:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.updateIncentiveProgram' });
       throw error;
     }
   }
@@ -2002,7 +2002,7 @@ export class PointsService {
 
       PointsService.invalidateIncentiveCache();
     } catch (error) {
-      console.error('Error deleting incentive program:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.deleteIncentiveProgram' });
       throw error;
     }
   }
@@ -2061,7 +2061,7 @@ export class PointsService {
         return docRef.id;
       }
     } catch (error) {
-      console.error('Error saving incentive standard:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.saveStandard' });
       throw error;
     }
   }
@@ -2111,7 +2111,7 @@ export class PointsService {
       await batch.commit();
       PointsService.invalidateIncentiveCache();
     } catch (error) {
-      console.error('Error bulk deleting standards:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.bulkDeleteStandards' });
       throw error;
     }
   }
@@ -2152,7 +2152,7 @@ export class PointsService {
       await batch.commit();
       PointsService.invalidateIncentiveCache();
     } catch (error) {
-      console.error('Error deleting incentive standard:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.deleteStandard' });
       throw error;
     }
   }
@@ -2277,7 +2277,7 @@ export class PointsService {
 
       return progress;
     } catch (error) {
-      console.error('Error fetching LO star progress:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.getLOStarProgress' });
       throw error;
     }
   }
@@ -2324,7 +2324,7 @@ export class PointsService {
       }
       return DEFAULT_CONFIG;
     } catch (error) {
-      console.error('Error fetching radar points config:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.getRadarPointsConfig' });
       return DEFAULT_CONFIG;
     }
   }
@@ -2342,7 +2342,7 @@ export class PointsService {
       await setDoc(docRef, config);
       console.log('Saved radar points config to cloud:', config);
     } catch (error) {
-      console.error('Error saving radar points config:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.saveRadarPointsConfig' });
       throw error;
     }
   }
@@ -2488,7 +2488,7 @@ export class PointsService {
         tier
       });
     } catch (err) {
-      console.error(`Error recalculating radar stats for member ${memberId}:`, err);
+      errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { context: 'PointsService.recalculateMemberRadarStats', memberId });
     }
   }
 }

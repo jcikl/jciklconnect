@@ -760,8 +760,7 @@ export class ToyyibService {
       const data = await proxyCall('getSettlements');
       return Array.isArray(data) ? data : [];
     } catch (error) {
-      console.error('ToyyibPay getSettlements failed:', error);
-      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { component: 'toyyibService', action: 'getSettlements' });
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'ToyyibService.getSettlements' });
       return [];
     }
   }

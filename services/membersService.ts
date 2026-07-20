@@ -163,7 +163,7 @@ export class MembersService {
             : MOCK_MEMBERS;
           return list;
         }
-        console.error('Error fetching members:', error);
+        errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MembersService.getAllMembers' });
         throw error;
       }
     }, MEMBERS_TTL, 'membersService.getAllMembers');
@@ -184,7 +184,7 @@ export class MembersService {
       }
       return null;
     } catch (error) {
-      console.error('Error fetching member:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MembersService.getMemberById' });
       throw error;
     }
   }
@@ -225,7 +225,7 @@ export class MembersService {
         await PointsService.recalculateMemberRadarStats(d.id);
       }
     } catch (e) {
-      console.error('Error recalculating introducer stats:', e);
+      errorLoggingService.logError(e instanceof Error ? e : new Error(String(e)), { context: 'MembersService.recalculateIntroducerStats' });
     }
   }
 
@@ -498,7 +498,7 @@ export class MembersService {
         const { BusinessDirectoryService } = await import('./businessDirectoryService');
         await BusinessDirectoryService.syncPublicListing(docRef.id, normalizedData);
       } catch (syncErr) {
-        console.error('syncPublicListing failed after createMember — member was created successfully:', syncErr);
+        errorLoggingService.logError(syncErr instanceof Error ? syncErr : new Error(String(syncErr)), { context: 'MembersService.createMember', additionalInfo: 'syncPublicListing failed — member was created successfully' });
       }
 
       if (cleanMemberData.introducer) {
@@ -507,7 +507,7 @@ export class MembersService {
 
       return docRef.id;
     } catch (error) {
-      console.error('Error creating member:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MembersService.createMember' });
       throw error;
     }
   }
@@ -660,7 +660,7 @@ export class MembersService {
               revertFields['contact.email'] = currentEmail;
             }
             await updateDoc(memberRef, revertFields).catch(e =>
-              console.error('Failed to revert email in Firestore after Auth 409:', e)
+              errorLoggingService.logError(e instanceof Error ? e : new Error(String(e)), { context: 'MembersService.updateMember', additionalInfo: 'Failed to revert email in Firestore after Auth 409' })
             );
             this.invalidateMembersCache();
             throw new Error('This email is already used by another account. Email not updated.');
@@ -671,7 +671,7 @@ export class MembersService {
         } catch (err) {
           if (err instanceof Error && err.message.includes('already used')) throw err;
           // Function unreachable (e.g. local dev) — Firestore email was updated; Auth email stays unchanged
-          console.warn('update-auth-email unreachable, skipping Auth sync:', err);
+          errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { context: 'MembersService.updateMember', additionalInfo: 'update-auth-email unreachable, skipping Auth sync' });
         }
       }
 
@@ -680,7 +680,7 @@ export class MembersService {
       try {
         await BusinessDirectoryService.syncPublicListing(memberId, mergedMember as Record<string, unknown>);
       } catch (syncErr) {
-        console.warn('syncPublicListing failed after updateMember — member update was saved successfully:', syncErr);
+        errorLoggingService.logError(syncErr instanceof Error ? syncErr : new Error(String(syncErr)), { context: 'MembersService.updateMember', additionalInfo: 'syncPublicListing failed — member update was saved successfully' });
       }
       try {
         await this.syncBoardMemberDisplayFields(memberId, mergedMember as Member);
@@ -713,7 +713,7 @@ export class MembersService {
         }
       }
     } catch (error) {
-      console.error('Error updating member:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MembersService.updateMember' });
       throw error;
     }
   }
@@ -942,7 +942,7 @@ export class MembersService {
       logDelete(CACHE_KEY_ALL_MEMBERS, 'membersService.deleteMember');
       this.invalidateMembersCache();
     } catch (error) {
-      console.error('Error deleting member:', error, 'memberId=', memberId);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MembersService.deleteMember', additionalInfo: `memberId=${memberId}` });
       throw error;
     }
   }
@@ -961,7 +961,7 @@ export class MembersService {
         (member.skills ?? []).some(skill => skill.toLowerCase().includes(term))
       );
     } catch (error) {
-      console.error('Error searching members:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MembersService.searchMembers' });
       throw error;
     }
   }
@@ -991,7 +991,7 @@ export class MembersService {
       apiCache.set(cacheKey, results, 300000);
       return results;
     } catch (error) {
-      console.error('Error fetching members by role:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MembersService.getMembersByRole' });
       throw error;
     }
   }
@@ -1030,7 +1030,7 @@ export class MembersService {
 
       return null;
     } catch (error) {
-      console.error('Error fetching member by email:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MembersService.getMemberByEmail' });
       throw error;
     }
   }
@@ -1049,7 +1049,7 @@ export class MembersService {
         id: doc.id,
       } as Member));
     } catch (error) {
-      console.error('Error fetching members at risk:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MembersService.getMembersAtRisk' });
       throw error;
     }
   }
@@ -1097,7 +1097,7 @@ export class MembersService {
       logWrite(CACHE_KEY_ALL_MEMBERS, 'membersService.recalculateAttendance');
       this.invalidateMembersCache();
     } catch (error) {
-      console.error('Error recalculating attendance:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MembersService.recalculateAttendance' });
       throw error;
     }
   }
@@ -1142,9 +1142,9 @@ export class MembersService {
         targetCollection: COLLECTIONS.MEMBERS,
         targetId: memberId,
         after: { role: newRole },
-      }).catch(err => console.warn('[updateMemberRole] Audit write failed:', err));
+      }).catch(err => errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { context: 'MembersService.updateMemberRole', additionalInfo: 'Audit write failed' }));
     } catch (error) {
-      console.error('Error updating member role:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MembersService.updateMemberRole' });
       throw error;
     }
   }
@@ -1167,7 +1167,7 @@ export class MembersService {
       await this.commitWithRetry(batch);
       this.invalidateMembersCache();
     } catch (error) {
-      console.error('Error assigning mentor:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MembersService.assignMentor' });
       throw error;
     }
   }
@@ -1299,7 +1299,7 @@ export class MembersService {
         );
       }
     } catch (error) {
-      console.error('Error in batch update:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MembersService.batchUpdateMembers' });
       throw error;
     }
   }
@@ -1452,7 +1452,7 @@ export class MembersService {
       logDelete(CACHE_KEY_ALL_MEMBERS, 'membersService.batchDeleteMembers');
       this.invalidateMembersCache();
     } catch (error) {
-      console.error('Error in batch delete:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MembersService.batchDeleteMembers' });
       throw error;
     }
   }

@@ -27,6 +27,7 @@ import { withDevMode, isDevMode } from '../utils/devMode';
 import { invalidateFinanceCache } from './financeService';
 import { apiCache } from './cacheService';
 import { MOCK_PROJECTS, MOCK_TASKS } from './mockData';
+import { errorLoggingService } from './errorLoggingService';
 
 const CACHE_KEY_ALL_PROJECTS = 'projects:all';
 const PROJECTS_TTL = 3 * 60 * 1000; // 3 minutes
@@ -52,7 +53,7 @@ export class ProjectsService {
             updatedAt: d.data().updatedAt?.toDate?.()?.toISOString?.() ?? d.data().updatedAt,
           } as Project));
         } catch (error) {
-          console.error('Error fetching projects:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'ProjectsService.getAllProjects' });
           throw error;
         }
       }, PROJECTS_TTL, 'projectsService.getAllProjects')
@@ -71,7 +72,7 @@ export class ProjectsService {
       }
       return null;
     } catch (error) {
-      console.error('Error fetching project:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'ProjectsService.getProjectById', projectId });
       throw error;
     }
   }
@@ -135,7 +136,7 @@ export class ProjectsService {
       this.invalidateProjectsCache();
       return docRef.id;
     } catch (error) {
-      console.error('Error creating project:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'ProjectsService.createProject' });
       throw error;
     }
   }
@@ -283,7 +284,7 @@ export class ProjectsService {
             }
           }
         } catch (error) {
-          console.error('Error updating project:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'ProjectsService.updateProject', projectId });
           throw error;
         }
       }
@@ -360,7 +361,7 @@ export class ProjectsService {
             }
           }
         } catch (error) {
-          console.error('Error deleting project:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'ProjectsService.deleteProject', projectId });
           throw error;
         }
       }
@@ -395,7 +396,7 @@ export class ProjectsService {
           });
           this.invalidateProjectsCache();
         } catch (error) {
-          console.error('Error registering member for project:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'ProjectsService.registerMember', projectId, memberId });
           throw error;
         }
       }
@@ -417,7 +418,7 @@ export class ProjectsService {
           });
           this.invalidateProjectsCache();
         } catch (error) {
-          console.error('Error unregistering member from project:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'ProjectsService.unregisterMember', projectId, memberId });
           throw error;
         }
       }
@@ -465,7 +466,7 @@ export class ProjectsService {
             } as Task;
           });
         } catch (error) {
-          console.error('Error fetching project tasks:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'ProjectsService.getProjectTasks', projectId });
           throw error;
         }
       }
@@ -490,7 +491,7 @@ export class ProjectsService {
             dueDate: data.dueDate?.toDate?.()?.toISOString() || data.dueDate,
           } as Task;
         } catch (error) {
-          console.error('Error fetching task by ID:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'ProjectsService.getTaskById', taskId });
           throw error;
         }
       }
@@ -552,7 +553,7 @@ export class ProjectsService {
             return docRef.id;
           }
         } catch (error) {
-          console.error('Error creating/updating task:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'ProjectsService.createTask' });
           throw error;
         }
       }
@@ -711,7 +712,7 @@ export class ProjectsService {
             }
           }
         } catch (error) {
-          console.error('Error updating task:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'ProjectsService.updateTask', taskId });
           throw error;
         }
       }
@@ -743,7 +744,7 @@ export class ProjectsService {
             }
           }
         } catch (error) {
-          console.error('Error deleting task:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'ProjectsService.deleteTask', taskId });
           throw error;
         }
       }
@@ -760,7 +761,7 @@ export class ProjectsService {
 
       await this.updateProject(projectId, { completion });
     } catch (error) {
-      console.error('Error updating project completion:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'ProjectsService.updateProjectCompletion', projectId });
       throw error;
     }
   }

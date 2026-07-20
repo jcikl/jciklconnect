@@ -121,7 +121,6 @@ export class EventBudgetService {
             } as EventBudget;
           } catch (error) {
             errorLoggingService.logError(error as Error, { component: 'EventBudgetService', action: 'getEventBudget', additionalData: { eventId } });
-            console.error('Error fetching event budget:', error);
             throw error;
           }
         }, EVENT_BUDGET_TTL, 'eventBudgetService.getEventBudget');
@@ -160,7 +159,6 @@ export class EventBudgetService {
           return budgetData.eventId;
         } catch (error) {
           errorLoggingService.logError(error as Error, { component: 'EventBudgetService', action: 'saveEventBudget', additionalData: { eventId: budgetData.eventId } });
-          console.error('Error saving event budget:', error);
           throw error;
         }
       }
@@ -274,7 +272,6 @@ export class EventBudgetService {
       };
     } catch (error) {
       errorLoggingService.logError(error as Error, { component: 'EventBudgetService', action: 'reconcileEventBudget', additionalData: { eventId } });
-      console.error('Error reconciling event budget:', error);
       throw error;
     }
   }

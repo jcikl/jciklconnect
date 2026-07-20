@@ -8,6 +8,7 @@ import { MembersService } from './membersService';
 import { EventsService } from './eventsService';
 import { projectFinancialService } from './projectFinancialService';
 import { withDevMode } from '../utils/devMode';
+import { errorLoggingService } from './errorLoggingService';
 import { formatDate } from '../utils/dateUtils';
 import { formatCurrency } from '../utils/formatUtils';
 
@@ -212,7 +213,7 @@ export class ProjectReportService {
             }
           }
         } catch (error) {
-          console.warn('Could not load financial data for project report:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'ProjectReportService.generateReport.financialData', projectId });
         }
       }
 
@@ -333,7 +334,7 @@ export class ProjectReportService {
         nextSteps,
       };
     } catch (error) {
-      console.error('Error generating project report:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'ProjectReportService.generateReport', projectId });
       throw error;
     }
   });

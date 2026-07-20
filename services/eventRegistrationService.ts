@@ -381,7 +381,6 @@ export const EventRegistrationService = {
               action: 'cancel-financeCleanup',
               additionalData: { registrationId, financeTransactionId },
             });
-            console.warn('[EventRegistrationService.cancel] Could not clean up income tx:', err);
             throw err;
           }
         }

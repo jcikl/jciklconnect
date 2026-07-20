@@ -943,7 +943,7 @@ export class PaymentRequestService {
         });
       });
     } catch (err) {
-      console.warn('[PaymentRequestService] Failed to write notification', err);
+      errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { context: 'PaymentRequestService._writeNotification' });
     }
   }
 
@@ -979,7 +979,7 @@ export class PaymentRequestService {
         );
       }
     } catch (err) {
-      console.warn('[PaymentRequestService] Failed to notify approvers', err);
+      errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { context: 'PaymentRequestService._notifyApprovers' });
     }
   }
 }

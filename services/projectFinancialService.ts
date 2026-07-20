@@ -35,6 +35,7 @@ import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { FinanceService } from './financeService';
 import { isDevMode, withDevMode } from '../utils/devMode';
+import { errorLoggingService } from './errorLoggingService';
 import { MOCK_PROJECT_FINANCIAL_ACCOUNTS, MOCK_PROJECT_TRANSACTIONS } from './mockData';
 
 export interface CreateProjectAccountData {
@@ -291,7 +292,7 @@ class ProjectFinancialService {
 
       return { account, summary, transactions: projectTransactions };
     } catch (error) {
-      console.error('Error fetching full project financial details:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'ProjectFinancialService.getFullProjectFinancialDetails', projectId: project.id });
       return null;
     }
 });
@@ -418,7 +419,7 @@ class ProjectFinancialService {
         createdBy: project.submittedBy || 'system',
       };
     } catch (error) {
-      console.error('Error fetching single project account:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'ProjectFinancialService.getProjectFinancialAccount', projectId });
       return null;
     }
 });
@@ -467,7 +468,7 @@ class ProjectFinancialService {
           tags: undefined,
         } as ProjectTransaction));
     } catch (error) {
-      console.error('Error fetching production project transactions:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'ProjectFinancialService.getProjectTransactions', financialAccountId });
       return [];
     }
 });
@@ -828,7 +829,7 @@ class ProjectFinancialService {
 
       return accounts;
     } catch (error) {
-      console.error('Error fetching production project accounts:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'ProjectFinancialService.getAllProjectAccounts', year });
       return [];
     }
 });
@@ -858,7 +859,7 @@ class ProjectFinancialService {
         date: doc.data().date?.toDate?.()?.toISOString() || doc.data().date,
       } as ProjectTransaction));
     } catch (error) {
-      console.error('Error fetching all project tracker transactions:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'ProjectFinancialService.getAllProjectTrackerTransactions' });
       return [];
     }
 });

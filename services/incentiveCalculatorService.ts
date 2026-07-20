@@ -17,6 +17,7 @@ import {
 } from '../types';
 import { PointsService } from './pointsService';
 import { isDevMode } from '../utils/devMode';
+import { errorLoggingService } from './errorLoggingService';
 
 export class IncentiveCalculatorService {
     /**
@@ -38,7 +39,7 @@ export class IncentiveCalculatorService {
                 }
             }
         } catch (error) {
-            console.error('Error in batch incentive calculation:', error);
+            errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'IncentiveCalculatorService.calculateAll' });
             throw error;
         }
     }

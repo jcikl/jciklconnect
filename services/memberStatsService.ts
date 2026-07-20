@@ -4,6 +4,7 @@ import { MembersService } from './membersService';
 import { EventsService } from './eventsService';
 import { ProjectsService } from './projectsService';
 import { withDevMode } from '../utils/devMode';
+import { errorLoggingService } from './errorLoggingService';
 
 export interface MemberStatistics {
   totalMembers: number;
@@ -181,7 +182,7 @@ export class MemberStatsService {
         topPerformers,
       };
     } catch (error) {
-      console.error('Error generating member statistics:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MemberStatsService.generateStatistics' });
       throw error;
     }
   });
@@ -251,7 +252,7 @@ export class MemberStatsService {
         recommendations,
       };
     } catch (error) {
-      console.error('Error generating member report:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MemberStatsService.generateReport' });
       throw error;
     }
   }

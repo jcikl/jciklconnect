@@ -34,6 +34,7 @@ export interface ErrorContext {
   userId?: string;
   context?: string;
   additionalData?: Record<string, any>;
+  [key: string]: any;
 }
 
 class ErrorLoggingService {

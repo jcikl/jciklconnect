@@ -15,6 +15,7 @@ import { EventsService } from './eventsService';
 import { ProjectsService } from './projectsService';
 import { FinanceService } from './financeService';
 import { PointsService } from './pointsService';
+import { errorLoggingService } from './errorLoggingService';
 
 export interface ReportData {
   title: string;
@@ -122,7 +123,7 @@ export class ReportService {
             },
           };
         } catch (error) {
-          console.error('Error generating financial report:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'ReportService.generateFinancialReport' });
           throw error;
         }
       }
@@ -191,7 +192,7 @@ export class ReportService {
             },
           };
         } catch (error) {
-          console.error('Error generating membership report:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'ReportService.generateMembershipReport' });
           throw error;
         }
       }
@@ -266,7 +267,7 @@ export class ReportService {
         },
       };
     } catch (error) {
-      console.error('Error generating engagement report:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'ReportService.generateEngagementReport' });
       throw error;
     }
 });
@@ -329,7 +330,7 @@ export class ReportService {
         },
       };
     } catch (error) {
-      console.error('Error generating project report:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'ReportService.generateProjectReport' });
       throw error;
     }
 });
@@ -599,7 +600,7 @@ export class ReportService {
         },
       };
     } catch (error) {
-      console.error('Error generating inventory report:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'ReportService.generateInventoryReport' });
       throw error;
     }
 });

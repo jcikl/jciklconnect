@@ -1,4 +1,4 @@
-// Finance Service - CRUD Operations
+﻿// Finance Service - CRUD Operations
 import {
   collection,
   doc,
@@ -176,7 +176,7 @@ export class FinanceService {
 
             return transactions;
           } catch (error) {
-            console.error('Error fetching transactions:', error);
+            errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.getAllTransactions' });
             throw error;
           }
         },
@@ -243,7 +243,7 @@ export class FinanceService {
 
           return netFlows;
         } catch (error) {
-          console.error('Error calculating historical net flows:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.calculateHistoricalNetFlows' });
           return {};
         }
       }
@@ -283,7 +283,7 @@ export class FinanceService {
           years.add(getMYTYear());
           return Array.from(years).sort((a, b) => b - a);
         } catch (error) {
-          console.error('Error fetching transaction years for account:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.getTransactionYearsForAccount' });
           return [getMYTYear()];
         }
       }
@@ -319,7 +319,7 @@ export class FinanceService {
           years.add(getMYTYear());
           return Array.from(years).sort((a, b) => b - a);
         } catch (error) {
-          console.error('Error fetching all transaction years:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.getAllTransactionYears' });
           return [getMYTYear()];
         }
       }
@@ -361,11 +361,11 @@ export class FinanceService {
                 } as Transaction))
                 .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
             } catch (fallbackError) {
-              console.error('Error fetching project transactions (fallback):', fallbackError);
+              errorLoggingService.logError(fallbackError instanceof Error ? fallbackError : new Error(String(fallbackError)), { context: 'financeService.getProjectTransactions:fallback' });
               throw fallbackError;
             }
           }
-          console.error('Error fetching project transactions:', indexError);
+          errorLoggingService.logError(indexError instanceof Error ? indexError : new Error(String(indexError)), { context: 'financeService.getProjectTransactions' });
           throw indexError;
         }
       }
@@ -482,7 +482,7 @@ export class FinanceService {
         const combined = [...directTransactions, ...virtualTransactionsFromSplits];
         return combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       } catch (error) {
-        console.error('Error fetching bank transactions for project:', error);
+        errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.getBankTransactionsForProject' });
         throw error;
       }
       }
@@ -566,7 +566,7 @@ export class FinanceService {
             try {
               await this.syncMemberMembership(transactionData.memberId as string, transactionData.projectId);
             } catch (syncErr) {
-              console.error('createTransaction: membership post-sync failed (non-blocking):', syncErr);
+              errorLoggingService.logError(syncErr instanceof Error ? syncErr : new Error(String(syncErr)), { context: 'financeService.createTransaction:membershipSync' });
             }
           }
 
@@ -576,8 +576,7 @@ export class FinanceService {
           try {
             await this.syncTransactionWithInventory({ ...transactionData, id: txRef.id });
           } catch (inventorySyncErr) {
-            console.error('createTransaction: inventory post-sync failed (non-blocking):', inventorySyncErr);
-            errorLoggingService.logError(
+              errorLoggingService.logError(
               inventorySyncErr instanceof Error ? inventorySyncErr : new Error(String(inventorySyncErr)),
               { component: 'financeService', action: 'createTransaction:inventorySync' }
             );
@@ -586,7 +585,6 @@ export class FinanceService {
           invalidateFinanceCache();
           return txRef.id;
         } catch (error) {
-          console.error('Error creating transaction:', error);
           errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { component: 'financeService', action: 'createTransaction' });
           throw error;
         }
@@ -653,7 +651,7 @@ export class FinanceService {
 
           return newDocRef.id;
         } catch (error) {
-          console.error('Error creating project transaction:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.createProjectTransaction' });
           throw error;
         }
       }
@@ -691,7 +689,7 @@ export class FinanceService {
           await updateDoc(transactionRef, updateData as Record<string, unknown>);
           invalidateFinanceCache();
         } catch (error) {
-          console.error('Error updating project transaction:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.updateProjectTransaction' });
           throw error;
         }
       }
@@ -974,7 +972,6 @@ export class FinanceService {
         try {
           await this.syncMemberMembership(memberId, projectId);
         } catch (syncErr) {
-          console.error('createTransactionSplit: membership sync failed (non-blocking):', syncErr);
           errorLoggingService.logError(
             syncErr instanceof Error ? syncErr : new Error(String(syncErr)),
             { component: 'financeService', action: 'createTransactionSplit:membershipSync' }
@@ -984,7 +981,7 @@ export class FinanceService {
 
       return splitIds;
     } catch (error) {
-      console.error('Error creating transaction splits:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.createTransactionSplits' });
       throw error;
     }
       }
@@ -1008,7 +1005,7 @@ export class FinanceService {
             createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || doc.data().createdAt,
           } as TransactionSplit));
         } catch (error) {
-          console.error('Error fetching transaction splits:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.getTransactionSplits' });
           throw error;
         }
       }
@@ -1045,7 +1042,7 @@ export class FinanceService {
             } as TransactionSplit;
           });
         } catch (error) {
-          console.error('Error fetching all transaction splits:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.getAllTransactionSplits' });
           throw error;
         }
       }
@@ -1152,7 +1149,7 @@ export class FinanceService {
                 const hasMovement = await InventoryService.hasStockMovementForRef(splitId);
                 if (!hasMovement) shouldSync = true;
               } catch (e) {
-                console.warn('Error checking inventory sync status for split:', e);
+                errorLoggingService.logError(e instanceof Error ? e : new Error(String(e)), { context: 'financeService.updateTransactionSplit:inventoryCheck' });
               }
             }
 
@@ -1166,7 +1163,7 @@ export class FinanceService {
             }
           }
         } catch (error) {
-          console.error('Error updating transaction split:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.updateTransactionSplit' });
           throw error;
         }
       }
@@ -1262,7 +1259,6 @@ export class FinanceService {
               const { InventoryService } = await import('./inventoryService');
               await InventoryService.deleteStockMovementForRef(splitId);
             } catch (invErr) {
-              console.error('deleteTransactionSplit: inventory cleanup failed (non-blocking):', invErr);
               errorLoggingService.logError(
                 invErr instanceof Error ? invErr : new Error(String(invErr)),
                 { component: 'financeService', action: 'deleteTransactionSplit:inventoryCleanup' }
@@ -1275,7 +1271,6 @@ export class FinanceService {
             try {
               await this.syncMemberMembership(split.memberId, `${split.year} membership`);
             } catch (syncErr) {
-              console.error('deleteTransactionSplit: membership sync failed (non-blocking):', syncErr);
               errorLoggingService.logError(
                 syncErr instanceof Error ? syncErr : new Error(String(syncErr)),
                 { component: 'financeService', action: 'deleteTransactionSplit:membershipSync' }
@@ -1283,7 +1278,7 @@ export class FinanceService {
             }
           }
         } catch (error) {
-          console.error('Error deleting transaction split:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.deleteTransactionSplit' });
           throw error;
         }
       }
@@ -1329,7 +1324,7 @@ export class FinanceService {
 
           return unique.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         } catch (error) {
-          console.error('Error fetching transactions by type:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.getTransactionsByType' });
           throw error;
         }
       }
@@ -1458,7 +1453,7 @@ export class FinanceService {
               console.log('Detected missing stock movement for transaction, syncing now...');
             }
           } catch (e) {
-            console.warn('Error checking inventory sync status:', e);
+            errorLoggingService.logError(e instanceof Error ? e : new Error(String(e)), { context: 'financeService.syncTransactionWithInventory:inventoryCheck' });
           }
         }
 
@@ -1531,7 +1526,6 @@ export class FinanceService {
 
       invalidateFinanceCache();
     } catch (error) {
-      console.error('Error updating transaction:', error);
       errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { component: 'financeService', action: 'updateTransaction' });
       throw error;
     }
@@ -1848,7 +1842,6 @@ export class FinanceService {
         try {
           await this.syncMemberMembership(nextSplit.memberId, projectId);
         } catch (syncErr) {
-          console.error('batchUpdateSplitCategory: membership sync failed (non-blocking):', syncErr);
           errorLoggingService.logError(
             syncErr instanceof Error ? syncErr : new Error(String(syncErr)),
             { component: 'financeService', action: 'batchUpdateSplitCategory:membershipSync' }
@@ -1866,7 +1859,6 @@ export class FinanceService {
             this.getMembershipProjectIdFromYear(currentSplit.year)
           );
         } catch (syncErr) {
-          console.error('batchUpdateSplitCategory: old-member membership sync failed (non-blocking):', syncErr);
           errorLoggingService.logError(
             syncErr instanceof Error ? syncErr : new Error(String(syncErr)),
             { component: 'financeService', action: 'batchUpdateSplitCategory:membershipSyncOld' }
@@ -1911,7 +1903,7 @@ export class FinanceService {
 
           return null;
         } catch (error) {
-          console.error('Error fetching transaction by ID:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.getTransactionById' });
           throw error;
         }
       }
@@ -1995,7 +1987,7 @@ export class FinanceService {
             const { EventPaymentMatchingService } = await import('./eventPaymentMatchingService');
             for (const bankTxId of transaction.matchedBankTxIds) {
               await EventPaymentMatchingService.removeMatch(transactionId, bankTxId).catch((err) =>
-                console.warn('[deleteTransaction] Could not clean up bank tx link:', err)
+                errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { context: 'financeService.deleteTransaction:removeBankTxLink', additionalData: { bankTxId } })
               );
             }
           }
@@ -2006,12 +1998,12 @@ export class FinanceService {
             for (const split of childSplits) {
               if (split.inventoryLinkId && split.inventoryQuantity) {
                 await InventoryService.deleteStockMovementForRef(split.id).catch(err =>
-                  console.warn('[deleteTransaction] Could not clean up split inventory:', err)
+                  errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { context: 'financeService.deleteTransaction:splitInventoryCleanup', additionalData: { splitId: split.id } })
                 );
               }
               if (split.category === 'Membership' && split.memberId && split.year) {
                 await this.syncMemberMembership(split.memberId, `${split.year} membership`).catch(err =>
-                  console.warn('[deleteTransaction] Could not sync membership for split:', err)
+                  errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { context: 'financeService.deleteTransaction:splitMembershipSync', additionalData: { memberId: split.memberId } })
                 );
               }
             }
@@ -2041,7 +2033,7 @@ export class FinanceService {
             await this.syncMemberMembership(transaction.memberId as string, transaction.projectId);
           }
         } catch (error) {
-          console.error('Error deleting transaction:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.deleteTransaction' });
           throw error;
         }
       }
@@ -2115,7 +2107,6 @@ export class FinanceService {
 
           invalidateFinanceCache();
         } catch (error) {
-          console.error('Error reversing transaction:', error);
           errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { component: 'financeService', action: 'reverseTransaction' });
           throw error;
         }
@@ -2281,7 +2272,7 @@ export class FinanceService {
       // E1: invalidate cache after successful delete + cascade
       invalidateFinanceCache();
     } catch (error) {
-      console.error('Error deleting project transaction:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.deleteProjectTransaction' });
       throw error;
     }
       }
@@ -2321,7 +2312,7 @@ export class FinanceService {
         (transaction as any).id
       );
     } catch (error) {
-      console.error('Error syncing transaction with inventory:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.syncTransactionWithInventory' });
       // I-2: inventory sync failed — the transaction was already written but the inventory
       // quantity was not updated. Flush the finance cache so stale totals don't mask the gap.
       // The inventory quantity discrepancy requires manual reconciliation.
@@ -2546,7 +2537,7 @@ export class FinanceService {
         console.log(`Synced membership for member ${memberId} year ${year}. Status: ${status}, Amount: ${totalAmount}`);
       }
     } catch (error) {
-      console.error('Error syncing member membership:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.syncMemberMembership' });
       // E5: re-throw so callers know the sync failed
       throw error;
     }
@@ -2660,7 +2651,7 @@ export class FinanceService {
               return { ...account, balance: (account.initialBalance || 0) + transactionSum };
             });
           } catch (error) {
-            console.error('Error fetching bank accounts:', error);
+            errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.getAllBankAccounts' });
             throw error;
           }
         },
@@ -2707,7 +2698,7 @@ export class FinanceService {
           invalidateFinanceCache();
           return docRef.id;
         } catch (error) {
-          console.error('Error creating bank account:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.createBankAccount' });
           throw error;
         }
       }
@@ -2735,7 +2726,7 @@ export class FinanceService {
           await updateDoc(accountRef, updateData as Record<string, unknown>);
           invalidateFinanceCache();
         } catch (error) {
-          console.error('Error updating bank account:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.updateBankAccount' });
           throw error;
         }
       }
@@ -2801,7 +2792,7 @@ export class FinanceService {
           date: doc.data().date?.toDate?.()?.toISOString() || doc.data().date,
         } as Transaction));
       } catch (error) {
-        console.error('Error fetching transactions by category:', error);
+        errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.getTransactionsByCategory' });
         throw error;
       }
     }, 180000);
@@ -2894,7 +2885,7 @@ export class FinanceService {
         byCategory,
       };
     } catch (error) {
-      console.error('Error calculating financial summary:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.getFinancialSummary' });
       throw error;
     }
   }
@@ -3034,7 +3025,7 @@ export class FinanceService {
             },
           });
         } catch (memberError) {
-          console.error(`Error processing renewal for member ${memberId}:`, memberError);
+          errorLoggingService.logError(memberError instanceof Error ? memberError : new Error(String(memberError)), { context: 'financeService.initiateDuesRenewal:member', additionalData: { memberId } });
           validationErrors.push({
             memberId,
             error: memberError instanceof Error ? memberError.message : 'Unknown error',
@@ -3062,7 +3053,7 @@ export class FinanceService {
       // Phase 3: Sync members.membership.{year} for each created transaction (D-2 fix)
       for (const item of toCreate) {
         await this.syncMemberMembership(item.memberId, `${year} membership`).catch(err =>
-          console.warn(`[initiateDuesRenewal] membership sync failed for ${item.memberId}:`, err)
+          errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { context: 'financeService.initiateDuesRenewal:membershipSync', additionalData: { memberId: item.memberId } })
         );
       }
 
@@ -3078,7 +3069,7 @@ export class FinanceService {
           });
           notificationsSent++;
         } catch (notifErr) {
-          console.warn(`[initiateDuesRenewal] notification failed for ${item.memberId}:`, notifErr);
+          errorLoggingService.logError(notifErr instanceof Error ? notifErr : new Error(String(notifErr)), { context: 'financeService.initiateDuesRenewal:notification', additionalData: { memberId: item.memberId } });
         }
       }
 
@@ -3093,7 +3084,7 @@ export class FinanceService {
         validationErrors,
       };
     } catch (error) {
-      console.error('Error initiating dues renewal:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.initiateDuesRenewal' });
       throw error;
     }
       }
@@ -3161,7 +3152,7 @@ export class FinanceService {
       }
       return { sent, failed };
     } catch (error) {
-      console.error('Error sending dues reminders:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.sendDuesReminders' });
       throw error;
     }
       }
@@ -3255,7 +3246,7 @@ export class FinanceService {
         byCategory: { renewal: renewalCount, new: newCount },
       };
     } catch (error) {
-      console.error('Error getting dues renewal status:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.getDuesRenewalStatus' });
       throw error;
     }
       }
@@ -3372,7 +3363,7 @@ export class FinanceService {
         return a.memberName.localeCompare(b.memberName);
       });
     } catch (error) {
-      console.error('Error getting members dues list:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.getMembersDuesList' });
       throw error;
     }
       }
@@ -3441,7 +3432,7 @@ export class FinanceService {
 
       return { success: true };
     } catch (error) {
-      console.error('Error processing dues payment:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.processDuesPayment' });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -3533,7 +3524,7 @@ export class FinanceService {
 
       return { totalBalance, byType };
     } catch (error) {
-      console.error('Error calculating system balance:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.calculateSystemBalance' });
       throw error;
     }
       }
@@ -3603,7 +3594,7 @@ export class FinanceService {
 
           return discrepancies;
         } catch (error) {
-          console.error('Error detecting discrepancies:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.detectDiscrepancies' });
           throw error;
         }
       }
@@ -3786,14 +3777,14 @@ export class FinanceService {
           } catch {
             // Best-effort cleanup; log the original error regardless.
           }
-          console.error('reconcileBankAccount: phase-2 transaction marking failed; reconciliation record and bank balance rolled back', markError);
+          errorLoggingService.logError(markError instanceof Error ? markError : new Error(String(markError)), { context: 'financeService.reconcileBankAccount:phase2' });
           throw markError;
         }
       }
 
       return docRef.id;
     } catch (error) {
-      console.error('Error reconciling bank account:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.reconcileBankAccount' });
       throw error;
     }
       }
@@ -3820,7 +3811,7 @@ export class FinanceService {
             updatedAt: doc.data().updatedAt?.toDate?.()?.toISOString() || doc.data().updatedAt,
           } as ReconciliationRecord));
         } catch (error) {
-          console.error('Error fetching reconciliation history:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.getReconciliationHistory' });
           throw error;
         }
       }
@@ -3929,7 +3920,6 @@ export class FinanceService {
 
           invalidateFinanceCache();
         } catch (error) {
-          console.error('Error deleting reconciliation:', error);
           errorLoggingService.logError(
             error instanceof Error ? error : new Error(String(error)),
             { component: 'financeService', action: 'deleteReconciliation' }
@@ -4049,7 +4039,7 @@ export class FinanceService {
           if (prId) {
             const { PaymentRequestService } = await import('./paymentRequestService');
             await PaymentRequestService.revertPaid(prId).catch(err =>
-              console.warn('[unmatchTransactions] revertPaid failed for PR', prId, err)
+              errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { context: 'financeService.unmatchTransactions:revertPaid', additionalData: { prId } })
             );
             break; // only one tx in a pair links to a PR
           }
@@ -4093,7 +4083,7 @@ export class FinanceService {
             balance: (account.initialBalance || 0) + transactionSum
           };
         } catch (error) {
-          console.error('Error fetching bank account:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.getBankAccountById' });
           throw error;
         }
       }
@@ -4214,7 +4204,7 @@ export class FinanceService {
         },
       };
     } catch (error) {
-      console.error('Error generating financial report:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.generateFinancialReport' });
       throw error;
     }
   }
@@ -4278,7 +4268,7 @@ export class FinanceService {
 
       return lines.join('\n');
     } catch (error) {
-      console.error('Error exporting financial report:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.exportFinancialReportAsCSV' });
       throw error;
     }
   }
@@ -4320,7 +4310,7 @@ export class FinanceService {
 
       return lines.join('\n');
     } catch (error) {
-      console.error('Error exporting transactions:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.exportTransactionsAsCSV' });
       throw error;
     }
   }
@@ -4422,7 +4412,7 @@ export class FinanceService {
         generatedAt: new Date(),
       };
     } catch (error) {
-      console.error('Error generating income statement:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.generateIncomeStatement' });
       throw error;
     }
   }
@@ -4590,7 +4580,7 @@ export class FinanceService {
         totalLiabilitiesAndEquity: totalLiabilities + equity.totalEquity,
       };
     } catch (error) {
-      console.error('Error generating balance sheet:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.generateBalanceSheet' });
       throw error;
     }
   }
@@ -4743,7 +4733,7 @@ export class FinanceService {
         generatedAt: new Date(),
       };
     } catch (error) {
-      console.error('Error generating cash flow statement:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.generateCashFlowStatement' });
       throw error;
     }
   }
@@ -4819,7 +4809,7 @@ export class FinanceService {
         generatedAt: new Date(),
       };
     } catch (error) {
-      console.error('Error generating income details statement:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.generateIncomeDetailsStatement' });
       throw error;
     }
   }
@@ -4951,7 +4941,7 @@ export class FinanceService {
           const { EventPaymentMatchingService } = await import('./eventPaymentMatchingService');
           for (const bankTxId of tx.matchedBankTxIds) {
             await EventPaymentMatchingService.removeMatch(transactionId, bankTxId).catch((err) =>
-              console.warn('[voidTransaction] Could not clean up bank tx link:', err)
+              errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { context: 'financeService.voidTransaction:removeBankTxLink', additionalData: { bankTxId } })
             );
           }
         }

@@ -22,6 +22,7 @@ import { apiCache } from './cacheService';
 import { CommunicationService } from './communicationService';
 import { Member, MentorMatch, UserRole } from '../types';
 import { isDevMode, withDevMode } from '../utils/devMode';
+import { errorLoggingService } from './errorLoggingService';
 
 export interface MentorMatchSuggestion {
   mentor: Member;
@@ -96,7 +97,7 @@ export class MentorshipService {
         .sort((a, b) => b.matchScore - a.matchScore)
         .slice(0, 10); // Return top 10 matches
     } catch (error) {
-      console.error('Error finding potential mentors:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MentorshipService.findPotentialMentors' });
       throw error;
     }
   }
@@ -245,7 +246,7 @@ export class MentorshipService {
             ...matchData,
           };
         } catch (error) {
-          console.error('Error creating mentor match:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MentorshipService.createMentorMatch' });
           throw error;
         }
       }
@@ -290,7 +291,7 @@ export class MentorshipService {
           await this.sendMatchNotifications(match, approvedBy);
 
         } catch (error) {
-          console.error('Error approving mentor match:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MentorshipService.approveMentorMatch' });
           throw error;
         }
       }
@@ -316,7 +317,7 @@ export class MentorshipService {
         type: 'success',
       });
     } catch (error) {
-      console.error('Error sending match notifications:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MentorshipService.sendMatchNotifications' });
     }
   }
 
@@ -347,7 +348,7 @@ export class MentorshipService {
       
       return bestMatch.mentor.id;
     } catch (error) {
-      console.error('Error auto-matching mentor:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MentorshipService.autoMatchMentors' });
       throw error;
     }
   }
@@ -371,7 +372,7 @@ export class MentorshipService {
             ...doc.data(),
           })) as MentorMatch[];
         } catch (error) {
-          console.error('Error getting mentor matches:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MentorshipService.getMentorMatches' });
           throw error;
         }
       }
@@ -397,7 +398,7 @@ export class MentorshipService {
             ...doc.data(),
           })) as MentorMatch[];
         } catch (error) {
-          console.error('Error getting mentee matches:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MentorshipService.getMenteeMatches' });
           throw error;
         }
       }
@@ -436,7 +437,7 @@ export class MentorshipService {
           MembersService.invalidateMembersCache();
           this.invalidateMentorMatchesCache(matchId);
         } catch (error) {
-          console.error('Error completing mentorship:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MentorshipService.completeMentorship' });
           throw error;
         }
       }
@@ -472,7 +473,7 @@ export class MentorshipService {
 
           successRate = totalMatches > 0 ? (completedMentorships / totalMatches) * 100 : 0;
         } catch (error) {
-          console.error('Error getting mentorship match stats:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MentorshipService.getMentorshipStats.fetchCompletedCount' });
         }
       }
 
@@ -485,7 +486,7 @@ export class MentorshipService {
         successRate: Math.round(successRate * 10) / 10,
       };
     } catch (error) {
-      console.error('Error getting mentorship stats:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MentorshipService.getMentorshipStats' });
       throw error;
     }
   }
@@ -506,7 +507,7 @@ export class MentorshipService {
             updatedAt: serverTimestamp(),
           });
         } catch (error) {
-          console.error('Error logging mentorship session:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MentorshipService.logSession' });
           throw error;
         }
       }
@@ -552,7 +553,7 @@ export class MentorshipService {
           MembersService.invalidateMembersCache();
           this.invalidateMentorMatchesCache(matchId);
         } catch (error) {
-          console.error('Error cancelling mentorship:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MentorshipService.cancelMentorship' });
           throw error;
         }
       }
@@ -595,7 +596,7 @@ export class MentorshipService {
           MembersService.invalidateMembersCache();
           this.invalidateMentorMatchesCache(matchId);
         } catch (error) {
-          console.error('Error deleting mentor match:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MentorshipService.deleteMentorMatch' });
           throw error;
         }
       }
@@ -624,7 +625,7 @@ export class MentorshipService {
           const feedbackRef = collection(db, 'mentorshipFeedback');
           await addDoc(feedbackRef, feedbackData);
         } catch (error) {
-          console.error('Error collecting mentorship feedback:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MentorshipService.collectFeedback' });
           throw error;
         }
       }

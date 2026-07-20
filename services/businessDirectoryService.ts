@@ -232,7 +232,7 @@ export class BusinessDirectoryService {
       const snapshot = await getDocs(q);
       return snapshot.docs.map((docSnap) => mapListingDoc(docSnap.id, docSnap.data()));
     } catch (error) {
-      console.error('Error fetching businesses by industry:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'BusinessDirectoryService.getBusinessesByIndustry', industry });
       throw error;
     }
   }

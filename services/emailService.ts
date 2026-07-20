@@ -368,7 +368,7 @@ export class EmailService {
             createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || doc.data().createdAt,
           } as EmailLog));
         } catch (error) {
-          console.error('Error fetching email logs:', error);
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'EmailService.getEmailLogs' });
           throw error;
         }
       }

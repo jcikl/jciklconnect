@@ -63,8 +63,7 @@ const bump = async (page: GuestPage, fields: Record<string, ReturnType<typeof in
       );
     } catch (err) {
       // Analytics must never break the guest experience
-      console.warn('guestAnalytics write failed:', err);
-      errorLoggingService.logError(err as Error, { component: 'guestAnalytics.bump', additionalData: { page: Object.keys(fields).join(',') } });
+      errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { context: 'GuestAnalyticsService.bump', additionalData: { page: Object.keys(fields).join(',') } });
     }
   });
 };

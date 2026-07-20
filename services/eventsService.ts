@@ -103,7 +103,6 @@ export class EventsService {
           });
         } catch (error) {
           errorLoggingService.logError(error as Error, { component: 'EventsService', action: 'getAllEvents' });
-          console.error('Error fetching events:', error);
           throw error;
         }
       }, EVENTS_TTL, 'eventsService.getAllEvents')
@@ -140,7 +139,6 @@ export class EventsService {
           return eventData;
         } catch (error) {
           errorLoggingService.logError(error as Error, { component: 'EventsService', action: 'getEventById', additionalData: { eventId } });
-          console.error('Error fetching event:', error);
           throw error;
         }
       }
@@ -195,7 +193,6 @@ export class EventsService {
           return docRef.id;
         } catch (error) {
           errorLoggingService.logError(error as Error, { component: 'EventsService', action: 'createEvent' });
-          console.error('Error creating event:', error);
           throw error;
         }
       }
@@ -230,7 +227,6 @@ export class EventsService {
           this.invalidateEventsCache();
         } catch (error) {
           errorLoggingService.logError(error as Error, { component: 'EventsService', action: 'updateEvent', additionalData: { eventId } });
-          console.error('Error updating event:', error);
           throw error;
         }
       }
@@ -264,7 +260,7 @@ export class EventsService {
                       await FinanceService.deleteTransaction(txId);
                     }
                   } catch (err) {
-                    console.warn('[EventsService.deleteEvent] Could not clean up tx', txId, err);
+                    errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { context: 'EventsService.deleteEvent', additionalData: { txId } });
                   }
                 })
               );
@@ -310,7 +306,6 @@ export class EventsService {
           this.invalidateEventsCache();
         } catch (error) {
           errorLoggingService.logError(error as Error, { component: 'EventsService', action: 'deleteEvent', additionalData: { eventId } });
-          console.error('Error deleting event:', error);
           throw error;
         }
       }
@@ -404,7 +399,6 @@ export class EventsService {
           this.invalidateEventsCache(); // P1-C: invalidate after attendee count changes
         } catch (error) {
           errorLoggingService.logError(error as Error, { component: 'EventsService', action: 'registerForEvent', additionalData: { eventId, memberId } });
-          console.error('Error registering for event:', error);
           throw error;
         }
       }
@@ -464,7 +458,7 @@ export class EventsService {
                 await FinanceService.deleteTransaction(financeTransactionId);
               }
             } catch (txErr) {
-              console.warn('[EventsService.cancelRegistration] Could not delete tx', financeTransactionId, txErr);
+              errorLoggingService.logError(txErr instanceof Error ? txErr : new Error(String(txErr)), { context: 'EventsService.cancelRegistration', additionalData: { financeTransactionId } });
               // Non-fatal: registration is already cancelled; finance team can void manually.
             }
           }
@@ -499,7 +493,6 @@ export class EventsService {
                 action: 'cancelRegistration-reversePoints',
                 additionalData: { memberId, eventId },
               });
-              console.warn('[EventsService.cancelRegistration] Could not reverse attendance points for', memberId, pointsErr);
             }
           }
           this.invalidateEventsCache();
@@ -509,7 +502,6 @@ export class EventsService {
             action: 'cancelRegistration',
             additionalData: { eventId, memberId },
           });
-          console.error('Error canceling registration:', error);
           throw error;
         }
       }
@@ -638,7 +630,7 @@ export class EventsService {
                     await FinanceService.deleteTransaction(reg.financeTransactionId!);
                   }
                 } catch (err) {
-                  console.warn('[EventsService.cancelEvent] Could not clean up tx for', reg.id, err);
+                  errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { context: 'EventsService.cancelEvent', additionalData: { regId: reg.id } });
                 }
               })
           );
@@ -677,7 +669,7 @@ export class EventsService {
                     );
                   }
                 } catch (err) {
-                  console.warn('[EventsService.cancelEvent] Could not reverse points for', reg.memberId, err);
+                  errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { context: 'EventsService.cancelEvent', additionalData: { memberId: reg.memberId } });
                 }
               })
             );
@@ -710,7 +702,7 @@ export class EventsService {
               )
             );
           } catch (notifErr) {
-            console.warn('[EventsService.cancelEvent] Notifications failed (cancellation already committed):', notifErr);
+            errorLoggingService.logError(notifErr instanceof Error ? notifErr : new Error(String(notifErr)), { context: 'EventsService.cancelEvent', additionalData: { note: 'Notifications failed (cancellation already committed)' } });
           }
         }
       }
@@ -776,7 +768,6 @@ export class EventsService {
           MembersService.recalculateAttendance(memberId).catch(err => errorLoggingService.logError(err, { action: 'recalculate-attendance', additionalData: { memberId } }));
         } catch (error) {
           errorLoggingService.logError(error as Error, { component: 'EventsService', action: 'markAttendance', additionalData: { eventId, memberId } });
-          console.error('Error marking attendance:', error);
           throw error;
         }
       }
@@ -865,17 +856,13 @@ export class EventsService {
               );
             }
           } catch (pointsErr) {
-            console.warn(
-              '[EventsService.undoAttendance] Could not reverse attendance points for memberId:',
-              memberId, 'eventId:', eventId, pointsErr
-            );
+            errorLoggingService.logError(pointsErr instanceof Error ? pointsErr : new Error(String(pointsErr)), { context: 'EventsService.undoAttendance', additionalData: { memberId, eventId } });
           }
 
           const { MembersService } = await import('./membersService');
           MembersService.recalculateAttendance(memberId).catch(err => errorLoggingService.logError(err, { action: 'recalculate-attendance', additionalData: { memberId } }));
         } catch (error) {
           errorLoggingService.logError(error as Error, { component: 'EventsService', action: 'undoAttendance', additionalData: { eventId, memberId } });
-          console.error('Error undoing attendance:', error);
           throw error;
         }
       }
@@ -892,7 +879,7 @@ export class EventsService {
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
         .slice(0, limitCount);
     } catch (error) {
-      console.error('Error fetching upcoming events:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'EventsService.getUpcomingEvents' });
       throw error;
     }
   }
@@ -903,7 +890,7 @@ export class EventsService {
       const allEvents = await this.getAllEvents();
       return allEvents.filter(e => e.type === type);
     } catch (error) {
-      console.error('Error fetching events by type:', error);
+      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'EventsService.getEventsByType' });
       throw error;
     }
   }
