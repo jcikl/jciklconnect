@@ -202,10 +202,13 @@ service cloud.firestore {
       // Allow read: authenticated users (including those without member doc yet)
       allow read: if isAuthenticated();
       
-      // Allow create: active members only (MEMBER+); GUEST excluded; require author attribution
+      // Allow create: active members only (MEMBER+); GUEST excluded; require author attribution.
+      // authorId must equal the caller's uid so update/delete rules (which read resource.data.authorId)
+      // are guaranteed to work even if the post was created by bypassing the service layer.
       allow create: if isActiveMember() &&
                        request.resource.data.keys().hasAll(['author', 'content', 'createdAt']) &&
-                       request.resource.data.author.id == request.auth.uid;
+                       request.resource.data.author.id == request.auth.uid &&
+                       request.resource.data.authorId == request.auth.uid;
       
       // Allow update: post author (checked via flat authorId field written at create time) or BOARD+.
       // Uses resource.data.authorId (existing doc) — NOT request.resource.data — so an attacker
@@ -479,7 +482,8 @@ service cloud.firestore {
       allow create: if isAuthenticated() &&
         request.resource.data.get('memberId', null) is string &&
         request.resource.data.get('eventId', null) is string &&
-        (request.resource.data.get('memberId', null) == request.auth.uid || canReadOrgMembers());
+        (request.resource.data.get('memberId', null) == request.auth.uid || canReadOrgMembers()) &&
+        request.resource.data.get('status', 'registered') == 'registered';
       // ER-U4: Board update add hasOnly — prevent overwriting points/attendedAt/memberId from SDK
       allow update: if isAuthenticated() &&
         ((canReadOrgMembers() && (isAdmin() ||
@@ -577,25 +581,15 @@ service cloud.firestore {
                     (resource.data.memberId == request.auth.uid || isBoard() || isAdmin());
       allow list: if isActiveMember();
       // FIX: added required field validation to prevent partial/malformed responses
-      // DEDUP NOTE: Firestore rules cannot enforce one-response-per-member-per-survey.
-      // The service layer (surveyService) MUST query for existing responses by memberId+surveyId
-      // before calling addDoc, and reject the submission if one already exists.
+      // DEDUP: !exists() check prevents duplicate submissions when service uses memberId_surveyId as doc ID.
+      // Service MUST use a deterministic responseId = memberId + '_' + surveyId when calling setDoc.
       allow create: if isAuthenticated() &&
                       request.resource.data.memberId == request.auth.uid &&
-                      request.resource.data.keys().hasAll(['surveyId', 'memberId', 'responses', 'submittedAt']);
+                      request.resource.data.keys().hasAll(['surveyId', 'memberId', 'responses', 'submittedAt']) &&
+                      !exists(/databases/$(database)/documents/surveyResponses/$(responseId));
       allow update, delete: if isBoard() || isAdmin();
     }
 
-    // /proposals collection — no service implementation as of 2026-07. Rule kept as placeholder.
-    // FIX 9: require MEMBER+ to read/create proposals — GUEST excluded
-    match /proposals/{proposalId} {
-      allow read: if isActiveMember();
-      allow create: if isActiveMember();
-      allow update, delete: if isAuthenticated() &&
-                               exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                               get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
-    }
-    
     // Workflows collection
     match /workflows/{workflowId} {
       // FIX 11: list rule must not use resource.data (null in list queries).
@@ -735,7 +729,7 @@ service cloud.firestore {
       allow update: if isBoard() || isAdmin() ||
         (isAuthenticated() &&
          request.resource.data.diff(resource.data).affectedKeys()
-           .hasOnly(['views', 'clicks', 'updatedAt']));
+           .hasOnly(['impressions', 'clicks', 'updatedAt']));
     }
     
     // Promotion Packages collection
@@ -770,7 +764,8 @@ service cloud.firestore {
     // Members need to submit their own activity plans; Board/Admin can moderate; delete is Board/Admin only
     match /activityPlans/{planId} {
       allow read: if isAuthenticated();
-      allow create, update: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isBoard() || isAdmin();
       allow delete: if isBoard() || isAdmin();
     }
     
@@ -876,7 +871,7 @@ service cloud.firestore {
     // Guest Registrations collection
     // FIX 22: allow update had no hasOnly whitelist — Board could overwrite any field including immutable registration data
     match /guestRegistrations/{registrationId} {
-      allow read: if isBoard();
+      allow read: if isBoard() || isAdmin();
       // FIX 5: allow create: if true had no field validation — bots could write arbitrary content
       // Fields from eventsService.ts: eventId, name, email, phone, registeredAt, status, organization, notes
       allow create: if request.resource.data.keys().hasAll(['name', 'email', 'eventId', 'registeredAt'])
@@ -1078,7 +1073,7 @@ service cloud.firestore {
       // Split: get keeps the identity check; list trusts the service-layer where(memberId == uid) filter.
       allow get: if isAuthenticated() && (isAdmin() || isBoard() ||
                      resource.data.memberId == request.auth.uid);
-      allow list: if isMember();
+      allow list: if isMember() || isAdmin();
       // P0 fix: Board/Admin must be allowed to create LO-level auto-calculated submissions
       // (syncSubmission in IncentiveCalculatorService writes docs with no memberId — they are
       // LO-level aggregates, not individual member claims).
