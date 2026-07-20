@@ -16,6 +16,7 @@ import { db } from '../config/firebase';
 import { COLLECTIONS, CONTRACT_STATUS } from '../config/constants';
 import { PointsService } from './pointsService';
 import { errorLoggingService } from './errorLoggingService';
+import { isDevMode } from '../utils/devMode';
 
 export interface CommitmentContract {
   id?: string;
@@ -55,6 +56,7 @@ export class ContractService {
     memberName: string,
     data: { goalTitle: string; goalDescription: string; stakedPoints: number; deadline: Date }
   ): Promise<string> {
+    if (isDevMode()) { console.log('[DEV] ContractService.signContract called'); return 'mock-contract-id'; }
     // P1-D guard: fetch an existing contract template to check remaining slots
     // (Only applicable when signing against a pre-existing contract template;
     //  for fresh self-bet contracts there is no slot limit.)
@@ -123,6 +125,7 @@ export class ContractService {
    * Get active contracts for a member
    */
   static async getMemberContracts(memberId: string): Promise<CommitmentContract[]> {
+    if (isDevMode()) return [];
     const q = query(
       collection(db, COLLECTIONS.CONTRACTS),
       where('memberId', '==', memberId),
@@ -142,6 +145,7 @@ export class ContractService {
     proofUrl: string,
     currentUserId: string
   ): Promise<void> {
+    if (isDevMode()) { console.log('[DEV] ContractService.verifyContract called'); return; }
     const contractRef = doc(db, COLLECTIONS.CONTRACTS, contractId);
     // FIX: Wrap in runTransaction to prevent TOCTOU — two concurrent "Submit Proof"
     // requests can no longer both pass the status check and overwrite each other's proofUrl.
@@ -171,6 +175,7 @@ export class ContractService {
    * FIX P1-C: failurePenalty deduction is now applied when status → FAILED.
    */
   static async enforcePenalty(contractId: string): Promise<void> {
+    if (isDevMode()) { console.log('[DEV] ContractService.enforcePenalty called'); return; }
     const contractRef = doc(db, COLLECTIONS.CONTRACTS, contractId);
 
     // Capture penalty details inside the transaction so we can apply them after commit.
@@ -237,6 +242,7 @@ export class ContractService {
    *      This is the atomic commit — both happen together or neither does.
    */
   static async fulfillContract(contractId: string, currentUserId?: string): Promise<void> {
+    if (isDevMode()) { console.log('[DEV] ContractService.fulfillContract called'); return; }
     const contractRef = doc(db, COLLECTIONS.CONTRACTS, contractId);
     const contractDoc = await getDoc(contractRef);
     if (!contractDoc.exists()) return;
@@ -308,6 +314,7 @@ export class ContractService {
    * P1 FIX: cascade escrow release added; all writes in one writeBatch.
    */
   static async deleteContract(contractId: string, adminId: string): Promise<void> {
+    if (isDevMode()) { console.log('[DEV] ContractService.deleteContract called'); return; }
     const contractRef = doc(db, COLLECTIONS.CONTRACTS, contractId);
     const contractSnap = await getDoc(contractRef);
     if (!contractSnap.exists()) return;

@@ -16,6 +16,7 @@ import {
     Member
 } from '../types';
 import { PointsService } from './pointsService';
+import { isDevMode } from '../utils/devMode';
 
 export class IncentiveCalculatorService {
     /**
@@ -24,6 +25,7 @@ export class IncentiveCalculatorService {
      * @param programId The Active Incentive Program ID
      */
     static async calculateAll(loId: string, programId: string): Promise<void> {
+        if (isDevMode()) { console.log('[DEV] IncentiveCalculatorService.calculateAll called'); return; }
         try {
             const standards = await PointsService.getStandards(programId);
             const autoStandards = standards.filter(s =>
