@@ -23,7 +23,7 @@ import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { TrainingModule, Document } from '../types';
 import { isDevMode, withDevMode } from '../utils/devMode';
-import { apiCache } from './cacheService';
+import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 import { errorLoggingService } from './errorLoggingService';
 import { MOCK_TRAININGS, MOCK_DOCUMENTS } from './mockData';
 
@@ -31,7 +31,7 @@ import { MOCK_TRAININGS, MOCK_DOCUMENTS } from './mockData';
 
 const CACHE_KEY_MODULES_ALL = 'trainingModules_all';
 const CACHE_KEY_MODULE = (id: string) => `trainingModule_${id}`;
-const CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+const CACHE_TTL = CACHE_TTL_3MIN;
 
 export class KnowledgeService {
 

@@ -1096,7 +1096,6 @@ export class PromotionService {
     if (isDevMode()) return defaults;
 
     try {
-      // TODO: Move 'system' to COLLECTIONS.SYSTEM in constants.ts
       const snap = await getDoc(doc(db, COLLECTIONS.SYSTEM, 'promotionSettings'));
       if (snap.exists()) return snap.data() as PromotionSettings;
     } catch (e) {

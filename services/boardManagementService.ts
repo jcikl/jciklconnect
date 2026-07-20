@@ -27,11 +27,11 @@ import { Member, UserRole, BoardPosition, BoardMember, BoardTransition, BoardTer
 import { isDevMode, withDevMode } from '../utils/devMode';
 import { MembersService } from './membersService';
 import { CommunicationService } from './communicationService';
-import { apiCache } from './cacheService';
+import { apiCache, CACHE_TTL_5MIN, CACHE_TTL_10MIN } from './cacheService';
 import { logError as logServiceError } from './errorLoggingService';
 
 const CACHE_PREFIX_BOARD_TERM = 'boardTermSettings:';
-const BOARD_TERM_TTL = 10 * 60 * 1000; // 10 minutes
+const BOARD_TERM_TTL = CACHE_TTL_10MIN;
 
 function invalidateBoardTermCache(year: string): void {
   apiCache.delete(CACHE_PREFIX_BOARD_TERM + year);
@@ -97,7 +97,7 @@ export class BoardManagementService {
       const q = loId ? query(col, where('loId', '==', loId)) : col;
       const snap = await getDocs(q);
       const result = snap.docs.map(d => ({ id: d.id, ...d.data() } as BoardMember));
-      apiCache.set(cacheKey, result, 5 * 60 * 1000);
+      apiCache.set(cacheKey, result, CACHE_TTL_5MIN);
       return result;
     } catch (error) {
       logServiceError(

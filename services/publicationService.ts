@@ -14,7 +14,7 @@ import {
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { withDevMode } from '../utils/devMode';
-import { apiCache } from './cacheService';
+import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 import { errorLoggingService } from './errorLoggingService';
 
 export interface Publication {
@@ -83,7 +83,7 @@ const MOCK_PUBLICATIONS: Publication[] = [
 // ─── Firestore CRUD ────────────────────────────────────────────────────────────
 
 const COLL = COLLECTIONS.PUBLICATIONS;
-const CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+const CACHE_TTL = CACHE_TTL_3MIN;
 const CACHE_KEY_ALL = 'publications:all';
 const CACHE_KEY_PUBLISHED = 'publications:published';
 

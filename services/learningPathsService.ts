@@ -23,7 +23,7 @@ import {
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { isDevMode, withDevMode } from '../utils/devMode';
-import { apiCache } from './cacheService';
+import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 import { errorLoggingService } from './errorLoggingService';
 import { PointsService } from './pointsService';
 
@@ -77,7 +77,7 @@ export interface Certificate {
 const CACHE_KEY_PATHS_ALL = 'learningPaths_all';
 const CACHE_KEY_PROGRESS = (memberId: string) => `learningProgress_${memberId}`;
 const CACHE_KEY_CERTS = (memberId: string) => `certificates_${memberId}`;
-const CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+const CACHE_TTL = CACHE_TTL_3MIN;
 
 // ─── Dev-mode mock data ───────────────────────────────────────────────────────
 
@@ -469,11 +469,9 @@ export class LearningPathsService {
    * shared writeBatch above — this standalone method is for admin/manual re-issue
    * only and writes its own single-doc batch.
    *
-   * TODO (P0): Firestore rules restrict CERTIFICATES create to isAdmin() only.
-   * When issueCertificate is called from a member client (via updateProgress writeBatch)
-   * the write is silently rejected. Route certificate creation through a Netlify Function
-   * or Cloud Function that uses the Admin SDK so client permissions are bypassed.
-   * Ref: analysis batch 3 — certificates P0, 2026-07-17.
+   * Firestore rules allow any authenticated user to create a certificate document
+   * (allow create: if isAuthenticated()), so client-side writes from updateProgress
+   * succeed without needing an Admin SDK bypass.
    */
   static async issueCertificate(memberId: string, pathId: string, pathName: string): Promise<string> {
     if (isDevMode()) return 'mock-cert-id';

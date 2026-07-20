@@ -13,7 +13,7 @@ import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { withDevMode } from '../utils/devMode';
 import { Partnership } from '../types';
-import { apiCache } from './cacheService';
+import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 import { errorLoggingService } from './errorLoggingService';
 
 /**
@@ -73,7 +73,7 @@ function toDateString(val: any): string {
  */
 const COLL = COLLECTIONS.ADVERTISEMENTS || 'advertisements';
 const CACHE_KEY = 'partnerships:all';
-const CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+const CACHE_TTL = CACHE_TTL_3MIN;
 
 export class PartnershipsService {
   static invalidatePartnershipsCache(): void {

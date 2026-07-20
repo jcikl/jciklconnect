@@ -23,7 +23,7 @@ import { InventoryItem, MaintenanceSchedule, InventoryAlert, StockMovement } fro
 import { withDevMode } from '../utils/devMode';
 import { MOCK_INVENTORY } from './mockData';
 import { removeUndefined } from '../utils/dataUtils';
-import { apiCache } from './cacheService';
+import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 import { errorLoggingService } from './errorLoggingService';
 
 export class InventoryService {
@@ -33,7 +33,7 @@ export class InventoryService {
   private static readonly CACHE_MOVEMENTS_PREFIX = 'inventory:movements:';
   private static readonly CACHE_ALERTS = 'inventory:alerts';
   private static readonly CACHE_MAINTENANCE = 'inventory:maintenance';
-  private static readonly CACHE_TTL = 3 * 60 * 1000; // 3 min
+  private static readonly CACHE_TTL = CACHE_TTL_3MIN;
 
   private static invalidateInventoryCache(itemId?: string): void {
     apiCache.delete(InventoryService.CACHE_ALL);

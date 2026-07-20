@@ -3,7 +3,7 @@ import { getAuth } from 'firebase/auth';
 import { db } from '../config/firebase';
 import { COLLECTIONS, TOYYIB_CONFIG } from '../config/constants';
 import { errorLoggingService } from './errorLoggingService';
-import { apiCache } from './cacheService';
+import { apiCache, CACHE_TTL_5MIN } from './cacheService';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
 export interface ToyyibApiCategoryRaw {
@@ -262,7 +262,7 @@ export class ToyyibService {
     // Load known category codes from Firestore, plus bill aggregates in parallel.
     // Bills scan is cached for 5 min to avoid a full unbounded collection read on every call.
     const BILLS_CACHE_KEY = 'toyyib:billStats';
-    const BILLS_CACHE_TTL = 5 * 60 * 1000;
+    const BILLS_CACHE_TTL = CACHE_TTL_5MIN;
 
     const [snap, billStats] = await Promise.all([
       getDocs(collection(db, COLLECTIONS.TOYYIB_CATEGORIES)),

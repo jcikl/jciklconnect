@@ -19,7 +19,7 @@ import { COLLECTIONS } from '../config/constants';
 import { withDevMode, isDevMode } from '../utils/devMode';
 import { MOCK_SURVEYS } from './mockData';
 import { removeUndefined } from '../utils/dataUtils';
-import { apiCache } from './cacheService';
+import { apiCache, CACHE_TTL_5MIN } from './cacheService';
 import { errorLoggingService } from './errorLoggingService';
 
 // Cache key helpers
@@ -27,7 +27,7 @@ const CACHE_KEY_ALL = 'surveys:all';
 const cacheKeyById = (id: string) => `surveys:${id}`;
 const CACHE_KEY_RESPONSES_PREFIX = 'surveyResponses:';
 const cacheKeyResponses = (surveyId: string) => `${CACHE_KEY_RESPONSES_PREFIX}${surveyId}`;
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL_MS = CACHE_TTL_5MIN;
 
 function invalidateSurveysCache(surveyId?: string): void {
   apiCache.delete(CACHE_KEY_ALL);

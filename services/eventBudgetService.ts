@@ -24,9 +24,9 @@ import { FinanceService } from './financeService';
 import { EventsService } from './eventsService';
 import { Transaction } from '../types';
 import { errorLoggingService } from './errorLoggingService';
-import { apiCache } from './cacheService';
+import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 
-const EVENT_BUDGET_TTL = 3 * 60 * 1000;
+const EVENT_BUDGET_TTL = CACHE_TTL_3MIN;
 
 export interface EventBudget {
   id?: string;

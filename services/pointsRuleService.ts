@@ -29,12 +29,12 @@ import {
   Member
 } from '../types';
 import { isDevMode, withDevMode } from '../utils/devMode';
-import { apiCache } from './cacheService';
+import { apiCache, CACHE_TTL_5MIN } from './cacheService';
 import { PointsService } from './pointsService';
 import { errorLoggingService } from './errorLoggingService';
 
 const CACHE_PREFIX_POINTS_RULES = 'pointsRules:';
-const CACHE_TTL_POINTS_RULES = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL_POINTS_RULES = CACHE_TTL_5MIN;
 
 function invalidatePointsRulesCache(): void {
   apiCache.deleteByPrefix(CACHE_PREFIX_POINTS_RULES);

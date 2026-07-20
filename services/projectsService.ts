@@ -25,12 +25,12 @@ import { Project, Task } from '../types';
 import { PointsService } from './pointsService';
 import { withDevMode, isDevMode } from '../utils/devMode';
 import { invalidateFinanceCache } from './financeService';
-import { apiCache } from './cacheService';
+import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 import { MOCK_PROJECTS, MOCK_TASKS } from './mockData';
 import { errorLoggingService } from './errorLoggingService';
 
 const CACHE_KEY_ALL_PROJECTS = 'projects:all';
-const PROJECTS_TTL = 3 * 60 * 1000; // 3 minutes
+const PROJECTS_TTL = CACHE_TTL_3MIN;
 
 export class ProjectsService {
   static invalidateProjectsCache(): void {

@@ -6,12 +6,12 @@ import { EventsService } from './eventsService';
 import { ProjectsService } from './projectsService';
 import { CommunicationService } from './communicationService';
 import { PointsService } from './pointsService';
-import { apiCache } from './cacheService';
+import { apiCache, CACHE_TTL_5MIN } from './cacheService';
 import { errorLoggingService } from './errorLoggingService';
 import { COLLECTIONS } from '../config/constants';
 
 const CACHE_KEY_NUDGE_RULES = 'nudgeRules:all';
-const NUDGE_RULES_TTL = 5 * 60 * 1000; // 5 minutes
+const NUDGE_RULES_TTL = CACHE_TTL_5MIN;
 
 export interface Nudge {
   id: string;

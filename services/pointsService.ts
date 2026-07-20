@@ -22,7 +22,7 @@ import { COLLECTIONS, POINT_CATEGORIES, MEMBER_TIERS } from '../config/constants
 import { Member, MemberTier, IncentiveProgram, IncentiveStandard, IncentiveSubmission, LOStarProgress, RadarPointsConfig } from '../types';
 import { isDevMode, withDevMode } from '../utils/devMode';
 import { MembersService } from './membersService';
-import { apiCache } from './cacheService';
+import { apiCache, CACHE_TTL_3MIN, CACHE_TTL_5MIN } from './cacheService';
 import { errorLoggingService } from './errorLoggingService';
 
 // --- Cache key prefixes ---
@@ -566,9 +566,10 @@ export class PointsService {
         try {
           const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
           // P0 fix: atomic increment — eliminates the read-modify-write race condition.
-          // TODO: Add tier recalculation — see approveClaim() for the pattern.
-          // Tier recalculation is intentionally omitted here; callers that need tier
-          // updates (e.g. approveClaim) handle it in their own batch.
+          // Tier recalculation is intentionally omitted here because this deprecated
+          // method is a thin wrapper; callers that need tier updates (e.g. approveClaim)
+          // handle recalculation inside their own writeBatch. Migrate call sites to the
+          // awardPoints batch pattern (SYNC-003) rather than adding tier logic here.
           await updateDoc(memberRef, {
             points: increment(pointsDelta),
             updatedAt: Timestamp.now(),
@@ -698,7 +699,7 @@ export class PointsService {
               throw error;
             }
           },
-          5 * 60 * 1000,
+          CACHE_TTL_5MIN,
           'getPointRule'
         );
       }
@@ -764,7 +765,7 @@ export class PointsService {
           throw error;
         }
           },
-          5 * 60 * 1000,
+          CACHE_TTL_5MIN,
           'getPointRules'
         );
       }
@@ -1359,7 +1360,7 @@ export class PointsService {
         errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'PointsService.getStandards' });
         throw error;
       }
-    }, 3 * 60 * 1000);
+    }, CACHE_TTL_3MIN);
   }
 
   // Submit an incentive claim
@@ -2272,7 +2273,7 @@ export class PointsService {
       }
 
       // P2 FIX: store computed result in cache (3-minute TTL)
-      const LO_STAR_TTL = 3 * 60 * 1000;
+      const LO_STAR_TTL = CACHE_TTL_3MIN;
       apiCache.set(loStarCacheKey, progress, LO_STAR_TTL);
 
       return progress;

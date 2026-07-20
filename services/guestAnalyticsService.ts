@@ -2,7 +2,7 @@
 import { db } from '../config/firebase';
 import { withDevMode } from '../utils/devMode';
 import { COLLECTIONS } from '../config/constants';
-import { apiCache } from './cacheService';
+import { apiCache, CACHE_TTL_5MIN } from './cacheService';
 import { errorLoggingService } from './errorLoggingService';
 
 export type GuestPage = 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'directory' | 'partnerships';
@@ -130,7 +130,7 @@ export class GuestAnalyticsService {
           row.avgDwellSeconds = row.views > 0 ? Math.round(row.dwellSeconds / row.views) : 0;
         }
         const result = Array.from(byPage.values());
-        apiCache.set(cacheKey, result, 5 * 60 * 1000);
+        apiCache.set(cacheKey, result, CACHE_TTL_5MIN);
         return result;
       }
     );

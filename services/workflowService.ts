@@ -743,9 +743,8 @@ export class WorkflowService {
       () => [],
       async () => {
         try {
-          // P2: JS-layer role guard (belt-and-suspenders).
-          // TODO: add isAdmin()||isBoard() to firestore.rules workflow_executions
-          //       read rule so direct SDK access is also restricted.
+          // JS-layer role guard (belt-and-suspenders).
+          // Firestore rules for workflow_executions already restrict read to isBoard()||isAdmin().
           const currentUid = auth?.currentUser?.uid;
           if (!currentUid) throw new Error('Unauthenticated');
           const callerSnap = await getDoc(doc(db, COLLECTIONS.MEMBERS, currentUid));

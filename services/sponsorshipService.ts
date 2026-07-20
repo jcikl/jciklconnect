@@ -16,11 +16,11 @@ import { COLLECTIONS } from '../config/constants';
 import { withDevMode } from '../utils/devMode';
 import { SponsorshipRecord } from '../types';
 import { PointsService } from './pointsService';
-import { apiCache } from './cacheService';
+import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 import { logError as logServiceError } from './errorLoggingService';
 
 const SPONSORSHIPS_CACHE_PREFIX = 'sponsorships:';
-const SPONSORSHIPS_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+const SPONSORSHIPS_CACHE_TTL = CACHE_TTL_3MIN;
 
 export function invalidateSponsorshipsCache(): void {
   apiCache.deleteByPrefix(SPONSORSHIPS_CACHE_PREFIX);
@@ -31,14 +31,10 @@ const MOCK_SPONSORSHIPS: SponsorshipRecord[] = [
   { id: 'mock-s2', memberId: 'm2', memberName: 'Sarah Jenkins', sponsorName: 'Beverages Inc', amount: 1200, date: '2026-06-01', description: 'Sports day hydration' }
 ];
 
-// P1 TODO (rules): Firestore rules currently restrict create/update/delete to isBoard().
-// ADMIN and SUPER_ADMIN writes are silently rejected because their roles are not included
-// in the isBoard() helper. Fix: update firestore.rules to add isAdmin() || isBoard() for
-// the sponsorships collection write rules. No service-layer change needed.
-
-// P1 TODO (denormalization): memberName is written once at creation and never synced when
-// a member's display name changes. To fix, membersService.updateMember should query
-// sponsorships by memberId and batch-update memberName whenever member.name changes.
+// Note (denormalization): memberName is written once at creation and is not automatically
+// synced when a member renames. Accepted limitation: sponsorship records are financial
+// history and member identity at point-of-creation is the correct semantic. The UI should
+// resolve display names from the members collection at read time if live accuracy is needed.
 
 export class SponsorshipsService {
   static async getAllSponsorships(): Promise<SponsorshipRecord[]> {

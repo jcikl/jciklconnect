@@ -46,7 +46,7 @@ import {
   buildMembershipProjectId,
   buildCategoryCleanupUpdates,
 } from '../utils/transactionCategoryUtils';
-import { apiCache } from './cacheService';
+import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 
 // PERF6: chunkArray above is also used by reconcileBankAccount to batch-fetch splits
 import { SponsorshipsService } from './sponsorshipService';
@@ -71,7 +71,7 @@ interface RawTransactionDoc {
 }
 
 const FINANCE_CACHE_PREFIX = 'finance:';
-const TX_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+const TX_CACHE_TTL = CACHE_TTL_3MIN;
 
 /** Invalidate all finance caches (call after any write to transactions/bankAccounts). */
 export function invalidateFinanceCache(): void {

@@ -30,11 +30,11 @@ import {
     Badge as UserBadge
 } from '../types';
 import { PointsService } from './pointsService';
-import { apiCache } from './cacheService';
+import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 import { errorLoggingService } from './errorLoggingService';
 
 const BADGES_CACHE_PREFIX = 'gamification:badges:';
-const BADGES_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+const BADGES_CACHE_TTL = CACHE_TTL_3MIN;
 
 export class GamificationService {
     // === Cache helpers ===

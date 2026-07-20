@@ -24,11 +24,11 @@ import { Event, ProjectCommitteeMember } from '../types';
 import { EventRegistrationService } from './eventRegistrationService';
 import { isDevMode, withDevMode } from '../utils/devMode';
 import { errorLoggingService } from './errorLoggingService';
-import { apiCache } from './cacheService';
+import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 import { MOCK_EVENTS } from './mockData';
 
 const CACHE_KEY_ALL_EVENTS = 'events:all';
-const EVENTS_TTL = 3 * 60 * 1000; // 3 minutes
+const EVENTS_TTL = CACHE_TTL_3MIN;
 
 export class EventsService {
   private static mockEvents: Event[] = [...MOCK_EVENTS];
@@ -993,7 +993,7 @@ export class EventsService {
           throw error;
         }
       },
-      3 * 60 * 1000
+      CACHE_TTL_3MIN
     );
   }
 

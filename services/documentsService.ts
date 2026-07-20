@@ -16,7 +16,7 @@ import { getStorage, ref as storageRef, deleteObject } from 'firebase/storage';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { withDevMode } from '../utils/devMode';
-import { apiCache } from './cacheService';
+import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 import { errorLoggingService } from './errorLoggingService';
 import { Document } from '../types';
 
@@ -129,7 +129,7 @@ export class DocumentsService {
               versionCount: versions.length,
             } as DocumentWithVersions;
           });
-        }, 3 * 60 * 1000);
+        }, CACHE_TTL_3MIN);
       }
     );
   }
@@ -156,7 +156,7 @@ export class DocumentsService {
             currentVersion,
             versionCount: versions.length,
           } as DocumentWithVersions;
-        }, 3 * 60 * 1000);
+        }, CACHE_TTL_3MIN);
       }
     );
   }
@@ -180,7 +180,7 @@ export class DocumentsService {
             ...d.data(),
             uploadedAt: d.data().uploadedAt?.toDate() || new Date(),
           })) as DocumentVersion[];
-        }, 3 * 60 * 1000);
+        }, CACHE_TTL_3MIN);
       }
     );
   }

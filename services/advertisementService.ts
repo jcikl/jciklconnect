@@ -19,7 +19,7 @@ import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { withDevMode } from '../utils/devMode';
 import { toDate } from '../utils/dateUtils';
-import { apiCache } from './cacheService';
+import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 import { errorLoggingService } from './errorLoggingService';
 
 export interface Advertisement {
@@ -105,7 +105,7 @@ const MOCK_AD: Advertisement = {
 };
 
 const COLL = COLLECTIONS.ADVERTISEMENTS || 'advertisements';
-const CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+const CACHE_TTL = CACHE_TTL_3MIN;
 const CACHE_KEY_ALL = 'ads:all';
 const CACHE_KEY_ACTIVE_PREFIX = 'ads:active:';
 const CACHE_KEY_PACKAGES = 'pkgs:promotionPackages';

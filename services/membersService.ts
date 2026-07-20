@@ -40,13 +40,13 @@ import {
 } from '../types';
 import { isDevMode } from '../utils/devMode';
 import { getMYTYear } from '../utils/dateUtils';
-import { apiCache } from './cacheService';
+import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 import { MOCK_MEMBERS } from './mockData';
 import { AuditLogService } from './auditLogService';
 
 const CACHE_KEY_ALL_MEMBERS = 'members:all';
 const CACHE_KEY_LO = (loId: string) => `members:lo:${loId}`;
-const MEMBERS_TTL = 3 * 60 * 1000; // 3 minutes
+const MEMBERS_TTL = CACHE_TTL_3MIN;
 import {
   MembershipConfigService,
   getTargetDuesForMembershipType,

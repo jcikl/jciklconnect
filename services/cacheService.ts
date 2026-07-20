@@ -16,6 +16,13 @@ export interface CacheOptions {
   useLocalStorage?: boolean; // Whether to persist to localStorage
 }
 
+// Named TTL constants for consistent cache expiry across all services
+export const CACHE_TTL_3MIN = 3 * 60 * 1000;
+export const CACHE_TTL_5MIN = 5 * 60 * 1000;
+export const CACHE_TTL_10MIN = 10 * 60 * 1000;
+export const CACHE_TTL_15MIN = 15 * 60 * 1000;
+export const CACHE_TTL_1HOUR = 60 * 60 * 1000;
+
 class CacheService {
   private memoryCache = new Map<string, CacheEntry<any>>();
   private inFlight = new Map<string, Promise<any>>();

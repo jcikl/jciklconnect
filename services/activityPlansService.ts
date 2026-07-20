@@ -19,7 +19,7 @@ import {
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { withDevMode } from '../utils/devMode';
-import { apiCache } from './cacheService';
+import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 import { errorLoggingService } from './errorLoggingService';
 
 // ---------------------------------------------------------------------------
@@ -27,7 +27,7 @@ import { errorLoggingService } from './errorLoggingService';
 // ---------------------------------------------------------------------------
 const CACHE_PREFIX_ACTIVITY_PLANS = 'activity_plans';
 const CACHE_KEY_ALL = `${CACHE_PREFIX_ACTIVITY_PLANS}_all`;
-const ACTIVITY_PLANS_TTL = 3 * 60 * 1000; // 3 minutes
+const ACTIVITY_PLANS_TTL = CACHE_TTL_3MIN;
 
 function cacheKeyByStatus(status: string) {
   return `${CACHE_PREFIX_ACTIVITY_PLANS}_status_${status}`;

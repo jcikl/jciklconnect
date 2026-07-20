@@ -15,7 +15,7 @@ import {
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { withDevMode } from '../utils/devMode';
-import { apiCache } from './cacheService';
+import { apiCache, CACHE_TTL_5MIN } from './cacheService';
 import { errorLoggingService } from './errorLoggingService';
 
 const TEMPLATES_CACHE_PREFIX = 'templates:';
@@ -126,7 +126,7 @@ export class TemplatesService {
             throw error;
           }
         },
-        5 * 60 * 1000
+        CACHE_TTL_5MIN
       )
     );
   }
@@ -155,7 +155,7 @@ export class TemplatesService {
             throw error;
           }
         },
-        5 * 60 * 1000
+        CACHE_TTL_5MIN
       )
     );
   }
@@ -266,7 +266,7 @@ export class TemplatesService {
             throw error;
           }
         },
-        5 * 60 * 1000
+        CACHE_TTL_5MIN
       )
     );
   }
@@ -369,7 +369,7 @@ export class TemplatesService {
             throw error;
           }
         },
-        5 * 60 * 1000
+        CACHE_TTL_5MIN
       )
     );
   }

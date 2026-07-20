@@ -14,11 +14,11 @@ import {
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { withDevMode } from '../utils/devMode';
-import { apiCache } from './cacheService';
+import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 import { errorLoggingService } from './errorLoggingService';
 
 const FEEDBACK_CACHE_PREFIX = 'eventFeedback:';
-const FEEDBACK_CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+const FEEDBACK_CACHE_TTL = CACHE_TTL_3MIN;
 
 function feedbackCacheKey(eventId: string): string {
   return `${FEEDBACK_CACHE_PREFIX}${eventId}`;

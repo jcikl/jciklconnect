@@ -18,11 +18,11 @@ import { BusinessProfile } from '../types';
 import { withDevMode } from '../utils/devMode';
 import { MOCK_BUSINESSES } from './mockData';
 import { MembersService } from './membersService';
-import { apiCache } from './cacheService';
+import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 import { errorLoggingService } from './errorLoggingService';
 
 const CACHE_KEY_ALL_PUBLIC = 'businessDirectory:public:all';
-const CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes
+const CACHE_TTL_MS = CACHE_TTL_3MIN;
 
 function invalidateBusinessDirectoryCache(): void {
   apiCache.delete(CACHE_KEY_ALL_PUBLIC);
