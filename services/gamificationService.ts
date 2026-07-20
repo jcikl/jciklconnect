@@ -435,22 +435,16 @@ export class GamificationService {
     }
 
     static calculateAwardProgress(award: AwardDefinition, currentProgressValue: number): number {
-        // Guard unimplemented criteria types so they return 0 instead of silently
-        // falling through to the util with undefined behaviour (P1-C)
-        switch (award.criteria?.type) {
-            case 'consecutive_attendance':
-                console.warn('[GamificationService] consecutive_attendance badge criteria not yet implemented — returning 0 progress');
-                return 0;
-            case 'role_held':
-                console.warn('[GamificationService] role_held badge criteria not yet implemented — returning 0 progress');
-                return 0;
-            case 'training_completed':
-                console.warn('[GamificationService] training_completed badge criteria not yet implemented — returning 0 progress');
-                return 0;
-            case 'recruitment_count':
-                console.warn('[GamificationService] recruitment_count badge criteria not yet implemented — returning 0 progress');
-                return 0;
+        // consecutive_attendance requires server-side streak tracking and cannot be
+        // computed from a simple count — return 0 until streak logic is implemented.
+        if (award.criteria?.type === 'consecutive_attendance') {
+            console.warn('[GamificationService] consecutive_attendance badge criteria requires streak tracking — returning 0 progress');
+            return 0;
         }
+        // All other criteria types (including role_held, training_completed,
+        // recruitment_count) are count-based: the caller has already fetched the
+        // member's count and passed it as currentProgressValue, so we can compute
+        // linear or milestone-based progress directly.
         return calculateAwardProgressUtil(award, currentProgressValue);
     }
 
