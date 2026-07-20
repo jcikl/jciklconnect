@@ -2716,7 +2716,7 @@ export class FinanceService {
           const updateData = {
             ...updates,
             updatedAt: Timestamp.now(),
-          } as Partial<BankAccount>;
+          } as unknown as Partial<BankAccount>;
 
           if (updates.lastReconciled) {
             (updateData as Record<string, unknown>).lastReconciled = Timestamp.fromDate(new Date(updates.lastReconciled));
