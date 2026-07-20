@@ -2026,7 +2026,7 @@ export class FinanceService {
             metadata: {
               deletedAt: new Date().toISOString(),
             },
-          }).catch(err => console.error('[deleteTransaction] Failed to write audit tombstone:', err));
+          }).catch(err => errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { context: 'financeService.deleteTransaction audit tombstone' }));
 
           // Sync with Member Membership if category is Membership
           if (transaction && transaction.category === 'Membership' && transaction.memberId) {

@@ -471,7 +471,7 @@ export class PaymentRequestService {
           targetCollection: COLLECTIONS.PAYMENT_REQUESTS,
           targetId: id,
           after: { status, ...(rejectionReason ? { rejectionReason } : {}) },
-        }).catch(err => console.warn('[updateStatus] Audit write failed:', err));
+        }).catch(err => errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { context: 'paymentRequestService.updateStatus audit write' }));
       }
     );
   }
@@ -647,8 +647,7 @@ export class PaymentRequestService {
       await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, pr.id), { expenseTxFailed: false });
     } catch (err) {
       // Non-fatal: log but don't block the approval
-      console.error('[PaymentRequestService] Failed to auto-create expense transaction for PR', pr.id, err);
-      errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { component: 'paymentRequestService', action: '_autoCreateExpenseTransactionForPR' });
+      errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { component: 'paymentRequestService', action: '_autoCreateExpenseTransactionForPR', prId: pr.id });
       // Mark failure so UI can surface a retry button (情景 I)
       try {
         await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, pr.id), { expenseTxFailed: true });
@@ -924,8 +923,7 @@ export class PaymentRequestService {
         invalidateFinanceCache();
       }
     } catch (err) {
-      console.error('[PaymentRequestService] Failed to delete expense transaction for PR', prId, err);
-      errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { component: 'paymentRequestService', action: '_deleteExpenseTransactionForPR' });
+      errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { component: 'paymentRequestService', action: '_deleteExpenseTransactionForPR', prId });
     }
   }
 
