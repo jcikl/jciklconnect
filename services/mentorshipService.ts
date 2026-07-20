@@ -23,6 +23,7 @@ import { CommunicationService } from './communicationService';
 import { Member, MentorMatch, UserRole } from '../types';
 import { isDevMode, withDevMode } from '../utils/devMode';
 import { errorLoggingService } from './errorLoggingService';
+import { COLLECTIONS } from '../config/constants';
 
 export interface MentorMatchSuggestion {
   mentor: Member;
@@ -275,10 +276,10 @@ export class MentorshipService {
             startDate: serverTimestamp(),
             updatedAt: serverTimestamp(),
           });
-          batch.update(doc(db, 'members', match.mentorId), {
+          batch.update(doc(db, COLLECTIONS.MEMBERS, match.mentorId), {
             menteeIds: arrayUnion(match.menteeId),
           });
-          batch.update(doc(db, 'members', match.menteeId), {
+          batch.update(doc(db, COLLECTIONS.MEMBERS, match.menteeId), {
             mentorId: match.mentorId,
           });
           await batch.commit();
@@ -425,10 +426,10 @@ export class MentorshipService {
             endDate: serverTimestamp(),
             updatedAt: serverTimestamp(),
           });
-          batch.update(doc(db, 'members', match.mentorId), {
+          batch.update(doc(db, COLLECTIONS.MEMBERS, match.mentorId), {
             menteeIds: arrayRemove(match.menteeId),
           });
-          batch.update(doc(db, 'members', match.menteeId), {
+          batch.update(doc(db, COLLECTIONS.MEMBERS, match.menteeId), {
             mentorId: deleteField(),
           });
           await batch.commit();
@@ -540,12 +541,12 @@ export class MentorshipService {
             updatedAt: serverTimestamp(),
           });
           if (match.mentorId) {
-            batch.update(doc(db, 'members', match.mentorId), {
+            batch.update(doc(db, COLLECTIONS.MEMBERS, match.mentorId), {
               menteeIds: arrayRemove(match.menteeId),
             });
           }
           if (match.menteeId) {
-            batch.update(doc(db, 'members', match.menteeId), {
+            batch.update(doc(db, COLLECTIONS.MEMBERS, match.menteeId), {
               mentorId: deleteField(),
             });
           }
@@ -583,12 +584,12 @@ export class MentorshipService {
           batch.delete(matchRef);
           // Clean up member cross-references if the match was ever active
           if (match.mentorId) {
-            batch.update(doc(db, 'members', match.mentorId), {
+            batch.update(doc(db, COLLECTIONS.MEMBERS, match.mentorId), {
               menteeIds: arrayRemove(match.menteeId),
             });
           }
           if (match.menteeId) {
-            batch.update(doc(db, 'members', match.menteeId), {
+            batch.update(doc(db, COLLECTIONS.MEMBERS, match.menteeId), {
               mentorId: deleteField(),
             });
           }

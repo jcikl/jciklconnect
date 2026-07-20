@@ -561,7 +561,7 @@ export class CommunicationService {
 
     try {
       // Check if already processed today using a system config document
-      const configRef = doc(db, 'system_config', 'birthday_processor');
+      const configRef = doc(db, COLLECTIONS.SYSTEM_CONFIG, 'birthday_processor');
       const configSnap = await getDoc(configRef);
       
       if (configSnap.exists() && configSnap.data().lastProcessedDate === todayStr && !isDevMode()) {
@@ -616,7 +616,7 @@ export class CommunicationService {
       // If document doesn't exist, create it (excluding dev mode)
       if (!isDevMode()) {
         try {
-          const configRef = doc(db, 'system_config', 'birthday_processor');
+          const configRef = doc(db, COLLECTIONS.SYSTEM_CONFIG, 'birthday_processor');
           const configSnap = await getDoc(configRef);
           if (!configSnap.exists()) {
              const { setDoc } = await import('firebase/firestore');

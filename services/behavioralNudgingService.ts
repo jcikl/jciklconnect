@@ -8,6 +8,7 @@ import { CommunicationService } from './communicationService';
 import { PointsService } from './pointsService';
 import { apiCache } from './cacheService';
 import { errorLoggingService } from './errorLoggingService';
+import { COLLECTIONS } from '../config/constants';
 
 const CACHE_KEY_NUDGE_RULES = 'nudgeRules:all';
 const NUDGE_RULES_TTL = 5 * 60 * 1000; // 5 minutes
@@ -226,7 +227,7 @@ export class BehavioralNudgingService {
           // Store dismissal state with deterministic ID: memberId_nudgeId
           const dismissKey = `${memberId}_${nudgeId}`;
           await setDoc(
-            doc(db, 'nudges', dismissKey),
+            doc(db, COLLECTIONS.NUDGES, dismissKey),
             {
               nudgeId,
               memberId,

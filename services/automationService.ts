@@ -53,7 +53,11 @@ export interface WorkflowStep {
 
 export interface WorkflowCondition {
   field: string;
-  operator: '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains';
+  /** Supports both symbol-based ('==', '!=', …) and word-based ('equals', 'not_equals', …) operators
+   * to match both local WorkflowStep conditions and Firestore-stored WorkflowCondition documents. */
+  operator: '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'not_contains'
+    | 'equals' | 'not_equals' | 'greater_than' | 'less_than' | 'greater_equal' | 'less_equal'
+    | 'exists' | 'not_exists';
   value: unknown;
 }
 
@@ -687,21 +691,35 @@ export class AutomationService {
       const fieldValue = this.getNestedValue(context, condition.field);
 
       switch (condition.operator) {
+        // Symbol-based operators (local WorkflowStep conditions)
         case '==':
+        case 'equals':
           return fieldValue === condition.value;
         case '!=':
+        case 'not_equals':
           return fieldValue !== condition.value;
         case '>':
+        case 'greater_than':
           return (fieldValue as number) > (condition.value as number);
         case '<':
+        case 'less_than':
           return (fieldValue as number) < (condition.value as number);
         case '>=':
+        case 'greater_equal':
           return (fieldValue as number) >= (condition.value as number);
         case '<=':
+        case 'less_equal':
           return (fieldValue as number) <= (condition.value as number);
         case 'contains':
           return String(fieldValue).includes(String(condition.value));
+        case 'not_contains':
+          return !String(fieldValue).includes(String(condition.value));
+        case 'exists':
+          return fieldValue !== undefined && fieldValue !== null;
+        case 'not_exists':
+          return fieldValue === undefined || fieldValue === null;
         default:
+          errorLoggingService.logWarning(`Unknown condition operator: ${condition.operator}`, { action: 'AutomationService.evaluateCondition' });
           return false;
       }
     }

@@ -99,6 +99,14 @@ export const COLLECTIONS = {
   TOYYIBPAY_WEBHOOKS: 'toyyibpay_webhooks',
   /** Tracks which members have already received birthday notification emails on a given date */
   BIRTHDAY_NOTIFICATIONS_SENT: 'birthdayNotificationsSent',
+  /** Nudge dismiss records written by behavioralNudgingService */
+  NUDGES: 'nudges',
+  /** Atomic sequence counters (e.g. PR reference number generation) */
+  COUNTERS: 'counters',
+  /** System-wide configuration documents (e.g. radar_points_config, promotionSettings) */
+  SYSTEM: 'system',
+  /** Birthday-processor and other server-side runtime config */
+  SYSTEM_CONFIG: 'system_config',
 } as const;
 
 /** 付款申请参考编号前缀：PR-{loId}-{YYYYMMDD}-{序号}，与银行备注约定一致（Story 2.1） */

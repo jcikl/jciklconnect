@@ -748,7 +748,7 @@ export class WorkflowService {
           //       read rule so direct SDK access is also restricted.
           const currentUid = auth?.currentUser?.uid;
           if (!currentUid) throw new Error('Unauthenticated');
-          const callerSnap = await getDoc(doc(db, 'members', currentUid));
+          const callerSnap = await getDoc(doc(db, COLLECTIONS.MEMBERS, currentUid));
           const callerRole: string = callerSnap.exists()
             ? (callerSnap.data() as any).role ?? ''
             : '';

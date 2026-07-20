@@ -318,10 +318,15 @@ class RuleExecutionService {
         return this.triggerWorkflow(action.config, data);
       case 'webhook':
         return this.callWebhook(action.config, data);
+      case 'send_webhook':
+        // Alias for 'webhook' — both map to the same handler
+        return this.callWebhook(action.config, data);
+      case 'update_member':
+        return this.updateField(action.config, data);
       case 'log_event':
         return this.logEvent(action.config, data);
       default:
-        return { ok: false, reason: `Unknown action type: ${action.type}` };
+        return { ok: false, reason: `Unknown action type: ${(action as { type: string }).type}` };
     }
   }
 

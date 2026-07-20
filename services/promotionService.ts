@@ -1097,7 +1097,7 @@ export class PromotionService {
 
     try {
       // TODO: Move 'system' to COLLECTIONS.SYSTEM in constants.ts
-      const snap = await getDoc(doc(db, 'system', 'promotionSettings'));
+      const snap = await getDoc(doc(db, COLLECTIONS.SYSTEM, 'promotionSettings'));
       if (snap.exists()) return snap.data() as PromotionSettings;
     } catch (e) {
       // Fall through to defaults if Firestore is unavailable

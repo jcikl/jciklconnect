@@ -64,7 +64,7 @@ export class PaymentRequestService {
     // are created simultaneously on the same day.
     const dateStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
     const today = dateStr.replace(/-/g, '');
-    const counterRef = doc(db, 'counters', `pr_${loId}_${dateStr}`);
+    const counterRef = doc(db, COLLECTIONS.COUNTERS, `pr_${loId}_${dateStr}`);
     let seq = 1;
     await runTransaction(db, async (txn) => {
       const counterSnap = await txn.get(counterRef);

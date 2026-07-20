@@ -2301,7 +2301,7 @@ export class PointsService {
     }
 
     try {
-      const docRef = doc(db, 'system', 'radar_points_config');
+      const docRef = doc(db, COLLECTIONS.SYSTEM, 'radar_points_config');
       const snap = await getDoc(docRef);
       if (snap.exists()) {
         const data = snap.data();
@@ -2338,7 +2338,7 @@ export class PointsService {
     }
 
     try {
-      const docRef = doc(db, 'system', 'radar_points_config');
+      const docRef = doc(db, COLLECTIONS.SYSTEM, 'radar_points_config');
       await setDoc(docRef, config);
       console.log('Saved radar points config to cloud:', config);
     } catch (error) {
