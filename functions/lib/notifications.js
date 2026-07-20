@@ -429,7 +429,10 @@ exports.sendBirthdayNotifications = functions.pubsub
         sentBatch.set(db.collection('birthdayNotificationsSent').doc(`${id}_${todayDateStr}`), { sentAt: admin.firestore.FieldValue.serverTimestamp(), type: 'personal' });
     }
     if (otherMemberIds.length > 0) {
-        sentBatch.set(announcementSentRef, { sentAt: admin.firestore.FieldValue.serverTimestamp(), count: otherMemberIds.length });
+        sentBatch.set(announcementSentRef, {
+            sentAt: admin.firestore.FieldValue.serverTimestamp(),
+            count: otherMemberIds.length,
+        });
     }
     await sentBatch.commit();
     // Send FCM pushes concurrently (cannot be batched via Firestore)

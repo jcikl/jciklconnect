@@ -43,8 +43,6 @@ export const COLLECTIONS = {
   PROMOTION_PACKAGES: 'promotionPackages',
   EVENT_FEEDBACK: 'eventFeedback',
   PROJECT_REPORTS: 'projectReports',
-  CONVERSATIONS: 'conversations',
-  MESSAGES: 'messages',
   BADGES: 'badges',
   BADGE_AWARDS: 'badgeAwards',
   WEBHOOKS: 'webhooks',
@@ -85,8 +83,6 @@ export const COLLECTIONS = {
   FINANCE_ALERTS: 'finance_alerts',
   /** Firestore read/write audit log — written by firestoreLogger */
   SYSTEM_LOGS: 'systemLogs',
-  /** Governance: motions / resolutions voted on by board */
-  VOTES: 'votes',
   /** Project sub-tasks assigned to committee members */
   TASKS: 'tasks',
   /** Mentor–mentee pairings */
@@ -97,8 +93,6 @@ export const COLLECTIONS = {
   MANUAL_PROMOTION_REQUESTS: 'manualPromotionRequests',
   /** Immutable audit trail for sensitive business actions (role changes, deletes, reversals, etc.) */
   AUDIT_LOG: 'auditLog',
-  /** Elections and ballot subcollections */
-  ELECTIONS: 'elections',
   /** Member email dedup slots — one doc per sanitised email, enforces uniqueness across import paths */
   MEMBER_EMAILS: 'memberEmails',
   /** ToyyibPay outbound webhook records */

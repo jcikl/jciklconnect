@@ -331,12 +331,14 @@ exports.updateAchievementProgress = functions
 // P0 fix: was only handling 'participation' category — all other types returned current=0
 // so members never reached any milestone for contribution/leadership/training/milestone types.
 async function calculateAchievementProgress(achievement, memberId) {
+    var _a, _b;
     let current = 0;
     const completedMilestones = [];
     const category = achievement.category || '';
-    const criteriaType = (achievement.criteria && achievement.criteria.type) || '';
+    const criteriaType = ((_a = achievement.criteria) === null || _a === void 0 ? void 0 : _a.type) || '';
     // --- participation / event attendance ---
     if (category === 'participation' || criteriaType === 'event_count' || criteriaType === 'event_attendance') {
+        // BIZ-005 fix: use eventRegistrations checked-in status, not the events.attendees counter.
         const snap = await db.collection('eventRegistrations')
             .where('memberId', '==', memberId)
             .where('status', '==', 'checked_in')
@@ -345,6 +347,7 @@ async function calculateAchievementProgress(achievement, memberId) {
     }
     // --- contribution / project completion ---
     else if (category === 'contribution' || criteriaType === 'project_count' || criteriaType === 'project_completion') {
+        // Count projects where this member has a completed task contribution.
         const snap = await db.collection('points')
             .where('memberId', '==', memberId)
             .where('category', '==', 'project_task')
@@ -353,6 +356,7 @@ async function calculateAchievementProgress(achievement, memberId) {
     }
     // --- leadership / role held ---
     else if (category === 'leadership' || criteriaType === 'role_held') {
+        // Count distinct leadership roles this member has held (boardMembers records).
         const snap = await db.collection('boardMembers')
             .where('memberId', '==', memberId)
             .get();
@@ -360,6 +364,7 @@ async function calculateAchievementProgress(achievement, memberId) {
     }
     // --- training / learning completion ---
     else if (category === 'training' || criteriaType === 'training_completed') {
+        // Count completed learning paths or training modules.
         const snap = await db.collection('learningProgress')
             .where('memberId', '==', memberId)
             .where('status', '==', 'completed')
@@ -368,29 +373,34 @@ async function calculateAchievementProgress(achievement, memberId) {
     }
     // --- milestone / points threshold ---
     else if (category === 'milestone' || criteriaType === 'points_threshold') {
+        // Use total accumulated points from the member document.
         const memberSnap = await db.collection('members').doc(memberId).get();
-        current = memberSnap.exists ? ((memberSnap.data() && memberSnap.data().points) || 0) : 0;
+        current = memberSnap.exists ? (((_b = memberSnap.data()) === null || _b === void 0 ? void 0 : _b.points) || 0) : 0;
     }
     // --- recruitment ---
     else if (criteriaType === 'recruitment_count') {
+        // Count members recruited (referredBy == memberId).
         const snap = await db.collection('members')
             .where('referredBy', '==', memberId)
             .get();
         current = snap.size;
     }
-    // --- consecutive attendance (approximated by total check-ins) ---
+    // --- consecutive attendance (requires ordered session data — approximated) ---
     else if (criteriaType === 'consecutive_attendance') {
+        // Approximate: count total checked-in registrations; true consecutive streak
+        // requires a separate scheduled computation and is tracked separately.
         const snap = await db.collection('eventRegistrations')
             .where('memberId', '==', memberId)
             .where('status', '==', 'checked_in')
             .get();
         current = snap.size;
     }
-    // --- unknown category ---
+    // --- unknown category — log and skip (returns current=0) ---
     else {
-        console.warn(`[calculateAchievementProgress] Unknown achievement category/criteriaType: category="${category}" criteriaType="${criteriaType}" — skipping`);
+        console.warn(`[calculateAchievementProgress] Unknown achievement category/criteriaType: category="${category}" criteriaType="${criteriaType}" — skipping progress calculation`);
     }
-    // P0 fix: guard against missing milestones array
+    // P0 fix: add owner filter guard — progress documents are now fetched per memberId.
+    // Milestone check uses the freshly-computed `current` for this member only.
     const milestones = Array.isArray(achievement.milestones) ? achievement.milestones : [];
     for (const milestone of milestones) {
         if (current >= milestone.threshold) {

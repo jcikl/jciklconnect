@@ -476,6 +476,18 @@ Firestore rules 5项修复已写入文件，**待执行 `firebase deploy --only 
 本次修复：16路并行 agent 修复所有服务层+Firestore规则（P0+P1+P2），commit `8ceaede`。
 P0减少20条（91→71）确认修复生效；P2增加54条因分析粒度更深。
 Top P0集合：pointsRuleExecutions×3、votes×3、webhooks×3、birthdayNotificationsSent×3；退回完整度：完整1个（boardTermSettings）、部分55个、缺失25个。
+
+**v6 P0专项修复（2026-07-19）— 17路并行 agent，commit `1c9bba2`**
+
+修复内容：
+- firestore.rules：pointsRuleExecutions hasOnly白名单扩展；votes list限isAdmin；workflow_executions create限Board/Admin；systemLogs create限Admin+hasOnly；webhook_logs hasOnly；points create限Board/Admin（防自我加分）；communication update改用resource.data.authorId；advertisements update hasOnly修正；achievementProgress list开放isAuthenticated；manualPromotionRequests create强制status==pending
+- services/electionsService.ts：ballot ID修正为voterId_electionId（匹配Firestore规则）
+- services/gamificationService.ts：成就进度计算新增recruitment/training/role三种类型
+- services/promotionService.ts：overrideRequirements仅ADMIN可绕过审批
+- functions/src/notifications.ts + functions/lib/notifications.js：生日通知去重（birthdayNotificationsSent集合）
+- netlify/functions/birthday-notifications.js：停用（Cloud Function为唯一发送方）
+- App.tsx：移除客户端生日通知生成（避免每台设备重复触发）
+
 **待执行：`firebase deploy --only firestore:rules && firebase deploy --only functions`**
 
 ### 已分析集合（collection-deps）
