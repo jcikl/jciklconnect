@@ -86,10 +86,14 @@ export interface BankAccount {
   currentBalance?: number; // SYNC-002: running balance maintained atomically by createTransaction/deleteTransaction
   currency: string;
   lastReconciled: string;
+  lastReconciledAt?: string;
+  lastReconciledBy?: string;
   accountNumber?: string;
   bankName?: string;
   accountType?: 'Current' | 'Savings' | 'Investment' | 'Fixed Deposit' | 'Cash' | 'Other';
   loId?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface FinanceAlert {

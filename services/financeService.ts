@@ -2688,7 +2688,6 @@ export class FinanceService {
             loId,
             // P2-C: balance stored here is a cached snapshot; always use calculateBalance() for accuracy
             lastReconciled: Timestamp.fromDate(new Date(accountData.lastReconciled)),
-            // TODO: Add createdAt, updatedAt, lastReconciledAt, lastReconciledBy to BankAccount type in types.ts
             createdAt: Timestamp.now(),
             updatedAt: Timestamp.now(),
           };

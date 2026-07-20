@@ -329,7 +329,6 @@ export class EmailService {
   }
 
   // Get email logs
-  // TODO: requires composite indexes in firestore.indexes.json: (to, createdAt desc) and (status, createdAt desc)
   static async getEmailLogs(
     filters?: {
       to?: string;
