@@ -5,6 +5,7 @@
 
 [build.environment]
   SECRETS_SCAN_OMIT_PATHS = ".env.example,public/firebase-messaging-sw.js"
+  SECRETS_SCAN_OMIT_KEYS = "VITE_FIREBASE_API_KEY"
 
 # Required env vars (set in Netlify dashboard, not here):
 #   VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID
