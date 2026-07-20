@@ -165,7 +165,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     const { deleteDoc } = await import('firebase/firestore');
                     await deleteDoc(doc(db, COLLECTIONS.MEMBERS, oldId));
                   } catch (err) {
-                    console.error('Failed to cleanup old profile:', err);
+                    errorLoggingService.logError(err, { action: 'auth-cleanup-old-profile', oldId });
                   }
                 }
 
@@ -180,7 +180,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                   memberData = { ...memberData, ...boardSync };
                 }
               } catch (boardSyncErr) {
-                console.warn('Board membership sync skipped:', boardSyncErr);
+                errorLoggingService.logError(boardSyncErr, { action: 'auth-board-sync', uid: firebaseUser.uid });
               }
               // Atomic: user + member land in the same commit so no render sees user without member
               setUser(firebaseUser);
@@ -200,7 +200,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 (err) => {
                   // Suppress permission errors fired during sign-out (token already invalidated)
                   if (!auth.currentUser) return;
-                  console.warn('[auth] member onSnapshot error:', err);
+                  errorLoggingService.logError(err, { action: 'auth-member-snapshot', uid: firebaseUser.uid });
                 }
               );
             } else if (!memberData && isMounted && !checkDevMode()) {
@@ -447,7 +447,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const { MembersService } = await import('../services/membersService');
       existingProfile = await MembersService.getMemberByEmail(email);
     } catch (e) {
-      console.warn('Could not check for existing profile during signup:', e);
+      errorLoggingService.logError(e, { action: 'signup-check-existing-profile', email });
     }
 
     // 2. Create Firebase Auth user — set flag so onAuthStateChanged doesn't sign out
@@ -526,7 +526,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const { deleteDoc } = await import('firebase/firestore');
         await deleteDoc(doc(db, COLLECTIONS.MEMBERS, existingProfile.id));
       } catch (e) {
-        console.error('Failed to cleanup old imported profile:', e);
+        errorLoggingService.logError(e, { action: 'signup-cleanup-old-imported-profile', oldId: existingProfile.id });
       }
     }
 

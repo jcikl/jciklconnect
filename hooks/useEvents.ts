@@ -25,7 +25,7 @@ export const useEvents = (options?: { publicMode?: boolean }) => {
       EventsService.getAllEvents().catch(err => {
         if (publicMode) {
           // In public mode, silently fail — Firestore rules may block unauthenticated reads
-          console.warn('[Public Events] Could not fetch events:', err instanceof Error ? err.message : err);
+          errorLoggingService.logError(err, { action: 'useEvents-public-fetch' });
           return [];
         }
         throw err;

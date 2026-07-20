@@ -1103,7 +1103,8 @@ export function useFinanceData(searchQuery?: string) {
       try {
         const { items } = await PaymentRequestService.list({ pageSize: 100 });
         if (!ignore) setUncompletedPRs(items.filter(pr => pr.status === 'submitted' || pr.status === 'draft'));
-      } catch {
+      } catch (err) {
+        errorLoggingService.logError(err, { action: 'loadUncompletedPRs' });
         if (!ignore) setUncompletedPRs([]);
       }
     };

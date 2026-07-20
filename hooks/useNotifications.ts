@@ -11,6 +11,7 @@ import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { Notification } from '../types';
 import { CommunicationService } from '../services/communicationService';
+import { errorLoggingService } from '../services/errorLoggingService';
 import { isDevMode } from '../utils/devMode';
 import { MOCK_NOTIFICATIONS } from '../services/mockData';
 
@@ -62,7 +63,7 @@ export function useNotifications(memberId: string | undefined): UseNotifications
         setError(null);
       },
       err => {
-        console.error('[useNotifications] onSnapshot error:', err);
+        errorLoggingService.logError(err, { action: 'useNotifications-onSnapshot', memberId });
         setError(err.message);
         setLoading(false);
       }
@@ -77,7 +78,7 @@ export function useNotifications(memberId: string | undefined): UseNotifications
     try {
       await CommunicationService.markNotificationAsRead(notificationId);
     } catch (err) {
-      console.error('[useNotifications] markAsRead error:', err);
+      errorLoggingService.logError(err, { action: 'useNotifications-markAsRead', notificationId });
       showToast('操作失败，请重试', 'error');
     }
   }, [showToast]);
@@ -87,7 +88,7 @@ export function useNotifications(memberId: string | undefined): UseNotifications
     try {
       await CommunicationService.markAllAsRead(memberId);
     } catch (err) {
-      console.error('[useNotifications] markAllAsRead error:', err);
+      errorLoggingService.logError(err, { action: 'useNotifications-markAllAsRead', memberId });
       showToast('操作失败，请重试', 'error');
     }
   }, [memberId, showToast]);
@@ -96,7 +97,7 @@ export function useNotifications(memberId: string | undefined): UseNotifications
     try {
       await CommunicationService.deleteNotification(notificationId);
     } catch (err) {
-      console.error('[useNotifications] deleteNotification error:', err);
+      errorLoggingService.logError(err, { action: 'useNotifications-deleteNotification', notificationId });
       showToast('操作失败，请重试', 'error');
     }
   }, [showToast]);

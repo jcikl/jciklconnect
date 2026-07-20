@@ -73,13 +73,18 @@ export const useProjects = () => {
     }
   };
 
+  const getProjectTasksRef = useRef(false);
   const getProjectTasks = async (projectId: string): Promise<Task[]> => {
+    if (getProjectTasksRef.current) return [];
+    getProjectTasksRef.current = true;
     try {
       return await ProjectsService.getProjectTasks(projectId);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load tasks';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      getProjectTasksRef.current = false;
     }
   };
 
@@ -100,13 +105,18 @@ export const useProjects = () => {
     }
   };
 
+  const getTaskByIdRef = useRef(false);
   const getTaskById = async (taskId: string): Promise<Task | null> => {
+    if (getTaskByIdRef.current) return null;
+    getTaskByIdRef.current = true;
     try {
       return await ProjectsService.getTaskById(taskId);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load task';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      getTaskByIdRef.current = false;
     }
   };
 
