@@ -104,7 +104,7 @@ const MOCK_AD: Advertisement = {
   updatedAt: new Date('2024-01-01'),
 };
 
-const COLL = COLLECTIONS.ADVERTISEMENTS || 'advertisements';
+const COLL = COLLECTIONS.ADVERTISEMENTS;
 const CACHE_TTL = CACHE_TTL_3MIN;
 const CACHE_KEY_ALL = 'ads:all';
 const CACHE_KEY_ACTIVE_PREFIX = 'ads:active:';
@@ -392,12 +392,12 @@ export class AdvertisementService {
           const q =
             conditions.length > 0
               ? query(
-                  collection(db, COLLECTIONS.BENEFIT_USAGE || 'benefitUsage'),
+                  collection(db, COLLECTIONS.BENEFIT_USAGE),
                   ...conditions,
                   orderBy('usedAt', 'desc')
                 )
               : query(
-                  collection(db, COLLECTIONS.BENEFIT_USAGE || 'benefitUsage'),
+                  collection(db, COLLECTIONS.BENEFIT_USAGE),
                   orderBy('usedAt', 'desc')
                 );
 

@@ -61,6 +61,8 @@ const bump = async (page: GuestPage, fields: Record<string, ReturnType<typeof in
         { page, date, updatedAt: new Date().toISOString(), ...fields },
         { merge: true }
       );
+      apiCache.delete(`guest-summary-7`);
+      apiCache.delete(`guest-summary-30`);
     } catch (err) {
       // Analytics must never break the guest experience
       errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { context: 'GuestAnalyticsService.bump', additionalData: { page: Object.keys(fields).join(',') } });

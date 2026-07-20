@@ -15,6 +15,7 @@ export const useInventory = () => {
   const isSchedulingRef = useRef(false);
   const isCompletingRef = useRef(false);
   const isAcknowledgingRef = useRef(false);
+  const isGeneratingAlertsRef = useRef(false);
   const isUpdatingScheduleRef = useRef(false);
 
   const { data: items, loading, error, reload: loadItems } = useFirestoreCollection<InventoryItem>({
@@ -193,6 +194,8 @@ export const useInventory = () => {
   };
 
   const checkAndGenerateAlerts = async () => {
+    if (isGeneratingAlertsRef.current) return;
+    isGeneratingAlertsRef.current = true;
     try {
       await InventoryService.checkAndGenerateAlerts();
       await loadAlerts();
@@ -200,6 +203,8 @@ export const useInventory = () => {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to check alerts';
       showToast(errorMessage, 'error');
+    } finally {
+      isGeneratingAlertsRef.current = false;
     }
   };
 

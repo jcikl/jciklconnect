@@ -1,6 +1,7 @@
 ﻿// Data Import/Export Service
 import Papa from 'papaparse';
 import { collection, doc, writeBatch, Timestamp } from 'firebase/firestore';
+import { isDevMode } from '../utils/devMode';
 import { db, auth } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 // xlsx is dynamically imported inside importFromFile() and exportToExcel() to avoid eager loading
@@ -331,6 +332,9 @@ export class DataImportExportService {
     userId: string,
     filename: string
   ): Promise<DataImportResult> {
+    if (isDevMode()) {
+      return { id: this.generateId(), filename, totalRows: data.length, successfulRows: 0, failedRows: 0, errors: [], warnings: [], status: 'success', importedAt: new Date(), importedBy: userId, duration: 0, summary: { created: 0, updated: 0, skipped: data.length, duplicates: 0, invalidRecords: 0 } };
+    }
     const startTime = Date.now();
     const { errors, warnings } = this.validateData(data, entityType);
 

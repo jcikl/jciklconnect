@@ -75,6 +75,8 @@ export const COLLECTIONS = {
   POINT_ESCROW: 'pointEscrow', // For holding funds during contracts
   PUBLICATIONS: 'publications',
   PARTNERSHIPS: 'partnerships',
+  BOARD_MEMBERS: 'boardMembers',
+  BOARD_TRANSITIONS: 'boardTransitions',
   BOARD_TERM_SETTINGS: 'boardTermSettings',
   INQUIRIES: 'inquiries',
   TOYYIB_CATEGORIES: 'toyyibCategories',

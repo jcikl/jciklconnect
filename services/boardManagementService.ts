@@ -67,7 +67,7 @@ export class BoardManagementService {
       ],
       async () => {
         try {
-          const boardMembersRef = collection(db, 'boardMembers');
+          const boardMembersRef = collection(db, COLLECTIONS.BOARD_MEMBERS);
           const q = query(boardMembersRef, where('isActive', '==', true));
           const snapshot = await getDocs(q);
 
@@ -93,7 +93,7 @@ export class BoardManagementService {
     const cached = apiCache.get<BoardMember[]>(cacheKey);
     if (cached) return cached;
     try {
-      const col = collection(db, 'boardMembers');
+      const col = collection(db, COLLECTIONS.BOARD_MEMBERS);
       const q = loId ? query(col, where('loId', '==', loId)) : col;
       const snap = await getDocs(q);
       const result = snap.docs.map(d => ({ id: d.id, ...d.data() } as BoardMember));
@@ -112,7 +112,7 @@ export class BoardManagementService {
   static async getBoardMembersByYear(year: string): Promise<BoardMember[]> {
     if (isDevMode()) { return []; }
     try {
-      const boardMembersRef = collection(db, 'boardMembers');
+      const boardMembersRef = collection(db, COLLECTIONS.BOARD_MEMBERS);
       const q = query(boardMembersRef, where('term', '==', year));
       const snapshot = await getDocs(q);
 
@@ -164,7 +164,7 @@ export class BoardManagementService {
             updatedAt: new Date().toISOString(),
           };
 
-          const transitionsRef = collection(db, 'boardTransitions');
+          const transitionsRef = collection(db, COLLECTIONS.BOARD_TRANSITIONS);
           const docRef = await addDoc(transitionsRef, transitionData);
 
           return {
@@ -188,7 +188,7 @@ export class BoardManagementService {
       () => { console.log(`[Dev Mode] Would execute board transition ${transitionId}`); },
       async () => {
         try {
-          const transitionRef = doc(db, 'boardTransitions', transitionId);
+          const transitionRef = doc(db, COLLECTIONS.BOARD_TRANSITIONS, transitionId);
 
           // P1 fix: idempotency guard — atomically claim this execution by setting
           // status='completed' inside a runTransaction. A second concurrent call will
@@ -226,7 +226,7 @@ export class BoardManagementService {
 
           // Archive outgoing boardMembers docs
           for (const outgoingMember of transition.outgoingBoard) {
-            const boardMemberRef = doc(db, 'boardMembers', outgoingMember.id);
+            const boardMemberRef = doc(db, COLLECTIONS.BOARD_MEMBERS, outgoingMember.id);
             batch.update(boardMemberRef, {
               isActive: false,
               endDate: now,
@@ -248,7 +248,7 @@ export class BoardManagementService {
               updatedAt: now,
               ...(isCurrentTerm ? { isCurrentBoardMember: true } : {}),
             };
-            const newRef = doc(collection(db, 'boardMembers'));
+            const newRef = doc(collection(db, COLLECTIONS.BOARD_MEMBERS));
             batch.set(newRef, boardMemberData);
             return { ref: newRef, incomingMember };
           });
@@ -306,7 +306,7 @@ export class BoardManagementService {
   private static async archiveBoardMember(boardMember: BoardMember): Promise<void> {
     try {
       const now = new Date().toISOString();
-      const boardMemberRef = doc(db, 'boardMembers', boardMember.id);
+      const boardMemberRef = doc(db, COLLECTIONS.BOARD_MEMBERS, boardMember.id);
       const memberRef = doc(db, COLLECTIONS.MEMBERS, boardMember.memberId);
 
       // Fix 10 (P1): consolidate three sequential writes into one atomic writeBatch so
@@ -337,7 +337,7 @@ export class BoardManagementService {
           type: 'info',
         });
       } catch (notifErr) {
-        console.warn('[BoardManagementService.archiveBoardMember] Notification failed:', notifErr);
+        logServiceError(notifErr instanceof Error ? notifErr : new Error(String(notifErr)), { component: 'BoardManagementService', action: 'archiveBoardMember' });
       }
     } catch (error) {
       logServiceError(
@@ -367,7 +367,7 @@ export class BoardManagementService {
 
       // Atomic: boardMembers record + member role update in a single batch
       const batch = writeBatch(db);
-      const newBoardMemberRef = doc(collection(db, 'boardMembers'));
+      const newBoardMemberRef = doc(collection(db, COLLECTIONS.BOARD_MEMBERS));
       batch.set(newBoardMemberRef, boardMemberData);
       batch.update(doc(db, COLLECTIONS.MEMBERS, boardMember.memberId), {
         role: UserRole.BOARD,
@@ -388,7 +388,7 @@ export class BoardManagementService {
           type: 'success',
         });
       } catch (notifErr) {
-        console.warn('[BoardManagementService.activateBoardMember] Notification failed:', notifErr);
+        logServiceError(notifErr instanceof Error ? notifErr : new Error(String(notifErr)), { component: 'BoardManagementService', action: 'activateBoardMember' });
       }
     } catch (error) {
       logServiceError(
@@ -437,7 +437,7 @@ export class BoardManagementService {
       () => [],
       async () => {
         try {
-          const transitionsRef = collection(db, 'boardTransitions');
+          const transitionsRef = collection(db, COLLECTIONS.BOARD_TRANSITIONS);
           const q = query(transitionsRef, orderBy('transitionDate', 'desc'));
           const snapshot = await getDocs(q);
 
@@ -556,7 +556,7 @@ export class BoardManagementService {
       () => { if (isDevMode()) { console.log(`[Dev Mode] Would set board for term ${year}`, assignments); } },
       async () => {
         try {
-          const boardMembersRef = collection(db, 'boardMembers');
+          const boardMembersRef = collection(db, COLLECTIONS.BOARD_MEMBERS);
       const existing = await this.getBoardMembersByYear(year);
 
       const now = new Date().toISOString();
@@ -603,7 +603,7 @@ export class BoardManagementService {
       const boardBatch = writeBatch(db);
       // Delete ALL existing records for this term atomically so superseded assignments never surface
       for (const bm of existing) {
-        boardBatch.delete(doc(db, 'boardMembers', bm.id));
+        boardBatch.delete(doc(db, COLLECTIONS.BOARD_MEMBERS, bm.id));
       }
       for (const { newRef, data, memberId } of boardMemberEntries) {
         boardBatch.set(newRef, data);
@@ -781,11 +781,25 @@ export class BoardManagementService {
     }
 
     // Past/future term edit: only clear stale flags pointing at this non-current year
+    const clearBatch = writeBatch(db);
+    let hasClearUpdates = false;
+    const clearNow = new Date().toISOString();
     for (const memberId of newMemberIds) {
       const member = await MembersService.getMemberById(memberId);
       if (member?.currentBoardYear === yearNum) {
-        await this.clearMemberCurrentBoardStatus(memberId);
+        clearBatch.update(doc(db, COLLECTIONS.MEMBERS, memberId), {
+          currentBoardYear: deleteField(),
+          currentBoardPosition: deleteField(),
+          isCurrentBoardMember: false,
+          isCurrentCommissionDirector: false,
+          updatedAt: clearNow,
+        });
+        hasClearUpdates = true;
       }
+    }
+    if (hasClearUpdates) {
+      await clearBatch.commit();
+      MembersService.invalidateMembersCache();
     }
   }
 
@@ -825,10 +839,21 @@ export class BoardManagementService {
         const activeCommDirIds = new Set(
           active.flatMap((b) => b.commissionDirectorIds ?? [])
         );
+        const ghostCommDirBatch = writeBatch(db);
+        let hasGhostCommDirUpdates = false;
+        const ghostNow = new Date().toISOString();
         for (const d of commDirGhostSnap.docs) {
           if (!activeCommDirIds.has(d.id)) {
-            await this.clearCommissionDirectorStatus(d.id);
+            ghostCommDirBatch.update(doc(db, COLLECTIONS.MEMBERS, d.id), {
+              isCurrentCommissionDirector: false,
+              updatedAt: ghostNow,
+            });
+            hasGhostCommDirUpdates = true;
           }
+        }
+        if (hasGhostCommDirUpdates) {
+          await ghostCommDirBatch.commit();
+          MembersService.invalidateMembersCache();
         }
 
         await this.syncMemberDocumentsForTerm(
@@ -1011,7 +1036,7 @@ export class BoardManagementService {
             if (r.status === 'fulfilled') {
               notificationsSent++;
             } else {
-              console.warn(`[BoardManagementService.transitionBoardMembers] Notification failed for member ${notificationPayloads[i].memberId}:`, r.reason);
+              logServiceError(r.reason instanceof Error ? r.reason : new Error(String(r.reason)), { component: 'BoardManagementService', action: 'transitionBoardMembers', additionalData: { memberId: notificationPayloads[i].memberId } });
             }
           });
 
@@ -1130,7 +1155,7 @@ export class BoardManagementService {
       () => [],
       async () => {
         try {
-          const boardMembersRef = collection(db, 'boardMembers');
+          const boardMembersRef = collection(db, COLLECTIONS.BOARD_MEMBERS);
           const q = query(boardMembersRef, where('memberId', '==', memberId));
           const snapshot = await getDocs(q);
 
@@ -1155,7 +1180,7 @@ export class BoardManagementService {
       () => [],
       async () => {
         try {
-          const boardMembersRef = collection(db, 'boardMembers');
+          const boardMembersRef = collection(db, COLLECTIONS.BOARD_MEMBERS);
           const q = query(boardMembersRef, where('commissionDirectorIds', 'array-contains', memberId));
           const snapshot = await getDocs(q);
 

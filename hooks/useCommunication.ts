@@ -16,6 +16,7 @@ export const useCommunication = () => {
   const { showToast } = useToast();
   const isSubmittingRef = useRef(false);
   const isLikingRef = useRef(false);
+  const isMarkingReadRef = useRef(false);
 
   // Only fetch when auth has resolved, member is logged in, and not in dev mode
   const enabled = !authLoading && !!member && !isDevMode() && !isDevModeFromAuth;
@@ -77,6 +78,8 @@ export const useCommunication = () => {
   };
 
   const markNotificationAsRead = async (notificationId: string) => {
+    if (isMarkingReadRef.current) return;
+    isMarkingReadRef.current = true;
     try {
       await CommunicationService.markNotificationAsRead(notificationId);
       await loadData();
@@ -84,6 +87,8 @@ export const useCommunication = () => {
       const errorMessage = err instanceof Error ? err.message : 'Failed to mark notification as read';
       showToast(errorMessage, 'error');
       throw err;
+    } finally {
+      isMarkingReadRef.current = false;
     }
   };
 

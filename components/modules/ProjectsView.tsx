@@ -434,7 +434,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
       e.currentTarget.reset();
       showToast('Project created successfully', 'success');
     } catch (err) {
-      // Error handled by hook
+      showToast(err instanceof Error ? err.message : 'Failed to create project', 'error');
     }
   };
 
@@ -465,7 +465,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
       setSelectedTemplate(null);
       e.currentTarget.reset();
     } catch (err) {
-      // Error handled by hook
+      showToast(err instanceof Error ? err.message : 'Failed to save template', 'error');
     }
   };
 

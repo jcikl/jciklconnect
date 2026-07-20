@@ -131,6 +131,7 @@ export class CommunicationService {
             likes: increment(1),
             likedBy: arrayUnion(memberId),
           });
+          cacheService.deleteByPrefix(COLLECTIONS.COMMUNICATION + ':');
         } catch (error) {
           errorLoggingService.logError(error as Error, { action: 'CommunicationService.likePost' });
           throw error;
@@ -304,6 +305,10 @@ export class CommunicationService {
       bcc?: string | string[];
     }
   ): Promise<string> {
+    if (isDevMode()) {
+      console.log(`[DEV MODE] Would send email to member ${memberId}: ${subject}`);
+      return `dev-email-${memberId}`;
+    }
     try {
       // Get member email
       const { MembersService } = await import('./membersService');
@@ -345,9 +350,13 @@ export class CommunicationService {
       batchSize?: number;
     }
   ): Promise<{ success: number; failed: number }> {
+    if (isDevMode()) {
+      console.log(`[DEV MODE] Would send bulk email to ${memberIds.length} members: ${subject}`);
+      return { success: 0, failed: 0 };
+    }
     try {
       const { MembersService } = await import('./membersService');
-      
+
       // Get all member emails
       const members = await Promise.all(
         memberIds.map(id => MembersService.getMemberById(id))
