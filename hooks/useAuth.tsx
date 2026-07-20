@@ -222,8 +222,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           } catch (error) {
             // Only log error if not in dev mode
             if (!checkDevMode() && isMounted) {
-              console.error('Error loading member data:', error);
-              errorLoggingService.logError(error, { action: 'auth-state-load' });
+              errorLoggingService.logError(error as Error, { action: 'useAuth-load-member-data' });
               // Don't nullify auth state if we're mid-signup — the member doc hasn't
               // been written yet so getMemberByEmail will throw a permissions error,
               // which is expected. signUp() will set user/member itself on completion.

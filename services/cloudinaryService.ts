@@ -3,6 +3,7 @@
  */
 import imageCompression from 'browser-image-compression';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { errorLoggingService } from './errorLoggingService';
 
 /** Injects e_trim into a Cloudinary URL to auto-remove transparent/uniform-color borders. */
 export const trimCloudinaryImage = (url: string): string => {
@@ -204,7 +205,7 @@ export const uploadToCloudinary = (
       } else {
         try {
           const errorData = JSON.parse(xhr.responseText);
-          console.error('Cloudinary upload failed:', errorData);
+          errorLoggingService.logError(new Error('Cloudinary upload failed'), { action: 'cloudinaryUpload', additionalData: { errorData } });
           const rawMsg: string = errorData.error?.message || '';
           let friendlyMsg: string;
           if (rawMsg.match(/format|file type/i)) {
@@ -216,7 +217,7 @@ export const uploadToCloudinary = (
           }
           reject(new Error(friendlyMsg));
         } catch (e) {
-          console.error('Cloudinary upload failed:', xhr.responseText);
+          errorLoggingService.logError(new Error(`Cloudinary upload failed (status ${xhr.status})`), { action: 'cloudinaryUpload', additionalData: { responseText: xhr.responseText } });
           reject(new Error(`Failed to upload to Cloudinary (status ${xhr.status})`));
         }
       }
@@ -243,7 +244,7 @@ export const getPublicIdFromUrl = (url: string): string | null => {
     const path = match[1].replace(/\.[^/.]+$/, '');
     return decodeURIComponent(path);
   } catch (err) {
-    console.error('Failed to parse Cloudinary public ID:', err);
+    errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { action: 'getPublicIdFromUrl' });
     return null;
   }
 };
@@ -265,7 +266,7 @@ export const deleteFromCloudinary = async (url: string): Promise<boolean> => {
     const auth = getAuth();
     const user = auth.currentUser;
     if (!user) {
-      console.warn('[cloudinaryService] No authenticated user — skipping deletion.');
+      errorLoggingService.logWarning('[cloudinaryService] No authenticated user — skipping deletion.', { action: 'deleteFromCloudinary' });
       return false;
     }
     const idToken = await user.getIdToken();
@@ -282,14 +283,14 @@ export const deleteFromCloudinary = async (url: string): Promise<boolean> => {
 
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
-      console.error('[cloudinaryService] Delete proxy error:', err);
+      errorLoggingService.logError(new Error('[cloudinaryService] Delete proxy error'), { action: 'deleteFromCloudinary', additionalData: { err } });
       return false;
     }
 
     const data = await response.json();
     return data.success === true;
   } catch (err) {
-    console.error('Failed to delete image from Cloudinary:', err);
+    errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { action: 'deleteFromCloudinary' });
     return false;
   }
 };

@@ -330,7 +330,7 @@ export class CommunicationService {
 
       return await EmailService.sendEmail(emailMessage);
     } catch (error) {
-      console.error('Error sending email notification:', error);
+      errorLoggingService.logError(error as Error, { action: 'CommunicationService.sendEmailNotification' });
       throw error;
     }
   }
@@ -383,7 +383,7 @@ export class CommunicationService {
         failed: result.failed + (memberIds.length - validEmails.length),
       };
     } catch (error) {
-      console.error('Error sending bulk email notifications:', error);
+      errorLoggingService.logError(error as Error, { action: 'CommunicationService.sendBulkEmailNotifications' });
       throw error;
     }
   }
@@ -534,7 +534,7 @@ export class CommunicationService {
         notificationsSent,
       };
       } catch (error) {
-        console.error('Error creating announcement:', error);
+        errorLoggingService.logError(error as Error, { action: 'CommunicationService.createAnnouncement' });
         throw error;
       }
     }
@@ -612,7 +612,7 @@ export class CommunicationService {
 
       return { processed: true, count: birthdayMembers.length };
     } catch (error) {
-      console.error('Error processing daily birthdays:', error);
+      errorLoggingService.logError(error as Error, { action: 'CommunicationService.processDailyBirthdays' });
       // If document doesn't exist, create it (excluding dev mode)
       if (!isDevMode()) {
         try {
@@ -626,7 +626,7 @@ export class CommunicationService {
              });
           }
         } catch (e) {
-          console.error('Failed to initialize birthday_processor config:', e);
+          errorLoggingService.logError(e as Error, { action: 'CommunicationService.processDailyBirthdays.initConfig' });
         }
       }
       throw error;

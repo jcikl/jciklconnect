@@ -418,7 +418,7 @@ export class GamificationService {
                             : 'checkEligibleBadgesForMember → awardAward failed',
                         additionalData: { awardId: award.id, memberId },
                     });
-                    console.error('[checkEligibleBadgesForMember] Failed to award badge', award.id, err);
+                    errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { action: 'checkEligibleBadgesForMember → awardBadge', additionalData: { awardId: award.id, memberId } });
                 }
             }
         }
