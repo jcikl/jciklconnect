@@ -300,6 +300,7 @@ export class GamificationService {
                             type: 'success',
                         });
                     } catch (notifErr) {
+                        errorLoggingService.logError(notifErr as Error, { component: 'GamificationService', action: 'awardAward.notification', additionalData: { awardId, memberId } });
                         console.warn('[awardAward] Notification failed after badge committed:', notifErr);
                     }
 

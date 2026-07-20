@@ -23,6 +23,7 @@ import { Member, MemberTier, IncentiveProgram, IncentiveStandard, IncentiveSubmi
 import { isDevMode, withDevMode } from '../utils/devMode';
 import { MembersService } from './membersService';
 import { apiCache } from './cacheService';
+import { errorLoggingService } from './errorLoggingService';
 
 // --- Cache key prefixes ---
 const CACHE_PREFIX_POINTS = 'points:';
@@ -177,6 +178,7 @@ export class PointsService {
               type: 'info',
             });
           } catch (notifErr) {
+            errorLoggingService.logError(notifErr as Error, { component: 'PointsService', action: 'awardPoints.notification' });
             console.warn('[pointsService] Notification after awardPoints failed:', notifErr);
           }
 
@@ -1677,6 +1679,7 @@ export class PointsService {
             const { GamificationService } = await import('./gamificationService');
             await GamificationService.checkEligibleBadgesForMember(cs.memberId);
           } catch (err) {
+            errorLoggingService.logError(err as Error, { component: 'PointsService', action: 'approveClaim.badgeCheck', additionalData: { memberId: cs.memberId } });
             console.warn('[approveClaim] Badge/achievement check failed (non-critical):', err);
           }
         }
@@ -1762,6 +1765,7 @@ export class PointsService {
             awardedBy: approverId,
           });
         } catch (reversalErr) {
+          errorLoggingService.logError(reversalErr as Error, { component: 'PointsService', action: 'rejectClaim.reversalHistoryWrite', additionalData: { submissionId } });
           console.error('[rejectClaim] Points reversal history write failed (non-fatal):', reversalErr);
         }
       }

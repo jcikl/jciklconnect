@@ -389,6 +389,7 @@ class RuleExecutionService {
         workflowId: execution.ruleId,
         createdAt: Timestamp.now(),
       }).catch(err => {
+        errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { component: 'RuleExecutionService', action: 'logExecution', additionalData: { ruleId: execution.ruleId } });
         console.warn('[RuleExecutionService] Failed to persist execution log to Firestore:', err);
       });
     } else {

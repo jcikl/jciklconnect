@@ -13,6 +13,7 @@ import {
   query,
   where,
   orderBy,
+  limit,
   Timestamp,
   arrayUnion,
   arrayRemove,
@@ -313,7 +314,7 @@ export class ProjectsService {
           }
 
           // P1 FIX: fetch orphan collections linked to this project.
-          const [txSnap, tasksSnap, reportsSnap, plansSnap, projectTrxSnap] = await Promise.all([
+          const [txSnap, tasksSnap, reportsSnap, plansSnap, projectTrxGuardSnap] = await Promise.all([
             // Clear projectId from bank transactions (unlink, not delete)
             getDocs(query(collection(db, COLLECTIONS.TRANSACTIONS), where('projectId', '==', projectId))),
             // Hard-delete tasks, projectReports, and activityPlans that belong to this project.
@@ -321,14 +322,19 @@ export class ProjectsService {
             getDocs(query(collection(db, COLLECTIONS.PROJECT_REPORTS), where('projectId', '==', projectId))),
             // P1 FIX: ActivityPlan uses parentProjectId (not projectId) for its project link
             getDocs(query(collection(db, COLLECTIONS.ACTIVITY_PLANS), where('parentProjectId', '==', projectId))),
-            // P1 FIX: hard-delete projectTrx (project financial ledger) entries
-            getDocs(query(collection(db, COLLECTIONS.PROJECT_TRANSACTIONS), where('projectId', '==', projectId))),
+            // Guard: block deletion if project financial ledger (projectTrx) records exist —
+            // deleting financial records silently would destroy audit history.
+            getDocs(query(collection(db, COLLECTIONS.PROJECT_TRANSACTIONS), where('projectId', '==', projectId), limit(1))),
           ]);
+
+          if (!projectTrxGuardSnap.empty) {
+            throw new Error('Cannot delete project with existing financial records. Remove or reassign project transactions first.');
+          }
 
           // Atomically delete the project, unlink transactions, and remove orphan docs.
           const BATCH_SIZE = 490;
           const now = Timestamp.now();
-          const orphanDeleteDocs = [...tasksSnap.docs, ...reportsSnap.docs, ...plansSnap.docs, ...projectTrxSnap.docs];
+          const orphanDeleteDocs = [...tasksSnap.docs, ...reportsSnap.docs, ...plansSnap.docs];
           const allBatchOps: Array<{ type: 'delete' | 'update'; ref: import('firebase/firestore').DocumentReference; data?: Record<string, unknown> }> = [
             { type: 'delete', ref: projectRef },
             ...txSnap.docs.map(d => ({ type: 'update' as const, ref: d.ref, data: { projectId: null, updatedAt: now } })),

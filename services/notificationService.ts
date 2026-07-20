@@ -4,6 +4,7 @@ import { app, db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { withDevMode } from '../utils/devMode';
 import { MembersService } from './membersService';
+import { errorLoggingService } from './errorLoggingService';
 
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY;
 
@@ -57,6 +58,7 @@ export async function registerPushNotifications(userId: string): Promise<string 
         }
         return token;
       } catch (err) {
+        errorLoggingService.logError(err as Error, { component: 'notificationService', action: 'registerPushNotifications' });
         console.error('FCM registration failed:', err);
         return null;
       }
@@ -90,6 +92,7 @@ export function onForegroundMessage(handler: (payload: { title: string; body: st
       handler({ title, body });
     });
   } catch (err) {
+    errorLoggingService.logError(err as Error, { component: 'notificationService', action: 'onForegroundMessage' });
     console.warn('Foreground message listener unavailable:', err);
     return () => {};
   }
