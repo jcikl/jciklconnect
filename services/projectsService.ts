@@ -546,10 +546,12 @@ export class ProjectsService {
             }
 
             await setDoc(taskRef, newTask, { merge: true });
+            this.invalidateProjectsCache();
             return taskId;
           } else {
             // 否则使用 addDoc 让 Firestore 自动生成 ID
             const docRef = await addDoc(collection(db, COLLECTIONS.TASKS), newTask);
+            this.invalidateProjectsCache();
             return docRef.id;
           }
         } catch (error) {

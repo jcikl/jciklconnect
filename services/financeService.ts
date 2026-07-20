@@ -4032,6 +4032,7 @@ export class FinanceService {
           });
         }
         await batch.commit();
+        invalidateFinanceCache();
         // Revert any PR that was marked paid via this match pair (情景 E — unmatch path)
         for (const snap of snaps) {
           if (!snap.exists()) continue;

@@ -506,6 +506,7 @@ export class MentorshipService {
             totalHours: increment(hours),
             updatedAt: serverTimestamp(),
           });
+          this.invalidateMentorMatchesCache(matchId);
         } catch (error) {
           errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MentorshipService.logSession' });
           throw error;

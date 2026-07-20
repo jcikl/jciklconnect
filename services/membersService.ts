@@ -1243,6 +1243,35 @@ export class MembersService {
       ]);
       const hasSenatorshipFields = Object.keys(normalized).some(k => SENATORSHIP_LOCK_FIELDS.has(k));
 
+      // Pre-compute per-member GUEST→MEMBER membership[year] initialization patches.
+      // Mirrors updateMember lines 565-587 (variant symmetry fix): when a member is promoted
+      // from GUEST to MEMBER via batch, they must receive a Probation membership record for the
+      // current year — otherwise they carry MEMBER role with no dues entry.
+      const membershipInitPatchMap = new Map<string, Record<string, unknown>>();
+      if (updates.role === UserRole.MEMBER && !updates.membership) {
+        const probationRules = (await MembershipConfigService.getRules()).Probation;
+        const probationDues = probationRules?.duesAmount ?? MembershipDues.Probation;
+        memberIds.forEach(id => {
+          const existing = existingByIds.get(id) ?? null;
+          if (!existing) return;
+          if (existing.role !== UserRole.GUEST && existing.role != null) return; // only GUEST→MEMBER
+          const joinDate = (updates as any).joinDate || existing.joinDate;
+          const yearStr = joinDate ? String(new Date(joinDate).getFullYear()) : String(getMYTYear());
+          const existingMembership = (existing.membership as Record<string, unknown> | undefined) ?? {};
+          if (existingMembership[yearStr]) return; // already has a record for this year
+          membershipInitPatchMap.set(id, {
+            [`membership.${yearStr}`]: {
+              year: parseInt(yearStr),
+              dues: probationDues,
+              type: 'Probation',
+              amount: 0,
+              status: 'pending',
+              transactionId: [],
+            },
+          });
+        });
+      }
+
       // Firestore writeBatch limit is 500; flush every 400 to stay safe
       for (let i = 0; i < memberIds.length; i += 400) {
         const batch = writeBatch(db);
@@ -1266,7 +1295,9 @@ export class MembersService {
           const perMemberNormalized = this.normalizeMemberData(memberUpdates as Record<string, any>, existing);
           // Merge pre-computed membership type patch (mirrors updateMember syncComputedMembershipType)
           const typePatch = membershipTypePatchMap.get(id) ?? {};
-          batch.update(doc(db, COLLECTIONS.MEMBERS, id), { ...perMemberNormalized, ...typePatch, updatedAt: now });
+          // Merge GUEST→MEMBER membership initialization patch (variant symmetry fix)
+          const membershipInitPatch = membershipInitPatchMap.get(id) ?? {};
+          batch.update(doc(db, COLLECTIONS.MEMBERS, id), { ...perMemberNormalized, ...typePatch, ...membershipInitPatch, updatedAt: now });
         });
         await this.commitWithRetry(batch);
       }
@@ -1423,28 +1454,37 @@ export class MembersService {
         }
       }
 
-      // Cascade: soft-cancel eventRegistrations and open paymentRequests for all deleted members (E5 fix)
+      // Cascade: soft-cancel eventRegistrations and open paymentRequests, and delete notifications
+      // for all deleted members. Mirrors deleteMember's cascadeBatch logic (variant symmetry fix).
       // Firestore 'in' operator supports up to 30 values; chunk accordingly.
       const chunkSize = 30;
       const allRegDocs: any[] = [];
       const allPrDocs: any[] = [];
+      const allNotifDocs: any[] = [];
       for (let i = 0; i < memberIds.length; i += chunkSize) {
         const chunk = memberIds.slice(i, i + chunkSize);
-        const [chunkRegs, chunkPrs] = await Promise.all([
+        const [chunkRegs, chunkPrs, chunkNotifs] = await Promise.all([
           getDocs(query(collection(db, COLLECTIONS.EVENT_REGISTRATIONS), where('memberId', 'in', chunk))),
           getDocs(query(collection(db, COLLECTIONS.PAYMENT_REQUESTS), where('memberId', 'in', chunk), where('status', 'in', ['pending', 'submitted', 'approved']))),
+          getDocs(query(collection(db, COLLECTIONS.NOTIFICATIONS), where('memberId', 'in', chunk))),
         ]);
         allRegDocs.push(...chunkRegs.docs);
         allPrDocs.push(...chunkPrs.docs);
+        allNotifDocs.push(...chunkNotifs.docs);
       }
-      if (allRegDocs.length > 0 || allPrDocs.length > 0) {
-        const cascadeOps = [
-          ...allRegDocs.map((d: any) => ({ ref: d.ref, data: { status: 'cancelled', updatedAt: now } })),
-          ...allPrDocs.map((d: any) => ({ ref: d.ref, data: { status: 'memberDeleted', updatedAt: now } })),
+      if (allRegDocs.length > 0 || allPrDocs.length > 0 || allNotifDocs.length > 0) {
+        type CascadeOp = { ref: ReturnType<typeof doc>; data: Record<string, unknown>; op: 'update' | 'delete' };
+        const cascadeOps: CascadeOp[] = [
+          ...allRegDocs.map((d: any) => ({ ref: d.ref, data: { status: 'cancelled', updatedAt: now }, op: 'update' as const })),
+          ...allPrDocs.map((d: any) => ({ ref: d.ref, data: { status: 'memberDeleted', updatedAt: now }, op: 'update' as const })),
+          ...allNotifDocs.map((d: any) => ({ ref: d.ref, data: {}, op: 'delete' as const })),
         ];
         for (let i = 0; i < cascadeOps.length; i += 400) {
           const cascadeBatch = writeBatch(db);
-          cascadeOps.slice(i, i + 400).forEach(({ ref, data }) => cascadeBatch.update(ref, data));
+          cascadeOps.slice(i, i + 400).forEach(({ ref, data, op }) => {
+            if (op === 'delete') { cascadeBatch.delete(ref); }
+            else { cascadeBatch.update(ref, data); }
+          });
           await this.commitWithRetry(cascadeBatch);
         }
       }
