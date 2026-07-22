@@ -712,9 +712,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const simulateAsMember = useCallback(async (memberId: string, _roleHint: UserRole) => {
     if (!member) return;
 
-    // Only allow if in dev mode OR current role is ADMIN
+    // Only allow if in dev mode OR current role is ADMIN / SUPER_ADMIN
     const currentRole = originalRole || (member.role as UserRole);
-    if (!isDevMode && currentRole !== UserRole.ADMIN) return;
+    if (!isDevMode && currentRole !== UserRole.ADMIN && currentRole !== UserRole.SUPER_ADMIN) return;
 
     // Save original member before first impersonation
     if (!originalMember) {

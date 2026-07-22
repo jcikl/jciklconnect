@@ -1304,6 +1304,29 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+
+    // Permission configuration collections
+    // Used by Config > Access. Authenticated users may read effective permission metadata;
+    // only admins may change access rules.
+    match /permissionCatalog/{permissionId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /userRolePermissions/{ruleId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /membershipTypePermissions/{ruleId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /positionPermissions/{ruleId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
     // Default: deny all other access
     match /{document=**} {
       allow read, write: if false;

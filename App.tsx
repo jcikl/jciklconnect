@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo, useRef, lazy, Suspense, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, lazy, Suspense, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom';
 import {
@@ -1152,7 +1152,7 @@ export const JCIKLApp: React.FC = () => {
                 {/* Right: Actions */}
                 <div className="flex items-center gap-0.5 h-9">
                   {/* Role simulator */}
-                  {(isDevMode || member.role === UserRole.ADMIN || simulatedRole !== null) && (
+                  {(isDevMode || member.role === UserRole.ADMIN || member.role === UserRole.SUPER_ADMIN || simulatedRole !== null) && (
                     <div className="relative z-30">
                       <button
                         onClick={() => setIsSimulateDropdownOpen(!isSimulateDropdownOpen)}

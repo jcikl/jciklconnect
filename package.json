@@ -13,7 +13,22 @@
     "test:ui": "vitest --ui",
     "cap:sync": "npm run build && npx cap sync",
     "cap:android": "npm run build && npx cap sync android && npx cap open android",
-    "cap:ios": "npm run build && npx cap sync ios && npx cap open ios"
+    "cap:ios": "npm run build && npx cap sync ios && npx cap open ios",
+    "lark:base:plan": "node scripts/lark/provision-jcikl-base.mjs",
+    "lark:base:create": "node scripts/lark/provision-jcikl-base.mjs --apply",
+    "lark:migrate:audit": "node scripts/lark/audit-firestore-for-lark.mjs",
+    "lark:migrate:plan": "node scripts/lark/migrate-firestore-to-lark.mjs",
+    "lark:migrate:apply": "node scripts/lark/migrate-firestore-to-lark.mjs --apply",
+    "lark:migrate:full": "powershell -ExecutionPolicy Bypass -File ./scripts/lark/run-full-lark-migration.ps1",
+    "lark:relations:plan": "node scripts/lark/backfill-lark-relations.mjs",
+    "lark:relations:apply": "node scripts/lark/backfill-lark-relations.mjs --apply",
+    "lark:relations:full": "powershell -ExecutionPolicy Bypass -File ./scripts/lark/run-lark-relation-backfill.ps1",
+    "firebase:permissions:seed": "node scripts/firebase/seed-permission-rules.mjs",
+    "lark:permissions:sync": "node scripts/lark/sync-permissions-lark-to-firestore.mjs",
+    "firebase:members:role-audit": "node scripts/firebase/audit-member-role-membership-consistency.mjs",
+    "firebase:members:role-fix": "node scripts/firebase/audit-member-role-membership-consistency.mjs --apply",
+    "firebase:permissions:clean-super-admin:audit": "node scripts/firebase/clean-super-admin-permission-rules.mjs",
+    "firebase:permissions:clean-super-admin": "node scripts/firebase/clean-super-admin-permission-rules.mjs --apply"
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^8.3.0",
