@@ -43,6 +43,7 @@ import { getMYTYear } from '../utils/dateUtils';
 import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 import { MOCK_MEMBERS } from './mockData';
 import { AuditLogService } from './auditLogService';
+import { LarkSyncService } from './larkSyncService';
 
 const CACHE_KEY_ALL_MEMBERS = 'members:all';
 const CACHE_KEY_LO = (loId: string) => `members:lo:${loId}`;
@@ -505,6 +506,8 @@ export class MembersService {
         this.recalculateIntroducerStats(cleanMemberData.introducer).catch(err => errorLoggingService.logError(err, { action: 'recalculate-introducer-stats', additionalData: { introducer: cleanMemberData.introducer } }));
       }
 
+      void LarkSyncService.syncRecord({ collection: 'members', id: docRef.id, action: 'upsert' });
+
       return docRef.id;
     } catch (error) {
       errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MembersService.createMember' });
@@ -711,6 +714,8 @@ export class MembersService {
           this.recalculateIntroducerStats(introducer).catch(err => errorLoggingService.logError(err, { action: 'recalculate-introducer-stats', additionalData: { introducer } }));
         }
       }
+
+      void LarkSyncService.syncRecord({ collection: 'members', id: memberId, action: 'upsert' });
     } catch (error) {
       errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MembersService.updateMember' });
       throw error;
@@ -940,6 +945,7 @@ export class MembersService {
 
       logDelete(CACHE_KEY_ALL_MEMBERS, 'membersService.deleteMember');
       this.invalidateMembersCache();
+      void LarkSyncService.syncRecord({ collection: 'members', id: memberId, action: 'upsert' });
     } catch (error) {
       errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MembersService.deleteMember', additionalInfo: `memberId=${memberId}` });
       throw error;
@@ -1134,6 +1140,7 @@ export class MembersService {
       );
       await this.commitWithRetry(roleBatch);
       this.invalidateMembersCache();
+      void LarkSyncService.syncRecord({ collection: 'members', id: memberId, action: 'upsert' });
       // P1-fix: audit role changes — these are high-sensitivity operations.
       AuditLogService.writeAuditEntry({
         action: 'UPDATE_MEMBER_ROLE',
@@ -1328,6 +1335,9 @@ export class MembersService {
           [...affectedIntroducers].map(id => this.recalculateIntroducerStats(id))
         );
       }
+      memberIds.forEach(id => {
+        void LarkSyncService.syncRecord({ collection: 'members', id, action: 'upsert' });
+      });
     } catch (error) {
       errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MembersService.batchUpdateMembers' });
       throw error;
@@ -1490,6 +1500,9 @@ export class MembersService {
 
       logDelete(CACHE_KEY_ALL_MEMBERS, 'membersService.batchDeleteMembers');
       this.invalidateMembersCache();
+      memberIds.forEach(id => {
+        void LarkSyncService.syncRecord({ collection: 'members', id, action: 'upsert' });
+      });
     } catch (error) {
       errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MembersService.batchDeleteMembers' });
       throw error;
@@ -2110,4 +2123,3 @@ export class MembersService {
     };
   }
 }
-
