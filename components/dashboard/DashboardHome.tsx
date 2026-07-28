@@ -120,8 +120,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         label: 'Basic', checks: [
           { label: 'Profile photo', done: !!(member.general?.avatarUrl || (member as any).general?.avatarUrl) },
           { label: 'Phone number', done: !!member.contact?.phone },
-          { label: 'Company name', done: !!member.companyName },
-          { label: 'Industry', done: !!member.industry },
           { label: 'Apparel & Items', done: !!(member.others?.tshirtSize && member.others?.shirtStyle) || !!(member.others?.tshirtSize && member.others?.shirtStyle) },
         ]
       },
@@ -133,6 +131,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       },
       {
         label: 'Professional', checks: [
+          { label: 'Company name', done: !!member.companyName },
+          { label: 'Industry', done: !!member.industry },
           { label: 'Position / title', done: !!(member.business?.departmentAndPosition ?? member.business?.departmentAndPosition) },
           { label: 'Business categories', done: Array.isArray(member.business?.businessCategory) && member.business?.businessCategory.length > 0 },
           { label: 'Company description', done: !!(member.business?.companyDescription ?? member.business?.companyDescription) },
@@ -1412,9 +1412,9 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         const { done, total, pct, missing } = profileCompleteness;
         const set = (key: string, v: string) => setProfileDraft(d => ({ ...d, [key]: v }));
         const val = (key: string, fallback = '') => profileDraft[key] ?? fallback;
-        const basicLabels = ['Profile photo', 'Phone number', 'Company name', 'Industry', 'Apparel & Items'];
+        const basicLabels = ['Profile photo', 'Phone number', 'Apparel & Items'];
         const contactLabels = ['Address', 'Emergency contact'];
-        const professionalLabels = ['Position / title', 'Business categories', 'Company description', 'Ideal referral', 'Special member offer', 'Company website', 'International business', 'Level of management'];
+        const professionalLabels = ['Company name', 'Industry', 'Position / title', 'Business categories', 'Company description', 'Ideal referral', 'Special member offer', 'Company website', 'International business', 'Level of management'];
         const basicCount = missing.filter(f => basicLabels.includes(f.label)).length;
         const contactCount = missing.filter(f => contactLabels.includes(f.label)).length;
         const professionalCount = missing.filter(f => professionalLabels.includes(f.label)).length;
@@ -1541,8 +1541,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                         </div>
                         {[
                           { label: 'Phone Number', value: member?.contact?.phone },
-                          { label: 'Company Name', value: member?.companyName },
-                          { label: 'Industry', value: member?.industry },
                           { label: 'Shirt Style', value: member?.others?.shirtStyle },
                           { label: 'T-Shirt Size', value: member?.others?.tshirtSize },
                           { label: 'Jacket Size', value: member?.others?.jacketSize },
@@ -1558,16 +1556,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                         <Input label="Phone Number" type="tel"
                           value={val('phone', member?.contact?.phone ?? '')}
                           onChange={e => set('phone', e.target.value)} />
-                      )}
-                      {missing.find(f => f.label === 'Company name') && (
-                        <Input label="Company Name"
-                          value={val('companyName', member?.companyName ?? '')}
-                          onChange={e => set('companyName', e.target.value)} />
-                      )}
-                      {missing.find(f => f.label === 'Industry') && (
-                        <Input label="Industry"
-                          value={val('industry', member?.industry ?? '')}
-                          onChange={e => set('industry', e.target.value)} />
                       )}
                       {missing.find(f => f.label === 'Apparel & Items') && (
                         <div className="space-y-3">
@@ -1637,6 +1625,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                   <div className="space-y-3">
                     {/* Filled fields — always shown as read-only */}
                     {[
+                      { label: 'Company Name', value: member?.companyName },
+                      { label: 'Industry', value: member?.industry },
                       { label: 'Position / Title', value: member?.business?.departmentAndPosition },
                       { label: 'Business Categories', value: Array.isArray(member?.business?.businessCategory) && member.business!.businessCategory!.length > 0 ? member.business!.businessCategory!.join(', ') : undefined },
                       { label: 'Company Description', value: member?.business?.companyDescription },
@@ -1658,6 +1648,16 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                           <p className="text-xs font-semibold text-emerald-400">All professional info filled</p>
                         </div>
                       : <>
+                          {missing.find(f => f.label === 'Company name') && (
+                            <Input label="Company Name"
+                              value={val('companyName', member?.companyName ?? '')}
+                              onChange={e => set('companyName', e.target.value)} />
+                          )}
+                          {missing.find(f => f.label === 'Industry') && (
+                            <Input label="Industry"
+                              value={val('industry', member?.industry ?? '')}
+                              onChange={e => set('industry', e.target.value)} />
+                          )}
                           {missing.find(f => f.label === 'Position / title') && (
                             <Input label="Position / Title"
                               value={val('departmentAndPosition', member?.business?.departmentAndPosition ?? '')}
