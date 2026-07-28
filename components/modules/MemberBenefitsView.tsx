@@ -272,7 +272,7 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
                   <div className="absolute top-2 left-2 flex flex-col gap-1">
                     {b._isMemberOffer && (
                       <span className="flex items-center gap-0.5 text-[9px] font-bold bg-violet-600 text-white px-1.5 py-0.5 rounded-full shadow">
-                        <Users size={8} /> Member Offer
+                        <Users size={8} /> {b._memberId === member?.id ? 'Your Offer' : 'Member Offer'}
                       </span>
                     )}
                     {isExpiringSoon && !b._isMemberOffer && (
@@ -291,10 +291,7 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
                 {/* Content */}
                 <div className="flex flex-col flex-1 p-3">
                   {b._isMemberOffer ? (
-                    <>
-                      {b._memberName && <p className="text-[9px] font-black text-violet-500 uppercase tracking-widest mb-0.5 truncate">{b._memberName}</p>}
-                      {b.provider && <p className="text-[9px] text-slate-400 mb-0.5 truncate">{b.provider}</p>}
-                    </>
+                    b.provider && <p className="text-[9px] text-slate-400 mb-0.5 truncate">{b.provider}</p>
                   ) : (
                     b.provider && <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5 truncate">{b.provider}</p>
                   )}
