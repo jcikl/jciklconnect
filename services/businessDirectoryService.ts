@@ -20,6 +20,7 @@ import { MOCK_BUSINESSES } from './mockData';
 import { MembersService } from './membersService';
 import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 import { errorLoggingService } from './errorLoggingService';
+import { getSpecialOfferSummary } from '../types/member';
 
 const CACHE_KEY_ALL_PUBLIC = 'businessDirectory:public:all';
 const CACHE_TTL_MS = CACHE_TTL_3MIN;
@@ -65,8 +66,8 @@ export function mapMemberToBusinessProfile(id: string, data: Record<string, unkn
       (business.companyWebsite as string | undefined) ||
       '',
     offer:
-      (data.specialOffer as string | undefined) ||
-      (business.specialOffer as string | undefined) ||
+      getSpecialOfferSummary(data.specialOffer as any) ||
+      getSpecialOfferSummary(business.specialOffer as any) ||
       '',
     logo:
       (data.companyLogoUrl as string | undefined) ||
