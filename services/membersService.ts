@@ -351,7 +351,7 @@ export class MembersService {
     if (data.business?.businessCategory !== undefined) business.businessCategory = data.business?.businessCategory;
     else if (data.business?.businessCategory !== undefined) business.businessCategory = data.business?.businessCategory;
     if (data.business?.specialOffer !== undefined) business.specialOffer = data.business?.specialOffer;
-    else if (data.business?.specialOffer !== undefined) business.specialOffer = data.business?.specialOffer;
+    else if (data.specialOffer !== undefined) business.specialOffer = data.specialOffer;
     if (data.business?.acceptInternationalBusiness !== undefined) business.acceptInternationalBusiness = data.business?.acceptInternationalBusiness;
     
     if (data.business?.idealReferrals !== undefined) {

@@ -51,9 +51,9 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
 
   const memberOffers = useMemo((): BenefitItem[] => {
     return members
-      .filter(m => hasSpecialOffer(m.business?.specialOffer) && m.id !== member?.id)
+      .filter(m => hasSpecialOffer(m.business?.specialOffer || (m as any).specialOffer) && m.id !== member?.id)
       .map(m => {
-        const offer = m.business!.specialOffer!;
+        const offer = m.business?.specialOffer || (m as any).specialOffer as SpecialOffer | string;
         const offerObj = typeof offer === 'object' ? offer as SpecialOffer : null;
         const summary = getSpecialOfferSummary(offer);
         const offerTypeLabel = offerObj ? (SPECIAL_OFFER_TYPE_LABELS[offerObj.type] ?? '') : '';
