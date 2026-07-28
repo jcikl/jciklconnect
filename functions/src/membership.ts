@@ -12,7 +12,8 @@ export const checkMemberPromotion = functions.firestore
     const memberId = context.params.memberId;
 
     // Only check Probation members
-    if (after.membershipType !== 'probation' && after.membershipType !== 'Probation') {
+    const afterMembershipType = after.jciCareer?.membershipType ?? after.membershipType;
+    if (afterMembershipType !== 'probation' && afterMembershipType !== 'Probation') {
       return null;
     }
 
@@ -124,8 +125,9 @@ export const generateDuesRenewal = functions.runWith({ timeoutSeconds: 300 }).ht
     }
 
     // Determine dues amount based on membership type
+    const memberMembershipType = member.jciCareer?.membershipType ?? member.membershipType;
     let amount = 0;
-    switch (member.membershipType?.toLowerCase?.() || member.membershipType) {
+    switch (memberMembershipType?.toLowerCase?.() || memberMembershipType) {
       case 'probation':
         amount = 350;
         break;
@@ -142,7 +144,7 @@ export const generateDuesRenewal = functions.runWith({ timeoutSeconds: 300 }).ht
         break;
       case 'senator':
         // Verify senator certification
-        if (!member.senatorCertified) {
+        if (!(member.jciCareer?.senatorship?.senatorCertified ?? member.senatorCertified)) {
           console.warn(`Senator ${memberId} does not have valid certification`);
           continue;
         }
@@ -150,14 +152,14 @@ export const generateDuesRenewal = functions.runWith({ timeoutSeconds: 300 }).ht
         break;
       case 'visiting':
         // Verify non-Malaysian citizenship
-        if (member.citizenship === 'Malaysian') {
+        if ((member.general?.nationality ?? member.citizenship ?? member.nationality) === 'Malaysian') {
           console.warn(`Visiting member ${memberId} has Malaysian citizenship`);
           continue;
         }
         amount = 500;
         break;
       default:
-        console.warn(`Unknown membership type for member ${memberId}: ${member.membershipType}`);
+        console.warn(`Unknown membership type for member ${memberId}: ${memberMembershipType}`);
         continue;
     }
 
@@ -271,9 +273,11 @@ export const autoInitiateDuesRenewal = functions.pubsub
       const memberSnap = await db.collection('members').doc(memberId).get();
       if (!memberSnap.exists) continue;
       const m = memberSnap.data()!;
-      if (m.status === 'Inactive' || m.membershipType === 'Guest') continue;
+      const mMembershipType: string = m.jciCareer?.membershipType ?? m.membershipType;
+      const mJoinDate = m.jciCareer?.joinDate ?? m.joinDate;
+      if (m.status === 'Inactive' || mMembershipType === 'Guest') continue;
 
-      const type: string = m.membershipType ?? 'Probation';
+      const type: string = mMembershipType ?? 'Probation';
       const baseDues = getDues(type);
       if (baseDues === 0) continue; // Honorary / Senator
 
@@ -356,7 +360,8 @@ export const sendAnnualDuesReminders = functions.pubsub
       if (!rec) continue;
       const status: string = rec.status ?? '';
       if (!['pending', 'partial', 'overdue'].includes(status)) continue;
-      if (m.membershipType === 'Guest' || m.membershipType === 'Honorary' || m.membershipType === 'Senator') continue;
+      const mType: string = m.jciCareer?.membershipType ?? m.membershipType;
+      if (mType === 'Guest' || mType === 'Honorary' || mType === 'Senator') continue;
 
       const outstanding = Math.max(0, (rec.dues ?? 0) - (rec.amount ?? 0));
 
@@ -365,7 +370,7 @@ export const sendAnnualDuesReminders = functions.pubsub
         memberId,
         type: 'dues_reminder',
         title: `${year} 年度会费提醒`,
-        message: `温馨提醒：您 ${year} 年度的 ${m.membershipType ?? ''} 会费 RM${outstanding} 尚未缴清。请尽快完成缴费以维持您的会籍权益。`,
+        message: `温馨提醒：您 ${year} 年度的 ${mType ?? ''} 会费 RM${outstanding} 尚未缴清。请尽快完成缴费以维持您的会籍权益。`,
         read: false,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
