@@ -186,8 +186,34 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                         onChange={e => update({ terms: e.target.value })}
                         className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue resize-none"
                       />
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs text-slate-500 whitespace-nowrap">Expiry date</label>
+                      <input
+                        type="url"
+                        placeholder="Logo URL (optional)"
+                        value={structured.logoUrl ?? ''}
+                        onChange={e => update({ logoUrl: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                      />
+                      <input
+                        type="url"
+                        placeholder="Ad Banner URL (optional)"
+                        value={structured.imageUrl ?? ''}
+                        onChange={e => update({ imageUrl: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                      />
+                      <div className="flex items-center gap-3">
+                        <label className="text-xs text-slate-500 whitespace-nowrap">Status</label>
+                        <div className="flex gap-2">
+                          {(['Active', 'Paused'] as const).map(s => (
+                            <button key={s} type="button"
+                              onClick={() => update({ status: s })}
+                              className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
+                                (structured.status ?? 'Active') === s
+                                  ? s === 'Active' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-slate-400 text-white border-slate-400'
+                                  : 'bg-white text-slate-500 border-slate-300 hover:border-slate-400'
+                              }`}>{s}</button>
+                          ))}
+                        </div>
+                        <label className="text-xs text-slate-500 whitespace-nowrap ml-auto">Expiry</label>
                         <input
                           type="date"
                           value={structured.expiryDate ?? ''}
