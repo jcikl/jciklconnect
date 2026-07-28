@@ -1527,7 +1527,11 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
               </div>
 
               {/* Tab content */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              <div className="flex-1 overflow-y-auto p-4 space-y-3
+                [&_input]:bg-white/10 [&_input]:border-white/20 [&_input]:text-white [&_input]:placeholder:text-white/30
+                [&_button[type=button]]:bg-white/10 [&_button[type=button]]:border-white/20 [&_button[type=button]]:text-white
+                [&_textarea]:bg-white/10 [&_textarea]:border-white/20 [&_textarea]:text-white [&_textarea]:placeholder:text-white/30
+                [&_label]:text-white/60">
                 {profileTab === 'basic' && (
                   basicCount === 0
                     ? <div className="space-y-2">
