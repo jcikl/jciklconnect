@@ -176,8 +176,8 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
       birthPlace: (() => { const ic = member.idNumber || member.general?.idNumber || ''; return isMalaysianIC(ic) ? (getBirthPlaceFromIC(ic) || member.birthPlace || member.general?.birthPlace || '') : (member.birthPlace || member.general?.birthPlace || ''); })(),
       dateOfBirth: (() => { const ic = member.idNumber || member.general?.idNumber || ''; return isMalaysianIC(ic) ? (getDateOfBirthFromIC(ic) || member.dateOfBirth || member.general?.dob || '') : (member.dateOfBirth || member.general?.dob || ''); })(),
       gender: (() => { const ic = member.idNumber || member.general?.idNumber || ''; return isMalaysianIC(ic) ? (getGenderFromIC(ic) || member.gender || member.general?.gender || '') : (member.gender || member.general?.gender || ''); })(),
-      ethnicity: (member.general?.ethnicity ?? member.ethnicity) || '',
-      dietaryPreference: (member.general?.dietaryPreference ?? member.dietaryPreference) || '',
+      ethnicity: member.general?.ethnicity || '',
+      dietaryPreference: member.general?.dietaryPreference || '',
       nationality: member.nationality || 'Malaysia',
       introducer: member.introducer || '',
       bio: member.bio || '',
@@ -186,16 +186,16 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
 
       companyName: member.companyName || '',
       companyWebsite: member.companyWebsite || '',
-      companyDescription: (member.business?.companyDescription ?? member.companyDescription) || '',
-      departmentAndPosition: (member.business?.departmentAndPosition ?? member.departmentAndPosition) || '',
+      companyDescription: member.business?.companyDescription || '',
+      departmentAndPosition: member.business?.departmentAndPosition || '',
       acceptInternationalBusiness: member.acceptInternationalBusiness || '',
       businessCategory: Array.isArray(member.businessCategory) ? [...member.businessCategory] : [],
       industry: member.industry || '',
-      interestedIndustries: Array.isArray(member.business?.interestedIndustries ?? member.interestedIndustries) ? [...(member.business?.interestedIndustries ?? member.interestedIndustries)!] : [],
-      levelOfManagement: (member.business?.levelOfManagement ?? member.levelOfManagement) || '',
+      interestedIndustries: Array.isArray(member.business?.interestedIndustries) ? [...member.business.interestedIndustries!] : [],
+      levelOfManagement: member.business?.levelOfManagement || '',
       idealReferralIndustry: member.idealReferralIndustry || '',
       idealReferral: member.idealReferral || (Array.isArray(member.idealReferrals) ? member.idealReferrals.join(', ') : ''),
-      specialOffer: member.business?.specialOffer ?? member.specialOffer ?? '',
+      specialOffer: member.business?.specialOffer ?? '',
 
       phone: member.phone || '',
       alternatePhone: member.alternatePhone || '',
@@ -219,8 +219,8 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
       senatorCertified: !!member.senatorCertified,
       senatorshipId: member.senatorshipId || '',
       senatorshipBoardValidated: !!member.senatorshipBoardValidated,
-      senatorshipValidatedBy: (member.jciCareer?.senatorshipValidatedBy ?? member.senatorshipValidatedBy) || '',
-      senatorshipValidatedAt: (member.jciCareer?.senatorshipValidatedAt ?? member.senatorshipValidatedAt) || '',
+      senatorshipValidatedBy: member.jciCareer?.senatorshipValidatedBy || '',
+      senatorshipValidatedAt: member.jciCareer?.senatorshipValidatedAt || '',
       role: member.role || '',
       membershipType: member.membershipType || '',
     });
@@ -644,7 +644,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
   };
 
   const handleSendInviteEmail = async () => {
-    const email = member.contact?.email || member.email;
+    const email = member.contact?.email;
     if (!email) { showToast('No email address found for this member', 'error'); return; }
     try {
       const idToken = await user?.getIdToken();
@@ -672,7 +672,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
   // if so, the CTA becomes "Reset Password" instead of "Send Invite"
   const [authEmailExists, setAuthEmailExists] = useState<boolean | null>(null);
   useEffect(() => {
-    const email = member.contact?.email || member.email;
+    const email = member.contact?.email;
     if (!email) { setAuthEmailExists(false); return; }
     let cancelled = false;
     setAuthEmailExists(null);
@@ -694,7 +694,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
   }, [member.id]);
 
   const handleResetPassword = async () => {
-    const email = member.contact?.email || member.email;
+    const email = member.contact?.email;
     if (!email) { showToast('No email address found for this member', 'error'); return; }
     try {
       const { sendPasswordResetEmail } = await import('firebase/auth');
@@ -781,7 +781,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
 
   // Elite Leaderboard Radar Data
   const radarData = useMemo(() => {
-    const stats = (member.jciCareer?.radarStats ?? member.radarStats) || {
+    const stats = member.jciCareer?.radarStats || {
       training: 0,
       leadership: 0,
       events: 0,
@@ -798,7 +798,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
       ...item,
       displaySubject: `${item.subject}: ${item.value}`
     }));
-  }, [member.jciCareer?.radarStats, member.radarStats]);
+  }, [member.jciCareer?.radarStats]);
 
   const maxRadarVal = useMemo(() => {
     const vals = radarData.map(d => d.value);
@@ -840,10 +840,10 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-white font-black text-xl leading-tight">{member.name}</h1>
               </div>
-              {(member.companyName || (member.business?.departmentAndPosition ?? member.departmentAndPosition)) && (
+              {(member.companyName || member.business?.departmentAndPosition) && (
                 <p className="text-white/70 text-xs mt-0.5 truncate">
                   <Briefcase size={10} className="inline mr-1 opacity-70" />
-                  {[(member.business?.departmentAndPosition ?? member.departmentAndPosition), member.companyName].filter(Boolean).join(' · ')}
+                  {[member.business?.departmentAndPosition, member.companyName].filter(Boolean).join(' · ')}
                 </p>
               )}
               <div className="flex flex-col gap-0.5 mt-1 text-white/60 text-[10px]">
@@ -939,10 +939,10 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
               <div className="flex flex-row items-center gap-2 flex-wrap">
                 <h1 className="text-2xl font-black text-white tracking-tight leading-tight break-words drop-shadow">{member.name}</h1>
               </div>
-              {(member.companyName || (member.business?.departmentAndPosition ?? member.departmentAndPosition)) && (
+              {(member.companyName || member.business?.departmentAndPosition) && (
                 <p className="text-sm font-semibold text-white/70 flex items-center gap-1.5">
                   <Briefcase size={13} className="text-white/50 shrink-0" />
-                  {[(member.business?.departmentAndPosition ?? member.departmentAndPosition), member.companyName].filter(Boolean).join(' · ')}
+                  {[member.business?.departmentAndPosition, member.companyName].filter(Boolean).join(' · ')}
                 </p>
               )}
             </div>

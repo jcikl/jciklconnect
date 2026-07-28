@@ -277,7 +277,7 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                 <div>
                   <span className="text-slate-500 block text-xs uppercase font-medium">Birth Place</span>
                   {(() => {
-                    const storedBp = member.general?.birthPlace ?? member.birthPlace;
+                    const storedBp = member.general?.birthPlace;
                     const bp = storedBp
                       || (isMalaysianIC(member.idNumber || '') ? getBirthPlaceFromIC(member.idNumber || '') : '');
                     return (
@@ -296,11 +296,11 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                 </div>
                 <div>
                   <span className="text-slate-500 block text-xs uppercase font-medium">Ethnicity</span>
-                  <p className="font-medium text-slate-900">{(member.general?.ethnicity ?? member.ethnicity) || 'Not provided'}</p>
+                  <p className="font-medium text-slate-900">{member.general?.ethnicity || 'Not provided'}</p>
                 </div>
                 <div>
                   <span className="text-slate-500 block text-xs uppercase font-medium">Dietary Preference</span>
-                  <p className="font-medium text-slate-900 capitalize">{(member.general?.dietaryPreference ?? member.dietaryPreference) || 'Not provided'}</p>
+                  <p className="font-medium text-slate-900 capitalize">{member.general?.dietaryPreference || 'Not provided'}</p>
                 </div>
               </div>
 

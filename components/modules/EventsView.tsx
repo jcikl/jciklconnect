@@ -367,7 +367,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     const palette = ['bg-blue-100 text-blue-700', 'bg-violet-100 text-violet-700', 'bg-emerald-100 text-emerald-700', 'bg-amber-100 text-amber-700', 'bg-rose-100 text-rose-700'];
     return palette[(id ?? '').charCodeAt(0) % palette.length];
   };
-  const memberAvatar = (m: Member) => m.general?.avatarUrl ?? m.avatarUrl ?? m.avatar ?? undefined;
+  const memberAvatar = (m: Member) => m.general?.avatarUrl ?? undefined;
   const fmtDate = (iso: string | null | undefined) => {
     if (!iso) return null;
     const d = new Date(iso);
@@ -467,7 +467,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
       .catch(() => setMyRegistration(null));
     // Pre-fill registration form from member profile
     setRegForm({
-      dietary: ((member.general?.dietaryPreference ?? member.dietaryPreference) as 'normal' | 'vegetarian' | 'halal') ?? 'normal',
+      dietary: (member.general?.dietaryPreference as 'normal' | 'vegetarian' | 'halal') ?? 'normal',
       emergencyContactName: member.emergencyContactName ?? member.emergencyContact ?? '',
       emergencyContactPhone: member.emergencyContactPhone ?? '',
       tshirtSize: member.tshirtSize ?? '',
@@ -1083,7 +1083,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                               setAddMemberId(id);
                               const m = members.find(x => x.id === id);
                               if (m) setAddForm({
-                                dietary: ((m.general?.dietaryPreference ?? m.dietaryPreference) as 'normal' | 'vegetarian' | 'halal') ?? 'normal',
+                                dietary: (m.general?.dietaryPreference as 'normal' | 'vegetarian' | 'halal') ?? 'normal',
                                 tshirtSize: m.tshirtSize ?? '',
                               });
                             }}
