@@ -19,7 +19,7 @@ export const useHobbyClubs = () => {
     isSubmittingRef.current = true;
     try {
       if (!member) throw new Error('You must be logged in to create a club');
-      const id = await HobbyClubsService.createClub({ ...clubData, lead: member.name });
+      const id = await HobbyClubsService.createClub({ ...clubData, lead: member.general?.name ?? member.name });
       await loadClubs();
       showToast('Club created successfully', 'success');
       return id;
