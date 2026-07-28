@@ -1530,7 +1530,25 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
                 {profileTab === 'basic' && (
                   basicCount === 0
-                    ? <div className="flex flex-col items-center py-10 gap-2"><CheckCircle size={32} className="text-emerald-400" /><p className="text-sm text-white/50">All basic info filled</p></div>
+                    ? <div className="space-y-2">
+                        <div className="flex items-center gap-2 pb-1 mb-1">
+                          <CheckCircle size={16} className="text-emerald-400 shrink-0" />
+                          <p className="text-xs font-semibold text-emerald-400">All basic info filled</p>
+                        </div>
+                        {[
+                          { label: 'Phone Number', value: member?.contact?.phone },
+                          { label: 'Company Name', value: member?.companyName },
+                          { label: 'Industry', value: member?.industry },
+                          { label: 'Shirt Style', value: member?.others?.shirtStyle },
+                          { label: 'T-Shirt Size', value: member?.others?.tshirtSize },
+                          { label: 'Jacket Size', value: member?.others?.jacketSize },
+                        ].filter(r => r.value).map(r => (
+                          <div key={r.label} className="flex items-center justify-between py-2 px-3 rounded-xl bg-white/5">
+                            <span className="text-xs text-white/40">{r.label}</span>
+                            <span className="text-xs text-white/80 font-medium">{r.value}</span>
+                          </div>
+                        ))}
+                      </div>
                     : <div className="space-y-3">
                       {missing.find(f => f.label === 'Phone number') && (
                         <Input label="Phone Number" type="tel"
@@ -1570,7 +1588,23 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                 )}
                 {profileTab === 'contact' && (
                   contactCount === 0
-                    ? <div className="flex flex-col items-center py-10 gap-2"><CheckCircle size={32} className="text-emerald-400" /><p className="text-sm text-white/50">All contact info filled</p></div>
+                    ? <div className="space-y-2">
+                        <div className="flex items-center gap-2 pb-1 mb-1">
+                          <CheckCircle size={16} className="text-emerald-400 shrink-0" />
+                          <p className="text-xs font-semibold text-emerald-400">All contact info filled</p>
+                        </div>
+                        {[
+                          { label: 'Address', value: member?.contact?.address },
+                          { label: 'Emergency Contact Name', value: member?.contact?.emergency?.name },
+                          { label: 'Emergency Relationship', value: member?.contact?.emergency?.relationship },
+                          { label: 'Emergency Phone', value: member?.contact?.emergency?.phone },
+                        ].filter(r => r.value).map(r => (
+                          <div key={r.label} className="flex items-start justify-between gap-3 py-2 px-3 rounded-xl bg-white/5">
+                            <span className="text-xs text-white/40 shrink-0">{r.label}</span>
+                            <span className="text-xs text-white/80 font-medium text-right">{r.value}</span>
+                          </div>
+                        ))}
+                      </div>
                     : <div className="space-y-3">
                       {missing.find(f => f.label === 'Address') && (
                         <Input label="Address"
@@ -1597,7 +1631,26 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                 )}
                 {profileTab === 'professional' && (
                   professionalCount === 0
-                    ? <div className="flex flex-col items-center py-10 gap-2"><CheckCircle size={32} className="text-emerald-400" /><p className="text-sm text-white/50">All professional info filled</p></div>
+                    ? <div className="space-y-2">
+                        <div className="flex items-center gap-2 pb-1 mb-1">
+                          <CheckCircle size={16} className="text-emerald-400 shrink-0" />
+                          <p className="text-xs font-semibold text-emerald-400">All professional info filled</p>
+                        </div>
+                        {[
+                          { label: 'Position / Title', value: member?.business?.departmentAndPosition },
+                          { label: 'Business Categories', value: Array.isArray(member?.business?.businessCategory) ? member!.business!.businessCategory!.join(', ') : undefined },
+                          { label: 'Company Description', value: member?.business?.companyDescription },
+                          { label: 'Ideal Referral', value: Array.isArray(member?.business?.idealReferrals) ? member!.business!.idealReferrals!.join(', ') : (member?.idealReferralIndustry ?? undefined) },
+                          { label: 'Company Website', value: member?.business?.companyWebsite },
+                          { label: 'International Business', value: member?.business?.acceptInternationalBusiness },
+                          { label: 'Level of Management', value: member?.business?.levelOfManagement },
+                        ].filter(r => r.value).map(r => (
+                          <div key={r.label} className="flex items-start justify-between gap-3 py-2 px-3 rounded-xl bg-white/5">
+                            <span className="text-xs text-white/40 shrink-0">{r.label}</span>
+                            <span className="text-xs text-white/80 font-medium text-right">{r.value}</span>
+                          </div>
+                        ))}
+                      </div>
                     : <div className="space-y-3">
                       {missing.find(f => f.label === 'Position / title') && (
                         <Input label="Position / Title"
