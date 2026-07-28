@@ -100,24 +100,24 @@ export class MembersService {
     const merged = { ...(existing || {}), ...data } as Member;
     const rules = await MembershipConfigService.getRules();
     const profileInput = {
-      nationality: merged.nationality,
-      dateOfBirth: merged.dateOfBirth,
-      senatorCertified: merged.senatorCertified,
-      senatorshipId: merged.senatorshipId,
-      senatorshipBoardValidated: merged.senatorshipBoardValidated,
+      nationality: merged.general?.nationality,
+      dateOfBirth: merged.general?.dob,
+      senatorCertified: merged.jciCareer?.senatorship?.certified,
+      senatorshipId: merged.jciCareer?.senatorship?.senatorNumber,
+      senatorshipBoardValidated: merged.jciCareer?.senatorship?.boardValidated,
       role: merged.role,
-      membershipType: merged.membershipType,
+      membershipType: merged.jciCareer?.membershipType,
     };
     // When the caller explicitly passes membershipType (e.g. guest approval → 'Probation'),
     // validate+honour it rather than silently overriding with the profile-derived value.
     // resolveEligibleMembershipType keeps the proposed type when eligible; otherwise suggests a valid alternative.
-    const computed = ('membershipType' in data && data.membershipType)
-      ? resolveEligibleMembershipType(data.membershipType as MembershipType, profileInput, rules)
+    const computed = ('membershipType' in data && data.jciCareer?.membershipType)
+      ? resolveEligibleMembershipType(data.jciCareer?.membershipType as MembershipType, profileInput, rules)
       : computeMembershipTypeFromMember(profileInput, rules);
     const newRole = roleForMembershipType(computed as MembershipType, merged.role as UserRole);
     const roleChanges: Partial<Member> = newRole !== (merged.role as UserRole) ? { role: newRole } : {};
-    if (merged.membershipType === computed && !('membershipType' in data) && !Object.keys(roleChanges).length) return data;
-    return { ...data, membershipType: computed, ...roleChanges };
+    if (merged.jciCareer?.membershipType === computed && !Object.keys(roleChanges).length) return data;
+    return { ...data, jciCareer: { ...data.jciCareer, membershipType: computed }, ...roleChanges };
   }
   /** Invalidate all members cache (call after any write to members collection). */
   static invalidateMembersCache(): void {
@@ -246,35 +246,35 @@ export class MembersService {
     const general: Partial<MemberGeneral> & { fullName?: string } = {
       ...(existing?.general || {}),
     };
-    if (data.name !== undefined) general.name = data.name;
-    if (data.fullName !== undefined) general.fullName = data.fullName;
-    if (data.chineseName !== undefined) general.chineseName = data.chineseName;
-    else if (data.chiName !== undefined) general.chineseName = data.chiName;
-    if (data.idNumber !== undefined) general.idNumber = data.idNumber;
-    else if (data.nationalId !== undefined) general.idNumber = data.nationalId;
-    if (data.dateOfBirth !== undefined) {
-      general.dob = data.dateOfBirth;
+    if (data.general?.name !== undefined) general.name = data.general?.name;
+    if (data.general?.fullName !== undefined) general.fullName = data.general?.fullName;
+    if (data.general?.chineseName !== undefined) general.chineseName = data.general?.chineseName;
+    else if (data.general?.chineseName !== undefined) general.chineseName = data.general?.chineseName;
+    if (data.general?.idNumber !== undefined) general.idNumber = data.general?.idNumber;
+    else if (data.general?.idNumber !== undefined) general.idNumber = data.general?.idNumber;
+    if (data.general?.dob !== undefined) {
+      general.dob = data.general?.dob;
       // Index field for birthday queries: "MMDD" e.g. "0706" for July 6
-      const dobStr: string = data.dateOfBirth;
+      const dobStr: string = data.general?.dob;
       if (dobStr && dobStr.length >= 10) {
         result.birthdayMMDD = dobStr.slice(5, 7) + dobStr.slice(8, 10);
       }
-    } else if (data.dob !== undefined) {
-      general.dob = data.dob;
-      const dobStr: string = data.dob;
+    } else if (data.general?.dob !== undefined) {
+      general.dob = data.general?.dob;
+      const dobStr: string = data.general?.dob;
       if (dobStr && dobStr.length >= 10) {
         result.birthdayMMDD = dobStr.slice(5, 7) + dobStr.slice(8, 10);
       }
     }
-    if (data.gender !== undefined) general.gender = data.gender;
-    if (data.race !== undefined) general.race = data.race;
-    else if (data.ethnicity !== undefined) general.race = data.ethnicity;
-    if (data.ethnicity !== undefined) general.ethnicity = data.ethnicity;
-    if (data.dietaryPreference !== undefined) general.dietaryPreference = data.dietaryPreference;
-    if (data.nationality !== undefined) general.nationality = data.nationality;
-    if (data.birthPlace !== undefined) general.birthPlace = data.birthPlace;
-    if (data.avatarUrl !== undefined) general.avatarUrl = data.avatarUrl;
-    else if (data.avatar !== undefined) general.avatarUrl = data.avatar;
+    if (data.general?.gender !== undefined) general.gender = data.general?.gender;
+    if (data.general?.race !== undefined) general.race = data.general?.race;
+    else if (data.general?.ethnicity !== undefined) general.race = data.general?.ethnicity;
+    if (data.general?.ethnicity !== undefined) general.ethnicity = data.general?.ethnicity;
+    if (data.general?.dietaryPreference !== undefined) general.dietaryPreference = data.general?.dietaryPreference;
+    if (data.general?.nationality !== undefined) general.nationality = data.general?.nationality;
+    if (data.general?.birthPlace !== undefined) general.birthPlace = data.general?.birthPlace;
+    if (data.general?.avatarUrl !== undefined) general.avatarUrl = data.general?.avatarUrl;
+    else if (data.general?.avatarUrl !== undefined) general.avatarUrl = data.general?.avatarUrl;
 
     if (Object.keys(general).length > 0 || existing?.general) {
       result.general = general;
@@ -290,26 +290,23 @@ export class MembersService {
       socials: { ...(existing?.contact?.socials || {}) },
       emergency: { ...(existing?.contact?.emergency || {}) }
     };
-    if (data.email !== undefined) contact.email = data.email;
-    if (data.phone !== undefined) contact.phone = data.phone;
-    if (data.alternatePhone !== undefined) contact.alternatePhone = data.alternatePhone;
-    if (data.address !== undefined) contact.address = data.address;
+    if (data.contact?.email !== undefined) contact.email = data.contact?.email;
+    if (data.contact?.phone !== undefined) contact.phone = data.contact?.phone;
+    if (data.contact?.alternatePhone !== undefined) contact.alternatePhone = data.contact?.alternatePhone;
+    if (data.contact?.address !== undefined) contact.address = data.contact?.address;
     
-    if (data.whatsappJoined !== undefined) contact.whatsappJoined = !!data.whatsappJoined;
-    else if (data.whatsappGroup !== undefined) contact.whatsappJoined = !!data.whatsappGroup;
-    else if (data.whatsappgroup !== undefined) contact.whatsappJoined = !!data.whatsappgroup;
+    if (data.contact?.whatsappJoined !== undefined) contact.whatsappJoined = !!data.contact?.whatsappJoined;
+    else if (data.contact?.whatsappJoined !== undefined) contact.whatsappJoined = !!data.contact?.whatsappJoined;
+    else if (data.contact?.whatsappJoined !== undefined) contact.whatsappJoined = !!data.contact?.whatsappJoined;
 
-    if (data.linkedin !== undefined) contact.socials.linkedin = data.linkedin;
-    else if (data.linkedIn !== undefined) contact.socials.linkedin = data.linkedIn;
-    if (data.facebook !== undefined) contact.socials.facebook = data.facebook;
-    if (data.instagram !== undefined) contact.socials.instagram = data.instagram;
-    if (data.wechat !== undefined) contact.socials.wechat = data.wechat;
-    else if (data.weChat !== undefined) contact.socials.wechat = data.weChat;
+    if (data.contact?.socials?.linkedin !== undefined) contact.socials.linkedin = data.contact?.socials?.linkedin;
+    if (data.contact?.socials?.facebook !== undefined) contact.socials.facebook = data.contact?.socials?.facebook;
+    if (data.contact?.socials?.instagram !== undefined) contact.socials.instagram = data.contact?.socials?.instagram;
+    if (data.contact?.socials?.wechat !== undefined) contact.socials.wechat = data.contact?.socials?.wechat;
 
-    if (data.emergencyContactName !== undefined) contact.emergency.name = data.emergencyContactName;
-    else if (data.emergencyContact !== undefined) contact.emergency.name = data.emergencyContact;
-    if (data.emergencyContactPhone !== undefined) contact.emergency.phone = data.emergencyContactPhone;
-    if (data.emergencyContactRelationship !== undefined) contact.emergency.relationship = data.emergencyContactRelationship;
+    if (data.contact?.emergency?.name !== undefined) contact.emergency.name = data.contact?.emergency?.name;
+    if (data.contact?.emergency?.phone !== undefined) contact.emergency.phone = data.contact?.emergency?.phone;
+    if (data.contact?.emergency?.relationship !== undefined) contact.emergency.relationship = data.contact?.emergency?.relationship;
 
     if (Object.keys(contact.socials).length === 0 && !existing?.contact?.socials) delete contact.socials;
     if (Object.keys(contact.emergency).length === 0 && !existing?.contact?.emergency) delete contact.emergency;
@@ -322,14 +319,14 @@ export class MembersService {
     const others: Partial<NonNullable<Member['others']>> = {
       ...(existing?.others || {}),
     };
-    if (data.bio !== undefined) others.bio = data.bio;
-    if (data.shirtStyle !== undefined) others.shirtStyle = data.shirtStyle;
-    else if (data.cutStyle !== undefined) others.shirtStyle = data.cutStyle;
-    if (data.tshirtSize !== undefined) others.tshirtSize = data.tshirtSize;
-    if (data.jacketSize !== undefined) others.jacketSize = data.jacketSize;
-    if (data.embroideredName !== undefined) others.embroideredName = data.embroideredName;
-    if (data.tshirtStatus !== undefined) others.tshirtStatus = data.tshirtStatus;
-    if (data.hobbies !== undefined) others.hobbies = data.hobbies;
+    if (data.others?.bio !== undefined) others.bio = data.others?.bio;
+    if (data.others?.shirtStyle !== undefined) others.shirtStyle = data.others?.shirtStyle;
+    else if (data.others?.shirtStyle !== undefined) others.shirtStyle = data.others?.shirtStyle;
+    if (data.others?.tshirtSize !== undefined) others.tshirtSize = data.others?.tshirtSize;
+    if (data.others?.jacketSize !== undefined) others.jacketSize = data.others?.jacketSize;
+    if (data.others?.embroideredName !== undefined) others.embroideredName = data.others?.embroideredName;
+    if (data.others?.tshirtStatus !== undefined) others.tshirtStatus = data.others?.tshirtStatus;
+    if (data.others?.hobbies !== undefined) others.hobbies = data.others?.hobbies;
 
     if (Object.keys(others).length > 0 || existing?.others) {
       result.others = others;
@@ -340,38 +337,38 @@ export class MembersService {
       ...(existing?.business || {}),
     };
     if (data.companyName !== undefined) business.companyName = data.companyName;
-    if (data.companyWebsite !== undefined) business.companyWebsite = data.companyWebsite;
-    if (data.companyLogoUrl !== undefined) business.companyLogoUrl = data.companyLogoUrl;
-    if (data.introduction !== undefined) business.introduction = data.introduction;
-    else if (data.companyDescription !== undefined) business.introduction = data.companyDescription;
-    if (data.companyDescription !== undefined) business.companyDescription = data.companyDescription;
-    if (data.title !== undefined) business.position = data.title;
-    else if (data.position !== undefined) business.position = data.position;
-    else if (data.profession !== undefined) business.position = data.profession;
-    else if (data.departmentAndPosition !== undefined) business.position = data.departmentAndPosition;
-    if (data.departmentAndPosition !== undefined) business.departmentAndPosition = data.departmentAndPosition;
+    if (data.business?.companyWebsite !== undefined) business.companyWebsite = data.business?.companyWebsite;
+    if (data.business?.companyLogoUrl !== undefined) business.companyLogoUrl = data.business?.companyLogoUrl;
+    if (data.business?.introduction !== undefined) business.introduction = data.business?.introduction;
+    else if (data.business?.companyDescription !== undefined) business.introduction = data.business?.companyDescription;
+    if (data.business?.companyDescription !== undefined) business.companyDescription = data.business?.companyDescription;
+    if (data.business?.position !== undefined) business.position = data.business?.position;
+    else if (data.business?.position !== undefined) business.position = data.business?.position;
+    else if (data.business?.position !== undefined) business.position = data.business?.position;
+    else if (data.business?.departmentAndPosition !== undefined) business.position = data.business?.departmentAndPosition;
+    if (data.business?.departmentAndPosition !== undefined) business.departmentAndPosition = data.business?.departmentAndPosition;
     if (data.industry !== undefined) business.industry = data.industry;
-    if (data.businessCategory !== undefined) business.businessCategory = data.businessCategory;
-    else if (data.category !== undefined) business.businessCategory = data.category;
-    if (data.specialOffer !== undefined) business.specialOffer = data.specialOffer;
-    else if (data.offerToMember !== undefined) business.specialOffer = data.offerToMember;
-    if (data.acceptInternationalBusiness !== undefined) business.acceptInternationalBusiness = data.acceptInternationalBusiness;
+    if (data.business?.businessCategory !== undefined) business.businessCategory = data.business?.businessCategory;
+    else if (data.business?.businessCategory !== undefined) business.businessCategory = data.business?.businessCategory;
+    if (data.business?.specialOffer !== undefined) business.specialOffer = data.business?.specialOffer;
+    else if (data.business?.specialOffer !== undefined) business.specialOffer = data.business?.specialOffer;
+    if (data.business?.acceptInternationalBusiness !== undefined) business.acceptInternationalBusiness = data.business?.acceptInternationalBusiness;
     
-    if (data.idealReferrals !== undefined) {
-      business.idealReferrals = data.idealReferrals;
-    } else if (data.idealReferral !== undefined) {
-      business.idealReferrals = typeof data.idealReferral === 'string'
-        ? data.idealReferral.split(', ').filter(Boolean)
-        : data.idealReferral;
+    if (data.business?.idealReferrals !== undefined) {
+      business.idealReferrals = data.business?.idealReferrals;
+    } else if (data.business?.idealReferrals !== undefined) {
+      business.idealReferrals = typeof data.business?.idealReferrals === 'string'
+        ? data.business?.idealReferrals.split(', ').filter(Boolean)
+        : data.business?.idealReferrals;
     } else if (data.idealReferralIndustry !== undefined) {
       business.idealReferrals = typeof data.idealReferralIndustry === 'string'
         ? data.idealReferralIndustry.split(', ').filter(Boolean)
         : data.idealReferralIndustry;
     }
-    if (data.connections !== undefined) business.connections = data.connections;
-    if (data.levelOfManagement !== undefined) business.levelOfManagement = data.levelOfManagement;
-    if (data.interestedIndustries !== undefined) business.interestedIndustries = data.interestedIndustries;
-    if (data.idealReferralTypes !== undefined) business.idealReferralTypes = data.idealReferralTypes;
+    if (data.business?.connections !== undefined) business.connections = data.business?.connections;
+    if (data.business?.levelOfManagement !== undefined) business.levelOfManagement = data.business?.levelOfManagement;
+    if (data.business?.interestedIndustries !== undefined) business.interestedIndustries = data.business?.interestedIndustries;
+    if (data.business?.idealReferralTypes !== undefined) business.idealReferralTypes = data.business?.idealReferralTypes;
 
     if (Object.keys(business).length > 0 || existing?.business) {
       result.business = business;
@@ -387,38 +384,38 @@ export class MembersService {
       ...(existing?.jciCareer || {}),
       senatorship: { ...(existing?.jciCareer?.senatorship || {}) }
     };
-    if (data.membershipType !== undefined) jciCareer.membershipType = data.membershipType;
+    if (data.jciCareer?.membershipType !== undefined) jciCareer.membershipType = data.jciCareer?.membershipType;
     // membershipStatus legacy field removed (E5) — use membership[year].status instead
-    if (data.joinDate !== undefined) jciCareer.joinDate = data.joinDate;
-    else if (data.joinedDate !== undefined) jciCareer.joinDate = data.joinedDate;
-    if (data.introducer !== undefined) jciCareer.introducer = data.introducer;
+    if (data.jciCareer?.joinDate !== undefined) jciCareer.joinDate = data.jciCareer?.joinDate;
+    else if (data.jciCareer?.joinDate !== undefined) jciCareer.joinDate = data.jciCareer?.joinDate;
+    if (data.jciCareer?.introducer !== undefined) jciCareer.introducer = data.jciCareer?.introducer;
 
-    if (data.senatorshipId !== undefined) jciCareer.senatorship.senatorshipId = data.senatorshipId;
-    if (data.senatorCertified !== undefined) jciCareer.senatorship.senatorCertified = data.senatorCertified;
-    if (data.senatorshipBoardValidated !== undefined) jciCareer.senatorship.senatorshipBoardValidated = data.senatorshipBoardValidated;
+    if (data.jciCareer?.senatorship?.senatorNumber !== undefined) jciCareer.senatorship.senatorNumber = data.jciCareer?.senatorship?.senatorNumber;
+    if (data.jciCareer?.senatorship?.certified !== undefined) jciCareer.senatorship.certified = data.jciCareer?.senatorship?.certified;
+    if (data.jciCareer?.senatorship?.boardValidated !== undefined) jciCareer.senatorship.boardValidated = data.jciCareer?.senatorship?.boardValidated;
 
-    if (data.currentBoardYear !== undefined) jciCareer.currentBoardYear = data.currentBoardYear;
-    if (data.currentBoardPosition !== undefined) jciCareer.currentBoardPosition = data.currentBoardPosition;
-    if (data.isCurrentBoardMember !== undefined) jciCareer.isCurrentBoardMember = data.isCurrentBoardMember;
-    if (data.boardHistory !== undefined) jciCareer.boardHistory = data.boardHistory;
+    if (data.jciCareer?.currentBoardYear !== undefined) jciCareer.currentBoardYear = data.jciCareer?.currentBoardYear;
+    if (data.jciCareer?.currentBoardPosition !== undefined) jciCareer.currentBoardPosition = data.jciCareer?.currentBoardPosition;
+    if (data.jciCareer?.isCurrentBoardMember !== undefined) jciCareer.isCurrentBoardMember = data.jciCareer?.isCurrentBoardMember;
+    if (data.jciCareer?.boardHistory !== undefined) jciCareer.boardHistory = data.jciCareer?.boardHistory;
 
     if (data.points !== undefined) jciCareer.points = data.points;
     // attendanceRate deprecated (E6) — use attendanceCheckins/attendanceMonths/attendanceYear instead
-    if (data.badgesCount !== undefined) jciCareer.badgesCount = data.badgesCount;
-    if (data.projectsCount !== undefined) jciCareer.projectsCount = data.projectsCount;
-    if (data.trainingsCount !== undefined) jciCareer.trainingsCount = data.trainingsCount;
+    if (data.jciCareer?.badgesCount !== undefined) jciCareer.badgesCount = data.jciCareer?.badgesCount;
+    if (data.jciCareer?.projectsCount !== undefined) jciCareer.projectsCount = data.jciCareer?.projectsCount;
+    if (data.jciCareer?.trainingsCount !== undefined) jciCareer.trainingsCount = data.jciCareer?.trainingsCount;
 
-    if (data.probationTasks !== undefined) jciCareer.probationTasks = data.probationTasks;
-    if (data.promotionProgress !== undefined) jciCareer.promotionProgress = data.promotionProgress;
-    if (data.isDuesPaidCurrentYear !== undefined) jciCareer.isDuesPaidCurrentYear = data.isDuesPaidCurrentYear;
-    if (data.engagementProgress !== undefined) jciCareer.engagementProgress = data.engagementProgress;
-    if (data.radarStats !== undefined) jciCareer.radarStats = data.radarStats;
-    if (data.radarStatsByYear !== undefined) jciCareer.radarStatsByYear = data.radarStatsByYear;
-    if (data.membershipDuesHistory !== undefined) jciCareer.membershipDuesHistory = data.membershipDuesHistory;
-    if (data.leaderboardVisibility !== undefined) jciCareer.leaderboardVisibility = data.leaderboardVisibility;
-    if (data.hasPaidInitiationFee !== undefined) jciCareer.hasPaidInitiationFee = data.hasPaidInitiationFee;
-    if (data.senatorshipValidatedAt !== undefined) jciCareer.senatorshipValidatedAt = data.senatorshipValidatedAt;
-    if (data.senatorshipValidatedBy !== undefined) jciCareer.senatorshipValidatedBy = data.senatorshipValidatedBy;
+    if (data.jciCareer?.probationTasks !== undefined) jciCareer.probationTasks = data.jciCareer?.probationTasks;
+    if (data.jciCareer?.promotionProgress !== undefined) jciCareer.promotionProgress = data.jciCareer?.promotionProgress;
+    if (data.jciCareer?.isDuesPaidCurrentYear !== undefined) jciCareer.isDuesPaidCurrentYear = data.jciCareer?.isDuesPaidCurrentYear;
+    if (data.jciCareer?.engagementProgress !== undefined) jciCareer.engagementProgress = data.jciCareer?.engagementProgress;
+    if (data.jciCareer?.radarStats !== undefined) jciCareer.radarStats = data.jciCareer?.radarStats;
+    if (data.jciCareer?.radarStatsByYear !== undefined) jciCareer.radarStatsByYear = data.jciCareer?.radarStatsByYear;
+    if (data.jciCareer?.membershipDuesHistory !== undefined) jciCareer.membershipDuesHistory = data.jciCareer?.membershipDuesHistory;
+    if (data.jciCareer?.leaderboardVisibility !== undefined) jciCareer.leaderboardVisibility = data.jciCareer?.leaderboardVisibility;
+    if (data.jciCareer?.hasPaidInitiationFee !== undefined) jciCareer.hasPaidInitiationFee = data.jciCareer?.hasPaidInitiationFee;
+    if (data.jciCareer?.senatorshipValidatedAt !== undefined) jciCareer.senatorshipValidatedAt = data.jciCareer?.senatorshipValidatedAt;
+    if (data.jciCareer?.senatorshipValidatedBy !== undefined) jciCareer.senatorshipValidatedBy = data.jciCareer?.senatorshipValidatedBy;
 
     if (Object.keys(jciCareer.senatorship).length === 0 && !existing?.jciCareer?.senatorship) delete jciCareer.senatorship;
     if (Object.keys(jciCareer).length > 0 || existing?.jciCareer) {
@@ -490,17 +487,17 @@ export class MembersService {
     }
 
     try {
-      if (!memberData.name?.trim()) throw new Error('Member name is required');
-      if (!memberData.email?.trim()) throw new Error('Member email is required');
+      if (!memberData.general?.name?.trim()) throw new Error('Member name is required');
+      if (!memberData.contact?.email?.trim()) throw new Error('Member email is required');
       const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!EMAIL_RE.test(memberData.email)) throw new Error('Invalid email format');
-      if (memberData.idNumber && !/^\d{12}$/.test(memberData.idNumber)) throw new Error('IC number must be 12 digits');
+      if (!EMAIL_RE.test(memberData.contact?.email)) throw new Error('Invalid email format');
+      if (memberData.general?.idNumber && !/^\d{12}$/.test(memberData.general?.idNumber)) throw new Error('IC number must be 12 digits');
 
       // P0 Fix: Claim email slot AND create the member document inside the same
       // runTransaction so there is no window where the email slot exists but the
       // member document does not (or vice-versa). Two concurrent calls with the
       // same email both attempt to set the same emailSlot doc — only the first wins.
-      const sanitizedEmail = memberData.email.toLowerCase().replace(/[^a-z0-9@.]/g, '_');
+      const sanitizedEmail = memberData.contact?.email.toLowerCase().replace(/[^a-z0-9@.]/g, '_');
       const emailSlotRef = doc(db, COLLECTIONS.MEMBER_EMAILS, sanitizedEmail);
 
       const payload = {
@@ -531,7 +528,7 @@ export class MembersService {
         if (existing.exists()) {
           throw new Error('A member with this email already exists');
         }
-        txn.set(emailSlotRef, { email: memberData.email, memberId: memberRef.id, createdAt: Timestamp.now() });
+        txn.set(emailSlotRef, { email: memberData.contact?.email, memberId: memberRef.id, createdAt: Timestamp.now() });
         txn.set(memberRef, normalizedData);
       });
       const docRef = memberRef;
@@ -546,8 +543,8 @@ export class MembersService {
         errorLoggingService.logError(syncErr instanceof Error ? syncErr : new Error(String(syncErr)), { context: 'MembersService.createMember', additionalInfo: 'syncPublicListing failed — member was created successfully' });
       }
 
-      if (cleanMemberData.introducer) {
-        this.recalculateIntroducerStats(cleanMemberData.introducer).catch(err => errorLoggingService.logError(err, { action: 'recalculate-introducer-stats', additionalData: { introducer: cleanMemberData.introducer } }));
+      if (cleanMemberData.jciCareer?.introducer) {
+        this.recalculateIntroducerStats(cleanMemberData.jciCareer?.introducer).catch(err => errorLoggingService.logError(err, { action: 'recalculate-introducer-stats', additionalData: { introducer: cleanMemberData.jciCareer?.introducer } }));
       }
 
       void LarkSyncService.syncRecord({ collection: 'members', id: docRef.id, action: 'upsert' });
@@ -572,9 +569,9 @@ export class MembersService {
       // Shallow-copy to avoid mutating the caller's object (E11)
       updates = { ...updates };
 
-      if (updates.email != null) {
+      if (updates.contact?.email != null) {
         const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!EMAIL_RE.test(updates.email)) throw new Error('Invalid email format');
+        if (!EMAIL_RE.test(updates.contact?.email)) throw new Error('Invalid email format');
       }
 
       // mentorId must go through assignMentor() to keep menteeIds bidirectionally in sync (N2 fix)
@@ -582,24 +579,24 @@ export class MembersService {
         throw new Error('Use assignMentor() to change mentorId — updateMember does not sync menteeIds on mentor documents.');
       }
 
-      if (currentData?.senatorshipBoardValidated) {
+      if (currentData?.jciCareer?.senatorship?.boardValidated) {
         if (
           'senatorshipId' in updates &&
-          updates.senatorshipId !== currentData.senatorshipId
+          updates.jciCareer?.senatorship?.senatorNumber !== currentData.jciCareer?.senatorship?.senatorNumber
         ) {
-          delete updates.senatorshipId;
+          delete updates.jciCareer?.senatorship?.senatorNumber;
         }
         if ('senatorCertified' in updates) {
-          delete updates.senatorCertified;
+          delete updates.jciCareer?.senatorship?.certified;
         }
         if ('senatorshipBoardValidated' in updates) {
-          delete updates.senatorshipBoardValidated;
+          delete updates.jciCareer?.senatorship?.boardValidated;
         }
         if ('senatorshipValidatedAt' in updates) {
-          delete updates.senatorshipValidatedAt;
+          delete updates.jciCareer?.senatorshipValidatedAt;
         }
         if ('senatorshipValidatedBy' in updates) {
-          delete updates.senatorshipValidatedBy;
+          delete updates.jciCareer?.senatorshipValidatedBy;
         }
       }
 
@@ -609,14 +606,14 @@ export class MembersService {
       };
 
       // Check for GUEST -> MEMBER transition to initialize membership record (if not already handled by caller)
-      if (updates.role === UserRole.MEMBER && !updates.membership) {
+      if (updates.role === UserRole.MEMBER && !updates.jciCareer?.membershipDuesHistory) {
         if (currentData) {
           // If moving from GUEST (or no role) to MEMBER
           if (currentData.role === UserRole.GUEST || !currentData.role) {
-            const joinDate = updates.joinDate || currentData.joinDate;
+            const joinDate = updates.jciCareer?.joinDate || currentData.jciCareer?.joinDate;
             const yearStr = joinDate ? String(new Date(joinDate).getFullYear()) : String(getMYTYear());
             
-            const membership = currentData.membership || {};
+            const membership = currentData.jciCareer?.membershipDuesHistory || {};
             if (!membership[yearStr]) {
               membership[yearStr] = {
                 year: parseInt(yearStr),
@@ -626,7 +623,7 @@ export class MembersService {
                 status: 'pending',
                 transactionId: []
               };
-              updates.membership = membership;
+              Object.assign(updates, { 'jciCareer.membershipDuesHistory': membership });
               console.log(`Initialized membership record for member ${memberId} for year ${yearStr}`);
             }
           }
@@ -636,8 +633,8 @@ export class MembersService {
       // Capture email change intent before building cleanUpdates — Auth sync happens AFTER
       // Firestore is written so that a conflict (409) can revert the already-written Firestore
       // fields rather than leaving Auth updated but Firestore stale.
-      const newEmail = (updates as any).email ?? (updates.contact as any)?.email;
-      const currentEmail = currentData?.contact?.email || currentData?.email;
+      const newEmail = (updates as any).contact?.email ?? (updates.contact as any)?.contact?.email;
+      const currentEmail = currentData?.contact?.email || currentData?.contact?.email;
       const emailChanging =
         !!(newEmail &&
         currentEmail &&
@@ -703,7 +700,7 @@ export class MembersService {
             // Email already taken in Auth — revert the email fields we just wrote to Firestore
             const revertFields: Record<string, unknown> = { updatedAt: Timestamp.now() };
             if ('email' in normalizedUpdates) revertFields['email'] = currentEmail;
-            if (normalizedUpdates['contact.email'] !== undefined || (normalizedUpdates['contact'] as any)?.email !== undefined) {
+            if (normalizedUpdates['contact.email'] !== undefined || (normalizedUpdates['contact'] as any)?.contact?.email !== undefined) {
               revertFields['contact.email'] = currentEmail;
             }
             await updateDoc(memberRef, revertFields).catch(e =>
@@ -748,13 +745,13 @@ export class MembersService {
       // Related field: eventRegistrations.memberName (denormalized from member.general.name)
 
       // Trigger introducer recalculation if introducer changes
-      if (cleanUpdates.introducer !== undefined && (!currentData || cleanUpdates.introducer !== currentData.introducer)) {
-        if (currentData?.introducer) {
-          const introducer = currentData.introducer;
+      if (cleanUpdates.jciCareer?.introducer !== undefined && (!currentData || cleanUpdates.jciCareer?.introducer !== currentData.jciCareer?.introducer)) {
+        if (currentData?.jciCareer?.introducer) {
+          const introducer = currentData.jciCareer?.introducer;
           this.recalculateIntroducerStats(introducer).catch(err => errorLoggingService.logError(err, { action: 'recalculate-introducer-stats', additionalData: { introducer } }));
         }
-        if (cleanUpdates.introducer) {
-          const introducer = cleanUpdates.introducer;
+        if (cleanUpdates.jciCareer?.introducer) {
+          const introducer = cleanUpdates.jciCareer?.introducer;
           this.recalculateIntroducerStats(introducer).catch(err => errorLoggingService.logError(err, { action: 'recalculate-introducer-stats', additionalData: { introducer } }));
         }
       }
@@ -774,21 +771,20 @@ export class MembersService {
   ): Promise<void> {
     const member = await this.getMemberById(memberId);
     if (!member) throw new Error('Member not found');
-    if (!member.senatorshipId?.trim()) {
+    if (!member.jciCareer?.senatorship?.senatorNumber?.trim()) {
       throw new Error('Senatorship number is required before validation');
     }
-    if (member.senatorshipBoardValidated) {
+    if (member.jciCareer?.senatorship?.boardValidated) {
       throw new Error('Senatorship is already validated');
     }
 
     await this.updateMember(
       memberId,
       {
-        senatorshipBoardValidated: true,
-        senatorCertified: true,
-        senatorshipValidatedAt: new Date().toISOString(),
-        senatorshipValidatedBy: validatedByName || validatedByMemberId,
-      },
+        'jciCareer.senatorship': { certified: true, boardValidated: true },
+        'jciCareer.senatorshipValidatedAt': new Date().toISOString(),
+        'jciCareer.senatorshipValidatedBy': validatedByName || validatedByMemberId,
+      } as unknown as Partial<Member>,
       validatedByMemberId
     );
   }
@@ -799,7 +795,7 @@ export class MembersService {
     revokedBy?: string
   ): Promise<void> {
     const member = await this.getMemberById(memberId);
-    if (!member?.senatorshipBoardValidated) {
+    if (!member?.jciCareer?.senatorship?.boardValidated) {
       throw new Error('Senatorship is not validated');
     }
 
@@ -816,7 +812,7 @@ export class MembersService {
       senatorshipValidatedBy: deleteField(),
       'jciCareer.senatorshipValidatedAt': deleteField(),
       'jciCareer.senatorshipValidatedBy': deleteField(),
-      ...(typePatch.membershipType ? { membershipType: typePatch.membershipType } : {}),
+      ...(typePatch.jciCareer?.membershipType ? { membershipType: typePatch.jciCareer?.membershipType } : {}),
       ...(typePatch.role ? { role: typePatch.role } : {}),
       updatedAt: Timestamp.now(),
       ...(revokedBy ? { updatedBy: revokedBy } : {}),
@@ -836,20 +832,20 @@ export class MembersService {
         memberName: firstText(
           memberAny.general?.name,
           memberAny.general?.fullName,
-          memberAny.fullName,
-          memberAny.name
+          memberAny.general?.fullName,
+          memberAny.general?.name
         ),
         avatarUrl: firstText(
-          memberAny.general?.avatar,
           memberAny.general?.avatarUrl,
-          memberAny.avatarUrl,
-          memberAny.avatar
+          memberAny.general?.avatarUrl,
+          memberAny.general?.avatarUrl,
+          memberAny.general?.avatarUrl
         ) || '',
         companyName: firstText(
           memberAny.business?.companyName,
           memberAny.companyName,
           memberAny.business?.position,
-          memberAny.departmentAndPosition
+          memberAny.business?.departmentAndPosition
         ),
       };
 
@@ -937,7 +933,7 @@ export class MembersService {
         ? (targetDoc.data() as Omit<Member, 'id'>).mentorId
         : undefined;
       const targetEmailRaw: string | undefined = targetDoc.exists()
-        ? ((targetDoc.data() as any)?.contact?.email || (targetDoc.data() as any)?.email)
+        ? ((targetDoc.data() as any)?.contact?.email || (targetDoc.data() as any)?.contact?.email)
         : undefined;
       const [boardSnap, bizSnap, regSnap, prSnap, notifSnap] = await Promise.all([
         getDocs(query(collection(db, COLLECTIONS.BOARD_MEMBERS), where('memberId', '==', memberId))),
@@ -1005,8 +1001,8 @@ export class MembersService {
       const term = searchTerm.toLowerCase();
 
       return allMembers.filter(member =>
-        (member.name ?? '').toLowerCase().includes(term) ||
-        (member.email ?? '').toLowerCase().includes(term) ||
+        (member.general?.name ?? '').toLowerCase().includes(term) ||
+        (member.contact?.email ?? '').toLowerCase().includes(term) ||
         (member.skills ?? []).some(skill => skill.toLowerCase().includes(term))
       );
     } catch (error) {
@@ -1048,7 +1044,7 @@ export class MembersService {
   // Get member by email (for account linking)
   static async getMemberByEmail(email: string): Promise<Member | null> {
     if (isDevMode()) {
-      return MOCK_MEMBERS.find(m => m.email.toLowerCase() === email.toLowerCase()) || null;
+      return MOCK_MEMBERS.find(m => m.contact?.email.toLowerCase() === email.toLowerCase()) || null;
     }
 
     try {
@@ -1236,7 +1232,7 @@ export class MembersService {
       // Email changes must go through updateMember so the memberEmails uniqueness slot
       // and Auth email are updated atomically per-member (each member has a different
       // current email, which a single batch payload cannot handle correctly).
-      if ('email' in updates || (updates.contact && (updates.contact as any)?.email)) {
+      if ('email' in updates || (updates.contact && (updates.contact as any)?.contact?.email)) {
         throw new Error('Use updateMember() to change email — batchUpdateMembers cannot safely update email uniqueness slots for multiple members.');
       }
       // Base normalization used for display-field detection and display sync
@@ -1263,7 +1259,7 @@ export class MembersService {
         if (snap.exists()) {
           existingByIds.set(memberIds[i], { ...snap.data(), id: memberIds[i] } as Member);
           if (introducerChanging) {
-            oldIntroducerMap.set(memberIds[i], (snap.data() as Omit<Member, 'id'> & { introducer?: string }).introducer);
+            oldIntroducerMap.set(memberIds[i], (snap.data() as Omit<Member, 'id'> & { introducer?: string }).jciCareer?.introducer);
           }
         }
       });
@@ -1298,16 +1294,16 @@ export class MembersService {
       // from GUEST to MEMBER via batch, they must receive a Probation membership record for the
       // current year — otherwise they carry MEMBER role with no dues entry.
       const membershipInitPatchMap = new Map<string, Record<string, unknown>>();
-      if (updates.role === UserRole.MEMBER && !updates.membership) {
+      if (updates.role === UserRole.MEMBER && !updates.jciCareer?.membershipDuesHistory) {
         const probationRules = (await MembershipConfigService.getRules()).Probation;
         const probationDues = probationRules?.duesAmount ?? MembershipDues.Probation;
         memberIds.forEach(id => {
           const existing = existingByIds.get(id) ?? null;
           if (!existing) return;
           if (existing.role !== UserRole.GUEST && existing.role != null) return; // only GUEST→MEMBER
-          const joinDate = (updates as any).joinDate || existing.joinDate;
+          const joinDate = (updates as any).jciCareer?.joinDate || existing.jciCareer?.joinDate;
           const yearStr = joinDate ? String(new Date(joinDate).getFullYear()) : String(getMYTYear());
-          const existingMembership = (existing.membership as Record<string, unknown> | undefined) ?? {};
+          const existingMembership = (existing.jciCareer?.membershipDuesHistory as Record<string, unknown> | undefined) ?? {};
           if (existingMembership[yearStr]) return; // already has a record for this year
           membershipInitPatchMap.set(id, {
             [`membership.${yearStr}`]: {
@@ -1330,15 +1326,15 @@ export class MembersService {
 
           // Senatorship lock guard: strip protected fields for board-validated members (mirrors updateMember)
           let memberUpdates: Partial<Member> = updates;
-          if (hasSenatorshipFields && existing?.senatorshipBoardValidated) {
+          if (hasSenatorshipFields && existing?.jciCareer?.senatorship?.boardValidated) {
             memberUpdates = { ...updates };
-            if ('senatorshipId' in memberUpdates && (memberUpdates as any).senatorshipId !== existing.senatorshipId) {
-              delete (memberUpdates as any).senatorshipId;
+            if ('senatorshipId' in memberUpdates && (memberUpdates as any).jciCareer?.senatorship?.senatorNumber !== existing.jciCareer?.senatorship?.senatorNumber) {
+              delete (memberUpdates as any).jciCareer?.senatorship?.senatorNumber;
             }
-            if ('senatorCertified' in memberUpdates) delete (memberUpdates as any).senatorCertified;
-            if ('senatorshipBoardValidated' in memberUpdates) delete (memberUpdates as any).senatorshipBoardValidated;
-            if ('senatorshipValidatedAt' in memberUpdates) delete (memberUpdates as any).senatorshipValidatedAt;
-            if ('senatorshipValidatedBy' in memberUpdates) delete (memberUpdates as any).senatorshipValidatedBy;
+            if ('senatorCertified' in memberUpdates) delete (memberUpdates as any).jciCareer?.senatorship?.certified;
+            if ('senatorshipBoardValidated' in memberUpdates) delete (memberUpdates as any).jciCareer?.senatorship?.boardValidated;
+            if ('senatorshipValidatedAt' in memberUpdates) delete (memberUpdates as any).jciCareer?.senatorshipValidatedAt;
+            if ('senatorshipValidatedBy' in memberUpdates) delete (memberUpdates as any).jciCareer?.senatorshipValidatedBy;
           }
 
           // Normalize per-member so existing nested fields (socials, emergency, etc.) are preserved (E3 fix)
@@ -1371,7 +1367,7 @@ export class MembersService {
       // Recalculate introducer stats for all affected old + new introducers (M2 fix).
       // Mirrors updateMember behaviour. Fires concurrently; failures are silent.
       if (introducerChanging) {
-        const newIntroducer = normalized.introducer as string | undefined;
+        const newIntroducer = normalized.jciCareer?.introducer as string | undefined;
         const affectedIntroducers = new Set<string>();
         oldIntroducerMap.forEach(oldId => { if (oldId) affectedIntroducers.add(oldId); });
         if (newIntroducer) affectedIntroducers.add(newIntroducer);
@@ -1461,7 +1457,7 @@ export class MembersService {
       targetDocs.forEach(d => {
         if (!d.exists()) return;
         const data = d.data() as any;
-        const rawEmail: string | undefined = data?.contact?.email || data?.email;
+        const rawEmail: string | undefined = data?.contact?.email || data?.contact?.email;
         if (rawEmail) {
           memberEmailsToRelease.push(rawEmail.toLowerCase().replace(/[^a-z0-9@.]/g, '_'));
         }
@@ -1553,7 +1549,7 @@ export class MembersService {
     }
   }
 
-  /** Earliest year key on member.membership (e.g. "2024"). */
+  /** Earliest year key on member.jciCareer?.membershipDuesHistory (e.g. "2024"). */
   static getFirstMembershipYearKey(
     membership?: Record<string, MembershipRecord> | null
   ): string | null {
@@ -1603,7 +1599,7 @@ export class MembersService {
     if (isDevMode()) {
       for (const member of MOCK_MEMBERS) {
         result.scanned += 1;
-        const membership = { ...(member.membership || {}) } as Record<string, MembershipRecord>;
+        const membership = { ...(member.jciCareer?.membershipDuesHistory || {}) } as Record<string, MembershipRecord>;
         const firstYear = this.getFirstMembershipYearKey(membership);
         if (!firstYear) {
           result.skippedNoMembership += 1;
@@ -1622,7 +1618,7 @@ export class MembersService {
           dues: FIRST_MEMBERSHIP_DUES_TARGET,
           status: nextStatus,
         };
-        member.membership = membership;
+        if (member.jciCareer) member.jciCareer.membershipDuesHistory = membership;
         result.updated += 1;
       }
       return result;
@@ -1643,7 +1639,7 @@ export class MembersService {
       result.scanned += 1;
 
       try {
-        const membership = { ...(member.membership || {}) } as Record<string, MembershipRecord>;
+        const membership = { ...(member.jciCareer?.membershipDuesHistory || {}) } as Record<string, MembershipRecord>;
         const firstYear = this.getFirstMembershipYearKey(membership);
 
         if (!firstYear) {
@@ -1693,7 +1689,7 @@ export class MembersService {
    * Effective membership start year (calendar Oct rollover or first payment year).
    */
   static getEffectiveJoinYear(
-    member: Pick<Member, 'id' | 'joinDate'>,
+    member: Pick<Member, 'id' | 'jciCareer'>,
     calculationMode: 'calendar' | 'payment_date',
     membershipTransactions?: Pick<Transaction, 'memberId' | 'category' | 'date'>[]
   ): number {
@@ -1709,8 +1705,8 @@ export class MembersService {
       }
     }
 
-    if (!member.joinDate) return new Date().getFullYear();
-    const date = new Date(member.joinDate);
+    if (!member.jciCareer?.joinDate) return new Date().getFullYear();
+    const date = new Date(member.jciCareer?.joinDate);
     const calendarYear = date.getFullYear();
     const month = date.getMonth();
     const day = date.getDate();
@@ -1730,21 +1726,21 @@ export class MembersService {
   ): MembershipType {
     return computeMembershipTypeFromMember(
       {
-        nationality: member.nationality,
-        dateOfBirth: member.dateOfBirth,
-        senatorCertified: member.senatorCertified,
-        senatorshipId: member.senatorshipId,
-        senatorshipBoardValidated: member.senatorshipBoardValidated,
+        nationality: member.general?.nationality,
+        dateOfBirth: member.general?.dob,
+        senatorCertified: member.jciCareer?.senatorship?.certified,
+        senatorshipId: member.jciCareer?.senatorship?.senatorNumber,
+        senatorshipBoardValidated: member.jciCareer?.senatorship?.boardValidated,
         role: member.role,
-        membershipType: member.membershipType,
+        membershipType: member.jciCareer?.membershipType,
       },
       rules
     );
   }
 
   /**
-   * Batch-sync members.membershipType from membership dues + role + Config.
-   * Does not modify members.membership.
+   * Batch-sync members.jciCareer?.membershipType from membership dues + role + Config.
+   * Does not modify members.jciCareer?.membershipDuesHistory.
    */
   static async batchSyncMembershipTypes(options: {
     year: number;
@@ -1769,12 +1765,12 @@ export class MembersService {
 
     const applyType = (member: Member): MembershipType | null => {
       const nextType = this.inferMembershipType(member, year, rules);
-      const current = (member.membershipType || 'Probation') as MembershipType;
+      const current = (member.jciCareer?.membershipType || 'Probation') as MembershipType;
       if (nextType === current) {
         result.alreadyCorrect += 1;
         return null;
       }
-      member.membershipType = nextType;
+      if (member.jciCareer) member.jciCareer.membershipType = nextType;
       result.updated += 1;
       return nextType;
     };
@@ -1849,7 +1845,7 @@ export class MembersService {
   }
 
   /**
-   * Batch-sync members.membership[year] from each member's membershipType + Membership Config.
+   * Batch-sync members.jciCareer?.membershipDuesHistory[year] from each member's membershipType + Membership Config.
    * Recalculates status from existing paid amount. Does not change membershipType.
    *
    * SYNC-004 NOTE: Intentionally bypasses financeService.syncMemberMembership for the same
@@ -1901,14 +1897,14 @@ export class MembersService {
     const { rules, calculationMode } = config;
 
     const applyToMember = (member: Member): boolean => {
-      const membershipType = (member.membershipType || 'Probation') as MembershipType;
+      const membershipType = (member.jciCareer?.membershipType || 'Probation') as MembershipType;
       const effectiveJoinYear = this.getEffectiveJoinYear(
         member,
         calculationMode,
         membershipTransactions
       );
 
-      const membership = { ...(member.membership || {}) } as Record<string, MembershipRecord>;
+      const membership = { ...(member.jciCareer?.membershipDuesHistory || {}) } as Record<string, MembershipRecord>;
       let anyChange = false;
 
       if (toYear !== undefined) {
@@ -1981,7 +1977,7 @@ export class MembersService {
         anyChange = true;
       }
 
-      if (anyChange) member.membership = membership;
+      if (anyChange && member.jciCareer) member.jciCareer.membershipDuesHistory = membership;
       return anyChange;
     };
 
@@ -2014,8 +2010,8 @@ export class MembersService {
           result.errors.push(`${id}: ${err instanceof Error ? err.message : String(err)}`)
         );
         // Roll back the optimistic counters for members in this failed batch
-        result.updated -= idsInBatch.filter(id => members.find(m => m.id === id)?.membership).length;
-        result.created -= idsInBatch.filter(id => !members.find(m => m.id === id)?.membership).length;
+        result.updated -= idsInBatch.filter(id => members.find(m => m.id === id)?.jciCareer?.membershipDuesHistory).length;
+        result.created -= idsInBatch.filter(id => !members.find(m => m.id === id)?.jciCareer?.membershipDuesHistory).length;
       }
       batch = writeBatch(db);
       batchOps = 0;
@@ -2025,12 +2021,12 @@ export class MembersService {
     for (const member of members) {
       result.scanned += 1;
       try {
-        const membership = { ...(member.membership || {}) } as Record<string, MembershipRecord>;
+        const membership = { ...(member.jciCareer?.membershipDuesHistory || {}) } as Record<string, MembershipRecord>;
         const memberWorking = { ...member, membership } as Member;
         if (!applyToMember(memberWorking)) continue;
 
         batch.update(doc(db, COLLECTIONS.MEMBERS, member.id), {
-          membership: memberWorking.membership,
+          membership: memberWorking.jciCareer?.membershipDuesHistory,
           updatedAt: Timestamp.now(),
         });
         batchIds.push(member.id);
@@ -2070,7 +2066,7 @@ export class MembersService {
     for (const member of members) {
       result.scanned++;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if ((member as any).membershipType !== 'Full') continue;
+      if ((member as any).jciCareer?.membershipType !== 'Full') continue;
       try {
         batch.update(doc(db, COLLECTIONS.MEMBERS, member.id), {
           membershipType: 'Official',
@@ -2107,7 +2103,7 @@ export class MembersService {
       const generalDob = member.general?.dob;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const raw = member as any;
-      const flatDob: string | undefined = raw.dateOfBirth || raw.dob;
+      const flatDob: string | undefined = raw.general?.dob || raw.general?.dob;
       if (generalDob || !flatDob) continue;
       try {
         batch.update(doc(db, COLLECTIONS.MEMBERS, member.id), {

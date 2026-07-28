@@ -30,11 +30,11 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
               {member.industry && (
                 <span className="px-3 py-1 rounded-full bg-blue-50 text-jci-blue text-xs font-bold border border-blue-100">{member.industry}</span>
               )}
-              {member.acceptInternationalBusiness && member.acceptInternationalBusiness !== 'No' && (
+              {member.business?.acceptInternationalBusiness && member.business?.acceptInternationalBusiness !== 'No' && (
                 <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">🌐 Intl Business</span>
               )}
-              {member.companyWebsite && (
-                <a href={member.companyWebsite} target="_blank" rel="noreferrer" className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-bold border border-slate-200 hover:bg-slate-200 transition-colors flex items-center gap-1">
+              {member.business?.companyWebsite && (
+                <a href={member.business?.companyWebsite} target="_blank" rel="noreferrer" className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-bold border border-slate-200 hover:bg-slate-200 transition-colors flex items-center gap-1">
                   <ArrowUpRight size={11} /> Website
                 </a>
               )}
@@ -59,7 +59,7 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Company Website</label>
                   <input
                     type="text"
-                    value={inlineValues.companyWebsite}
+                    value={inlineValues.business?.companyWebsite}
                     onChange={e => setInlineValues({ ...inlineValues, companyWebsite: e.target.value })}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                   />
@@ -68,7 +68,7 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Position / Title</label>
                   <input
                     type="text"
-                    value={inlineValues.departmentAndPosition}
+                    value={inlineValues.business?.departmentAndPosition}
                     onChange={e => setInlineValues({ ...inlineValues, departmentAndPosition: e.target.value })}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                   />
@@ -76,7 +76,7 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                 <div>
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Level of Mgmt</label>
                   <select
-                    value={inlineValues.levelOfManagement}
+                    value={inlineValues.business?.levelOfManagement}
                     onChange={e => setInlineValues({ ...inlineValues, levelOfManagement: e.target.value })}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
                   >
@@ -100,7 +100,7 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                 <div>
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Intl. Business Engagement</label>
                   <select
-                    value={inlineValues.acceptInternationalBusiness}
+                    value={inlineValues.business?.acceptInternationalBusiness}
                     onChange={e => setInlineValues({ ...inlineValues, acceptInternationalBusiness: e.target.value })}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
                   >
@@ -115,7 +115,7 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
               <div className="border-t pt-3">
                 <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Company Description</label>
                 <textarea
-                  value={inlineValues.companyDescription}
+                  value={inlineValues.business?.companyDescription}
                   onChange={e => setInlineValues({ ...inlineValues, companyDescription: e.target.value })}
                   rows={2}
                   className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue resize-y"
@@ -127,7 +127,7 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Business Categories</label>
                   <MultiSelectDropdown
                     options={BUSINESS_CATEGORIES_OPTIONS}
-                    selected={inlineValues.businessCategory}
+                    selected={inlineValues.business?.businessCategory}
                     onChange={selected => setInlineValues({ ...inlineValues, businessCategory: selected })}
                     placeholder="Select categories..."
                   />
@@ -145,7 +145,7 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Ideal Referral</label>
                   <MultiSelectDropdown
                     options={IDEAL_REFERRAL_OPTIONS.map(opt => opt.label)}
-                    selected={inlineValues.idealReferral ? inlineValues.idealReferral.split(', ').filter(Boolean) : []}
+                    selected={inlineValues.business?.idealReferrals ? inlineValues.business?.idealReferrals.split(', ').filter(Boolean) : []}
                     onChange={selected => setInlineValues({ ...inlineValues, idealReferral: selected.join(', ') })}
                     placeholder="Select referrals..."
                   />
@@ -155,7 +155,7 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
               <div className="border-t pt-3 space-y-2">
                 <label className="text-slate-500 block text-xs uppercase font-medium">Special Member Offer</label>
                 {(() => {
-                  const raw = inlineValues.specialOffer;
+                  const raw = inlineValues.business?.specialOffer;
                   const structured: SpecialOffer = typeof raw === 'object' && raw !== null
                     ? raw as SpecialOffer
                     : { type: 'percentage_discount' as SpecialOfferType, description: typeof raw === 'string' ? raw : '', terms: '', expiryDate: '' };
@@ -206,9 +206,9 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
               <div>
                 <span className="text-slate-500 text-xs uppercase font-medium">Company Name</span>
                 <p className="font-bold text-slate-900 leading-tight mt-0.5">{member.companyName || 'Freelance / Not Provided'}</p>
-                {member.companyWebsite && (
-                  <a href={member.companyWebsite.startsWith('http') ? member.companyWebsite : `https://${member.companyWebsite}`} target="_blank" rel="noopener noreferrer" className="text-xs text-jci-blue hover:underline block mt-1">
-                    {member.companyWebsite}
+                {member.business?.companyWebsite && (
+                  <a href={member.business?.companyWebsite.startsWith('http') ? member.business?.companyWebsite : `https://${member.business?.companyWebsite}`} target="_blank" rel="noopener noreferrer" className="text-xs text-jci-blue hover:underline block mt-1">
+                    {member.business?.companyWebsite}
                   </a>
                 )}
               </div>
@@ -229,7 +229,7 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                 </div>
                 <div>
                   <span className="text-slate-500 text-xs uppercase font-medium">Intl. Business</span>
-                  <p className="font-medium text-slate-900 mt-0.5">{member.acceptInternationalBusiness || 'Unknown'}</p>
+                  <p className="font-medium text-slate-900 mt-0.5">{member.business?.acceptInternationalBusiness || 'Unknown'}</p>
                 </div>
               </div>
 
@@ -237,8 +237,8 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
               <div>
                 <span className="text-slate-500 text-xs uppercase font-medium">Business Categories</span>
                 <div className="flex flex-wrap gap-1 mt-1.5">
-                  {Array.isArray(member.businessCategory) && member.businessCategory.length > 0 ? (
-                    member.businessCategory.map((cat, idx) => (
+                  {Array.isArray(member.business?.businessCategory) && member.business?.businessCategory.length > 0 ? (
+                    member.business?.businessCategory.map((cat, idx) => (
                       <Badge key={idx} variant="neutral" className="text-[10px]">{cat}</Badge>
                     ))
                   ) : (
@@ -262,12 +262,12 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                   <div>
                     <span className="text-slate-500 text-xs uppercase font-medium">Ideal Referral</span>
                     <div className="flex flex-wrap gap-1 mt-1.5">
-                      {Array.isArray(member.idealReferrals) && member.idealReferrals.length > 0 ? (
-                        member.idealReferrals.map((type, idx) => (
+                      {Array.isArray(member.business?.idealReferrals) && member.business?.idealReferrals.length > 0 ? (
+                        member.business?.idealReferrals.map((type, idx) => (
                           <Badge key={idx} variant="info" className="text-[10px] bg-sky-50 text-sky-600 border-sky-100">{type}</Badge>
                         ))
-                      ) : member.idealReferral ? (
-                        <span className="text-sm text-slate-700 font-medium">{member.idealReferral}</span>
+                      ) : member.business?.idealReferrals ? (
+                        <span className="text-sm text-slate-700 font-medium">{member.business?.idealReferrals}</span>
                       ) : (
                         <span className="text-slate-400 italic font-normal">None</span>
                       )}

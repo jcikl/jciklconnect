@@ -445,7 +445,7 @@ export class PointsService {
             return {
               id: doc.id,
               memberId: data.memberId,
-              category: data.category,
+              category: data.business?.businessCategory,
               description: data.description,
               points: data.points || data.amount || 0, // Support both field names
               amount: data.amount || data.points || 0,
@@ -748,8 +748,8 @@ export class PointsService {
                 const data = doc.data() as Record<string, any>;
                 return {
                   id: doc.id,
-                  category: data.category,
-              name: data.name,
+                  category: data.business?.businessCategory,
+              name: data.general?.name,
               basePoints: data.basePoints,
               multiplier: data.multiplier,
               conditions: data.conditions,
@@ -930,7 +930,7 @@ export class PointsService {
               amount: -amount,
               points: -amount,
               category: 'Transfer_Out',
-              description: `To ${receiverDoc.data().name}: ${description}`,
+              description: `To ${receiverDoc.data().general?.name}: ${description}`,
               metadata: { ...metadata, relatedMemberId: receiverId },
               createdAt: Timestamp.now()
             });
@@ -940,7 +940,7 @@ export class PointsService {
               amount,
               points: amount,
               category: 'Transfer_In',
-              description: `From ${senderDoc.data().name}: ${description}`,
+              description: `From ${senderDoc.data().general?.name}: ${description}`,
               metadata: { ...metadata, relatedMemberId: senderId },
               createdAt: Timestamp.now()
             });
@@ -1665,7 +1665,7 @@ export class PointsService {
                 additionalData: {
                   submissionId: cs.id,
                   memberId: cs.memberId,
-                  category: (cs as any).category,
+                  category: (cs as any).business?.businessCategory,
                   delta: resolvedPoints,
                 }
               }
@@ -2361,8 +2361,8 @@ export class PointsService {
       }
 
       const member = memberSnap.data() as Member;
-      const memberName = (member.general?.name ?? member.name) || '';
-      const memberFullName = (member.general?.fullName ?? member.fullName) || (member.general?.name ?? '') || '';
+      const memberName = (member.general?.name ?? member.general?.name) || '';
+      const memberFullName = (member.general?.fullName ?? member.general?.fullName) || (member.general?.name ?? '') || '';
 
       // 1. Calculate Leadership & Training Points from Projects
       let leadership = 0;
@@ -2408,7 +2408,7 @@ export class PointsService {
       let referCount = 0;
       membersSnap.forEach(mDoc => {
         const m = mDoc.data() as Member;
-        const intro = (m.introducer || '').trim().toLowerCase();
+        const intro = (m.jciCareer?.introducer || '').trim().toLowerCase();
         if (intro) {
           if (
             intro === memberId.toLowerCase() ||

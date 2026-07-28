@@ -1,0 +1,432 @@
+App.tsx(381,5): error TS2779: The left-hand side of an assignment expression may not be an optional property access.
+App.tsx(381,14): error TS2339: Property 'business' does not exist on type 'Document'.
+App.tsx(1644,71): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; label: string; labelColor: string; avatar?: string; }'.
+App.tsx(1653,49): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; label: string; labelColor: string; avatar?: string; }'.
+App.tsx(1658,26): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; label: string; labelColor: string; avatar?: string; }'.
+App.tsx(1658,59): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; label: string; labelColor: string; avatar?: string; }'.
+App.tsx(1658,132): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; label: string; labelColor: string; avatar?: string; }'.
+App.tsx(1661,103): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; label: string; labelColor: string; avatar?: string; }'.
+components/admin/RadarDataImporter.tsx(842,67): error TS2339: Property 'business' does not exist on type 'ConfirmState'.
+components/admin/RadarDataImporter.tsx(1084,67): error TS2339: Property 'business' does not exist on type 'ConfirmState'.
+components/admin/RadarDataImporter.tsx(1268,81): error TS2339: Property 'business' does not exist on type '{ title: string; subtitle: string; fields: { label: string; value: number; onChange: (v: number) => void; }[]; } | { title: string; subtitle: string; fields: { label: string; value: number; onChange: (v: number) => void; step: number; }[]; }'.
+  Property 'business' does not exist on type '{ title: string; subtitle: string; fields: { label: string; value: number; onChange: (v: number) => void; }[]; }'.
+components/admin/RadarDataImporter.tsx(1367,67): error TS2339: Property 'business' does not exist on type 'ConfirmState'.
+components/dashboard/BoardDashboard.tsx(705,99): error TS2339: Property 'business' does not exist on type 'Project'.
+components/dashboard/BoardDashboard.tsx(838,77): error TS2339: Property 'business' does not exist on type 'HobbyClub'.
+components/dashboard/DashboardHome.tsx(51,17): error TS2339: Property 'jciCareer' does not exist on type '{ membershipType?: string; role?: string; }'.
+components/dashboard/DashboardHome.tsx(131,77): error TS2339: Property 'general' does not exist on type '{ name: string; relationship: string; phone: string; }'.
+components/dashboard/DashboardHome.tsx(432,103): error TS2339: Property 'business' does not exist on type 'EngagementRequirementStatus'.
+components/dashboard/DashboardHome.tsx(541,50): error TS2339: Property 'business' does not exist on type 'Advertisement'.
+components/dashboard/DashboardHome.tsx(546,96): error TS2339: Property 'business' does not exist on type 'Advertisement'.
+components/dashboard/DashboardHome.tsx(668,126): error TS2339: Property 'business' does not exist on type 'JourneyStep'.
+components/dashboard/DashboardHome.tsx(668,269): error TS2339: Property 'business' does not exist on type 'JourneyStep'.
+components/dashboard/DashboardHome.tsx(1091,72): error TS2339: Property 'business' does not exist on type 'JourneyStep'.
+components/dashboard/DashboardHome.tsx(1097,37): error TS2339: Property 'business' does not exist on type 'JourneyStep'.
+components/dashboard/DashboardHome.tsx(1100,144): error TS2339: Property 'business' does not exist on type 'JourneyStep'.
+components/dashboard/DashboardHome.tsx(1100,180): error TS2339: Property 'business' does not exist on type 'JourneyStep'.
+components/dashboard/DashboardHome.tsx(1111,150): error TS2339: Property 'business' does not exist on type 'JourneyStep'.
+components/dashboard/DashboardHome.tsx(1215,154): error TS2339: Property 'business' does not exist on type 'EngagementRequirementStatus'.
+components/dashboard/DashboardHome.tsx(1432,42): error TS2779: The left-hand side of an assignment expression may not be an optional property access.
+components/dashboard/DashboardHome.tsx(1432,59): error TS2339: Property 'phone' does not exist on type 'unknown'.
+components/dashboard/DashboardHome.tsx(1435,55): error TS2779: The left-hand side of an assignment expression may not be an optional property access.
+components/dashboard/DashboardHome.tsx(1435,73): error TS2339: Property 'companyDescription' does not exist on type 'unknown'.
+components/dashboard/DashboardHome.tsx(1435,117): error TS2339: Property 'companyDescription' does not exist on type 'string'.
+components/dashboard/DashboardHome.tsx(1436,50): error TS2779: The left-hand side of an assignment expression may not be an optional property access.
+components/dashboard/DashboardHome.tsx(1436,68): error TS2339: Property 'idealReferrals' does not exist on type 'unknown'.
+components/dashboard/DashboardHome.tsx(1436,108): error TS2339: Property 'idealReferrals' does not exist on type 'string'.
+components/dashboard/DashboardHome.tsx(1437,44): error TS2779: The left-hand side of an assignment expression may not be an optional property access.
+components/dashboard/DashboardHome.tsx(1437,61): error TS2339: Property 'address' does not exist on type 'unknown'.
+components/dashboard/DashboardHome.tsx(1438,57): error TS2779: The left-hand side of an assignment expression may not be an optional property access.
+components/dashboard/DashboardHome.tsx(1438,74): error TS2339: Property 'emergency' does not exist on type 'unknown'.
+components/dashboard/DashboardHome.tsx(1439,65): error TS2779: The left-hand side of an assignment expression may not be an optional property access.
+components/dashboard/DashboardHome.tsx(1439,82): error TS2339: Property 'emergency' does not exist on type 'unknown'.
+components/dashboard/DashboardHome.tsx(1440,53): error TS2779: The left-hand side of an assignment expression may not be an optional property access.
+components/dashboard/DashboardHome.tsx(1440,70): error TS2339: Property 'emergency' does not exist on type 'unknown'.
+components/dashboard/DashboardHome.tsx(1441,47): error TS2779: The left-hand side of an assignment expression may not be an optional property access.
+components/dashboard/DashboardHome.tsx(1441,63): error TS2339: Property 'shirtStyle' does not exist on type 'unknown'.
+components/dashboard/DashboardHome.tsx(1442,47): error TS2779: The left-hand side of an assignment expression may not be an optional property access.
+components/dashboard/DashboardHome.tsx(1442,63): error TS2339: Property 'tshirtSize' does not exist on type 'unknown'.
+components/dashboard/DashboardHome.tsx(1443,47): error TS2779: The left-hand side of an assignment expression may not be an optional property access.
+components/dashboard/DashboardHome.tsx(1443,63): error TS2339: Property 'jacketSize' does not exist on type 'unknown'.
+components/dashboard/DashboardHome.tsx(1447,44): error TS2339: Property 'departmentAndPosition' does not exist on type 'string'.
+components/dashboard/DashboardHome.tsx(1447,130): error TS2339: Property 'departmentAndPosition' does not exist on type 'string'.
+components/dashboard/DashboardHome.tsx(1448,44): error TS2339: Property 'specialOffer' does not exist on type 'string'.
+components/dashboard/DashboardHome.tsx(1448,112): error TS2339: Property 'specialOffer' does not exist on type 'string'.
+components/dashboard/DashboardHome.tsx(1449,44): error TS2339: Property 'companyWebsite' does not exist on type 'string'.
+components/dashboard/DashboardHome.tsx(1449,116): error TS2339: Property 'companyWebsite' does not exist on type 'string'.
+components/dashboard/DashboardHome.tsx(1450,44): error TS2339: Property 'acceptInternationalBusiness' does not exist on type 'string'.
+components/dashboard/DashboardHome.tsx(1450,142): error TS2339: Property 'acceptInternationalBusiness' does not exist on type 'string'.
+components/dashboard/DashboardHome.tsx(1451,44): error TS2339: Property 'levelOfManagement' does not exist on type 'string'.
+components/dashboard/DashboardHome.tsx(1451,122): error TS2339: Property 'levelOfManagement' does not exist on type 'string'.
+components/dashboard/DashboardHome.tsx(1619,55): error TS2345: Argument of type 'string[] | ""' is not assignable to parameter of type 'string'.
+  Type 'string[]' is not assignable to type 'string'.
+components/dashboard/DashboardHome.tsx(1623,65): error TS2339: Property 'specialOffer' does not exist on type 'string'.
+components/layout/SearchDropdown.tsx(29,8): error TS2339: Property 'name' does not exist on type 'Member'.
+components/layout/SearchDropdown.tsx(32,8): error TS2339: Property 'business' does not exist on type 'Event'.
+components/layout/SearchDropdown.tsx(96,76): error TS2339: Property 'name' does not exist on type 'Member'.
+components/layout/SearchDropdown.tsx(97,28): error TS2339: Property 'name' does not exist on type 'Member'.
+components/layout/SearchDropdown.tsx(110,28): error TS2339: Property 'business' does not exist on type 'Event'.
+components/layout/SearchDropdown.tsx(123,38): error TS2339: Property 'business' does not exist on type 'Project'.
+components/modules/ActivityPlansView.tsx(47,15): error TS2339: Property 'position' does not exist on type 'ActivityPlan'.
+components/modules/ActivityPlansView.tsx(85,27): error TS2339: Property 'name' does not exist on type 'Member'.
+components/modules/ActivityPlansView.tsx(85,42): error TS2339: Property 'name' does not exist on type 'Member'.
+components/modules/ActivityPlansView.tsx(111,39): error TS2339: Property 'name' does not exist on type 'Member'.
+components/modules/ActivityPlansView.tsx(111,54): error TS2339: Property 'name' does not exist on type 'Member'.
+components/modules/ActivityPlansView.tsx(127,59): error TS2339: Property 'name' does not exist on type 'Member'.
+components/modules/ActivityPlansView.tsx(127,74): error TS2339: Property 'name' does not exist on type 'Member'.
+components/modules/ActivityPlansView.tsx(143,62): error TS2339: Property 'position' does not exist on type 'ActivityPlan'.
+components/modules/ActivityPlansView.tsx(153,64): error TS2339: Property 'name' does not exist on type 'Member'.
+components/modules/ActivityPlansView.tsx(153,79): error TS2339: Property 'name' does not exist on type 'Member'.
+components/modules/ActivityPlansView.tsx(220,80): error TS2339: Property 'position' does not exist on type 'ActivityPlan'.
+components/modules/ActivityPlansView.tsx(266,90): error TS2339: Property 'name' does not exist on type 'Member'.
+components/modules/ActivityPlansView.tsx(266,105): error TS2339: Property 'name' does not exist on type 'Member'.
+components/modules/ActivityPlansView.tsx(299,93): error TS2339: Property 'name' does not exist on type 'Member'.
+components/modules/ActivityPlansView.tsx(299,108): error TS2339: Property 'name' does not exist on type 'Member'.
+components/modules/ActivityPlansView.tsx(311,63): error TS2339: Property 'name' does not exist on type 'Member'.
+components/modules/ActivityPlansView.tsx(311,78): error TS2339: Property 'name' does not exist on type 'Member'.
+components/modules/ActivityPlansView.tsx(357,41): error TS2339: Property 'position' does not exist on type 'ActivityPlan'.
+components/modules/ActivityPlansView.tsx(464,79): error TS2339: Property 'position' does not exist on type 'ActivityPlan'.
+components/modules/ActivityPlansView.tsx(519,42): error TS2339: Property 'position' does not exist on type 'ActivityPlan'.
+components/modules/ActivityPlansView.tsx(579,67): error TS2339: Property 'position' does not exist on type 'ConfirmState'.
+components/modules/AutomationStudio/RuleTestPanel.tsx(29,7): error TS2353: Object literal may only specify known properties, and 'name' does not exist in type 'Partial<Member>'.
+components/modules/AutomationStudio/RuleTestPanel.tsx(186,62): error TS2339: Property 'general' does not exist on type 'Rule'.
+components/modules/BusinessDirectoryView.tsx(1473,38): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1473,70): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1476,104): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1479,31): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1479,62): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1479,94): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1479,170): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1480,85): error TS2339: Property 'business' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1488,145): error TS2339: Property 'business' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1489,47): error TS2339: Property 'business' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1502,45): error TS2339: Property 'business' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1505,124): error TS2339: Property 'business' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1511,97): error TS2339: Property 'contact' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1650,38): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1650,76): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1652,73): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1652,101): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1652,138): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1652,176): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1652,266): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1653,71): error TS2339: Property 'business' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1658,141): error TS2339: Property 'business' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1659,45): error TS2339: Property 'business' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1672,43): error TS2339: Property 'business' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1675,119): error TS2339: Property 'business' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1681,65): error TS2339: Property 'contact' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1689,43): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1689,82): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1689,113): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1689,152): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1692,80): error TS2339: Property 'contact' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1693,62): error TS2339: Property 'business' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1693,106): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/BusinessDirectoryView.tsx(1695,50): error TS2339: Property 'business' does not exist on type '{ id: string; name: string; chineseName: string; avatarUrl: string; jciChapter: string; country: string; companyName: string; industry: string; businessCategory: string; position: string; email: string; phone: string; description: string; collaborationNeeds: string[]; specialOffer: string; }'.
+components/modules/CommunicationView.tsx(46,24): error TS2339: Property 'general' does not exist on type '{ id?: string; name: string; avatar: string; role: string; }'.
+components/modules/CommunicationView.tsx(234,37): error TS2339: Property 'business' does not exist on type 'ConfirmState'.
+components/modules/CommunicationView.tsx(300,105): error TS2339: Property 'general' does not exist on type '{ id?: string; name: string; avatar: string; role: string; }'.
+components/modules/Events/EventStatsTab.tsx(34,20): error TS2339: Property 'others' does not exist on type 'EventRegistration'.
+components/modules/EventsView.tsx(73,23): error TS2339: Property 'business' does not exist on type 'Event'.
+components/modules/EventsView.tsx(329,24): error TS2339: Property 'business' does not exist on type 'BoardMember'.
+components/modules/EventsView.tsx(329,75): error TS2339: Property 'business' does not exist on type 'BoardMember'.
+components/modules/EventsView.tsx(545,29): error TS2339: Property 'others' does not exist on type '{ dietary: "vegetarian" | "halal" | "normal"; tshirtSize: string; }'.
+components/modules/EventsView.tsx(548,19): error TS2339: Property 'others' does not exist on type '{ dietary: "vegetarian" | "halal" | "normal"; tshirtSize: string; }'.
+components/modules/EventsView.tsx(548,39): error TS2779: The left-hand side of an assignment expression may not be an optional property access.
+components/modules/EventsView.tsx(548,61): error TS2339: Property 'tshirtSize' does not exist on type 'unknown'.
+components/modules/EventsView.tsx(548,82): error TS2339: Property 'others' does not exist on type '{ dietary: "vegetarian" | "halal" | "normal"; tshirtSize: string; }'.
+components/modules/EventsView.tsx(593,49): error TS2339: Property 'business' does not exist on type 'Event'.
+components/modules/EventsView.tsx(780,26): error TS2339: Property 'business' does not exist on type 'Event'.
+components/modules/EventsView.tsx(798,24): error TS2339: Property 'business' does not exist on type 'Event'.
+components/modules/EventsView.tsx(979,43): error TS2339: Property 'others' does not exist on type 'EventRegistration'.
+components/modules/EventsView.tsx(979,136): error TS2339: Property 'others' does not exist on type 'EventRegistration'.
+components/modules/EventsView.tsx(1102,44): error TS2339: Property 'others' does not exist on type '{ dietary: "vegetarian" | "halal" | "normal"; tshirtSize: string; }'.
+components/modules/EventsView.tsx(1145,93): error TS2339: Property 'contact' does not exist on type 'EventRegistration'.
+components/modules/EventsView.tsx(1145,123): error TS2339: Property 'contact' does not exist on type 'EventRegistration'.
+components/modules/EventsView.tsx(1145,154): error TS2339: Property 'others' does not exist on type 'EventRegistration'.
+components/modules/EventsView.tsx(1184,40): error TS2339: Property 'others' does not exist on type 'EventRegistration'.
+components/modules/EventsView.tsx(1184,131): error TS2339: Property 'others' does not exist on type 'EventRegistration'.
+components/modules/EventsView.tsx(1241,36): error TS2339: Property 'others' does not exist on type 'EventRegistration'.
+components/modules/EventsView.tsx(1244,90): error TS2339: Property 'others' does not exist on type 'EventRegistration'.
+components/modules/EventsView.tsx(1247,37): error TS2339: Property 'contact' does not exist on type 'EventRegistration'.
+components/modules/EventsView.tsx(1247,67): error TS2339: Property 'contact' does not exist on type 'EventRegistration'.
+components/modules/EventsView.tsx(1250,40): error TS2339: Property 'contact' does not exist on type 'EventRegistration'.
+components/modules/EventsView.tsx(1250,130): error TS2339: Property 'contact' does not exist on type 'EventRegistration'.
+components/modules/EventsView.tsx(1251,40): error TS2339: Property 'contact' does not exist on type 'EventRegistration'.
+components/modules/EventsView.tsx(1251,110): error TS2339: Property 'contact' does not exist on type 'EventRegistration'.
+components/modules/EventsView.tsx(1371,30): error TS2339: Property 'business' does not exist on type 'Event'.
+components/modules/EventsView.tsx(1427,32): error TS2339: Property 'contact' does not exist on type 'RegistrationFormData'.
+components/modules/EventsView.tsx(1441,32): error TS2339: Property 'contact' does not exist on type 'RegistrationFormData'.
+components/modules/EventsView.tsx(1454,32): error TS2339: Property 'others' does not exist on type 'RegistrationFormData'.
+components/modules/HobbyClubsView.tsx(53,31): error TS2339: Property 'name' does not exist on type 'Member'.
+components/modules/HobbyClubsView.tsx(105,47): error TS2339: Property 'name' does not exist on type 'Member'.
+components/modules/HobbyClubsView.tsx(344,73): error TS2339: Property 'business' does not exist on type 'ConfirmState'.
+components/modules/HobbyClubsView.tsx(562,69): error TS2339: Property 'business' does not exist on type 'ConfirmState'.
+components/modules/HobbyClubsView.tsx(604,67): error TS2339: Property 'name' does not exist on type 'Member'.
+components/modules/HobbyClubsView.tsx(604,89): error TS2339: Property 'name' does not exist on type 'Member'.
+components/modules/HobbyClubsView.tsx(648,69): error TS2339: Property 'business' does not exist on type 'ConfirmState'.
+components/modules/InventoryView.tsx(345,110): error TS2339: Property 'name' does not exist on type 'Member'.
+components/modules/InventoryView.tsx(414,106): error TS2339: Property 'name' does not exist on type 'Member'.
+components/modules/InventoryView.tsx(562,25): error TS2339: Property 'name' does not exist on type 'Member'.
+components/modules/InventoryView.tsx(935,47): error TS2339: Property 'name' does not exist on type 'Member'.
+components/modules/MemberBenefitsView.tsx(70,12): error TS2339: Property 'business' does not exist on type 'Advertisement'.
+components/modules/MemberBenefitsView.tsx(143,36): error TS2339: Property 'business' does not exist on type 'Advertisement'.
+components/modules/MemberBenefitsView.tsx(152,91): error TS2339: Property 'business' does not exist on type 'Advertisement'.
+components/modules/MemberBenefitsView.tsx(206,36): error TS2339: Property 'business' does not exist on type 'Advertisement'.
+components/modules/MemberBenefitsView.tsx(245,108): error TS2339: Property 'business' does not exist on type 'Advertisement'.
+components/modules/MemberBenefitsView.tsx(319,80): error TS2339: Property 'business' does not exist on type 'Advertisement'.
+components/modules/MemberEditForm.tsx(235,7): error TS2353: Object literal may only specify known properties, and 'fullName' does not exist in type 'Partial<Member>'.
+components/modules/MemberEditForm.tsx(238,44): error TS2339: Property 'gender' does not exist on type 'Member'.
+components/modules/MemberEditForm.tsx(239,50): error TS2339: Property 'ethnicity' does not exist on type 'Member'.
+components/modules/MemberEditForm.tsx(240,66): error TS2339: Property 'dietaryPreference' does not exist on type 'Member'.
+components/modules/MemberEditForm.tsx(253,86): error TS2339: Property 'acceptInternationalBusiness' does not exist on type 'Member'.
+components/modules/MemberEditForm.tsx(269,48): error TS2339: Property 'cutStyle' does not exist on type 'Member'.
+components/modules/MemberEditForm.tsx(270,52): error TS2339: Property 'tshirtSize' does not exist on type 'Member'.
+components/modules/MemberEditForm.tsx(271,52): error TS2339: Property 'jacketSize' does not exist on type 'Member'.
+components/modules/MemberEditForm.tsx(273,56): error TS2339: Property 'tshirtStatus' does not exist on type 'Member'.
+components/modules/MemberEditForm.tsx(290,7): error TS2779: The left-hand side of an assignment expression may not be an optional property access.
+components/modules/MemberEditForm.tsx(653,81): error TS2339: Property 'split' does not exist on type 'string | string[]'.
+  Property 'split' does not exist on type 'string[]'.
+components/modules/MemberManagement/BoardOfDirectorsSection.tsx(225,47): error TS2339: Property 'business' does not exist on type 'BoardMember'.
+components/modules/MemberManagement/BoardOfDirectorsSection.tsx(274,50): error TS2339: Property 'business' does not exist on type 'BoardMember'.
+components/modules/MemberManagement/BoardOfDirectorsSection.tsx(287,41): error TS2339: Property 'business' does not exist on type 'BoardMember'.
+components/modules/MemberManagement/BoardOfDirectorsSection.tsx(287,80): error TS2339: Property 'business' does not exist on type 'BoardMember'.
+components/modules/MemberManagement/BoardOfDirectorsSection.tsx(288,14): error TS2339: Property 'business' does not exist on type 'BoardMember'.
+components/modules/MemberManagement/BoardOfDirectorsSection.tsx(293,26): error TS2339: Property 'business' does not exist on type 'BoardMember'.
+components/modules/MemberManagement/BoardOfDirectorsSection.tsx(301,41): error TS2339: Property 'business' does not exist on type 'BoardMember'.
+components/modules/MemberManagement/BoardOfDirectorsSection.tsx(301,84): error TS2339: Property 'business' does not exist on type 'BoardMember'.
+components/modules/MemberManagement/BoardOfDirectorsSection.tsx(302,14): error TS2339: Property 'business' does not exist on type 'BoardMember'.
+components/modules/MemberManagement/BoardOfDirectorsSection.tsx(307,26): error TS2339: Property 'business' does not exist on type 'BoardMember'.
+components/modules/MemberManagement/BoardOfDirectorsSection.tsx(456,52): error TS2339: Property 'business' does not exist on type 'BoardEntry'.
+components/modules/MemberManagement/BoardOfDirectorsSection.tsx(456,99): error TS2339: Property 'business' does not exist on type 'BoardEntry'.
+components/modules/MemberManagement/BoardOfDirectorsSection.tsx(689,42): error TS2339: Property 'business' does not exist on type 'BoardEntry'.
+components/modules/MemberManagement/BoardOfDirectorsSection.tsx(690,65): error TS2339: Property 'business' does not exist on type 'BoardEntry'.
+components/modules/MemberManagement/BoardOfDirectorsSection.tsx(691,61): error TS2339: Property 'business' does not exist on type 'BoardEntry'.
+components/modules/MemberManagement/IntroducerManagement.tsx(140,46): error TS2353: Object literal may only specify known properties, and 'introducer' does not exist in type 'Partial<Member>'.
+components/modules/MemberManagement/IntroducerManagement.tsx(264,21): error TS2339: Property 'general' does not exist on type '{ value: string; name: string; type: string; invitees: Member[]; }'.
+components/modules/MemberManagement/IntroducerManagement.tsx(268,13): error TS2339: Property 'general' does not exist on type '{ value: string; name: string; type: string; invitees: Member[]; }'.
+components/modules/MemberManagement/IntroducerManagement.tsx(268,43): error TS2339: Property 'general' does not exist on type '{ value: string; name: string; type: string; invitees: Member[]; }'.
+components/modules/MemberManagement/IntroducerManagement.tsx(304,43): error TS2353: Object literal may only specify known properties, and 'introducer' does not exist in type 'Partial<Member>'.
+components/modules/MemberManagement/IntroducerManagement.tsx(306,62): error TS2353: Object literal may only specify known properties, and 'introducer' does not exist in type 'Partial<Member>'.
+components/modules/MemberManagement/IntroducerManagement.tsx(325,46): error TS2353: Object literal may only specify known properties, and 'introducer' does not exist in type 'Partial<Member>'.
+components/modules/MemberManagement/IntroducerManagement.tsx(327,65): error TS2353: Object literal may only specify known properties, and 'introducer' does not exist in type 'Partial<Member>'.
+components/modules/MemberManagement/IntroducerManagement.tsx(344,48): error TS2353: Object literal may only specify known properties, and 'introducer' does not exist in type 'Partial<Member>'.
+components/modules/MemberManagement/IntroducerManagement.tsx(400,32): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; count: number; avatar: string; }'.
+components/modules/MemberManagement/IntroducerManagement.tsx(401,43): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; count: number; avatar: string; }'.
+components/modules/MemberManagement/IntroducerManagement.tsx(403,216): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; count: number; avatar: string; }'.
+components/modules/MemberManagement/IntroducerManagement.tsx(405,102): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; count: number; avatar: string; }'.
+components/modules/MemberManagement/IntroducerManagement.tsx(541,75): error TS2339: Property 'general' does not exist on type '{ value: string; name: string; type: string; invitees: Member[]; }'.
+components/modules/MemberManagement/IntroducerManagement.tsx(860,92): error TS2339: Property 'general' does not exist on type '{ value: string; name: string; type: string; invitees: Member[]; }'.
+components/modules/MemberManagement/IntroducerManagement.tsx(908,44): error TS2339: Property 'general' does not exist on type '{ value: string; name: string; invitees: Member[]; }'.
+components/modules/MemberManagement/IntroducerManagement.tsx(923,234): error TS2339: Property 'general' does not exist on type '{ value: string; name: string; invitees: Member[]; }'.
+components/modules/MemberManagement/PromotionTracking.tsx(827,51): error TS2339: Property 'jciCareer' does not exist on type '{ id: string; name: string; fullName?: string; joinDate: string; nationality?: string; dateOfBirth?: string; senatorCertified?: boolean; senatorshipId?: string; role?: string; membershipType?: string; computedMembershipType: string; promotionProgress?: MemberPromotionProgress; }'.
+components/modules/MemberManagement/PromotionTracking.tsx(828,35): error TS2339: Property 'jciCareer' does not exist on type '{ id: string; name: string; fullName?: string; joinDate: string; nationality?: string; dateOfBirth?: string; senatorCertified?: boolean; senatorshipId?: string; role?: string; membershipType?: string; computedMembershipType: string; promotionProgress?: MemberPromotionProgress; }'.
+components/modules/MemberManagement/PromotionTracking.tsx(831,50): error TS2339: Property 'jciCareer' does not exist on type '{ id: string; name: string; fullName?: string; joinDate: string; nationality?: string; dateOfBirth?: string; senatorCertified?: boolean; senatorshipId?: string; role?: string; membershipType?: string; computedMembershipType: string; promotionProgress?: MemberPromotionProgress; }'.
+components/modules/MemberManagement/PromotionTracking.tsx(832,56): error TS2339: Property 'jciCareer' does not exist on type '{ id: string; name: string; fullName?: string; joinDate: string; nationality?: string; dateOfBirth?: string; senatorCertified?: boolean; senatorshipId?: string; role?: string; membershipType?: string; computedMembershipType: string; promotionProgress?: MemberPromotionProgress; }'.
+components/modules/MemberManagement/PromotionTracking.tsx(834,54): error TS2339: Property 'jciCareer' does not exist on type '{ id: string; name: string; fullName?: string; joinDate: string; nationality?: string; dateOfBirth?: string; senatorCertified?: boolean; senatorshipId?: string; role?: string; membershipType?: string; computedMembershipType: string; promotionProgress?: MemberPromotionProgress; }'.
+components/modules/MemberManagement/PromotionTracking.tsx(848,34): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; fullName?: string; joinDate: string; nationality?: string; dateOfBirth?: string; senatorCertified?: boolean; senatorshipId?: string; role?: string; membershipType?: string; computedMembershipType: string; promotionProgress?: MemberPromotionProgress; }'.
+components/modules/MemberManagement/PromotionTracking.tsx(848,62): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; fullName?: string; joinDate: string; nationality?: string; dateOfBirth?: string; senatorCertified?: boolean; senatorshipId?: string; role?: string; membershipType?: string; computedMembershipType: string; promotionProgress?: MemberPromotionProgress; }'.
+components/modules/MemberManagement/PromotionTracking.tsx(852,96): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; fullName?: string; joinDate: string; nationality?: string; dateOfBirth?: string; senatorCertified?: boolean; senatorshipId?: string; role?: string; membershipType?: string; computedMembershipType: string; promotionProgress?: MemberPromotionProgress; }'.
+components/modules/MemberManagement/PromotionTracking.tsx(852,124): error TS2339: Property 'general' does not exist on type '{ id: string; name: string; fullName?: string; joinDate: string; nationality?: string; dateOfBirth?: string; senatorCertified?: boolean; senatorshipId?: string; role?: string; membershipType?: string; computedMembershipType: string; promotionProgress?: MemberPromotionProgress; }'.
+components/modules/MemberManagement/PromotionTracking.tsx(854,35): error TS2339: Property 'jciCareer' does not exist on type '{ id: string; name: string; fullName?: string; joinDate: string; nationality?: string; dateOfBirth?: string; senatorCertified?: boolean; senatorshipId?: string; role?: string; membershipType?: string; computedMembershipType: string; promotionProgress?: MemberPromotionProgress; }'.
+components/modules/MemberManagement/PromotionTracking.tsx(855,131): error TS2339: Property 'jciCareer' does not exist on type '{ id: string; name: string; fullName?: string; joinDate: string; nationality?: string; dateOfBirth?: string; senatorCertified?: boolean; senatorshipId?: string; role?: string; membershipType?: string; computedMembershipType: string; promotionProgress?: MemberPromotionProgress; }'.
+components/modules/MemberManagement/PromotionTracking.tsx(857,87): error TS2339: Property 'jciCareer' does not exist on type '{ id: string; name: string; fullName?: string; joinDate: string; nationality?: string; dateOfBirth?: string; senatorCertified?: boolean; senatorshipId?: string; role?: string; membershipType?: string; computedMembershipType: string; promotionProgress?: MemberPromotionProgress; }'.
+components/modules/MemberManagement/PromotionTracking.tsx(977,100): error TS2339: Property 'business' does not exist on type 'EngagementRequirementDefinition'.
+components/modules/MemberManagement/PromotionTracking.tsx(1065,40): error TS2339: Property 'business' does not exist on type 'EngagementRequirementStatus'.
+components/modules/MemberManagement/PromotionTracking.tsx(1124,95): error TS2339: Property 'business' does not exist on type 'EngagementRequirementStatus'.
+components/modules/MemberManagement/PromotionTracking.tsx(1199,32): error TS2339: Property 'general' does not exist on type 'PromotionRequirement'.
+components/modules/MemberManagement/PromotionTracking.tsx(1236,85): error TS2339: Property 'general' does not exist on type 'PromotionRequirement'.
+components/modules/MemberManagement/PromotionTracking.tsx(1373,123): error TS2339: Property 'business' does not exist on type 'EngagementRequirementStatus'.
+components/modules/MemberManagement/PromotionTracking.tsx(1440,97): error TS2339: Property 'business' does not exist on type 'EngagementRequirementStatus'.
+components/modules/MemberManagement/SenatorshipManagement.tsx(264,67): error TS2339: Property 'business' does not exist on type 'ConfirmState'.
+components/modules/Members/BackfillFromICScript.tsx(182,84): error TS2339: Property 'general' does not exist on type 'MemberRow'.
+components/modules/Members/GuestApprovalModal.tsx(72,13): error TS2339: Property 'business' does not exist on type 'Transaction'.
+components/modules/Members/GuestApprovalModal.tsx(96,9): error TS2353: Object literal may only specify known properties, and 'membershipType' does not exist in type 'Partial<Member>'.
+components/modules/Members/GuestManagementView.tsx(114,13): error TS2339: Property 'business' does not exist on type 'Transaction'.
+components/modules/Members/GuestManagementView.tsx(153,11): error TS2353: Object literal may only specify known properties, and 'membershipType' does not exist in type 'Partial<Member>'.
+components/modules/Members/GuestManagementView.tsx(181,58): error TS2353: Object literal may only specify known properties, and 'membershipType' does not exist in type 'Partial<Member>'.
+components/modules/Members/MemberDetail.tsx(290,79): error TS2339: Property 'dietaryPreference' does not exist on type 'Member'.
+components/modules/Members/MemberDetail.tsx(291,89): error TS2339: Property 'dietaryPreference' does not exist on type 'Member'.
+components/modules/Members/MemberDetail.tsx(389,30): error TS2339: Property 'business' does not exist on type '{ direction: string; category: string; items: string[]; }'.
+components/modules/Members/MemberDetail.tsx(389,99): error TS2339: Property 'business' does not exist on type '{ direction: string; category: string; items: string[]; }'.
+components/modules/Members/MemberDetail.tsx(1244,71): error TS2339: Property 'business' does not exist on type '{ id: string; title: string; titleZh: string; options: { label: string; labelZh: string; value: string; mapping: { direction: string; category: string; items: string[]; }; }[]; }'.
+components/modules/Members/MemberDetail.tsx(1244,94): error TS2339: Property 'business' does not exist on type '{ id: string; title: string; titleZh: string; options: { label: string; labelZh: string; value: string; mapping: { direction: string; category: string; items: string[]; }; }[]; }'.
+components/modules/Members/MemberDetailBasicTab.tsx(119,71): error TS2779: The left-hand side of an assignment expression may not be an optional property access.
+components/modules/Members/MemberDetailBasicTab.tsx(120,74): error TS2779: The left-hand side of an assignment expression may not be an optional property access.
+components/modules/Members/MemberDetailBasicTab.tsx(121,75): error TS2779: The left-hand side of an assignment expression may not be an optional property access.
+components/modules/Members/MemberDetailBasicTab.tsx(356,77): error TS2339: Property 'general' does not exist on type 'HobbyClub'.
+components/modules/Members/MemberDetailBasicTab.tsx(357,65): error TS2339: Property 'business' does not exist on type 'HobbyClub'.
+components/modules/Members/MemberDetailCareerTab.tsx(296,72): error TS2339: Property 'general' does not exist on type 'Badge'.
+components/modules/Members/MemberDetailCareerTab.tsx(351,31): error TS2339: Property 'business' does not exist on type 'BoardMember'.
+components/modules/Members/MemberDetailCareerTab.tsx(364,43): error TS2339: Property 'business' does not exist on type 'BoardMember'.
+components/modules/Members/MemberDetailCareerTab.tsx(389,80): error TS2339: Property 'business' does not exist on type 'TimelineItem'.
+components/modules/Members/MemberDetailCareerTab.tsx(413,80): error TS2339: Property 'business' does not exist on type 'TimelineItem'.
+components/modules/Members/MemberDetailCareerTab.tsx(427,78): error TS2339: Property 'business' does not exist on type 'TimelineItem'.
+components/modules/Members/MemberDetailCareerTab.tsx(494,34): error TS2339: Property 'business' does not exist on type '{ label: string; title: string; description: string; status: string; tone: string; icon: ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>; }'.
+components/modules/Members/MemberDetailCareerTab.tsx(502,76): error TS2339: Property 'business' does not exist on type '{ label: string; title: string; description: string; status: string; tone: string; icon: ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>; }'.
+components/modules/Members/MemberStatisticsView.tsx(136,70): error TS2339: Property 'general' does not exist on type '{ name: string; value: number; }'.
+components/modules/Members/MyProfileSelfView.tsx(168,80): error TS2339: Property 'business' does not exist on type 'Event'.
+components/modules/Members/MyProfileSelfView.tsx(183,71): error TS2339: Property 'business' does not exist on type 'Event'.
+components/modules/MembersView.tsx(394,99): error TS2339: Property 'general' does not exist on type 'File'.
+components/modules/PaymentRequests/SubmitPaymentRequestModal.tsx(75,35): error TS2339: Property 'contact' does not exist on type 'User'.
+components/modules/PaymentRequests/SubmitPaymentRequestModal.tsx(121,57): error TS2339: Property 'general' does not exist on type 'Project'.
+components/modules/PaymentRequests/SubmitPaymentRequestModal.tsx(157,58): error TS2339: Property 'general' does not exist on type 'File'.
+components/modules/PaymentRequests/SubmitPaymentRequestModal.tsx(278,141): error TS2339: Property 'contact' does not exist on type 'User'.
+components/modules/PaymentRequests/SubmitPaymentRequestModal.tsx(304,120): error TS2339: Property 'general' does not exist on type 'Project'.
+components/modules/PaymentRequests/SubmitPaymentRequestModal.tsx(370,97): error TS2339: Property 'general' does not exist on type 'File'.
+components/modules/PaymentRequests/SubmitPaymentRequestModal.tsx(374,90): error TS2339: Property 'general' does not exist on type 'File'.
+components/modules/PaymentRequests/SubmitPaymentRequestModal.tsx(398,179): error TS2339: Property 'general' does not exist on type 'Project'.
+components/modules/PaymentRequests/SubmitPaymentRequestModal.tsx(405,124): error TS2339: Property 'general' does not exist on type 'BankAccount'.
+components/modules/ProjectManagement/ProjectGanttChart.tsx(65,16): error TS2339: Property 'general' does not exist on type 'GanttTask'.
+components/modules/ProjectManagement/ProjectGanttChart.tsx(133,16): error TS2339: Property 'business' does not exist on type 'Task'.
+components/modules/ProjectManagement/ProjectGanttChart.tsx(403,37): error TS2339: Property 'general' does not exist on type 'GanttTask'.
+components/modules/ProjectManagement/ProjectGanttChart.tsx(403,92): error TS2339: Property 'general' does not exist on type 'GanttTask'.
+components/modules/ProjectManagement/ProjectGanttChart.tsx(584,97): error TS2339: Property 'general' does not exist on type 'GanttTask'.
+components/modules/ProjectManagement/ProjectGanttChart.tsx(648,160): error TS2339: Property 'general' does not exist on type 'Task'.
+components/modules/ProjectManagement/ProjectGanttChart.tsx(649,30): error TS2339: Property 'general' does not exist on type 'Task'.
+components/modules/Projects/ProjectCommitteeTab.tsx(50,18): error TS2339: Property 'position' does not exist on type 'ProjectCommitteeTask'.
+components/modules/Projects/ProjectCommitteeTab.tsx(74,18): error TS2339: Property 'position' does not exist on type 'ProjectCommitteeTask'.
+components/modules/Projects/ProjectCommitteeTab.tsx(93,31): error TS2339: Property 'position' does not exist on type '{ taskId?: string; title: string; dueDate: string; }'.
+components/modules/Projects/ProjectCommitteeTab.tsx(112,28): error TS2339: Property 'position' does not exist on type '{ taskId?: string; title: string; dueDate?: string; }'.
+components/modules/Projects/ProjectCommitteeTab.tsx(126,36): error TS2339: Property 'position' does not exist on type 'Project'.
+components/modules/Projects/ProjectCommitteeTab.tsx(126,56): error TS2339: Property 'general' does not exist on type 'Project'.
+components/modules/Projects/ProjectCommitteeTab.tsx(134,55): error TS2339: Property 'position' does not exist on type '{ taskId?: string; title: string; dueDate?: string; }'.
+components/modules/Projects/ProjectCommitteeTab.tsx(134,81): error TS2339: Property 'position' does not exist on type '{ taskId?: string; title: string; dueDate?: string; }'.
+components/modules/Projects/ProjectCommitteeTab.tsx(136,47): error TS2339: Property 'position' does not exist on type '{ taskId?: string; title: string; dueDate?: string; }'.
+components/modules/Projects/ProjectCommitteeTab.tsx(219,58): error TS2339: Property 'position' does not exist on type '{ taskId?: string; title: string; dueDate: string; }'.
+components/modules/Projects/ProjectCommitteeTab.tsx(242,67): error TS2339: Property 'position' does not exist on type '{ taskId?: string; title: string; dueDate: string; }'.
+components/modules/Projects/ProjectCommitteeTab.tsx(324,37): error TS2339: Property 'position' does not exist on type '{ taskId?: string; title: string; dueDate: string; }'.
+components/modules/Projects/ProjectKanban.tsx(281,104): error TS2339: Property 'business' does not exist on type 'Task'.
+components/modules/Projects/ProjectKanban.tsx(364,85): error TS2339: Property 'business' does not exist on type 'Task'.
+components/modules/Projects/ProjectTrainerTab.tsx(18,15): error TS2339: Property 'general' does not exist on type 'ProjectTrainer'.
+components/modules/Projects/ProjectTrainerTab.tsx(29,15): error TS2339: Property 'general' does not exist on type 'ProjectTrainer'.
+components/modules/Projects/ProjectTrainerTab.tsx(42,19): error TS2339: Property 'general' does not exist on type '{ name: string; memberId: string; role: string; durationHours: string; }'.
+components/modules/Projects/ProjectTrainerTab.tsx(47,24): error TS2339: Property 'general' does not exist on type '{ name: any; memberId: string; role: string; durationHours: number; }'.
+components/modules/Projects/ProjectTrainerTab.tsx(86,34): error TS2339: Property 'general' does not exist on type '{ name: string; memberId: string; role: string; durationHours: string; }'.
+components/modules/Projects/ProjectTrainerTab.tsx(87,21): error TS2339: Property 'general' does not exist on type '{ name: string; memberId: string; role: string; durationHours: string; }'.
+components/modules/Projects/ProjectTrainerTab.tsx(96,88): error TS2339: Property 'general' does not exist on type '{ name: string; memberId: string; role: string; durationHours: string; }'.
+components/modules/Projects/ProjectTrainerTab.tsx(133,39): error TS2779: The left-hand side of an assignment expression may not be an optional property access.
+components/modules/Projects/ProjectTrainerTab.tsx(133,54): error TS2339: Property 'general' does not exist on type '{ name: string; memberId: string; role: string; durationHours: string; }'.
+components/modules/Projects/ProjectTrainerTab.tsx(147,32): error TS2339: Property 'general' does not exist on type '{ name: string; memberId: string; role: string; durationHours: string; }'.
+components/modules/Projects/ProjectTrainerTab.tsx(151,65): error TS2779: The left-hand side of an assignment expression may not be an optional property access.
+components/modules/Projects/ProjectTrainerTab.tsx(151,80): error TS2339: Property 'general' does not exist on type '{ name: string; memberId: string; role: string; durationHours: string; }'.
+components/modules/WhapiConfigView.tsx(154,38): error TS2353: Object literal may only specify known properties, and 'whatsappGroup' does not exist in type 'Partial<Member>'.
+components/ui/IntroducerSelector.tsx(144,58): error TS2339: Property 'general' does not exist on type 'Project'.
+components/ui/IntroducerSelector.tsx(144,95): error TS2339: Property 'general' does not exist on type 'Project'.
+components/ui/IntroducerSelector.tsx(146,8): error TS2339: Property 'general' does not exist on type 'Project'.
+components/ui/IntroducerSelector.tsx(258,80): error TS2339: Property 'general' does not exist on type 'Project'.
+components/ui/IntroducerSelector.tsx(260,40): error TS2339: Property 'general' does not exist on type 'Project'.
+components/ui/IntroducerSelector.tsx(262,26): error TS2339: Property 'general' does not exist on type 'Project'.
+components/ui/MemberSelector.tsx(23,56): error TS2339: Property 'fullName' does not exist on type 'unknown'.
+hooks/useAuth.tsx(78,33): error TS2339: Property 'contact' does not exist on type '{ uid: string; email: string; displayName: string; }'.
+hooks/useAuth.tsx(99,53): error TS2339: Property 'contact' does not exist on type '{ uid: string; email: string; displayName: string; }'.
+hooks/useAuth.tsx(150,37): error TS2339: Property 'contact' does not exist on type 'User'.
+hooks/useAuth.tsx(152,90): error TS2339: Property 'contact' does not exist on type 'User'.
+hooks/useAuth.tsx(319,27): error TS2339: Property 'contact' does not exist on type 'User'.
+hooks/useAuth.tsx(407,9): error TS2353: Object literal may only specify known properties, and 'name' does not exist in type 'Member'.
+hooks/useAuth.tsx(436,27): error TS2339: Property 'contact' does not exist on type 'User'.
+hooks/useAuth.tsx(484,7): error TS2353: Object literal may only specify known properties, and 'name' does not exist in type 'Partial<Member>'.
+hooks/useAuth.tsx(652,25): error TS2339: Property 'contact' does not exist on type 'User'.
+hooks/useFinanceData.ts(810,28): error TS2339: Property 'general' does not exist on type 'Project'.
+hooks/useFinanceData.ts(834,61): error TS2339: Property 'general' does not exist on type 'BankAccount'.
+hooks/useFinanceData.ts(835,61): error TS2339: Property 'general' does not exist on type 'Project'.
+hooks/useFinanceData.ts(835,80): error TS2339: Property 'business' does not exist on type 'Project'.
+hooks/useFinanceData.ts(978,61): error TS2339: Property 'general' does not exist on type 'BankAccount'.
+hooks/useFinanceData.ts(979,57): error TS2339: Property 'general' does not exist on type 'Project'.
+hooks/useFinanceData.ts(989,56): error TS2339: Property 'general' does not exist on type 'Project'.
+hooks/useToyyibPayment.ts(111,95): error TS2339: Property 'business' does not exist on type '{ id: string; title: string; ticketPrice: number; }'.
+hooks/useToyyibPayment.ts(117,17): error TS2339: Property 'business' does not exist on type '{ id: string; title: string; ticketPrice: number; }'.
+services/aiPredictionService.ts(374,33): error TS2339: Property 'general' does not exist on type 'Project'.
+services/aiPredictionService.ts(743,31): error TS2339: Property 'general' does not exist on type 'Project'.
+services/aiPredictionService.ts(780,29): error TS2339: Property 'position' does not exist on type 'Event'.
+services/aiPredictionService.ts(843,30): error TS2339: Property 'general' does not exist on type '{ id: string; title: string; category: string; active: boolean; skillsRequired: string[]; name: string; estimatedDuration: string; }'.
+services/aiPredictionService.ts(859,52): error TS2339: Property 'general' does not exist on type 'HobbyClub'.
+services/aiPredictionService.ts(866,20): error TS2339: Property 'business' does not exist on type 'HobbyClub'.
+services/aiPredictionService.ts(866,83): error TS2339: Property 'business' does not exist on type 'HobbyClub'.
+services/aiPredictionService.ts(875,30): error TS2339: Property 'general' does not exist on type 'HobbyClub'.
+services/automationService.ts(70,20): error TS2339: Property 'general' does not exist on type 'AutomationRule'.
+services/automationService.ts(154,32): error TS2339: Property 'general' does not exist on type 'Omit<Workflow, "id" | "createdAt" | "updatedAt" | "executions">'.
+services/automationService.ts(373,32): error TS2339: Property 'general' does not exist on type 'Workflow'.
+services/automationService.ts(390,34): error TS2339: Property 'general' does not exist on type 'Workflow'.
+services/boardManagementService.ts(280,39): error TS2339: Property 'business' does not exist on type 'BoardMember'.
+services/boardManagementService.ts(336,54): error TS2339: Property 'business' does not exist on type 'BoardMember'.
+services/boardManagementService.ts(375,43): error TS2339: Property 'business' does not exist on type 'BoardMember'.
+services/boardManagementService.ts(387,80): error TS2339: Property 'business' does not exist on type 'BoardMember'.
+services/boardManagementService.ts(410,57): error TS2339: Property 'business' does not exist on type 'BoardMember'.
+services/boardManagementService.ts(420,101): error TS2339: Property 'business' does not exist on type 'BoardMember'.
+services/boardManagementService.ts(861,66): error TS2339: Property 'business' does not exist on type 'BoardMember'.
+services/boardManagementService.ts(889,69): error TS2339: Property 'business' does not exist on type 'BoardMember'.
+services/boardManagementService.ts(895,13): error TS2353: Object literal may only specify known properties, and 'currentBoardYear' does not exist in type 'Partial<Member>'.
+services/boardManagementService.ts(896,48): error TS2339: Property 'business' does not exist on type 'BoardMember'.
+services/boardManagementService.ts(1084,32): error TS2339: Property 'business' does not exist on type '{ memberId: string; position: string; }'.
+services/boardManagementService.ts(1085,36): error TS2339: Property 'business' does not exist on type '{ memberId: string; position: string; }'.
+services/boardManagementService.ts(1094,48): error TS2339: Property 'business' does not exist on type '{ memberId: string; position: string; }'.
+services/boardManagementService.ts(1102,101): error TS2339: Property 'business' does not exist on type '{ memberId: string; position: string; }'.
+services/communicationService.ts(456,38): error TS2339: Property 'business' does not exist on type '{ title: string; content: string; priority: "Low" | "High" | "Normal" | "Urgent"; targetAudience: "All Members" | "Board Only" | "Specific Roles" | "Specific Members"; selectedRoles?: string[]; ... 4 more ...; sendNotification?: boolean; }'.
+services/communicationService.ts(480,77): error TS2339: Property 'business' does not exist on type '{ title: string; content: string; priority: "Low" | "High" | "Normal" | "Urgent"; targetAudience: "All Members" | "Board Only" | "Specific Roles" | "Specific Members"; selectedRoles?: string[]; ... 4 more ...; sendNotification?: boolean; }'.
+services/communicationService.ts(483,68): error TS2339: Property 'business' does not exist on type '{ title: string; content: string; priority: "Low" | "High" | "Normal" | "Urgent"; targetAudience: "All Members" | "Board Only" | "Specific Roles" | "Specific Members"; selectedRoles?: string[]; ... 4 more ...; sendNotification?: boolean; }'.
+services/communicationService.ts(494,43): error TS2339: Property 'business' does not exist on type '{ title: string; content: string; priority: "Low" | "High" | "Normal" | "Urgent"; targetAudience: "All Members" | "Board Only" | "Specific Roles" | "Specific Members"; selectedRoles?: string[]; ... 4 more ...; sendNotification?: boolean; }'.
+services/communicationService.ts(525,41): error TS2339: Property 'business' does not exist on type '{ title: string; content: string; priority: "Low" | "High" | "Normal" | "Urgent"; targetAudience: "All Members" | "Board Only" | "Specific Roles" | "Specific Members"; selectedRoles?: string[]; ... 4 more ...; sendNotification?: boolean; }'.
+services/dataImportExportService.ts(69,34): error TS2339: Property 'general' does not exist on type 'File'.
+services/dataImportExportService.ts(463,97): error TS2779: The left-hand side of an assignment expression may not be an optional property access.
+services/dataImportExportService.ts(464,93): error TS2779: The left-hand side of an assignment expression may not be an optional property access.
+services/dataImportExportService.ts(465,97): error TS2779: The left-hand side of an assignment expression may not be an optional property access.
+services/engagementAutoSuggestService.ts(318,39): error TS2339: Property 'general' does not exist on type 'Project'.
+services/engagementAutoSuggestService.ts(318,65): error TS2339: Property 'business' does not exist on type 'Project'.
+services/financeService.ts(2485,13): error TS2779: The left-hand side of an assignment expression may not be an optional property access.
+services/financeService.ts(2485,38): error TS2339: Property 'membershipType' does not exist on type 'unknown'.
+services/financeService.ts(2488,13): error TS2779: The left-hand side of an assignment expression may not be an optional property access.
+services/financeService.ts(2488,38): error TS2339: Property 'probationTasks' does not exist on type 'unknown'.
+services/financeService.ts(2542,13): error TS2779: The left-hand side of an assignment expression may not be an optional property access.
+services/financeService.ts(2542,32): error TS2339: Property 'hasPaidInitiationFee' does not exist on type 'unknown'.
+services/financeService.ts(3060,29): error TS2339: Property 'jciCareer' does not exist on type '{ memberId: string; membershipType: string; duesAmount: number; txData: Record<string, unknown>; }'.
+services/financeService.ts(3060,79): error TS2339: Property 'jciCareer' does not exist on type '{ memberId: string; membershipType: string; duesAmount: number; txData: Record<string, unknown>; }'.
+services/financeService.ts(3084,35): error TS2339: Property 'jciCareer' does not exist on type '{ memberId: string; membershipType: string; duesAmount: number; txData: Record<string, unknown>; }'.
+services/financeService.ts(3316,35): error TS2339: Property 'jciCareer' does not exist on type '{ membershipType?: string; duesYear?: number; paymentStatus?: "pending" | "paid" | "overdue"; memberCategory?: "renewal" | "new"; }'.
+services/financeService.ts(3358,23): error TS2339: Property 'jciCareer' does not exist on type '{ membershipType?: string; duesYear?: number; paymentStatus?: "pending" | "paid" | "overdue"; memberCategory?: "renewal" | "new"; }'.
+services/financeService.ts(3358,79): error TS2339: Property 'jciCareer' does not exist on type '{ membershipType?: string; duesYear?: number; paymentStatus?: "pending" | "paid" | "overdue"; memberCategory?: "renewal" | "new"; }'.
+services/financeService.ts(3359,23): error TS2339: Property 'jciCareer' does not exist on type '{ membershipType?: string; duesYear?: number; paymentStatus?: "pending" | "paid" | "overdue"; memberCategory?: "renewal" | "new"; }'.
+services/financeService.ts(3359,67): error TS2339: Property 'jciCareer' does not exist on type '{ membershipType?: string; duesYear?: number; paymentStatus?: "pending" | "paid" | "overdue"; memberCategory?: "renewal" | "new"; }'.
+services/financeService.ts(3378,15): error TS2339: Property 'jciCareer' does not exist on type '{ memberId: string; memberName: string; membershipType: string; duesYear: number; duesAmount: number; paymentStatus: "pending" | "paid" | "overdue"; paymentDate?: string; isRenewal: boolean; }'.
+services/financeService.ts(3378,41): error TS2339: Property 'jciCareer' does not exist on type '{ memberId: string; memberName: string; membershipType: string; duesYear: number; duesAmount: number; paymentStatus: "pending" | "paid" | "overdue"; paymentDate?: string; isRenewal: boolean; }'.
+services/financeService.ts(3378,71): error TS2339: Property 'jciCareer' does not exist on type '{ memberId: string; memberName: string; membershipType: string; duesYear: number; duesAmount: number; paymentStatus: "pending" | "paid" | "overdue"; paymentDate?: string; isRenewal: boolean; }'.
+services/financeService.ts(3378,95): error TS2339: Property 'jciCareer' does not exist on type '{ memberId: string; memberName: string; membershipType: string; duesYear: number; duesAmount: number; paymentStatus: "pending" | "paid" | "overdue"; paymentDate?: string; isRenewal: boolean; }'.
+services/financeService.ts(3379,15): error TS2339: Property 'jciCareer' does not exist on type '{ memberId: string; memberName: string; membershipType: string; duesYear: number; duesAmount: number; paymentStatus: "pending" | "paid" | "overdue"; paymentDate?: string; isRenewal: boolean; }'.
+services/financeService.ts(3379,47): error TS2339: Property 'jciCareer' does not exist on type '{ memberId: string; memberName: string; membershipType: string; duesYear: number; duesAmount: number; paymentStatus: "pending" | "paid" | "overdue"; paymentDate?: string; isRenewal: boolean; }'.
+services/financeService.ts(3379,83): error TS2339: Property 'jciCareer' does not exist on type '{ memberId: string; memberName: string; membershipType: string; duesYear: number; duesAmount: number; paymentStatus: "pending" | "paid" | "overdue"; paymentDate?: string; isRenewal: boolean; }'.
+services/financeService.ts(3379,125): error TS2339: Property 'jciCareer' does not exist on type '{ memberId: string; memberName: string; membershipType: string; duesYear: number; duesAmount: number; paymentStatus: "pending" | "paid" | "overdue"; paymentDate?: string; isRenewal: boolean; }'.
+services/financeService.ts(4260,29): error TS2339: Property 'general' does not exist on type 'BankAccount'.
+services/membersService.ts(626,15): error TS2779: The left-hand side of an assignment expression may not be an optional property access.
+services/membersService.ts(784,9): error TS2322: Type 'Partial<{ membershipType: MembershipType; membershipStatus: MembershipStatus; joinDate: string; introducer?: string; senatorship: JciSenatorship; ... 22 more ...; senatorshipValidatedBy?: string; }>' is not assignable to type '{ membershipType: MembershipType; membershipStatus: MembershipStatus; joinDate: string; introducer?: string; senatorship: JciSenatorship; ... 22 more ...; senatorshipValidatedBy?: string; }'.
+  Property 'membershipType' is optional in type 'Partial<{ membershipType: MembershipType; membershipStatus: MembershipStatus; joinDate: string; introducer?: string; senatorship: JciSenatorship; ... 22 more ...; senatorshipValidatedBy?: string; }>' but required in type '{ membershipType: MembershipType; membershipStatus: MembershipStatus; joinDate: string; introducer?: string; senatorship: JciSenatorship; ... 22 more ...; senatorshipValidatedBy?: string; }'.
+services/membersService.ts(1623,9): error TS2779: The left-hand side of an assignment expression may not be an optional property access.
+services/membersService.ts(1775,7): error TS2779: The left-hand side of an assignment expression may not be an optional property access.
+services/membersService.ts(1982,22): error TS2779: The left-hand side of an assignment expression may not be an optional property access.
+services/mockData.ts(5,3): error TS2353: Object literal may only specify known properties, and 'name' does not exist in type 'Member'.
+services/mockData.ts(46,3): error TS2353: Object literal may only specify known properties, and 'name' does not exist in type 'Member'.
+services/mockData.ts(112,5): error TS2353: Object literal may only specify known properties, and 'name' does not exist in type 'Member'.
+services/mockData.ts(135,5): error TS2353: Object literal may only specify known properties, and 'name' does not exist in type 'Member'.
+services/mockData.ts(154,5): error TS2353: Object literal may only specify known properties, and 'name' does not exist in type 'Member'.
+services/paymentRequestService.ts(99,26): error TS2339: Property 'business' does not exist on type 'Omit<PaymentRequest, "id" | "createdAt" | "updatedAt" | "referenceNumber"> & { referenceNumber?: string; }'.
+services/paymentRequestService.ts(137,22): error TS2339: Property 'business' does not exist on type 'Omit<PaymentRequest, "id" | "createdAt" | "updatedAt" | "referenceNumber"> & { referenceNumber?: string; }'.
+services/paymentRequestService.ts(345,33): error TS2339: Property 'business' does not exist on type 'PaymentRequest'.
+services/paymentRequestService.ts(624,27): error TS2339: Property 'business' does not exist on type 'PaymentRequest'.
+services/pointsService.ts(862,36): error TS2339: Property 'business' does not exist on type 'PointTransaction'.
+services/pointsService.ts(863,39): error TS2339: Property 'business' does not exist on type 'PointTransaction'.
+services/pointsService.ts(1621,36): error TS2339: Property 'business' does not exist on type 'IncentiveStandard'.
+services/pointsService.ts(2209,39): error TS2339: Property 'business' does not exist on type 'IncentiveStandard'.
+services/pointsService.ts(2210,30): error TS2339: Property 'business' does not exist on type 'IncentiveStandard'.
+services/projectReportService.ts(186,23): error TS2339: Property 'business' does not exist on type 'Task'.
+services/projectReportService.ts(286,47): error TS2339: Property 'business' does not exist on type 'Task'.
+services/projectReportService.ts(295,30): error TS2339: Property 'general' does not exist on type 'Project'.
+services/promotionService.ts(633,23): error TS2339: Property 'general' does not exist on type 'PromotionRequirement'.
+services/promotionService.ts(907,51): error TS2353: Object literal may only specify known properties, and 'membershipType' does not exist in type 'Partial<Member>'.
+services/promotionService.ts(925,55): error TS2353: Object literal may only specify known properties, and 'membership' does not exist in type 'Partial<Member>'.
+services/reportService.ts(431,27): error TS2339: Property 'business' does not exist on type 'ReportData'.
+services/reportService.ts(563,35): error TS2339: Property 'business' does not exist on type 'InventoryItem'.
+services/reportService.ts(563,92): error TS2339: Property 'business' does not exist on type 'InventoryItem'.
+services/workflowService.ts(76,22): error TS2339: Property 'general' does not exist on type 'AutomationRule'.
+services/workflowService.ts(148,32): error TS2339: Property 'general' does not exist on type 'CreateWorkflowInput'.
+services/workflowService.ts(150,39): error TS2339: Property 'business' does not exist on type 'CreateWorkflowInput'.
+services/workflowService.ts(313,36): error TS2339: Property 'general' does not exist on type 'Workflow'.

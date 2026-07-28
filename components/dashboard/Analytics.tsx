@@ -34,8 +34,8 @@ export const MemberGrowthChart: React.FC<MemberGrowthChartProps> = ({ members = 
       for (let i = 11; i >= 0; i--) {
         const year = now.getFullYear() - i;
         const membersJoinedInYear = members.filter(m => {
-          if (!m.joinDate) return false;
-          const joinDate = new Date(m.joinDate);
+          if (!m.jciCareer?.joinDate) return false;
+          const joinDate = new Date(m.jciCareer?.joinDate);
           return !Number.isNaN(joinDate.getTime()) && joinDate.getFullYear() === year;
         }).length;
 
@@ -52,8 +52,8 @@ export const MemberGrowthChart: React.FC<MemberGrowthChartProps> = ({ members = 
     for (let i = 11; i >= 0; i--) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const membersJoinedInMonth = members.filter(m => {
-        if (!m.joinDate) return false;
-        const joinDate = new Date(m.joinDate);
+        if (!m.jciCareer?.joinDate) return false;
+        const joinDate = new Date(m.jciCareer?.joinDate);
         return !Number.isNaN(joinDate.getTime()) &&
           joinDate.getFullYear() === date.getFullYear() &&
           joinDate.getMonth() === date.getMonth();
@@ -330,10 +330,10 @@ export const PointsSourceRadarChart: React.FC<PointsSourceRadarChartProps> = ({ 
 
         // Process recruited members
         const recruitList: any[] = [];
-        const memberName = member.name || '';
-        const memberFullName = member.fullName || member.general?.name || '';
+        const memberName = member.general?.name || '';
+        const memberFullName = member.general?.fullName || member.general?.name || '';
         allMembers.forEach((m) => {
-          const intro = ((m as any).introducer || '').trim().toLowerCase();
+          const intro = ((m as any).jciCareer?.introducer || '').trim().toLowerCase();
           if (intro) {
             if (
               intro === memberId.toLowerCase() ||
@@ -341,7 +341,7 @@ export const PointsSourceRadarChart: React.FC<PointsSourceRadarChartProps> = ({ 
               (memberFullName && intro === memberFullName.trim().toLowerCase())
             ) {
               recruitList.push({
-                joinDate: (m as any).joinDate || '',
+                joinDate: (m as any).jciCareer?.joinDate || '',
               });
             }
           }

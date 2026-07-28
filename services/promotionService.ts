@@ -207,12 +207,12 @@ export class PromotionService {
   ): string {
     return computeMembershipTypeFromMember(
       {
-        nationality: member.nationality,
-        dateOfBirth: member.dateOfBirth,
-        senatorCertified: member.senatorCertified,
-        senatorshipId: member.senatorshipId,
+        nationality: member.general?.nationality,
+        dateOfBirth: member.general?.dob,
+        senatorCertified: member.jciCareer?.senatorship?.certified,
+        senatorshipId: member.jciCareer?.senatorship?.senatorNumber,
         role: member.role,
-        membershipType: member.membershipType,
+        membershipType: member.jciCareer?.membershipType,
       },
       rules
     );
@@ -322,7 +322,7 @@ export class PromotionService {
     return {
       id: `progress_${member.id}`,
       memberId: member.id,
-      memberName: member.general?.name ?? member.name,
+      memberName: member.general?.name ?? member.general?.name,
       currentMembershipType: 'Probation',
       requirements,
       overallProgress,
@@ -373,7 +373,7 @@ export class PromotionService {
     return {
       year,
       memberId: member.id,
-      memberName: (member.general?.fullName ?? member.fullName) || (member.general?.name ?? member.name),
+      memberName: (member.general?.fullName ?? member.general?.fullName) || (member.general?.name ?? member.general?.name),
       requirements,
       completedCount,
       totalCount,
@@ -514,10 +514,10 @@ export class PromotionService {
 
     // batch: dues update
     const currentYear = new Date().getFullYear().toString();
-    if (member.membership?.[currentYear]) {
+    if (member.jciCareer?.membershipDuesHistory?.[currentYear]) {
       const updatedMembership = {
-        ...member.membership,
-        [currentYear]: { ...member.membership[currentYear], dues: this.FULL_MEMBER_DUES }
+        ...member.jciCareer?.membershipDuesHistory,
+        [currentYear]: { ...member.jciCareer?.membershipDuesHistory[currentYear], dues: this.FULL_MEMBER_DUES }
       };
       batch.update(memberRef, { membership: updatedMembership });
     }
@@ -527,7 +527,7 @@ export class PromotionService {
     const promotion: PromotionHistory = {
       id: promotionRef.id,
       memberId,
-      memberName: member.general?.name ?? member.name,
+      memberName: member.general?.name ?? member.general?.name,
       fromMembershipType: 'Probation',
       toMembershipType: 'Official',
       promotionDate: new Date(),
@@ -639,7 +639,7 @@ export class PromotionService {
       const request: ManualPromotionRequest = {
         id: requestRef.id,
         memberId,
-        memberName: member.general?.name ?? member.name,
+        memberName: member.general?.name ?? member.general?.name,
         requestedBy,
         requestedAt: new Date(),
         reason,
@@ -658,7 +658,7 @@ export class PromotionService {
       const request: ManualPromotionRequest = {
         id: `dev-override-${memberId}-${Date.now()}`,
         memberId,
-        memberName: member.general?.name ?? member.name,
+        memberName: member.general?.name ?? member.general?.name,
         requestedBy,
         requestedAt: new Date(),
         reason,
@@ -674,7 +674,7 @@ export class PromotionService {
     const request: ManualPromotionRequest = {
       id: `manual_promotion_${memberId}_${Date.now()}`,
       memberId,
-      memberName: member.general?.name ?? member.name,
+      memberName: member.general?.name ?? member.general?.name,
       requestedBy,
       requestedAt: new Date(),
       reason,
@@ -872,15 +872,15 @@ export class PromotionService {
   }[] {
     return probation.map((m) => ({
       id: m.id,
-      name: m.name || '',
-      fullName: m.fullName,
-      joinDate: (typeof m.joinDate === 'string' ? m.joinDate : m.joinDate ? String(m.joinDate) : '') || '',
-      nationality: m.nationality,
-      dateOfBirth: m.dateOfBirth,
-      senatorCertified: m.senatorCertified,
-      senatorshipId: m.senatorshipId,
+      name: m.general?.name || '',
+      fullName: m.general?.fullName,
+      joinDate: (typeof m.jciCareer?.joinDate === 'string' ? m.jciCareer?.joinDate : m.jciCareer?.joinDate ? String(m.jciCareer?.joinDate) : '') || '',
+      nationality: m.general?.nationality,
+      dateOfBirth: m.general?.dob,
+      senatorCertified: m.jciCareer?.senatorship?.certified,
+      senatorshipId: m.jciCareer?.senatorship?.senatorNumber,
       role: m.role,
-      membershipType: m.membershipType,
+      membershipType: m.jciCareer?.membershipType,
       computedMembershipType: this.getComputedMembershipTypeWithRules(m, rules),
       promotionProgress: m.jciCareer?.promotionProgress,
     }));
@@ -897,14 +897,14 @@ export class PromotionService {
     const m = await this.getMemberById(memberId);
     await MembersService.updateMember(memberId, {
       promotionProgress: {
-        ...(m?.jciCareer?.promotionProgress ?? m?.promotionProgress ?? {}),
+        ...(m?.jciCareer?.promotionProgress ?? m?.jciCareer?.promotionProgress ?? {}),
         [field]: value
       }
     } as unknown as Partial<Member>); // computed field key not statically checkable against MemberPromotionProgress
   }
 
   private static async updateMembershipType(memberId: string, newType: string): Promise<void> {
-    await MembersService.updateMember(memberId, { membershipType: newType as MembershipType });
+    await MembersService.updateMember(memberId, { 'jciCareer.membershipType': newType } as unknown as Partial<Member>);
     console.log(`Updated member ${memberId} to ${newType} membership`);
   }
 
@@ -912,9 +912,9 @@ export class PromotionService {
     const currentYear = new Date().getFullYear();
     const member = await this.getMemberById(memberId);
 
-    if (member?.membership) {
+    if (member?.jciCareer?.membershipDuesHistory) {
       const yearStr = currentYear.toString();
-      const updatedMembership = { ...member.membership };
+      const updatedMembership = { ...member.jciCareer?.membershipDuesHistory };
 
       if (updatedMembership[yearStr]) {
         updatedMembership[yearStr] = {
@@ -922,7 +922,7 @@ export class PromotionService {
           dues: newAmount
         };
 
-        await MembersService.updateMember(memberId, { membership: updatedMembership });
+        await MembersService.updateMember(memberId, { 'jciCareer.membershipDuesHistory': updatedMembership } as unknown as Partial<Member>);
       }
     }
     // SEC-A-008: Gate financial PII log to dev only.
@@ -1138,7 +1138,7 @@ export class PromotionService {
       snap.docs.forEach(d => {
         const data = d.data();
         const promotionTs = data.promotionDate?.toMillis?.();
-        const joinTs = data.joinDate?.toMillis?.();
+        const joinTs = data.jciCareer?.joinDate?.toMillis?.();
         if (promotionTs && joinTs && promotionTs > joinTs) {
           days.push((promotionTs - joinTs) / 86400000);
         }

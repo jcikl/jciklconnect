@@ -33,10 +33,10 @@ export const MentorMatchingModal: React.FC<MentorMatchingModalProps> = ({ mentee
   };
 
   return (
-    <Modal isOpen={true} onClose={onClose} title={`Find Mentor for ${mentee.name}`} size="lg">
+    <Modal isOpen={true} onClose={onClose} title={`Find Mentor for ${mentee.general?.name}`} size="lg">
       <div className="space-y-4">
         <p className="text-sm text-slate-600">
-          Based on {mentee.name}'s profile, here are the best mentor matches:
+          Based on {mentee.general?.name}'s profile, here are the best mentor matches:
         </p>
 
         {potentialMentors.length === 0 ? (
@@ -50,10 +50,10 @@ export const MentorMatchingModal: React.FC<MentorMatchingModalProps> = ({ mentee
               <Card key={match.mentor.id} className="hover:shadow-md transition-shadow">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-4 flex-1">
-                    <img src={match.mentor.avatar || undefined} className="w-12 h-12 rounded-full border border-slate-100" alt="" onError={(e) => { e.currentTarget.src = getInitialsSvg(match.mentor.name, 48); }} />
+                    <img src={match.mentor.general?.avatarUrl || undefined} className="w-12 h-12 rounded-full border border-slate-100" alt="" onError={(e) => { e.currentTarget.src = getInitialsSvg(match.mentor.general?.name, 48); }} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-semibold text-slate-900 truncate">{match.mentor.name}</h4>
+                        <h4 className="font-semibold text-slate-900 truncate">{match.mentor.general?.name}</h4>
                         {index === 0 && <Badge variant="success">Best Match</Badge>}
                         <div className="flex items-center gap-1 text-xs text-jci-blue font-bold">
                           <Zap size={10} fill="currentColor" /> {match.matchScore}%

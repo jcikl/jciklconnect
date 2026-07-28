@@ -98,10 +98,10 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
                                     <div className="flex gap-3">
                                         {member ? (
                                             <img
-                                                src={(member.general?.avatarUrl ?? member.avatarUrl ?? member.avatar) || getInitialsSvg(member.general?.name ?? member.name, 36)}
-                                                alt={member.general?.name ?? member.name}
+                                                src={(member.general?.avatarUrl ?? member.general?.avatarUrl ?? member.general?.avatarUrl) || getInitialsSvg(member.general?.name ?? member.general?.name, 36)}
+                                                alt={member.general?.name ?? member.general?.name}
                                                 className="w-9 h-9 rounded-full bg-slate-200 flex-shrink-0 mt-0.5"
-                                                onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = getInitialsSvg(member.general?.name ?? member.name, 36); }}
+                                                onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = getInitialsSvg(member.general?.name ?? member.general?.name, 36); }}
                                             />
                                         ) : (
                                             <div className="w-9 h-9 rounded-full bg-slate-200 flex-shrink-0 mt-0.5" />
@@ -124,7 +124,7 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
                                                         setIsPosting(true);
                                                         try {
                                                             await createPost({
-                                                                author: { name: member.general?.name ?? member.name, avatar: member.general?.avatarUrl ?? member.avatarUrl ?? member.avatar, role: member.role },
+                                                                author: { name: member.general?.name ?? member.general?.name, avatar: member.general?.avatarUrl ?? member.general?.avatarUrl ?? member.general?.avatarUrl, role: member.role },
                                                                 content: postContent,
                                                                 likes: 0,
                                                                 comments: 0,
@@ -215,7 +215,7 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
                     if (!member || !selectedAnnouncement) return;
                     try {
                         await CommunicationService.updatePost(selectedAnnouncement.id, {
-                            author: { name: member.general?.name ?? member.name, avatar: member.general?.avatarUrl ?? member.avatarUrl ?? member.avatar, role: member.role },
+                            author: { name: member.general?.name ?? member.general?.name, avatar: member.general?.avatarUrl ?? member.general?.avatarUrl ?? member.general?.avatarUrl, role: member.role },
                             content: data.content,
                             likes: selectedAnnouncement.likes,
                             comments: selectedAnnouncement.comments,
@@ -261,7 +261,7 @@ const NotificationsList: React.FC<NotificationsListProps> = ({ notifications, lo
                     onClick={() => !notif.read && onRead(notif.id)}
                 >
                     <div className="flex justify-between items-start gap-2 mb-0.5">
-                        <span className={`font-semibold leading-snug ${notif.read ? 'text-slate-700' : 'text-slate-900'}`}>{notif.title}</span>
+                        <span className={`font-semibold leading-snug ${notif.read ? 'text-slate-700' : 'text-slate-900'}`}>{notif.business?.position}</span>
                         <span className="text-[10px] text-slate-400 flex-shrink-0 mt-0.5">{formatRelativeTime(notif.timestamp)}</span>
                     </div>
                     <p className="text-slate-500 text-xs leading-relaxed">{notif.message}</p>

@@ -17,11 +17,11 @@ function matchesSearch(m: Member, q: string): boolean {
   if (!q.trim()) return true;
   const lower = q.trim().toLowerCase();
   const searchable = [
-    m.name,
-    m.email,
-    m.phone,
-    (m as unknown as Record<string, unknown>).fullName,
-    m.address,
+    m.general?.name,
+    m.contact?.email,
+    m.contact?.phone,
+    (m as any).general?.fullName,
+    m.contact?.address,
   ]
     .filter(Boolean)
     .map(String)
@@ -116,7 +116,7 @@ export const MemberSelector: React.FC<MemberSelectorProps> = ({
   };
 
   const displayValue = selectedMember
-    ? (getOptionLabel ? getOptionLabel(selectedMember) : selectedMember.name)
+    ? (getOptionLabel ? getOptionLabel(selectedMember) : selectedMember.general?.name)
     : selfOption && !value ? selfLabel : '';
 
   return (
@@ -173,7 +173,7 @@ export const MemberSelector: React.FC<MemberSelectorProps> = ({
                   onMouseEnter={() => setHighlight(i)}
                   onClick={() => handleSelect(m.id)}
                 >
-                  {getOptionLabel ? getOptionLabel(m) : m.name}
+                  {getOptionLabel ? getOptionLabel(m) : m.general?.name}
                   {!m.id && selfOption && <span className="text-slate-400 ml-1">(current user)</span>}
                 </li>
               ))

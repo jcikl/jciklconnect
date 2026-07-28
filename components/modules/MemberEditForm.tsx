@@ -46,67 +46,67 @@ function normalizeGender(value: string): string {
 function initFormValues(member: Member) {
   return {
     // Basic Information
-    name: member.name || '',
-    fullName: member.fullName || '',
-    idNumber: member.idNumber || member.general?.idNumber || '',
-    birthPlace: (() => { const ic = member.idNumber || member.general?.idNumber || ''; return isMalaysianIC(ic) ? (getBirthPlaceFromIC(ic) || member.birthPlace || member.general?.birthPlace || '') : (member.birthPlace || member.general?.birthPlace || ''); })(),
-    dateOfBirth: (() => { const ic = member.idNumber || member.general?.idNumber || ''; return isMalaysianIC(ic) ? (getDateOfBirthFromIC(ic) || member.dateOfBirth || member.general?.dob || '') : (member.dateOfBirth || member.general?.dob || ''); })(),
-    gender: (() => { const ic = member.idNumber || member.general?.idNumber || ''; return normalizeGender(isMalaysianIC(ic) ? (getGenderFromIC(ic) || member.gender || member.general?.gender || '') : (member.gender || member.general?.gender || '')); })(),
+    name: member.general?.name || '',
+    fullName: member.general?.fullName || '',
+    idNumber: member.general?.idNumber || member.general?.idNumber || '',
+    birthPlace: (() => { const ic = member.general?.idNumber || member.general?.idNumber || ''; return isMalaysianIC(ic) ? (getBirthPlaceFromIC(ic) || member.general?.birthPlace || member.general?.birthPlace || '') : (member.general?.birthPlace || member.general?.birthPlace || ''); })(),
+    dateOfBirth: (() => { const ic = member.general?.idNumber || member.general?.idNumber || ''; return isMalaysianIC(ic) ? (getDateOfBirthFromIC(ic) || member.general?.dob || member.general?.dob || '') : (member.general?.dob || member.general?.dob || ''); })(),
+    gender: (() => { const ic = member.general?.idNumber || member.general?.idNumber || ''; return normalizeGender(isMalaysianIC(ic) ? (getGenderFromIC(ic) || member.general?.gender || member.general?.gender || '') : (member.general?.gender || member.general?.gender || '')); })(),
     ethnicity: member.general?.ethnicity ?? '',
-    nationality: member.nationality || 'Malaysia',
-    introducer: member.introducer || '',
-    bio: member.bio || '',
-    avatar: member.avatar || member.avatarUrl || member.general?.avatarUrl || '',
-    hobbies: Array.isArray(member.hobbies) ? member.hobbies : (member.hobbies ? [member.hobbies] : []),
+    nationality: member.general?.nationality || 'Malaysia',
+    introducer: member.jciCareer?.introducer || '',
+    bio: member.others?.bio || '',
+    avatar: member.general?.avatarUrl || member.general?.avatarUrl || member.general?.avatarUrl || '',
+    hobbies: Array.isArray(member.others?.hobbies) ? member.others?.hobbies : (member.others?.hobbies ? [member.others?.hobbies] : []),
     skills: Array.isArray(member.skills) ? member.skills.join(', ') : (member.skills || ''),
     dietaryPreference: member.general?.dietaryPreference ?? '',
 
     // Membership & Status
     role: member.role,
     tier: member.tier,
-    membershipType: member.membershipType || '',
-    senatorCertified: member.senatorCertified || false,
-    senatorshipId: member.senatorshipId || '',
-    senatorshipBoardValidated: member.senatorshipBoardValidated || false,
+    membershipType: member.jciCareer?.membershipType || '',
+    senatorCertified: member.jciCareer?.senatorship?.certified || false,
+    senatorshipId: member.jciCareer?.senatorship?.senatorNumber || '',
+    senatorshipBoardValidated: member.jciCareer?.senatorship?.boardValidated || false,
     attendanceRate: member.attendanceRate ?? 0,
     churnRisk: member.churnRisk,
 
     // Professional & Business
     companyName: member.companyName || '',
-    companyWebsite: member.companyWebsite || '',
+    companyWebsite: member.business?.companyWebsite || '',
     companyDescription: member.business?.companyDescription ?? '',
     departmentAndPosition: member.business?.departmentAndPosition ?? '',
     levelOfManagement: member.business?.levelOfManagement ?? '',
     idealReferralIndustry: member.idealReferralIndustry || '',
-    idealReferral: member.idealReferral || (Array.isArray(member.idealReferrals) ? member.idealReferrals.join(', ') : ''),
-    acceptInternationalBusiness: member.acceptInternationalBusiness || '',
-    businessCategory: Array.isArray(member.businessCategory) ? member.businessCategory : (member.businessCategory ? [member.businessCategory] : []),
+    idealReferral: member.business?.idealReferrals || (Array.isArray(member.business?.idealReferrals) ? member.business?.idealReferrals.join(', ') : ''),
+    acceptInternationalBusiness: member.business?.acceptInternationalBusiness || '',
+    businessCategory: Array.isArray(member.business?.businessCategory) ? member.business?.businessCategory : (member.business?.businessCategory ? [member.business?.businessCategory] : []),
     industry: member.industry || '',
     interestedIndustries: (() => { const v = member.business?.interestedIndustries; return Array.isArray(v) ? v : (v ? [v as string] : []); })(),
     internationalPartnershipTypes: Array.isArray(member.internationalPartnershipTypes) ? member.internationalPartnershipTypes : (member.internationalPartnershipTypes ? [member.internationalPartnershipTypes] : []),
 
     // Contact Information
-    phone: member.phone || '',
-    alternatePhone: member.alternatePhone || '',
-    whatsappGroup: !!member.whatsappGroup,
-    email: member.email || '',
-    address: member.address || '',
-    linkedin: member.linkedin || '',
-    facebook: member.facebook || '',
-    instagram: member.instagram || '',
-    wechat: member.wechat || '',
-    emergencyContactName: member.emergencyContactName || '',
-    emergencyContactPhone: member.emergencyContactPhone || '',
-    emergencyContactRelationship: member.emergencyContactRelationship || '',
+    phone: member.contact?.phone || '',
+    alternatePhone: member.contact?.alternatePhone || '',
+    whatsappGroup: !!member.contact?.whatsappJoined,
+    email: member.contact?.email || '',
+    address: member.contact?.address || '',
+    linkedin: member.contact?.socials?.linkedin || '',
+    facebook: member.contact?.socials?.facebook || '',
+    instagram: member.contact?.socials?.instagram || '',
+    wechat: member.contact?.socials?.wechat || '',
+    emergencyContactName: member.contact?.emergency?.name || '',
+    emergencyContactPhone: member.contact?.emergency?.phone || '',
+    emergencyContactRelationship: member.contact?.emergency?.relationship || '',
 
     // Apparel & Items
-    cutStyle: member.cutStyle || '',
-    tshirtSize: member.tshirtSize || '',
-    jacketSize: member.jacketSize || '',
-    embroideredName: member.embroideredName || '',
-    tshirtStatus: (member.tshirtStatus as string) || 'NA',
+    cutStyle: member.others?.shirtStyle || '',
+    tshirtSize: member.others?.tshirtSize || '',
+    jacketSize: member.others?.jacketSize || '',
+    embroideredName: member.others?.embroideredName || '',
+    tshirtStatus: (member.others?.tshirtStatus as string) || 'NA',
     // Approval year for GUEST -> MEMBER transition
-    membershipYear: member.joinDate ? new Date(member.joinDate).getFullYear() : new Date().getFullYear(),
+    membershipYear: member.jciCareer?.joinDate ? new Date(member.jciCareer?.joinDate).getFullYear() : new Date().getFullYear(),
   };
 }
 
@@ -145,13 +145,13 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
     () => ({
       nationality: formValues.nationality,
       dateOfBirth: formValues.dateOfBirth,
-      senatorCertified: member.senatorCertified,
+      senatorCertified: member.jciCareer?.senatorship?.certified,
       senatorshipId: formValues.senatorshipId,
-      senatorshipBoardValidated: member.senatorshipBoardValidated,
+      senatorshipBoardValidated: member.jciCareer?.senatorship?.boardValidated,
       role: formValues.role,
-      membershipType: member.membershipType,
+      membershipType: member.jciCareer?.membershipType,
     }),
-    [formValues, member.membershipType, member.senatorCertified, member.senatorshipBoardValidated]
+    [formValues, member.jciCareer?.membershipType, member.jciCareer?.senatorship?.certified, member.jciCareer?.senatorship?.boardValidated]
   );
 
   const handleChange = (field: string, value: string | number | boolean | string[]) => {
@@ -170,8 +170,8 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
 
       // If role changed to MEMBER, default the year to joinDate year (from original member or form)
       if (field === 'role' && value === UserRole.MEMBER && (member.role === UserRole.GUEST || !member.role)) {
-        if (member.joinDate) {
-          newValues.membershipYear = new Date(member.joinDate).getFullYear();
+        if (member.jciCareer?.joinDate) {
+          newValues.membershipYear = new Date(member.jciCareer?.joinDate).getFullYear();
         } else {
           newValues.membershipYear = new Date().getFullYear();
         }
@@ -182,7 +182,7 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
   };
 
   const currentAvatar = formValues.avatar;
-  const originalAvatar = member.avatar || member.avatarUrl || member.general?.avatarUrl || '';
+  const originalAvatar = member.general?.avatarUrl || member.general?.avatarUrl || member.general?.avatarUrl || '';
 
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -194,9 +194,9 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
       .filter(s => s.length > 0);
     const interestedIndustriesArr = formValues.interestedIndustries;
 
-    const senatorshipLocked = member.senatorshipBoardValidated === true;
+    const senatorshipLocked = member.jciCareer?.senatorship?.boardValidated === true;
     const senatorshipIdValue = senatorshipLocked
-      ? String(member.senatorshipId || '')
+      ? String(member.jciCareer?.senatorship?.senatorNumber || '')
       : formValues.senatorshipId?.toString().trim() ?? '';
 
     const computedMembershipType =
@@ -205,21 +205,21 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
           {
             nationality: formValues.nationality,
             dateOfBirth: formValues.dateOfBirth,
-            senatorCertified: member.senatorCertified,
+            senatorCertified: member.jciCareer?.senatorship?.certified,
             senatorshipId: senatorshipIdValue,
-            senatorshipBoardValidated: member.senatorshipBoardValidated,
+            senatorshipBoardValidated: member.jciCareer?.senatorship?.boardValidated,
             role: (formValues.role as UserRole) || member.role,
-            membershipType: member.membershipType,
+            membershipType: member.jciCareer?.membershipType,
           },
           membershipRules
         )
-        : member.membershipType;
+        : member.jciCareer?.membershipType;
 
-    const updates: Partial<Member> = {
-      name: formValues.name || member.name,
+    const updates = {
+      name: formValues.name || member.general?.name,
       avatar: formValues.avatar || '',
       avatarUrl: formValues.avatar || '',
-      email: formValues.email || member.email,
+      email: formValues.email || member.contact?.email,
       phone: formValues.phone || undefined,
       introducer: formValues.introducer || undefined,
       bio: formValues.bio || undefined,
@@ -232,30 +232,20 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
         ? { senatorshipId: senatorshipIdValue }
         : {}),
 
-      fullName: formValues.fullName || undefined,
-      idNumber: formValues.idNumber || undefined,
-      birthPlace: formValues.birthPlace || undefined,
-      gender: (formValues.gender as Member['gender']) || undefined,
-      ethnicity: (formValues.ethnicity as Member['ethnicity']) || undefined,
-      dietaryPreference: (formValues.dietaryPreference as Member['dietaryPreference']) || undefined,
-      nationality: formValues.nationality || undefined,
-      dateOfBirth: formValues.dateOfBirth || undefined,
-      hobbies: formValues.hobbies.length > 0 ? formValues.hobbies : undefined,
+      // hobbies moved to others.hobbies via Object.assign below
       skills: skillsArr.length > 0 ? skillsArr : member.skills,
 
       companyName: formValues.companyName || undefined,
-      companyWebsite: formValues.companyWebsite || undefined,
       companyDescription: formValues.companyDescription || undefined,
       departmentAndPosition: formValues.departmentAndPosition || undefined,
       levelOfManagement: formValues.levelOfManagement || undefined,
       idealReferralIndustry: formValues.idealReferralIndustry || undefined,
       idealReferral: formValues.idealReferral || undefined,
-      acceptInternationalBusiness: (formValues.acceptInternationalBusiness as Member['acceptInternationalBusiness']) || undefined,
       businessCategory: formValues.businessCategory.length > 0 ? formValues.businessCategory : undefined,
       industry: formValues.industry || undefined,
       interestedIndustries: interestedIndustriesArr.length > 0 ? interestedIndustriesArr : undefined,
       internationalPartnershipTypes: formValues.internationalPartnershipTypes,
-      alternatePhone: formValues.alternatePhone || member.alternatePhone,
+      alternatePhone: formValues.alternatePhone || member.contact?.alternatePhone,
       address: formValues.address || undefined,
       linkedin: formValues.linkedin || undefined,
 
@@ -266,37 +256,47 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
       emergencyContactPhone: formValues.emergencyContactPhone || undefined,
       emergencyContactRelationship: formValues.emergencyContactRelationship || undefined,
 
-      cutStyle: (formValues.cutStyle as Member['cutStyle']) || undefined,
-      tshirtSize: (formValues.tshirtSize as Member['tshirtSize']) || undefined,
-      jacketSize: (formValues.jacketSize as Member['jacketSize']) || undefined,
       embroideredName: formValues.embroideredName || undefined,
-      tshirtStatus: (formValues.tshirtStatus as Member['tshirtStatus']) || undefined,
     };
 
     // Dual-write nested Firestore dot-notation paths for field migration
     Object.assign(updates, {
+      'general.nationality': formValues.nationality || undefined,
+      'general.dob': formValues.dateOfBirth || undefined,
       'general.ethnicity': formValues.ethnicity || undefined,
       'general.dietaryPreference': formValues.dietaryPreference || undefined,
       'general.birthPlace': formValues.birthPlace || undefined,
+      'general.fullName': formValues.fullName || undefined,
+      'general.gender': formValues.gender || undefined,
+      'general.idNumber': formValues.idNumber || undefined,
+      'business.companyWebsite': formValues.companyWebsite || undefined,
       'business.companyDescription': formValues.companyDescription || undefined,
       'business.departmentAndPosition': formValues.departmentAndPosition || undefined,
       'business.levelOfManagement': formValues.levelOfManagement || undefined,
       'business.interestedIndustries': interestedIndustriesArr.length > 0 ? interestedIndustriesArr : undefined,
+      'business.acceptInternationalBusiness': formValues.acceptInternationalBusiness || undefined,
+      'others.shirtStyle': formValues.cutStyle || undefined,
+      'others.tshirtSize': formValues.tshirtSize || undefined,
+      'others.jacketSize': formValues.jacketSize || undefined,
+      'others.tshirtStatus': formValues.tshirtStatus || undefined,
+      'others.hobbies': formValues.hobbies.length > 0 ? formValues.hobbies : undefined,
     });
 
     // Handle GUEST -> MEMBER membership initialization
     if (formValues.role === UserRole.MEMBER && (member.role === UserRole.GUEST || !member.role)) {
       const yearStr = String(formValues.membershipYear);
-      updates.membership = {
-        ...(member.membership || {}),
-        [yearStr]: {
-          year: formValues.membershipYear,
-          dues: (member.jciCareer?.hasPaidInitiationFee ? 0 : 50) + (membershipRules?.Probation?.duesAmount ?? MembershipDues.Probation),
-          amount: 0,
-          status: 'pending',
-          transactionId: []
+      Object.assign(updates, {
+        'jciCareer.membershipDuesHistory': {
+          ...(member.jciCareer?.membershipDuesHistory || {}),
+          [yearStr]: {
+            year: formValues.membershipYear,
+            dues: (member.jciCareer?.hasPaidInitiationFee ? 0 : 50) + (membershipRules?.Probation?.duesAmount ?? MembershipDues.Probation),
+            amount: 0,
+            status: 'pending',
+            transactionId: []
+          }
         }
-      };
+      });
     }
 
     const filteredUpdates = selfEditableOnly
@@ -306,13 +306,13 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
           k === 'avatar' ||
           k === 'avatarUrl'
         )
-      ) as Partial<Member>)
-      : updates;
+      ) as unknown as Partial<Member>)
+      : updates as unknown as Partial<Member>;
 
     await onSubmit(filteredUpdates);
 
     const finalAvatar = formValues.avatar;
-    const originalAvatar = member.avatar || member.avatarUrl || member.general?.avatarUrl || '';
+    const originalAvatar = member.general?.avatarUrl || member.general?.avatarUrl || member.general?.avatarUrl || '';
     // Delete original saved avatar if replaced
     if (originalAvatar && originalAvatar !== finalAvatar) {
       deleteFromCloudinary(originalAvatar).catch(console.error);
@@ -533,14 +533,14 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                       name="senatorshipId"
                       value={formValues.senatorshipId}
                       onChange={(e) => handleChange('senatorshipId', e.target.value)}
-                      disabled={member.senatorshipBoardValidated === true}
+                      disabled={member.jciCareer?.senatorship?.boardValidated === true}
                       placeholder="e.g. 12345"
-                      className={`w-full rounded-lg border px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 ${member.senatorshipBoardValidated
+                      className={`w-full rounded-lg border px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 ${member.jciCareer?.senatorship?.boardValidated
                         ? 'border-slate-200 bg-slate-100 text-slate-600 cursor-not-allowed'
                         : 'border-slate-300 bg-white'
                         }`}
                     />
-                    {member.senatorshipBoardValidated && (
+                    {member.jciCareer?.senatorship?.boardValidated && (
                       <p className="text-xs text-green-700 leading-snug">
                         <span className="font-medium">Board validated</span>
                         {member.jciCareer?.senatorshipValidatedAt && (
@@ -650,7 +650,7 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                 <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Ideal Referral</label>
                 <MultiSelectDropdown
                   options={IDEAL_REFERRAL_OPTIONS.map(opt => opt.label)}
-                  selected={formValues.idealReferral ? formValues.idealReferral.split(', ').filter(Boolean) : []}
+                  selected={formValues.idealReferral ? (typeof formValues.idealReferral === 'string' ? formValues.idealReferral.split(', ') : formValues.idealReferral as string[]).filter(Boolean) : []}
                   onChange={selected => handleChange('idealReferral', selected.join(', '))}
                   placeholder="Select referrals..."
                 />

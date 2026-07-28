@@ -125,7 +125,7 @@ export class AIPredictionService {
         : 20; // Default if no history
 
       // Calculate member interest (based on past attendance to similar events)
-      const activeMembers = allMembers.filter(m => (m.jciCareer?.attendanceCheckins ?? m.attendanceCheckins ?? m.attendanceRate ?? 0) > 50);
+      const activeMembers = allMembers.filter(m => (m.jciCareer?.attendanceCheckins ?? m.jciCareer?.attendanceCheckins ?? m.attendanceRate ?? 0) > 50);
       const memberInterest = activeMembers.length * 0.3; // 30% of active members typically attend
 
       // Time of year factor (events in Q1 and Q4 tend to have higher attendance)
@@ -238,7 +238,7 @@ export class AIPredictionService {
 
       // Member engagement (average attendance rate of team)
       const memberEngagement = teamMembers.length > 0
-        ? teamMembers.reduce((sum, m) => sum + (m.jciCareer?.attendanceCheckins ?? m.attendanceCheckins ?? m.attendanceRate ?? 0), 0) / teamMembers.length
+        ? teamMembers.reduce((sum, m) => sum + (m.jciCareer?.attendanceCheckins ?? m.jciCareer?.attendanceCheckins ?? m.attendanceRate ?? 0), 0) / teamMembers.length
         : 50;
 
       // Calculate success probability
@@ -371,7 +371,7 @@ export class AIPredictionService {
           sponsorName: biz.companyName,
           matchScore,
           projectId,
-          projectName: project?.name,
+          projectName: project?.name || project?.title,
           reasons,
           contactInfo: {
             email: undefined, // BusinessProfile doesn't have email field
@@ -573,7 +573,7 @@ export class AIPredictionService {
       let churnScore = 0;
 
       // Attendance rate factor
-      const attendanceScore = member.jciCareer?.attendanceCheckins ?? member.attendanceCheckins ?? member.attendanceRate ?? 0;
+      const attendanceScore = member.jciCareer?.attendanceCheckins ?? member.jciCareer?.attendanceCheckins ?? member.attendanceRate ?? 0;
       if (attendanceScore < 30) {
         churnScore += 40;
         riskFactors.push({
@@ -618,7 +618,7 @@ export class AIPredictionService {
       }
 
       // Recent activity factor (simplified - would check actual last activity date)
-      const daysSinceJoin = Math.floor((new Date().getTime() - new Date(member.joinDate).getTime()) / (1000 * 60 * 60 * 24));
+      const daysSinceJoin = Math.floor((new Date().getTime() - new Date(member.jciCareer?.joinDate).getTime()) / (1000 * 60 * 60 * 24));
       if (daysSinceJoin > 365 && member.points < 200) {
         churnScore += 15;
         riskFactors.push({
@@ -740,7 +740,7 @@ export class AIPredictionService {
           recommendations.push({
             type: 'project' as const,
             itemId: project.id!,
-            itemName: project.name,
+            itemName: project.name || project.title,
             matchScore: Math.min(100, matchScore),
             reasons,
             priority: matchScore >= 75 ? 'High' : matchScore >= 60 ? 'Medium' : 'Low',
@@ -840,7 +840,7 @@ export class AIPredictionService {
             recommendations.push({
               type: 'training' as const,
               itemId: path.id!,
-              itemName: path.name,
+              itemName: path.title,
               matchScore: Math.min(100, matchScore),
               reasons,
               priority: matchScore >= 70 ? 'High' : 'Medium',
@@ -863,7 +863,7 @@ export class AIPredictionService {
           const reasons: string[] = [];
 
           // Interest matching (simplified)
-          if (club.category && member.skills.some(skill => club.category.toLowerCase().includes(skill.toLowerCase()))) {
+          if (club.category && member.skills.some((skill: string) => club.category!.toLowerCase().includes(skill.toLowerCase()))) {
             matchScore += 25;
             reasons.push('Matches your interests');
           }

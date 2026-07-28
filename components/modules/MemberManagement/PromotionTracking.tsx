@@ -115,7 +115,7 @@ const getEngagementYearFromJoinDate = (
 
 const MemberSummaryPanel: React.FC<{ member: Member | null }> = ({ member }) => {
   if (!member) return null;
-  const displayName = member.fullName || member.name || '?';
+  const displayName = member.general?.fullName || member.general?.name || '?';
   const initials = displayName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
   return (
     <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
@@ -124,17 +124,17 @@ const MemberSummaryPanel: React.FC<{ member: Member | null }> = ({ member }) => 
       </div>
       <div className="flex-1 min-w-0">
         <div className="font-semibold text-slate-900 truncate">{displayName}</div>
-        <div className="text-xs text-slate-500 truncate">{member.phone || member.idNumber || ''}</div>
+        <div className="text-xs text-slate-500 truncate">{member.contact?.phone || member.general?.idNumber || ''}</div>
       </div>
       <div className="shrink-0">
         <MembershipTypeDisplay
           member={{
-            nationality: member.nationality,
-            dateOfBirth: member.dateOfBirth,
-            senatorCertified: member.senatorCertified,
-            senatorshipId: member.senatorshipId,
+            nationality: member.general?.nationality,
+            dateOfBirth: member.general?.dob,
+            senatorCertified: member.jciCareer?.senatorship?.certified,
+            senatorshipId: member.jciCareer?.senatorship?.senatorNumber,
             role: member.role,
-            membershipType: member.membershipType as any,
+            membershipType: member.jciCareer?.membershipType as any,
           }}
           showDetails={false}
         />
@@ -219,7 +219,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
       setSelectedMemberProfile(profile ?? probationMembers.find((m) => m.id === memberId) ?? null);
       setSelectedMemberRecord(member);
 
-      const pp = member?.promotionProgress || ({} as MemberPromotionProgress);
+      const pp = member?.jciCareer?.promotionProgress || ({} as MemberPromotionProgress);
       const bodMeeting = parseDatedDetail(String(pp.bodMeetingAttended ?? ''));
       const organizingCommittee = parseDatedDetail(String(pp.eventOrganizerParticipation ?? ''));
       const [eventParticipation1, eventParticipation2] = splitEventParticipation(String(pp.eventParticipation ?? ''));
@@ -636,15 +636,15 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
     const term = (searchQuery || '').toLowerCase();
     const filtered = term
       ? probationMembers.filter((m: any) =>
-          (m.name ?? '').toLowerCase().includes(term) ||
-          (m.email ?? '').toLowerCase().includes(term) ||
-          (m.phone ?? '').toLowerCase().includes(term) ||
-          (m.fullName ?? '').toLowerCase().includes(term)
+          (m.general?.name ?? '').toLowerCase().includes(term) ||
+          (m.contact?.email ?? '').toLowerCase().includes(term) ||
+          (m.contact?.phone ?? '').toLowerCase().includes(term) ||
+          (m.general?.fullName ?? '').toLowerCase().includes(term)
         )
       : [...probationMembers];
-    const getName = (m: any) => ((m.fullName || m.name) ?? '').toLowerCase();
+    const getName = (m: any) => ((m.general?.fullName || m.general?.name) ?? '').toLowerCase();
     const isEligible = (m: any) => {
-      const pp = m.promotionProgress ?? m.jciCareer?.promotionProgress;
+      const pp = m.jciCareer?.promotionProgress ?? m.jciCareer?.promotionProgress;
       return !!(pp?.bodMeetingAttended && pp?.eventOrganizerParticipation && pp?.eventParticipation && pp?.jciInspireCompleted);
     };
     return filtered.sort((a, b) => {
@@ -659,18 +659,18 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
     const term = (searchQuery || '').toLowerCase();
     const yearScopedMembers = engagementMembers.filter((member) => {
       if (activeView === 'promotion') return false;
-      return getEngagementYearFromJoinDate(member.joinDate) === activeView;
+      return getEngagementYearFromJoinDate(member.jciCareer?.joinDate) === activeView;
     });
     const filtered = term
       ? yearScopedMembers.filter((member) =>
-          (member.name ?? '').toLowerCase().includes(term) ||
-          (member.email ?? '').toLowerCase().includes(term) ||
-          (member.phone ?? '').toLowerCase().includes(term) ||
-          (member.fullName ?? '').toLowerCase().includes(term) ||
-          (member.idNumber ?? '').toLowerCase().includes(term)
+          (member.general?.name ?? '').toLowerCase().includes(term) ||
+          (member.contact?.email ?? '').toLowerCase().includes(term) ||
+          (member.contact?.phone ?? '').toLowerCase().includes(term) ||
+          (member.general?.fullName ?? '').toLowerCase().includes(term) ||
+          (member.general?.idNumber ?? '').toLowerCase().includes(term)
         )
       : [...yearScopedMembers];
-    const getName = (m: Member) => ((m.fullName || m.name) ?? '').toLowerCase();
+    const getName = (m: Member) => ((m.general?.fullName || m.general?.name) ?? '').toLowerCase();
     const hasPending = (m: Member) =>
       PromotionService.buildEngagementProgress(m, activeView as EngagementYear)
         .requirements.some(r => r.progress.pendingVerification);
@@ -685,7 +685,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
   const pendingCounts = React.useMemo(() => {
     const count = (year: EngagementYear) =>
       engagementMembers
-        .filter(m => getEngagementYearFromJoinDate(m.joinDate) === year)
+        .filter(m => getEngagementYearFromJoinDate(m.jciCareer?.joinDate) === year)
         .filter(m => PromotionService.buildEngagementProgress(m, year).requirements.some(r => r.progress.pendingVerification))
         .length;
     return { firstYear: count('firstYear'), secondYear: count('secondYear') };
@@ -1047,16 +1047,16 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                   <div className="flex items-center gap-3 p-3">
                     {/* Avatar */}
                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs shrink-0 ${progress.isCompleted ? 'bg-green-500' : 'bg-jci-blue'}`}>
-                      {(member.fullName || member.name || '?').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                      {(member.general?.fullName || member.general?.name || '?').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
                     </div>
                     {/* Name + join date + dots */}
                     <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-sm text-slate-900 truncate">{member.fullName || member.name}</div>
+                      <div className="font-semibold text-sm text-slate-900 truncate">{member.general?.fullName || member.general?.name}</div>
                       <div className="flex items-center gap-1.5 mt-0.5">
-                        {member.membershipType && (
-                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">{member.membershipType}</span>
+                        {member.jciCareer?.membershipType && (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">{member.jciCareer?.membershipType}</span>
                         )}
-                        <span className="text-[11px] text-slate-400">Joined {member.joinDate}</span>
+                        <span className="text-[11px] text-slate-400">Joined {member.jciCareer?.joinDate}</span>
                       </div>
                       <div className="flex gap-1 mt-1">
                         {progress.requirements.map((req, i) => (

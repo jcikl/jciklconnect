@@ -50,7 +50,7 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
             const newClub: Omit<HobbyClub, 'id' | 'membersCount'> = {
                 name: formData.get('name') as string,
                 category: (formData.get('category') as HobbyClub['category']) || 'Social',
-                lead: member?.name || '',
+                lead: member?.general?.name || '',
                 image: formData.get('image') as string || getInitialsSvg(formData.get('name') as string, 200),
             };
 
@@ -102,7 +102,7 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
     };
 
     const isOwner = (club: HobbyClub) => {
-        return member && club.lead === member.name;
+        return member && club.lead === (member.general?.name || member.id);
     };
 
     const CATEGORY_STYLES: Record<string, string> = {
@@ -601,7 +601,7 @@ const ClubMembersModal: React.FC<ClubMembersModalProps> = ({ isOpen, onClose, cl
     };
 
     const clubMembers = members.filter(m => clubMemberIds.includes(m.id));
-    const isOwner = currentMember && club.lead === (currentMember.general?.name ?? currentMember.name);
+    const isOwner = currentMember && club.lead === (currentMember.general?.name || currentMember.id);
 
     return (
         <>
@@ -621,18 +621,18 @@ const ClubMembersModal: React.FC<ClubMembersModalProps> = ({ isOpen, onClose, cl
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 rounded-full bg-jci-blue text-white flex items-center justify-center font-semibold">
-                                            {(member.general?.name ?? member.name).charAt(0).toUpperCase()}
+                                            {(member.general?.name ?? '?').charAt(0).toUpperCase()}
                                         </div>
                                         <div>
-                                            <p className="font-semibold text-slate-900">{member.general?.name ?? member.name}</p>
-                                            <p className="text-xs text-slate-500">{member.contact?.email ?? member.email}</p>
+                                            <p className="font-semibold text-slate-900">{member.general?.name}</p>
+                                            <p className="text-xs text-slate-500">{member.contact?.email ?? member.contact?.email}</p>
                                         </div>
                                     </div>
                                     {isOwner && member.id !== currentMember?.id && (
                                         <Button
                                             variant="ghost"
                                             size="sm"
-                                            onClick={() => setConfirmState({ open: true, title: 'Remove Member', message: `Remove ${member.general?.name ?? member.name} from ${club.name}?`, variant: 'warning', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); try { await onRemoveMember(member.id); await loadMembers(); } catch (err) { /* Error handled */ } } })}
+                                            onClick={() => setConfirmState({ open: true, title: 'Remove Member', message: `Remove ${member.name ?? member.name} from ${club.name}?`, variant: 'warning', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); try { await onRemoveMember(member.id); await loadMembers(); } catch (err) { /* Error handled */ } } })}
                                             className="text-red-500 hover:text-red-700"
                                         >
                                             Remove

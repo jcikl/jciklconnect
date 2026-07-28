@@ -240,7 +240,7 @@ export const ProjectGanttChart: React.FC<ProjectGanttChartProps> = ({
       // Find the name of the person assigned to this role
       // We take the first non-empty assignee from the tasks in this role
       const firstAssignee = roleTasks.find(t => t.assignees.length > 0)?.assignees[0];
-      const memberName = firstAssignee ? (members.find(m => m.id === firstAssignee)?.name || '') : '';
+      const memberName = firstAssignee ? (members.find(m => m.id === firstAssignee)?.general?.name || '') : '';
       const headerName = memberName ? `${role} (${memberName})` : role;
 
       // Add a header for the group (type 'project')

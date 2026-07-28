@@ -144,7 +144,7 @@ export const BoardTransitionTools: React.FC<BoardTransitionToolsProps> = ({
 
   const getMemberName = (memberId: string): string => {
     const member = allMembers.find(m => m.id === memberId);
-    return member?.name || 'Unknown Member';
+    return member?.general?.name || 'Unknown Member';
   };
 
   const getPositionColor = (position: string): string => {
@@ -510,14 +510,14 @@ export const BoardTransitionTools: React.FC<BoardTransitionToolsProps> = ({
                             { value: '', label: 'Select Member' },
                             ...allMembers
                               .filter(m => m.role !== UserRole.BOARD) // Exclude current board members
-                              .map(m => ({ value: m.id, label: m.name }))
+                              .map(m => ({ value: m.id, label: m.general?.name }))
                           ]}
                         >
                           <option value="">Select Member</option>
                           {allMembers
                             .filter(m => m.role !== UserRole.BOARD)
                             .map(m => (
-                              <option key={m.id} value={m.id}>{m.name}</option>
+                              <option key={m.id} value={m.id}>{m.general?.name}</option>
                             ))}
                         </Forms.Select>
 

@@ -130,14 +130,14 @@ export const ProjectTrainerTab: React.FC<ProjectTrainerTabProps> = ({ project, o
                         next[rowIndex].memberId = value;
                         if (value) {
                           const member = members.find(m => m.id === value);
-                          if (member) next[rowIndex].name = member.name || '';
+                          if (member) next[rowIndex].name = member.general?.name || '';
                         }
                         return next;
                       });
                     }}
                     selfOption={false}
                     showLookupFields={false}
-                    getOptionLabel={(m) => m.fullName ? `${m.name} (${m.fullName})` : m.name}
+                    getOptionLabel={(m) => m.general?.fullName ? `${m.general?.name} (${m.general?.fullName})` : m.general?.name}
                   />
                 </div>
                 <div className="flex-1 min-w-[120px]">

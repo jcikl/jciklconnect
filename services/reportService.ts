@@ -153,7 +153,7 @@ export class ReportService {
           let filteredMembers = members;
           if (options.startDate && options.endDate) {
             filteredMembers = members.filter(m => {
-              const joinDate = new Date(m.joinDate);
+              const joinDate = new Date(m.jciCareer?.joinDate);
               return joinDate >= options.startDate! && joinDate <= options.endDate!;
             });
           }
@@ -174,7 +174,7 @@ export class ReportService {
               totalMembers: filteredMembers.length,
               activeMembers: filteredMembers.filter(m => m.duesStatus === 'Paid').length,
               newMembers: filteredMembers.filter(m => {
-                const joinDate = new Date(m.joinDate);
+                const joinDate = new Date(m.jciCareer?.joinDate);
                 const thirtyDaysAgo = new Date();
                 thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
                 return joinDate >= thirtyDaysAgo;
@@ -378,26 +378,26 @@ export class ReportService {
     let filtered = members;
     if (options.startDate && options.endDate) {
       filtered = members.filter(m => {
-        const d = new Date(m.joinDate || m.joinedDate || '');
+        const d = new Date(m.jciCareer?.joinDate || m.jciCareer?.joinDate || '');
         return d >= options.startDate! && d <= options.endDate!;
       });
     }
 
     const rows: MykdRow[] = filtered.map((m, i) => {
-      const dob = m.general?.dob || m.dob || m.dateOfBirth || '';
-      const race = (m.general?.race || m.general?.ethnicity || m.race || m.ethnicity || '') as string;
+      const dob = m.general?.dob || m.general?.dob || m.general?.dob || '';
+      const race = (m.general?.race || m.general?.ethnicity || m.general?.race || m.general?.ethnicity || '') as string;
       return {
         no: i + 1,
-        fullName: m.general?.name || m.fullName || m.name || '',
-        nationalId: m.general?.idNumber || m.nationalId || m.idNumber || '',
+        fullName: m.general?.name || m.general?.fullName || m.general?.name || '',
+        nationalId: m.general?.idNumber || m.general?.idNumber || m.general?.idNumber || '',
         age: dob ? calcAge(dob) : '',
         ethnicity: race,
         birthDate: dob,
-        birthPlace: (m.general as any)?.birthPlace || m.birthPlace || '',
-        occupation: m.business?.position || m.title || m.profession || m.departmentAndPosition || '',
-        homeAddress: m.contact?.address || m.address || '',
-        contactNumber: m.contact?.phone || m.phone || '',
-        email: m.contact?.email || m.email || '',
+        birthPlace: (m.general as any)?.general?.birthPlace || m.general?.birthPlace || '',
+        occupation: m.business?.position || m.business?.position || m.business?.position || m.business?.departmentAndPosition || '',
+        homeAddress: m.contact?.address || m.contact?.address || '',
+        contactNumber: m.contact?.phone || m.contact?.phone || '',
+        email: m.contact?.email || m.contact?.email || '',
       };
     });
 
@@ -477,13 +477,13 @@ export class ReportService {
     const breakdown: Record<string, { income: number; expenses: number }> = {};
     
     transactions.forEach(t => {
-      if (!breakdown[t.category]) {
-        breakdown[t.category] = { income: 0, expenses: 0 };
+      if (!breakdown[t.business?.businessCategory]) {
+        breakdown[t.business?.businessCategory] = { income: 0, expenses: 0 };
       }
       if (t.type === 'Income') {
-        breakdown[t.category].income += t.amount;
+        breakdown[t.business?.businessCategory].income += t.amount;
       } else {
-        breakdown[t.category].expenses += t.amount;
+        breakdown[t.business?.businessCategory].expenses += t.amount;
       }
     });
 

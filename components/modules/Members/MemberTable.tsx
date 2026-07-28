@@ -14,7 +14,7 @@ const getInitialsSvg = (name: string, size = 48): string => {
 };
 
 const getMemberAge = (member: Member): number | null => {
-  const dob = member.dateOfBirth || member.general?.dob;
+  const dob = member.general?.dob || member.general?.dob;
   if (!dob) return null;
   const birth = new Date(dob);
   if (isNaN(birth.getTime())) return null;
@@ -29,7 +29,7 @@ const getMemberAge = (member: Member): number | null => {
 export const getAttendanceDisplay = (m: Member) => {
   const year = new Date().getFullYear();
   const months = MembersService.computeAttendanceMonths(m.jciCareer?.joinDate);
-  const checkins = m.attendanceYear === year ? (m.attendanceCheckins || 0) : 0;
+  const checkins = m.jciCareer?.attendanceYear === year ? (m.jciCareer?.attendanceCheckins || 0) : 0;
   return { checkins, months, text: `${checkins} / ${months}`, ratio: Math.min(100, (checkins / months) * 100) };
 };
 
@@ -94,10 +94,10 @@ const DesktopMemberRow = React.memo(function DesktopMemberRow({
       {/* Member */}
       <div className="px-6 flex-1 min-w-0">
         <div className="flex items-center space-x-3">
-          <img src={member.avatar || undefined} alt={member.name} className="w-10 h-10 rounded-full bg-slate-200 shrink-0" onError={(e) => { e.currentTarget.src = getInitialsSvg(member.name, 40); }} />
+          <img src={member.general?.avatarUrl || undefined} alt={member.general?.name} className="w-10 h-10 rounded-full bg-slate-200 shrink-0" onError={(e) => { e.currentTarget.src = getInitialsSvg(member.general?.name, 40); }} />
           <div className="min-w-0">
-            <div className="font-medium text-slate-900 truncate">{member.name}</div>
-            <div className="text-xs text-slate-500 truncate">{member.email}</div>
+            <div className="font-medium text-slate-900 truncate">{member.general?.name}</div>
+            <div className="text-xs text-slate-500 truncate">{member.contact?.email}</div>
           </div>
         </div>
       </div>
@@ -165,7 +165,7 @@ const MobileMemberRow = React.memo(function MobileMemberRow({
   const riskHigh = member.churnRisk === 'High';
   const riskMed = member.churnRisk === 'Medium';
   const att = getAttendanceDisplay(member);
-  const displayType = getDisplayMembershipType ? getDisplayMembershipType(member) : ((member.membershipType as MembershipType) || 'Probation');
+  const displayType = getDisplayMembershipType ? getDisplayMembershipType(member) : ((member.jciCareer?.membershipType as MembershipType) || 'Probation');
   const age = getMemberAge(member);
 
   return (
@@ -189,20 +189,20 @@ const MobileMemberRow = React.memo(function MobileMemberRow({
         </div>
 
         {/* Avatar */}
-        {member.avatar ? (
-          <img src={member.avatar} alt={member.name}
+        {member.general?.avatarUrl ? (
+          <img src={member.general?.avatarUrl} alt={member.general?.name}
             className="w-10 h-10 rounded-2xl object-cover bg-slate-200 shrink-0 border border-slate-100"
-            onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = getInitialsSvg(member.name, 40); }} />
+            onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = getInitialsSvg(member.general?.name, 40); }} />
         ) : (
           <div className={`w-10 h-10 rounded-2xl shrink-0 flex items-center justify-center text-white font-black text-sm ${tierColor}`}>
-            {member.name.charAt(0)}
+            {member.general?.name.charAt(0)}
           </div>
         )}
 
         {/* Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="font-bold text-slate-900 text-sm truncate">{member.name}</span>
+            <span className="font-bold text-slate-900 text-sm truncate">{member.general?.name}</span>
             {isBoard && (
               <span className="bg-jci-blue/10 text-jci-blue text-[9px] font-black px-1.5 py-0.5 rounded-md shrink-0">BOD</span>
             )}
@@ -210,7 +210,7 @@ const MobileMemberRow = React.memo(function MobileMemberRow({
             {riskMed && <span className="bg-amber-100 text-amber-600 text-[9px] font-black px-1.5 py-0.5 rounded-md shrink-0">Monitor</span>}
           </div>
           <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-[11px] text-slate-400 truncate">{member.email}</span>
+            <span className="text-[11px] text-slate-400 truncate">{member.contact?.email}</span>
           </div>
           {/* Mini stats bar */}
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">

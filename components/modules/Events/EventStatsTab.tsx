@@ -21,7 +21,7 @@ const EventStatsTabBase: React.FC<EventStatsTabProps> = ({ participations, membe
   const dietaryCounts = { normal: 0, vegetarian: 0, halal: 0, unspecified: 0 };
   activeRegs.forEach(r => {
     const mem = members.find(m => m.id === r.memberId);
-    const dietary = r.dietary ?? ((mem?.general?.dietaryPreference ?? mem?.dietaryPreference) as 'normal' | 'vegetarian' | 'halal' | null | undefined) ?? null;
+    const dietary = r.dietary ?? ((mem?.general?.dietaryPreference ?? mem?.general?.dietaryPreference) as 'normal' | 'vegetarian' | 'halal' | null | undefined) ?? null;
     if (dietary === 'vegetarian') dietaryCounts.vegetarian++;
     else if (dietary === 'halal') dietaryCounts.halal++;
     else if (dietary === 'normal') dietaryCounts.normal++;
@@ -31,7 +31,7 @@ const EventStatsTabBase: React.FC<EventStatsTabProps> = ({ participations, membe
   const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
   const sizeCounts = activeRegs.reduce<Record<string, number>>((acc, r) => {
     const mem = members.find(m => m.id === r.memberId);
-    const size = r.tshirtSize ?? mem?.tshirtSize ?? null;
+    const size = r.tshirtSize ?? mem?.others?.tshirtSize ?? null;
     if (size) acc[size] = (acc[size] ?? 0) + 1;
     return acc;
   }, {});

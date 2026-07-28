@@ -42,7 +42,7 @@ import { MembersService } from '../../services/membersService';
 const getAttendanceDisplay = (m: Member) => {
   const year = new Date().getFullYear();
   const months = MembersService.computeAttendanceMonths(m.jciCareer?.joinDate);
-  const checkins = m.attendanceYear === year ? (m.attendanceCheckins || 0) : 0;
+  const checkins = m.jciCareer?.attendanceYear === year ? (m.jciCareer?.attendanceCheckins || 0) : 0;
   return { checkins, months, text: `${checkins} / ${months}`, ratio: Math.min(100, (checkins / months) * 100) };
 };
 import { MEMBER_SELF_EDITABLE_FIELDS, NATIONALITY_OPTIONS, JOIN_US_SURVEY_QUESTIONS, nationalityOptionsForValue } from '../../config/constants';
@@ -180,13 +180,13 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
   const getMemberDisplayMembershipType = useCallback((member: Member): MembershipType =>
     computeMembershipTypeFromMember(
       {
-        nationality: member.nationality,
-        dateOfBirth: member.dateOfBirth,
-        senatorCertified: member.senatorCertified,
-        senatorshipId: member.senatorshipId,
-        senatorshipBoardValidated: member.senatorshipBoardValidated,
+        nationality: member.general?.nationality,
+        dateOfBirth: member.general?.dob,
+        senatorCertified: member.jciCareer?.senatorship?.certified,
+        senatorshipId: member.jciCareer?.senatorship?.senatorNumber,
+        senatorshipBoardValidated: member.jciCareer?.senatorship?.boardValidated,
         role: member.role,
-        membershipType: member.membershipType,
+        membershipType: member.jciCareer?.membershipType,
       },
       membershipRules
     ), [membershipRules]);

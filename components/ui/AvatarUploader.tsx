@@ -64,7 +64,7 @@ export const AvatarUploader: React.FC<AvatarUploaderProps> = ({
   return (
     <div className="flex items-center gap-4">
       <img
-        src={currentUrl || getInitialsSvg(member.name ?? '')}
+        src={currentUrl || getInitialsSvg(member.general?.name ?? '')}
         alt="Avatar"
         className="w-16 h-16 rounded-full object-cover border border-slate-200 shrink-0"
       />

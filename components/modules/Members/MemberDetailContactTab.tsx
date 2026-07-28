@@ -30,7 +30,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                 <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Primary Phone</label>
                 <input
                   type="text"
-                  value={inlineValues.phone}
+                  value={inlineValues.contact?.phone}
                   onChange={e => setInlineValues({ ...inlineValues, phone: e.target.value })}
                   className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                 />
@@ -39,7 +39,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                 <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Alternate Phone</label>
                 <input
                   type="text"
-                  value={inlineValues.alternatePhone}
+                  value={inlineValues.contact?.alternatePhone}
                   onChange={e => setInlineValues({ ...inlineValues, alternatePhone: e.target.value })}
                   className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                 />
@@ -48,7 +48,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                 <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Email</label>
                 <input
                   type="email"
-                  value={inlineValues.email}
+                  value={inlineValues.contact?.email}
                   onChange={e => setInlineValues({ ...inlineValues, email: e.target.value })}
                   className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                 />
@@ -56,7 +56,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
               <div>
                 <label className="text-slate-500 block text-xs uppercase font-medium mb-1">WhatsApp Group Added</label>
                 <select
-                  value={inlineValues.whatsappGroup ? 'Yes' : 'No'}
+                  value={inlineValues.contact?.whatsappJoined ? 'Yes' : 'No'}
                   onChange={e => setInlineValues({ ...inlineValues, whatsappGroup: e.target.value === 'Yes' })}
                   className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
                 >
@@ -68,7 +68,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                 <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Address</label>
                 {canViewSensitiveFields ? (
                   <textarea
-                    value={inlineValues.address}
+                    value={inlineValues.contact?.address}
                     onChange={e => setInlineValues({ ...inlineValues, address: e.target.value })}
                     rows={2}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue resize-y"
@@ -86,7 +86,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Name</label>
                   <input
                     type="text"
-                    value={inlineValues.emergencyContactName}
+                    value={inlineValues.contact?.emergency?.name}
                     onChange={e => setInlineValues({ ...inlineValues, emergencyContactName: e.target.value })}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                   />
@@ -95,7 +95,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Relationship</label>
                   <input
                     type="text"
-                    value={inlineValues.emergencyContactRelationship}
+                    value={inlineValues.contact?.emergency?.relationship}
                     onChange={e => setInlineValues({ ...inlineValues, emergencyContactRelationship: e.target.value })}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                   />
@@ -104,7 +104,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Phone</label>
                   <input
                     type="text"
-                    value={inlineValues.emergencyContactPhone}
+                    value={inlineValues.contact?.emergency?.phone}
                     onChange={e => setInlineValues({ ...inlineValues, emergencyContactPhone: e.target.value })}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                   />
@@ -119,7 +119,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                   <label className="text-slate-500 block text-xs font-medium mb-1">LinkedIn</label>
                   <input
                     type="text"
-                    value={inlineValues.linkedin}
+                    value={inlineValues.contact?.socials?.linkedin}
                     onChange={e => setInlineValues({ ...inlineValues, linkedin: e.target.value })}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                   />
@@ -128,7 +128,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                   <label className="text-slate-500 block text-xs font-medium mb-1">Facebook</label>
                   <input
                     type="text"
-                    value={inlineValues.facebook}
+                    value={inlineValues.contact?.socials?.facebook}
                     onChange={e => setInlineValues({ ...inlineValues, facebook: e.target.value })}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                   />
@@ -137,7 +137,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                   <label className="text-slate-500 block text-xs font-medium mb-1">Instagram</label>
                   <input
                     type="text"
-                    value={inlineValues.instagram}
+                    value={inlineValues.contact?.socials?.instagram}
                     onChange={e => setInlineValues({ ...inlineValues, instagram: e.target.value })}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                   />
@@ -146,7 +146,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                   <label className="text-slate-500 block text-xs font-medium mb-1">WeChat ID</label>
                   <input
                     type="text"
-                    value={inlineValues.wechat}
+                    value={inlineValues.contact?.socials?.wechat}
                     onChange={e => setInlineValues({ ...inlineValues, wechat: e.target.value })}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                   />
@@ -163,7 +163,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                 </div>
                 <div>
                   <p className="text-xs text-slate-500 uppercase font-medium">Primary Phone</p>
-                  <p className="text-sm font-bold">{member.phone || 'N/A'}</p>
+                  <p className="text-sm font-bold">{member.contact?.phone || 'N/A'}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -172,7 +172,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                 </div>
                 <div>
                   <p className="text-xs text-slate-500 uppercase font-medium">Alternate Phone</p>
-                  <p className="text-sm font-bold">{member.alternatePhone || 'N/A'}</p>
+                  <p className="text-sm font-bold">{member.contact?.alternatePhone || 'N/A'}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -181,7 +181,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                 </div>
                 <div>
                   <p className="text-xs text-slate-500 uppercase font-medium">WhatsApp Group</p>
-                  <p className="text-sm font-bold">{member.whatsappGroup ? 'Yes' : 'Not Added'}</p>
+                  <p className="text-sm font-bold">{member.contact?.whatsappJoined ? 'Yes' : 'Not Added'}</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
@@ -191,7 +191,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                 <div>
                   <p className="text-xs text-slate-500 uppercase font-medium">Address</p>
                   {canViewSensitiveFields
-                    ? <p className="text-sm text-slate-700">{member.address || 'No address on file'}</p>
+                    ? <p className="text-sm text-slate-700">{member.contact?.address || 'No address on file'}</p>
                     : <RestrictedField />}
                 </div>
               </div>
@@ -200,22 +200,22 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
             <div className="space-y-4">
               <h4 className="text-xs font-bold text-slate-400 uppercase border-b pb-1">Emergency Contact</h4>
               <div>
-                <p className="text-sm font-bold text-slate-900">{member.emergencyContactName || 'None Listed'}</p>
-                <p className="text-xs text-slate-500">{member.emergencyContactRelationship} • {member.emergencyContactPhone}</p>
+                <p className="text-sm font-bold text-slate-900">{member.contact?.emergency?.name || 'None Listed'}</p>
+                <p className="text-xs text-slate-500">{member.contact?.emergency?.relationship} • {member.contact?.emergency?.phone}</p>
               </div>
 
               <h4 className="text-xs font-bold text-slate-400 uppercase border-b pb-1 mt-4">Social Media</h4>
               <div className="flex gap-4 items-center">
-                {member.linkedin
-                  ? <a href={member.linkedin} target="_blank" rel="noreferrer" className="text-[#0077B5]"><Linkedin size={20} /></a>
+                {member.contact?.socials?.linkedin
+                  ? <a href={member.contact?.socials?.linkedin} target="_blank" rel="noreferrer" className="text-[#0077B5]"><Linkedin size={20} /></a>
                   : <Linkedin size={20} className="text-slate-300" />}
-                {member.facebook
-                  ? <a href={member.facebook} target="_blank" rel="noreferrer" className="text-[#1877F2]"><Facebook size={20} /></a>
+                {member.contact?.socials?.facebook
+                  ? <a href={member.contact?.socials?.facebook} target="_blank" rel="noreferrer" className="text-[#1877F2]"><Facebook size={20} /></a>
                   : <Facebook size={20} className="text-slate-300" />}
-                {member.instagram
-                  ? <a href={member.instagram} target="_blank" rel="noreferrer" className="text-[#E1306C]"><Instagram size={20} /></a>
+                {member.contact?.socials?.instagram
+                  ? <a href={member.contact?.socials?.instagram} target="_blank" rel="noreferrer" className="text-[#E1306C]"><Instagram size={20} /></a>
                   : <Instagram size={20} className="text-slate-300" />}
-                {member.wechat
+                {member.contact?.socials?.wechat
                   ? <div className="text-[#07C160] flex items-center gap-1"><MessageCircle size={20} /></div>
                   : <MessageCircle size={20} className="text-slate-300" />}
               </div>

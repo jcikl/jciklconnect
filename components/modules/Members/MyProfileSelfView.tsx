@@ -90,9 +90,9 @@ export const MyProfileSelfView: React.FC<{ member: Member; onSave: (updates: Par
     <div className="space-y-6">
       <Card className="p-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div><span className="text-slate-500">Name</span><p className="font-medium">{member.name}</p></div>
+          <div><span className="text-slate-500">Name</span><p className="font-medium">{member.general?.name}</p></div>
           <div><span className="text-slate-500">Role</span><p className="font-medium">{member.role}</p></div>
-          <div><span className="text-slate-500">Join date</span><p className="font-medium">{formatDateToDDMMMYYYY(member.joinDate)}</p></div>
+          <div><span className="text-slate-500">Join date</span><p className="font-medium">{formatDateToDDMMMYYYY(member.jciCareer?.joinDate)}</p></div>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           {MEMBER_SELF_EDITABLE_FIELDS.map((key) => (
@@ -142,15 +142,15 @@ export const MyProfileSelfView: React.FC<{ member: Member; onSave: (updates: Par
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <div>
             <span className="text-slate-500 text-sm">Dues Status ({new Date().getFullYear()})</span>
-            <p className="font-medium capitalize">{member.membership?.[String(new Date().getFullYear())]?.status || 'pending'}</p>
+            <p className="font-medium capitalize">{member.jciCareer?.membershipDuesHistory?.[String(new Date().getFullYear())]?.status || 'pending'}</p>
           </div>
           <div>
             <span className="text-slate-500 text-sm">Total Paid This Year</span>
-            <p className="font-medium">RM {member.membership?.[String(new Date().getFullYear())]?.amount || 0}</p>
+            <p className="font-medium">RM {member.jciCareer?.membershipDuesHistory?.[String(new Date().getFullYear())]?.amount || 0}</p>
           </div>
           <div>
             <span className="text-slate-500 text-sm">Last Payment Date</span>
-            <p className="font-medium">{formatDateToDDMMMYYYY(member.membership?.[String(new Date().getFullYear())]?.paymentDate)}</p>
+            <p className="font-medium">{formatDateToDDMMMYYYY(member.jciCareer?.membershipDuesHistory?.[String(new Date().getFullYear())]?.paymentDate)}</p>
           </div>
         </div>
         {loadingExtra ? (

@@ -256,7 +256,7 @@ export const EngagementAutoSuggestService = {
   ): Promise<void> {
     const memberDoc = await MembersService.getMemberById(memberId);
     if (!memberDoc) throw new Error('Member not found');
-    const existing = (memberDoc.jciCareer?.engagementProgress ?? memberDoc.engagementProgress)?.[year]?.[requirementKey];
+    const existing = (memberDoc.jciCareer?.engagementProgress ?? memberDoc.jciCareer?.engagementProgress)?.[year]?.[requirementKey];
     if (!existing) throw new Error('Requirement not found');
 
     await PromotionService.saveEngagementRequirement(memberId, year, requirementKey, {

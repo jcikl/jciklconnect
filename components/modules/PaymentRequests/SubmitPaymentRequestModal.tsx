@@ -71,7 +71,7 @@ export const SubmitPaymentRequestModal: React.FC<SubmitPaymentRequestModalProps>
     setFormAttachments([]);
 
     if (user || member) {
-      setFormApplicantName(member?.name || user?.displayName || '');
+      setFormApplicantName(member?.general?.name || user?.displayName || '');
       setFormApplicantEmail(user?.email || '');
       // SEC-A-003: Bank account details are no longer persisted in localStorage (PII risk).
       // Pre-populate from the member's existing paymentInfo stored in Firestore instead.
@@ -118,7 +118,7 @@ export const SubmitPaymentRequestModal: React.FC<SubmitPaymentRequestModalProps>
         const adminIds = getAdministrativeProjectIds();
         const allProjects = await ProjectsService.getAllProjects();
         const adminProjects = allProjects.filter(p => adminIds.includes(p.id));
-        setAdminAccountOptions(adminProjects.map(p => p.name));
+        setAdminAccountOptions(adminProjects.map(p => p.name || p.title));
       } catch { /* ignore */ }
     };
     load();
@@ -274,8 +274,8 @@ export const SubmitPaymentRequestModal: React.FC<SubmitPaymentRequestModalProps>
                 onChange={(id) => {
                   setFormApplicantId(id);
                   const sel = memberOptions.find(m => m.id === id);
-                  if (sel) { setFormApplicantName(sel.name); setFormApplicantEmail(sel.email); }
-                  else if (id === '') { setFormApplicantName(member?.name || user?.displayName || ''); setFormApplicantEmail(user?.email || ''); }
+                  if (sel) { setFormApplicantName(sel.general?.name); setFormApplicantEmail(sel.contact?.email ?? (sel as any).email); }
+                  else if (id === '') { setFormApplicantName(member?.general?.name || user?.displayName || ''); setFormApplicantEmail(user?.email || ''); }
                 }}
                 selfOption
                 selfLabel="Self"
@@ -301,7 +301,7 @@ export const SubmitPaymentRequestModal: React.FC<SubmitPaymentRequestModalProps>
               </div>
               {formCategory === 'projects_activities' ? (
                 <Select label="Associated Project" value={formActivityId} onChange={(e) => { if (!preselectedProjectId) setFormActivityId(e.target.value); }}
-                  options={[{ value: '', label: 'Select a project...' }, ...projects.map(p => ({ value: p.id, label: p.name }))]} required
+                  options={[{ value: '', label: 'Select a project...' }, ...projects.map(p => ({ value: p.id, label: p.name || p.title }))]} required
                   disabled={!!preselectedProjectId} className={preselectedProjectId ? 'bg-slate-50 cursor-not-allowed' : ''} />
               ) : (
                 <div>

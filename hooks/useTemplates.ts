@@ -36,7 +36,7 @@ export const useTemplates = () => {
     try {
       const id = await TemplatesService.createEventTemplate({
         ...templateData,
-        createdBy: member?.name,
+        createdBy: member?.general?.name,
       });
       await reloadEventTemplates();
       showToast('Event template created successfully', 'success');
@@ -77,7 +77,7 @@ export const useTemplates = () => {
     try {
       const id = await TemplatesService.createActivityPlanTemplate({
         ...templateData,
-        createdBy: member?.name,
+        createdBy: member?.general?.name,
       });
       await reloadActivityPlanTemplates();
       showToast('Activity plan template created successfully', 'success');
@@ -118,7 +118,7 @@ export const useTemplates = () => {
     try {
       const id = await TemplatesService.createEventBudgetTemplate({
         ...templateData,
-        createdBy: member?.name,
+        createdBy: member?.general?.name,
       });
       await reloadEventBudgetTemplates();
       showToast('Event budget template created successfully', 'success');

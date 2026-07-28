@@ -215,28 +215,28 @@ export const JCIKLApp: React.FC = () => {
       // Commission Director set: all member IDs listed as commission directors
       const commissionDirectorSet = new Set<string>();
       boardMembers.forEach(b => {
-        boardPositionMap.set(b.memberId, b.position || 'Board');
+        boardPositionMap.set(b.memberId, b.business?.position || 'Board');
         (b.commissionDirectorIds || []).forEach(id => commissionDirectorSet.add(id));
       });
 
       const enriched = all.map(m => {
         const isBoard = boardPositionMap.has(m.id);
         const isCommDir = !isBoard && commissionDirectorSet.has(m.id);
-        const isProbation = !isBoard && !isCommDir && !!(m.probationTasks);
+        const isProbation = !isBoard && !isCommDir && !!(m.jciCareer?.probationTasks);
         // sortOrder: Board=0, CommDir=1, Member=2, Probation=3
         const sortOrder = isBoard ? 0 : isCommDir ? 1 : isProbation ? 3 : 2;
         return {
           id: m.id,
-          name: m.fullName || m.name || m.id,
+          name: m.general?.fullName || m.general?.name || m.id,
           label: isBoard
             ? 'Board'
             : isCommDir ? 'Comm. Director'
               : isProbation ? 'Probation'
                 : 'Member',
           labelColor: isBoard ? 'purple' : isCommDir ? 'teal' : isProbation ? 'amber' : 'blue',
-          avatar: m.avatarUrl || m.general?.avatarUrl || undefined,
+          avatar: m.general?.avatarUrl || m.general?.avatarUrl || undefined,
           sortOrder,
-          sortName: m.fullName || m.name || '',
+          sortName: m.general?.fullName || m.general?.name || '',
         };
       });
 
@@ -284,14 +284,14 @@ export const JCIKLApp: React.FC = () => {
     const currentYear = new Date().getFullYear();
     const totalMembers = members.length;
     const activeMembers = members.filter(m => {
-      const record = m.membership?.[currentYear];
+      const record = m.jciCareer?.membershipDuesHistory?.[currentYear];
       const isPaid = record?.status === 'paid' || record?.status === 'over paid';
       return m.role !== UserRole.GUEST && isPaid;
     }).length;
 
     const newMembersThisMonth = members.filter(m => {
-      if (!m.joinDate) return false;
-      const joinDate = new Date(m.joinDate);
+      if (!m.jciCareer?.joinDate) return false;
+      const joinDate = new Date(m.jciCareer?.joinDate);
       const now = new Date();
       return joinDate.getMonth() === now.getMonth() && joinDate.getFullYear() === now.getFullYear();
     }).length;
@@ -342,7 +342,7 @@ export const JCIKLApp: React.FC = () => {
   const allNotifications = notifications;
   const unreadNotifications = allNotifications.filter(n => !n.read);
 
-  // Sync document.title for accessibility (WCAG 2.4.2)
+  // Sync document.business?.position for accessibility (WCAG 2.4.2)
   React.useEffect(() => {
     const titles: Partial<Record<ViewType, string>> = {
       GUEST: 'Home',
@@ -1162,7 +1162,7 @@ export const JCIKLApp: React.FC = () => {
                         <Shield size={11} className="text-purple-300 shrink-0" />
                         <span className="hidden sm:inline">
                           {simulatedMemberId && member
-                            ? `${(member.fullName || member.name || 'Member').split(' ')[0]} (${simulatedRole})`
+                            ? `${(member.general?.fullName || member.general?.name || 'Member').split(' ')[0]} (${simulatedRole})`
                             : simulatedRole ? `${simulatedRole} Mode` : 'Dev/Admin'}
                         </span>
                         <ChevronDown size={10} className={`text-white/60 transition-transform duration-200 ${isSimulateDropdownOpen ? 'rotate-180' : ''}`} />
@@ -1397,11 +1397,11 @@ export const JCIKLApp: React.FC = () => {
                 className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 h-full"
               >
                 <div className={`rounded-xl overflow-hidden transition-all duration-200 ${showMobileMenu ? 'ring-2 ring-jci-blue ring-offset-1 ring-offset-transparent' : ''}`}>
-                  {member?.avatar ? (
-                    <img src={member.avatar} alt={member?.name || 'Me'} className="w-8 h-8 rounded-xl object-cover" />
+                  {member?.general?.avatarUrl ? (
+                    <img src={member.general?.avatarUrl} alt={member?.general?.name || 'Me'} className="w-8 h-8 rounded-xl object-cover" />
                   ) : (
                     <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black ${showMobileMenu ? 'bg-jci-blue text-white' : ('bg-white/10 text-slate-300')}`}>
-                      {(member?.name || 'M').charAt(0).toUpperCase()}
+                      {(member?.general?.name || 'M').charAt(0).toUpperCase()}
                     </div>
                   )}
                 </div>
@@ -1430,18 +1430,18 @@ export const JCIKLApp: React.FC = () => {
                     onClick={() => { handleViewChange('MEMBERS', member?.id); setShowMobileMenu(false); }}
                   >
                     <div className="relative shrink-0">
-                      {member?.avatar ? (
-                        <img src={member.avatar} alt={member?.name || ''} className="w-12 h-12 rounded-full object-cover border-2 border-white/20" />
+                      {member?.general?.avatarUrl ? (
+                        <img src={member.general?.avatarUrl} alt={member?.general?.name || ''} className="w-12 h-12 rounded-full object-cover border-2 border-white/20" />
                       ) : (
                         <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-black ${'bg-jci-blue text-white'}`}>
-                          {(member?.name || 'M').charAt(0).toUpperCase()}
+                          {(member?.general?.name || 'M').charAt(0).toUpperCase()}
                         </div>
                       )}
                       <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-400 rounded-full border-2 border-white" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className={`font-black text-sm leading-tight truncate ${'text-white'}`}>{member?.name || 'Member'}</p>
-                      <p className={`text-xs truncate mt-0.5 ${'text-slate-400'}`}>{member?.email || ''}</p>
+                      <p className={`font-black text-sm leading-tight truncate ${'text-white'}`}>{member?.general?.name || 'Member'}</p>
+                      <p className={`text-xs truncate mt-0.5 ${'text-slate-400'}`}>{member?.contact?.email || ''}</p>
                       <div className="flex items-center gap-1.5 mt-1">
                         <span className={`text-[10px] font-bold ${'text-slate-500'}`}>{((member as any)?.yearlyPoints?.[new Date().getFullYear()] ?? member?.points ?? 0)} pts {new Date().getFullYear()}</span>
                       </div>

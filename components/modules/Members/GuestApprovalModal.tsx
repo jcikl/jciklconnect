@@ -11,7 +11,7 @@ import { formatDateToDDMMMYYYY } from '../../../utils/dateUtils';
 const norm = (s?: string | null) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 const findMatchingTransaction = (guest: Member, txs: Transaction[]): Transaction | null => {
-  const names = [norm(guest.name), norm(guest.fullName)].filter(n => n.length >= 3);
+  const names = [norm(guest.general?.name), norm(guest.general?.fullName)].filter(n => n.length >= 3);
   for (const tx of txs) {
     const desc = norm(tx.description);
     const ref = norm(tx.referenceNumber ?? '');
@@ -23,7 +23,7 @@ const findMatchingTransaction = (guest: Member, txs: Transaction[]): Transaction
 };
 
 const hasPaidFee = (guest: Member) =>
-  !!(guest.jciCareer?.hasPaidInitiationFee ?? guest.hasPaidInitiationFee);
+  !!(guest.jciCareer?.hasPaidInitiationFee ?? guest.jciCareer?.hasPaidInitiationFee);
 
 const makeDefaultTasks = () => [
   { id: `task-${Date.now()}-1`, title: 'Attend Orientation Session', description: 'Attend the new member orientation session', status: 'Pending' as const, assignedAt: new Date().toISOString(), category: 'Training' as const },
@@ -54,7 +54,7 @@ export const GuestApprovalModal: React.FC<GuestApprovalModalProps> = ({
     return d.getMonth() >= 9 ? d.getFullYear() + 1 : d.getFullYear();
   };
 
-  const [approvalYear, setApprovalYear] = useState(() => getInitiationYear(guest.joinDate));
+  const [approvalYear, setApprovalYear] = useState(() => getInitiationYear(guest.jciCareer?.joinDate));
   const [matchedTx, setMatchedTx] = useState<Transaction | null>(null);
   const [txLoading, setTxLoading] = useState(false);
   const [unlinkedTxs, setUnlinkedTxs] = useState<Transaction[]>([]);
@@ -91,14 +91,14 @@ export const GuestApprovalModal: React.FC<GuestApprovalModalProps> = ({
       const paidAmount = matchedTx.amount;
       const membershipStatus = paidAmount >= dues ? 'paid' : paidAmount > 0 ? 'partial' : 'pending';
 
-      const memberUpdates: Partial<Member> = {
+      const memberUpdates = {
         role: UserRole.MEMBER,
-        membershipType: 'Probation' as any,
-        probationTasks: makeDefaultTasks() as any,
+        'jciCareer.membershipType': 'Probation',
+        'jciCareer.probationTasks': makeDefaultTasks(),
         probationApprovedBy: approverId,
         probationApprovedAt: new Date().toISOString(),
         membership: {
-          ...(guest.membership || {}),
+          ...(guest.jciCareer?.membershipDuesHistory || {}),
           [yearStr]: {
             year: approvalYear,
             dues,
@@ -128,7 +128,7 @@ export const GuestApprovalModal: React.FC<GuestApprovalModalProps> = ({
   };
 
   return (
-    <Modal isOpen onClose={onClose} title={`Approve Guest: ${guest.name}`}>
+    <Modal isOpen onClose={onClose} title={`Approve Guest: ${guest.general?.name}`}>
       <div className="space-y-4">
         <p className="text-sm text-slate-600">
           Approving this guest will move them to probation member status. They will need to complete probation tasks before becoming an official member.

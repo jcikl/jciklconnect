@@ -153,8 +153,8 @@ export class MentorshipService {
     }
 
     // Industry alignment
-    if (mentor.industry && (mentee.business?.interestedIndustries ?? mentee.interestedIndustries)) {
-      const industryMatch = (mentee.business?.interestedIndustries ?? mentee.interestedIndustries ?? []).some(industry =>
+    if (mentor.industry && (mentee.business?.interestedIndustries ?? mentee.business?.interestedIndustries)) {
+      const industryMatch = (mentee.business?.interestedIndustries ?? mentee.business?.interestedIndustries ?? []).some(industry =>
         industry.toLowerCase().includes(mentor.industry!.toLowerCase())
       );
       if (industryMatch) {
@@ -194,7 +194,7 @@ export class MentorshipService {
     }
 
     // Board history (experienced leaders)
-    if (mentor.boardHistory && mentor.boardHistory.length > 0) {
+    if (mentor.jciCareer?.boardHistory && mentor.jciCareer?.boardHistory.length > 0) {
       score += 10;
       factors.push('Previous board experience');
     }

@@ -46,9 +46,9 @@ import 'swiper/css/pagination';
 
 
 /** membershipType 归一化：兼容旧版小写值（'probation member' / 'official member'…）与缺失值（按角色兜底） */
-const normalizeMembership = (m: { membershipType?: string; role?: UserRole | string } | null): 'probation' | 'full' | 'guest' => {
+const normalizeMembership = (m: { membershipType?: string; role?: UserRole | string; jciCareer?: { membershipType?: string } } | null): 'probation' | 'full' | 'guest' => {
   if (!m) return 'guest';
-  const mt = (m.membershipType || '').toLowerCase();
+  const mt = (m.jciCareer?.membershipType || '').toLowerCase();
   if (mt.includes('probation')) return 'probation';
   if (mt && !mt.includes('guest')) return 'full';
   if (!mt) {
@@ -118,26 +118,26 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     const tabs = [
       {
         label: 'Basic', checks: [
-          { label: 'Profile photo', done: !!(member.avatar || (member as any).general?.avatarUrl) },
-          { label: 'Phone number', done: !!member.phone },
+          { label: 'Profile photo', done: !!(member.general?.avatarUrl || (member as any).general?.avatarUrl) },
+          { label: 'Phone number', done: !!member.contact?.phone },
           { label: 'Company name', done: !!member.companyName },
           { label: 'Industry', done: !!member.industry },
-          { label: 'Apparel & Items', done: !!(member.others?.tshirtSize && member.others?.shirtStyle) || !!(member.tshirtSize && member.shirtStyle) },
+          { label: 'Apparel & Items', done: !!(member.others?.tshirtSize && member.others?.shirtStyle) || !!(member.others?.tshirtSize && member.others?.shirtStyle) },
         ]
       },
       {
         label: 'Contact', checks: [
-          { label: 'Address', done: !!(member.contact?.address ?? member.address) },
-          { label: 'Emergency contact', done: !!(member.contact?.emergency?.name ?? member.emergencyContactName ?? member.emergencyContact) },
+          { label: 'Address', done: !!(member.contact?.address ?? member.contact?.address) },
+          { label: 'Emergency contact', done: !!(member.contact?.emergency?.name) },
         ]
       },
       {
         label: 'Professional', checks: [
-          { label: 'Position / title', done: !!(member.business?.departmentAndPosition ?? member.departmentAndPosition) },
-          { label: 'Business categories', done: Array.isArray(member.businessCategory) && member.businessCategory.length > 0 },
-          { label: 'Company description', done: !!(member.business?.companyDescription ?? member.companyDescription) },
-          { label: 'Ideal referral', done: !!(member.idealReferralIndustry || member.idealReferral) },
-          { label: 'Special member offer', done: !!(member.business?.specialOffer ?? (member as any).specialOffer) },
+          { label: 'Position / title', done: !!(member.business?.departmentAndPosition ?? member.business?.departmentAndPosition) },
+          { label: 'Business categories', done: Array.isArray(member.business?.businessCategory) && member.business?.businessCategory.length > 0 },
+          { label: 'Company description', done: !!(member.business?.companyDescription ?? member.business?.companyDescription) },
+          { label: 'Ideal referral', done: !!(member.idealReferralIndustry || member.business?.idealReferrals) },
+          { label: 'Special member offer', done: !!(member.business?.specialOffer ?? (member as any).business?.specialOffer) },
           { label: 'Company website', done: !!member.business?.companyWebsite },
           { label: 'International business', done: !!member.business?.acceptInternationalBusiness },
           { label: 'Level of management', done: !!member.business?.levelOfManagement },
@@ -270,7 +270,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
   const openJourneyModal = () => {
     if (!member) return;
-    const joinDateStr = typeof member.joinDate === 'string' ? member.joinDate : '';
+    const joinDateStr = typeof member.jciCareer?.joinDate === 'string' ? member.jciCareer?.joinDate : '';
     const joinYear = joinDateStr ? new Date(joinDateStr).getFullYear() : null;
     if (normalizeMembership(member) === 'probation') {
       setJourneyActiveTab('probation');
@@ -329,7 +329,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const currentDay = parseInt(mytTodayStr.slice(3), 10);
   const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }));
   const getDob = (m: any): string | undefined =>
-    m.general?.dob || m.dob || m.dateOfBirth;
+    m.general?.dob || m.general?.dob || m.general?.dob;
 
   const birthdayMembers = React.useMemo(() => {
     return members
@@ -400,14 +400,14 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const isFullMember = membershipKind === 'full';
   // Everyone sees the journey card — guests get the "Join us" upsell version
   const showJourneyCard = true;
-  const joinDateStr = typeof member.joinDate === 'string' ? member.joinDate : '';
+  const joinDateStr = typeof member.jciCareer?.joinDate === 'string' ? member.jciCareer?.joinDate : '';
   const joinYear = joinDateStr ? new Date(joinDateStr).getFullYear() : null;
   const yearsInMembership = joinYear ? new Date().getFullYear() - joinYear : 0;
   // 1st/2nd-year engagement only applies to members who joined in 2025 or later
   const isVeteranMember = isFullMember && joinYear !== null && joinYear < 2025;
   const showEngagementSteps = joinYear === null || joinYear >= 2025;
   // Membership status: Probation Member / Voting Member (Pending dues) / Voting Member
-  const currentYearDuesStatus = member.membership?.[String(new Date().getFullYear())]?.status;
+  const currentYearDuesStatus = member.jciCareer?.membershipDuesHistory?.[String(new Date().getFullYear())]?.status;
   const isDuesPaid = currentYearDuesStatus === 'paid' || currentYearDuesStatus === 'over paid';
   const membershipStatusLabel = isProbationMember
     ? 'Probation Member'
@@ -428,7 +428,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     : activeEngSummary?.isCompleted;
 
   const nextStepHint = isProbationMember
-    ? (promotionProgress?.requirements?.find((r: any) => !r.isCompleted)?.name ?? null)
+    ? (promotionProgress?.requirements?.find((r: any) => !r.isCompleted)?.title ?? promotionProgress?.requirements?.find((r: any) => !r.isCompleted)?.name ?? null)
     : (activeEngSummary?.requirements?.find(r => !r.isCompleted && !r.progress?.pendingVerification)?.title ?? null);
 
   return (
@@ -458,19 +458,19 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
             {todayBirthdays.length > 0 ? (
               <div className="mb-3 flex items-center gap-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-xl px-3 py-2">
                 <span className="w-2 h-2 rounded-full bg-amber-300 animate-pulse flex-shrink-0" />
-                <span className="text-[12px] font-bold text-white truncate">🎉 Today: {todayBirthdays.map(m => m.general?.name?.split(' ')[0] || m.name?.split(' ')[0]).join(', ')}</span>
+                <span className="text-[12px] font-bold text-white truncate">🎉 Today: {todayBirthdays.map(m => m.general?.name?.split(' ')[0] || m.general?.name?.split(' ')[0]).join(', ')}</span>
               </div>
             ) : nextBirthdayMember ? (
               <div className="mb-3 flex items-center gap-2 bg-white/15 backdrop-blur-sm border border-white/20 rounded-xl px-3 py-2">
-                <span className="text-[12px] font-semibold text-white/90 truncate">📅 Next: {nextBirthdayMember.general?.name?.split(' ')[0] || nextBirthdayMember.name?.split(' ')[0]} — {new Date(getDob(nextBirthdayMember)!).getDate()} {now.toLocaleString('default', { month: 'short' })}</span>
+                <span className="text-[12px] font-semibold text-white/90 truncate">📅 Next: {nextBirthdayMember.general?.name?.split(' ')[0] || nextBirthdayMember.general?.name?.split(' ')[0]} — {new Date(getDob(nextBirthdayMember)!).getDate()} {now.toLocaleString('default', { month: 'short' })}</span>
               </div>
             ) : null}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="flex items-center">
                   {birthdayMembers.slice(0, 5).map((m, i) => {
-                    const name = m.general?.name || m.name || '';
-                    const avatarUrl = m.general?.avatarUrl || m.avatar;
+                    const name = m.general?.name || m.general?.name || '';
+                    const avatarUrl = m.general?.avatarUrl || m.general?.avatarUrl;
                     const sharedStyle = { width: '36px', height: '36px', marginLeft: i > 0 ? '-10px' : '0px', zIndex: 10 - i };
                     if (avatarUrl) return <img key={m.id} src={avatarUrl} alt={name} className="rounded-full object-cover border-2 border-white/60 shadow-md flex-shrink-0 group-hover:-translate-y-0.5 transition-transform" style={sharedStyle} />;
                     const initials = name.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase();
@@ -1024,7 +1024,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                                 : <Clock size={11} className="text-white/30" />}
                             </div>
                             <div className="min-w-0">
-                              <span className={`font-semibold text-xs truncate block ${req.isCompleted ? 'text-white' : 'text-white/60'}`}>{req.name}</span>
+                              <span className={`font-semibold text-xs truncate block ${req.isCompleted ? 'text-white' : 'text-white/60'}`}>{req.general?.name}</span>
                               {req.isCompleted && req.completionDetails && (() => {
                                 const rawVal = Object.values(req.completionDetails)[0];
                                 const raw = typeof rawVal === 'string' ? rawVal : Array.isArray(rawVal) ? (rawVal as string[]).join(' ') : String(rawVal ?? '');
@@ -1306,14 +1306,14 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                 const dob = new Date(getDob(m)!);
                 const day = dob.getDate();
                 const isToday = day === currentDay;
-                const name = m.general?.name || m.name || '';
-                const avatarUrl = m.general?.avatarUrl || m.avatar;
+                const name = m.general?.name || m.general?.name || '';
+                const avatarUrl = m.general?.avatarUrl || m.general?.avatarUrl;
                 const initials = name.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase();
                 let hash = 0; for (let j = 0; j < name.length; j++) hash = name.charCodeAt(j) + ((hash << 5) - hash);
                 const gradients = ['from-pink-400 to-rose-500', 'from-violet-400 to-purple-500', 'from-sky-400 to-blue-500', 'from-teal-400 to-emerald-500', 'from-amber-400 to-orange-500'];
                 const avatarGradient = gradients[Math.abs(hash) % gradients.length];
-                const badge = membershipBadge(m.membershipType || '');
-                const duesPaid = m.isDuesPaidCurrentYear ?? (m.duesStatus === 'paid');
+                const badge = membershipBadge(m.jciCareer?.membershipType || '');
+                const duesPaid = m.jciCareer?.isDuesPaidCurrentYear ?? (m.duesStatus === 'paid');
                 const duesLabel = duesPaid ? 'Dues Paid' : 'Dues Pending';
                 const duesCls = duesPaid
                   ? 'bg-emerald-400/15 text-emerald-300 border-emerald-400/30'
@@ -1346,12 +1346,12 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                       {/* WhatsApp group status */}
                       <span
                         className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center shadow-md"
-                        style={m.whatsappGroup || m.whatsappgroup
+                        style={m.contact?.whatsappJoined || m.contact?.whatsappJoined
                           ? { background: '#25d366', border: '1.5px solid rgba(255,255,255,0.25)' }
                           : { background: '#475569', border: '1.5px solid rgba(255,255,255,0.10)' }}
-                        title={m.whatsappGroup || m.whatsappgroup ? 'In WhatsApp group' : 'Not in WhatsApp group'}
+                        title={m.contact?.whatsappJoined || m.contact?.whatsappJoined ? 'In WhatsApp group' : 'Not in WhatsApp group'}
                       >
-                        <svg viewBox="0 0 24 24" fill="currentColor" className={`w-2.5 h-2.5 ${m.whatsappGroup || m.whatsappgroup ? 'text-slate-900' : 'text-white'}`}>
+                        <svg viewBox="0 0 24 24" fill="currentColor" className={`w-2.5 h-2.5 ${m.contact?.whatsappJoined || m.contact?.whatsappJoined ? 'text-slate-900' : 'text-white'}`}>
                           <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
                           <path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.528 5.85L.057 23.25a.75.75 0 0 0 .918.919l5.4-1.47A11.95 11.95 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.88 0-3.638-.502-5.153-1.378l-.37-.213-3.833 1.043 1.044-3.832-.214-.372A9.944 9.944 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z" />
                         </svg>
@@ -1429,28 +1429,23 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
           setProfileSaving(true);
           try {
             const updates: Record<string, unknown> = {};
-            if ('phone' in profileDraft) updates.phone = profileDraft.phone;
+            if ('phone' in profileDraft) updates['contact.phone'] = profileDraft.phone;
             if ('companyName' in profileDraft) updates.companyName = profileDraft.companyName;
             if ('industry' in profileDraft) updates.industry = profileDraft.industry;
-            if ('companyDescription' in profileDraft) updates.companyDescription = profileDraft.companyDescription;
-            if ('idealReferral' in profileDraft) updates.idealReferral = profileDraft.idealReferral;
-            if ('address' in profileDraft) updates.address = profileDraft.address;
-            if ('emergencyContactName' in profileDraft) updates.emergencyContactName = profileDraft.emergencyContactName;
-            if ('emergencyContactRelationship' in profileDraft) updates.emergencyContactRelationship = profileDraft.emergencyContactRelationship;
-            if ('emergencyContact' in profileDraft) updates.emergencyContact = profileDraft.emergencyContact;
-            if ('shirtStyle' in profileDraft) updates.shirtStyle = profileDraft.shirtStyle;
-            if ('tshirtSize' in profileDraft) updates.tshirtSize = profileDraft.tshirtSize;
-            if ('jacketSize' in profileDraft) updates.jacketSize = profileDraft.jacketSize;
-            if ('specialOffer' in profileDraft || 'companyWebsite' in profileDraft || 'acceptInternationalBusiness' in profileDraft || 'levelOfManagement' in profileDraft || 'departmentAndPosition' in profileDraft) {
-              updates.business = {
-                ...(member.business ?? {}),
-                ...(profileDraft.departmentAndPosition !== undefined ? { departmentAndPosition: profileDraft.departmentAndPosition } : {}),
-                ...(profileDraft.specialOffer !== undefined ? { specialOffer: profileDraft.specialOffer } : {}),
-                ...(profileDraft.companyWebsite !== undefined ? { companyWebsite: profileDraft.companyWebsite } : {}),
-                ...(profileDraft.acceptInternationalBusiness !== undefined ? { acceptInternationalBusiness: profileDraft.acceptInternationalBusiness } : {}),
-                ...(profileDraft.levelOfManagement !== undefined ? { levelOfManagement: profileDraft.levelOfManagement } : {}),
-              };
-            }
+            if ('companyDescription' in profileDraft) updates['business.companyDescription'] = profileDraft.companyDescription;
+            if ('idealReferral' in profileDraft) updates['business.idealReferrals'] = profileDraft.idealReferral;
+            if ('address' in profileDraft) updates['contact.address'] = profileDraft.address;
+            if ('emergencyContactName' in profileDraft) updates['contact.emergency.name'] = profileDraft.emergencyContactName;
+            if ('emergencyContactRelationship' in profileDraft) updates['contact.emergency.relationship'] = profileDraft.emergencyContactRelationship;
+            if ('emergencyContact' in profileDraft) updates['contact.emergency.name'] = profileDraft.emergencyContact;
+            if ('shirtStyle' in profileDraft) updates['others.shirtStyle'] = profileDraft.shirtStyle;
+            if ('tshirtSize' in profileDraft) updates['others.tshirtSize'] = profileDraft.tshirtSize;
+            if ('jacketSize' in profileDraft) updates['others.jacketSize'] = profileDraft.jacketSize;
+            if ('departmentAndPosition' in profileDraft) updates['business.departmentAndPosition'] = profileDraft.departmentAndPosition;
+            if ('specialOffer' in profileDraft) updates['business.specialOffer'] = profileDraft.specialOffer;
+            if ('companyWebsite' in profileDraft) updates['business.companyWebsite'] = profileDraft.companyWebsite;
+            if ('acceptInternationalBusiness' in profileDraft) updates['business.acceptInternationalBusiness'] = profileDraft.acceptInternationalBusiness;
+            if ('levelOfManagement' in profileDraft) updates['business.levelOfManagement'] = profileDraft.levelOfManagement;
             await MembersService.updateMember(member.id, updates as Parameters<typeof MembersService.updateMember>[1]);
             showToast('Profile updated!', 'success');
             setShowProfileDrawer(false);
@@ -1492,7 +1487,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                       </div>
                     </div>
                     <div>
-                      <h3 className="font-bold text-white">{member?.name ?? 'Your Profile'}</h3>
+                      <h3 className="font-bold text-white">{member?.general?.name ?? 'Your Profile'}</h3>
                       <p className="text-xs text-blue-200/80">{done} of {total} sections filled</p>
                     </div>
                   </div>
@@ -1539,7 +1534,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                     : <div className="space-y-3">
                       {missing.find(f => f.label === 'Phone number') && (
                         <Input label="Phone Number" type="tel"
-                          value={val('phone', member?.phone ?? '')}
+                          value={val('phone', member?.contact?.phone ?? '')}
                           onChange={e => set('phone', e.target.value)} />
                       )}
                       {missing.find(f => f.label === 'Company name') && (
@@ -1557,15 +1552,15 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                           <p className="text-xs font-semibold text-white/40 uppercase tracking-wider">Apparel & Items</p>
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <Select label="Shirt Style"
-                              value={val('shirtStyle', member?.shirtStyle ?? '')}
+                              value={val('shirtStyle', member?.others?.shirtStyle ?? '')}
                               onChange={e => set('shirtStyle', e.target.value)}
                               options={[{ value: '', label: 'Select…' }, { value: 'Unisex', label: 'Unisex' }, { value: 'Lady Cut', label: 'Lady Cut' }]} />
                             <Select label="T-Shirt Size"
-                              value={val('tshirtSize', member?.tshirtSize ?? '')}
+                              value={val('tshirtSize', member?.others?.tshirtSize ?? '')}
                               onChange={e => set('tshirtSize', e.target.value)}
                               options={[{ value: '', label: 'Select…' }, ...['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '5XL', '7XL'].map(s => ({ value: s, label: s }))]} />
                             <Select label="Jacket Size"
-                              value={val('jacketSize', member?.jacketSize ?? '')}
+                              value={val('jacketSize', member?.others?.jacketSize ?? '')}
                               onChange={e => set('jacketSize', e.target.value)}
                               options={[{ value: '', label: 'Select…' }, ...['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '5XL', '7XL'].map(s => ({ value: s, label: s }))]} />
                           </div>
@@ -1579,7 +1574,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                     : <div className="space-y-3">
                       {missing.find(f => f.label === 'Address') && (
                         <Input label="Address"
-                          value={val('address', member?.address ?? '')}
+                          value={val('address', member?.contact?.address ?? '')}
                           onChange={e => set('address', e.target.value)} />
                       )}
                       {missing.find(f => f.label === 'Emergency contact') && (
@@ -1587,14 +1582,14 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                           <p className="text-xs font-semibold text-white/40 uppercase tracking-wider">Emergency Contact</p>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <Input label="Name"
-                              value={val('emergencyContactName', member?.emergencyContactName ?? '')}
+                              value={val('emergencyContactName', member?.contact?.emergency?.name ?? '')}
                               onChange={e => set('emergencyContactName', e.target.value)} />
                             <Input label="Relationship"
-                              value={val('emergencyContactRelationship', member?.emergencyContactRelationship ?? '')}
+                              value={val('emergencyContactRelationship', member?.contact?.emergency?.relationship ?? '')}
                               onChange={e => set('emergencyContactRelationship', e.target.value)} />
                           </div>
                           <Input label="Phone" type="tel"
-                            value={val('emergencyContact', member?.emergencyContact ?? '')}
+                            value={val('emergencyContact', member?.contact?.emergency?.name ?? '')}
                             onChange={e => set('emergencyContact', e.target.value)} />
                         </div>
                       )}
@@ -1606,23 +1601,23 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                     : <div className="space-y-3">
                       {missing.find(f => f.label === 'Position / title') && (
                         <Input label="Position / Title"
-                          value={val('departmentAndPosition', member?.business?.departmentAndPosition ?? member?.departmentAndPosition ?? '')}
+                          value={val('departmentAndPosition', member?.business?.departmentAndPosition ?? member?.business?.departmentAndPosition ?? '')}
                           onChange={e => set('departmentAndPosition', e.target.value)} />
                       )}
                       {missing.find(f => f.label === 'Company description') && (
                         <Textarea label="Company Description" rows={2}
-                          value={val('companyDescription', member?.companyDescription ?? '')}
+                          value={val('companyDescription', member?.business?.companyDescription ?? '')}
                           onChange={e => set('companyDescription', e.target.value)} />
                       )}
                       {missing.find(f => f.label === 'Ideal referral') && (
                         <Input label="Ideal Referral" placeholder="e.g. SME owners in F&B industry"
-                          value={val('idealReferral', member?.idealReferral ?? '')}
+                          value={val('idealReferral', Array.isArray(member?.business?.idealReferrals) ? member.business!.idealReferrals!.join(', ') : '')}
                           onChange={e => set('idealReferral', e.target.value)} />
                       )}
                       {missing.find(f => f.label === 'Special member offer') && (() => {
-                        const rawOffer = profileDraft.specialOffer ?? member?.business?.specialOffer ?? member?.specialOffer;
-                        const offerObj = (rawOffer && typeof rawOffer === 'object') ? rawOffer : { type: 'percentage_discount' as SpecialOfferType, description: typeof rawOffer === 'string' ? rawOffer : '', terms: '', expiryDate: '' };
-                        const patch = (k: string, v: string) => setProfileDraft(d => ({ ...d, specialOffer: { ...offerObj, [k]: v } }));
+                        const rawOffer = (profileDraft.specialOffer as unknown) ?? member?.business?.specialOffer;
+                        const offerObj = ((rawOffer && typeof rawOffer === 'object') ? rawOffer : { type: 'percentage_discount' as SpecialOfferType, description: typeof rawOffer === 'string' ? rawOffer : '', terms: '', expiryDate: '' }) as { type: SpecialOfferType; description: string; terms?: string; expiryDate?: string };
+                        const patch = (k: string, v: string) => setProfileDraft(d => ({ ...d, specialOffer: { ...offerObj, [k]: v } } as unknown as typeof d));
                         return (
                           <div className="space-y-2">
                             <label className="block text-xs font-semibold text-slate-600">Special Member Offer</label>

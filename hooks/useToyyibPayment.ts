@@ -39,29 +39,29 @@ export function useToyyibPayment() {
       if (existing) return { ...existing, isExisting: true };
 
       // 3. Resolve dues amount from config
-      const isFirstYear = !member.membership ||
-        !Object.keys(member.membership).some(y =>
+      const isFirstYear = !member.jciCareer?.membershipDuesHistory ||
+        !Object.keys(member.jciCareer?.membershipDuesHistory).some(y =>
           Number(y) < year &&
-          (member.membership![y]?.status === 'paid' || member.membership![y]?.status === 'over paid')
+          (member.jciCareer?.membershipDuesHistory![y]?.status === 'paid' || member.jciCareer?.membershipDuesHistory![y]?.status === 'over paid')
         );
       let amount: number;
       try {
         const config = await MembershipConfigService.getConfig();
         amount = getTargetDuesForMembershipType(
-          member.membershipType as MembershipType,
+          member.jciCareer?.membershipType as MembershipType,
           isFirstYear,
           config.rules,
         );
       } catch {
-        amount = DEFAULT_MEMBERSHIP_RULES[member.membershipType as MembershipType]?.duesAmount ?? 0;
+        amount = DEFAULT_MEMBERSHIP_RULES[member.jciCareer?.membershipType as MembershipType]?.duesAmount ?? 0;
       }
 
       // 4. Bill description
-      const isGuest = member.membershipType === 'Guest';
+      const isGuest = member.jciCareer?.membershipType === 'Guest';
       const billDesc = ToyyibService.formatMembershipBillDescription(
-        member.general?.name ?? member.name,
-        member.general?.idNumber ?? member.nationalId ?? member.idNumber,
-        (member.contact?.phone ?? member.phone) || '',
+        member.general?.name ?? member.general?.name,
+        member.general?.idNumber ?? member.general?.idNumber ?? member.general?.idNumber,
+        (member.contact?.phone ?? member.contact?.phone) || '',
         year,
         isGuest,
       );
@@ -71,9 +71,9 @@ export function useToyyibPayment() {
         billName: `${year} Renewal Membership`,
         billDescription: billDesc,
         billAmount: amount,
-        billTo: member.general?.name ?? member.name,
-        billEmail: (member.contact?.email ?? member.email) || '',
-        billPhone: (member.contact?.phone ?? member.phone) || '',
+        billTo: member.general?.name ?? member.general?.name,
+        billEmail: (member.contact?.email ?? member.contact?.email) || '',
+        billPhone: (member.contact?.phone ?? member.contact?.phone) || '',
         categoryCode,
         memberId: member.id,
       });
@@ -115,18 +115,18 @@ export function useToyyibPayment() {
 
       const billDesc = ToyyibService.formatEventBillDescription(
         project.title,
-        member.general?.name ?? member.name,
-        member.general?.idNumber ?? member.nationalId ?? member.idNumber,
-        (member.contact?.phone ?? member.phone) || '',
+        member.general?.name ?? member.general?.name,
+        member.general?.idNumber ?? member.general?.idNumber ?? member.general?.idNumber,
+        (member.contact?.phone ?? member.contact?.phone) || '',
       );
 
       const bill = await ToyyibService.createBill({
         billName: 'Ticketing',
         billDescription: billDesc,
         billAmount: project.ticketPrice,
-        billTo: member.general?.name ?? member.name,
-        billEmail: (member.contact?.email ?? member.email) || '',
-        billPhone: (member.contact?.phone ?? member.phone) || '',
+        billTo: member.general?.name ?? member.general?.name,
+        billEmail: (member.contact?.email ?? member.contact?.email) || '',
+        billPhone: (member.contact?.phone ?? member.contact?.phone) || '',
         categoryCode,
         memberId: member.id,
         projectId: project.id,

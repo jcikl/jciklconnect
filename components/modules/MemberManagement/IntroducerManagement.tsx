@@ -42,7 +42,7 @@ export const IntroducerManagement: React.FC<Props> = ({
   const recruiterYears = useMemo(() => {
     const years = new Set<string>();
     members.forEach(m => {
-      const y = (m.joinDate || '').substring(0, 4);
+      const y = (m.jciCareer?.joinDate || '').substring(0, 4);
       if (/^\d{4}$/.test(y)) years.add(y);
     });
     return ['all', ...Array.from(years).sort().reverse()];
@@ -67,22 +67,22 @@ export const IntroducerManagement: React.FC<Props> = ({
   const filteredTopRecruiters = useMemo(() => {
     const counts: Record<string, number> = {};
     members.forEach(m => {
-      if (!m.introducer || m.introducer.trim() === '') return;
-      if (getIntroducerType(m.introducer) !== 'JCI KL Member') return;
+      if (!m.jciCareer?.introducer || m.jciCareer?.introducer.trim() === '') return;
+      if (getIntroducerType(m.jciCareer?.introducer) !== 'JCI KL Member') return;
       if (recruiterYear !== 'all') {
-        const y = (m.joinDate || '').substring(0, 4);
+        const y = (m.jciCareer?.joinDate || '').substring(0, 4);
         if (y !== recruiterYear) return;
       }
-      const id = m.introducer.trim();
+      const id = m.jciCareer?.introducer.trim();
       counts[id] = (counts[id] || 0) + 1;
     });
     return Object.entries(counts)
       .map(([id, count]) => {
         const obj = members.find(m => m.id === id);
-        const short = obj?.name || '';
-        const full = obj?.fullName || '';
+        const short = obj?.general?.name || '';
+        const full = obj?.general?.fullName || '';
         const name = short && full && short !== full ? `${short} (${full})` : short || full || 'Unknown Member';
-        return { id, name, count, avatar: obj?.avatar || '' };
+        return { id, name, count, avatar: obj?.general?.avatarUrl || '' };
       })
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
@@ -137,7 +137,7 @@ export const IntroducerManagement: React.FC<Props> = ({
         showToast('Configuration error — please contact admin', 'error');
         return;
       }
-      await onBatchUpdateMembers(idsArray, { introducer: batchIntroducerVal });
+      await onBatchUpdateMembers(idsArray, { 'jciCareer.introducer': batchIntroducerVal } as unknown as Partial<Member>);
       showToast(`Successfully updated introducer for ${selectedMemberIds.size} members`, 'success');
       setSelectedMemberIds(new Set());
       setIsBatchEditing(false);
@@ -153,8 +153,8 @@ export const IntroducerManagement: React.FC<Props> = ({
     if (!introVal || introVal.trim() === '') return 'Direct Join / None';
     const foundMember = members.find(m => m.id === introVal);
     if (foundMember) {
-      const shortName = foundMember.name || '';
-      const fullName = foundMember.fullName || '';
+      const shortName = foundMember.general?.name || '';
+      const fullName = foundMember.general?.fullName || '';
       if (shortName && fullName && shortName !== fullName) {
         return `${shortName} (${fullName})`;
       }
@@ -166,7 +166,7 @@ export const IntroducerManagement: React.FC<Props> = ({
   // Calculate high-level statistics
   const stats = useMemo(() => {
     const totalCount = members.length;
-    const withIntroducer = members.filter(m => m.introducer && m.introducer.trim() !== '' && m.introducer.toLowerCase() !== 'direct join');
+    const withIntroducer = members.filter(m => m.jciCareer?.introducer && m.jciCareer?.introducer.trim() !== '' && m.jciCareer?.introducer.toLowerCase() !== 'direct join');
     const withIntroducerCount = withIntroducer.length;
     const noIntroducerCount = totalCount - withIntroducerCount;
     const percentage = totalCount > 0 ? Math.round((withIntroducerCount / totalCount) * 100) : 0;
@@ -185,12 +185,12 @@ export const IntroducerManagement: React.FC<Props> = ({
     const memberRecruitmentCounts: Record<string, number> = {};
 
     members.forEach(m => {
-      if (!m.introducer || m.introducer.trim() === '') {
+      if (!m.jciCareer?.introducer || m.jciCareer?.introducer.trim() === '') {
         breakdown['Direct Join']++;
         return;
       }
 
-      const type = getIntroducerType(m.introducer);
+      const type = getIntroducerType(m.jciCareer?.introducer);
       if (breakdown[type] !== undefined) {
         breakdown[type]++;
       } else {
@@ -198,7 +198,7 @@ export const IntroducerManagement: React.FC<Props> = ({
       }
 
       if (type === 'JCI KL Member') {
-        const introducerId = m.introducer.trim();
+        const introducerId = m.jciCareer?.introducer.trim();
         memberRecruitmentCounts[introducerId] = (memberRecruitmentCounts[introducerId] || 0) + 1;
       }
     });
@@ -209,8 +209,8 @@ export const IntroducerManagement: React.FC<Props> = ({
         const memberObj = members.find(m => m.id === id);
         let name = 'Unknown Member';
         if (memberObj) {
-          const shortName = memberObj.name || '';
-          const fullName = memberObj.fullName || '';
+          const shortName = memberObj.general?.name || '';
+          const fullName = memberObj.general?.fullName || '';
           if (shortName && fullName && shortName !== fullName) {
             name = `${shortName} (${fullName})`;
           } else {
@@ -220,7 +220,7 @@ export const IntroducerManagement: React.FC<Props> = ({
         return {
           id,
           name,
-          avatar: memberObj?.avatar || '',
+          avatar: memberObj?.general?.avatarUrl || '',
           count
         };
       })
@@ -242,9 +242,9 @@ export const IntroducerManagement: React.FC<Props> = ({
     const agg: Record<string, { value: string; name: string; type: string; invitees: Member[] }> = {};
 
     members.forEach(m => {
-      const val = (m.introducer || 'Direct Join').trim();
-      const type = getIntroducerType(m.introducer);
-      const name = resolveIntroducerDisplay(m.introducer);
+      const val = (m.jciCareer?.introducer || 'Direct Join').trim();
+      const type = getIntroducerType(m.jciCareer?.introducer);
+      const name = resolveIntroducerDisplay(m.jciCareer?.introducer);
 
       if (!agg[val]) {
         agg[val] = {
@@ -274,20 +274,20 @@ export const IntroducerManagement: React.FC<Props> = ({
   const filteredMembersForAssignment = useMemo(() => {
     return members.filter(m => {
       // Resolve the introducer name to allow searching by it
-      const introducerName = resolveIntroducerDisplay(m.introducer);
+      const introducerName = resolveIntroducerDisplay(m.jciCareer?.introducer);
 
       // 1. Search Query filter
       const matchesSearch = memberSearch.trim() === '' ||
-        (m.name || '').toLowerCase().includes(memberSearch.toLowerCase()) ||
-        (m.fullName || '').toLowerCase().includes(memberSearch.toLowerCase()) ||
-        (m.email || '').toLowerCase().includes(memberSearch.toLowerCase()) ||
+        (m.general?.name || '').toLowerCase().includes(memberSearch.toLowerCase()) ||
+        (m.general?.fullName || '').toLowerCase().includes(memberSearch.toLowerCase()) ||
+        (m.contact?.email || '').toLowerCase().includes(memberSearch.toLowerCase()) ||
         introducerName.toLowerCase().includes(memberSearch.toLowerCase()) ||
-        (m.introducer || '').toLowerCase().includes(memberSearch.toLowerCase());
+        (m.jciCareer?.introducer || '').toLowerCase().includes(memberSearch.toLowerCase());
 
       if (!matchesSearch) return false;
 
       // 2. Status filter
-      const hasIntro = m.introducer && m.introducer.trim() !== '' && m.introducer.toLowerCase() !== 'direct join';
+      const hasIntro = m.jciCareer?.introducer && m.jciCareer?.introducer.trim() !== '' && m.jciCareer?.introducer.toLowerCase() !== 'direct join';
       if (statusFilter === 'has_introducer') return hasIntro;
       if (statusFilter === 'no_introducer') return !hasIntro;
 
@@ -301,9 +301,9 @@ export const IntroducerManagement: React.FC<Props> = ({
     try {
       const ids = editingGroup.invitees.map(m => m.id);
       if (onBatchUpdateMembers) {
-        await onBatchUpdateMembers(ids, { introducer: newGroupIntroducerVal });
+        await onBatchUpdateMembers(ids, { 'jciCareer.introducer': newGroupIntroducerVal } as unknown as Partial<Member>);
       } else {
-        await Promise.all(ids.map(id => onUpdateMember(id, { introducer: newGroupIntroducerVal })));
+        await Promise.all(ids.map(id => onUpdateMember(id, { 'jciCareer.introducer': newGroupIntroducerVal } as unknown as Partial<Member>)));
       }
       showToast(`Updated introducer for ${ids.length} member${ids.length !== 1 ? 's' : ''}`, 'success');
       setEditingGroup(null);
@@ -322,9 +322,9 @@ export const IntroducerManagement: React.FC<Props> = ({
         .filter(g => selectedGroupValues.has(g.value))
         .flatMap(g => g.invitees.map(m => m.id));
       if (onBatchUpdateMembers) {
-        await onBatchUpdateMembers(allIds, { introducer: batchGroupIntroducerVal });
+        await onBatchUpdateMembers(allIds, { 'jciCareer.introducer': batchGroupIntroducerVal } as unknown as Partial<Member>);
       } else {
-        await Promise.all(allIds.map(id => onUpdateMember(id, { introducer: batchGroupIntroducerVal })));
+        await Promise.all(allIds.map(id => onUpdateMember(id, { 'jciCareer.introducer': batchGroupIntroducerVal } as unknown as Partial<Member>)));
       }
       showToast(`Reassigned ${allIds.length} members across ${selectedGroupValues.size} groups`, 'success');
       setSelectedGroupValues(new Set());
@@ -341,8 +341,8 @@ export const IntroducerManagement: React.FC<Props> = ({
     if (!editingMember) return;
     setIsSaving(true);
     try {
-      await onUpdateMember(editingMember.id, { introducer: newIntroducerVal });
-      showToast(`Successfully updated introducer for ${editingMember.name}`, 'success');
+      await onUpdateMember(editingMember.id, { 'jciCareer.introducer': newIntroducerVal } as unknown as Partial<Member>);
+      showToast(`Successfully updated introducer for ${editingMember.general?.name}`, 'success');
       setEditingMember(null);
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to update introducer', 'error');
@@ -400,7 +400,7 @@ export const IntroducerManagement: React.FC<Props> = ({
                     {recruiter.avatar ? (
                       <img src={recruiter.avatar} alt="" className="w-6 h-6 rounded-full" />
                     ) : (
-                      <div style={{background:'#0097D7', color:'#fff', borderRadius:'50%', width:24, height:24, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:600}}>{recruiter.name.charAt(0).toUpperCase()}</div>
+                      <div style={{background:'#0097D7', color:'#fff', borderRadius:'50%', width:24, height:24, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:600}}>{(recruiter.name || '?').charAt(0).toUpperCase()}</div>
                     )}
                     <span className="font-semibold text-slate-800 truncate max-w-[140px]">{recruiter.name}</span>
                   </div>
@@ -560,18 +560,18 @@ export const IntroducerManagement: React.FC<Props> = ({
                       <td className="px-4 py-4 hidden md:table-cell">
                         <div className="flex flex-wrap gap-1.5 max-w-xl">
                           {intro.invitees.slice(0, 3).map(inv => {
-                            const displayName = inv.fullName && inv.fullName !== inv.name
-                              ? `${inv.name} (${inv.fullName})`
-                              : inv.name;
+                            const displayName = inv.general?.fullName && inv.general?.fullName !== inv.general?.name
+                              ? `${inv.general?.name} (${inv.general?.fullName})`
+                              : inv.general?.name;
                             return (
                               <div
                                 key={inv.id}
                                 className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md border border-slate-200 text-xs font-semibold"
                               >
-                                {inv.avatar ? (
-                                  <img src={inv.avatar} className="w-4 h-4 rounded-full" alt="" />
+                                {inv.general?.avatarUrl ? (
+                                  <img src={inv.general?.avatarUrl} className="w-4 h-4 rounded-full" alt="" />
                                 ) : (
-                                  <div style={{background:'#0097D7', color:'#fff', borderRadius:'50%', width:16, height:16, display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:600}}>{inv.name.charAt(0).toUpperCase()}</div>
+                                  <div style={{background:'#0097D7', color:'#fff', borderRadius:'50%', width:16, height:16, display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:600}}>{inv.general?.name.charAt(0).toUpperCase()}</div>
                                 )}
                                 <span>{displayName}</span>
                               </div>
@@ -580,7 +580,7 @@ export const IntroducerManagement: React.FC<Props> = ({
                           {intro.invitees.length > 3 && (
                             <div
                               className="inline-flex items-center px-2.5 py-0.5 bg-slate-50 text-slate-500 rounded-md border border-slate-200 text-xs font-bold cursor-help"
-                              title={intro.invitees.slice(3).map(inv => inv.fullName ? `${inv.name} (${inv.fullName})` : inv.name).join(', ')}
+                              title={intro.invitees.slice(3).map(inv => inv.general?.fullName ? `${inv.general?.name} (${inv.general?.fullName})` : inv.general?.name).join(', ')}
                             >
                               +{intro.invitees.length - 3} more
                             </div>
@@ -678,8 +678,8 @@ export const IntroducerManagement: React.FC<Props> = ({
           {/* Mobile card list */}
           <div className="md:hidden divide-y divide-slate-100">
             {filteredMembersForAssignment.map(member => {
-              const introDisplay = resolveIntroducerDisplay(member.introducer);
-              const introType = getIntroducerType(member.introducer);
+              const introDisplay = resolveIntroducerDisplay(member.jciCareer?.introducer);
+              const introType = getIntroducerType(member.jciCareer?.introducer);
               return (
                 <div key={member.id} className="py-3 px-1 flex items-center gap-3">
                   <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -687,13 +687,13 @@ export const IntroducerManagement: React.FC<Props> = ({
                       <input type="checkbox" checked={selectedMemberIds.has(member.id)} onChange={() => toggleSelectMember(member.id)}
                         className="w-4 h-4 rounded border-slate-300 text-jci-blue focus:ring-jci-blue shrink-0" />
                     )}
-                    <img src={member.avatar || undefined} className="w-9 h-9 rounded-full bg-slate-200 shrink-0" alt="" />
+                    <img src={member.general?.avatarUrl || undefined} className="w-9 h-9 rounded-full bg-slate-200 shrink-0" alt="" />
                     <div className="min-w-0">
-                      <p className="text-sm font-bold text-slate-900 truncate">{member.name}</p>
+                      <p className="text-sm font-bold text-slate-900 truncate">{member.general?.name}</p>
                       <p className="text-xs text-slate-500 truncate">{introDisplay}</p>
                     </div>
                   </div>
-                  <button onClick={() => { setEditingMember(member); setNewIntroducerVal(member.introducer || ''); }}
+                  <button onClick={() => { setEditingMember(member); setNewIntroducerVal(member.jciCareer?.introducer || ''); }}
                     className="p-2 rounded-xl bg-slate-100 hover:bg-jci-blue/10 hover:text-jci-blue text-slate-500 transition-colors shrink-0">
                     <Edit2 size={14} />
                   </button>
@@ -730,9 +730,9 @@ export const IntroducerManagement: React.FC<Props> = ({
                   </tr>
                 ) : (
                   filteredMembersForAssignment.map(m => {
-                    const hasIntroducer = m.introducer && m.introducer.trim() !== '' && m.introducer.toLowerCase() !== 'direct join';
-                    const introducerName = resolveIntroducerDisplay(m.introducer);
-                    const type = getIntroducerType(m.introducer);
+                    const hasIntroducer = m.jciCareer?.introducer && m.jciCareer?.introducer.trim() !== '' && m.jciCareer?.introducer.toLowerCase() !== 'direct join';
+                    const introducerName = resolveIntroducerDisplay(m.jciCareer?.introducer);
+                    const type = getIntroducerType(m.jciCareer?.introducer);
 
                     return (
                       <tr key={m.id} className="hover:bg-slate-50/50 transition-colors">
@@ -746,18 +746,18 @@ export const IntroducerManagement: React.FC<Props> = ({
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center space-x-3">
-                            <img src={m.avatar || undefined} alt={m.name} className="w-8 h-8 rounded-full bg-slate-200" />
+                            <img src={m.general?.avatarUrl || undefined} alt={m.general?.name} className="w-8 h-8 rounded-full bg-slate-200" />
                             <div>
-                              <div className="font-semibold text-slate-900">{m.name}</div>
-                              {m.fullName && m.fullName !== m.name && (
-                                <div className="text-[10px] text-slate-400">{m.fullName}</div>
+                              <div className="font-semibold text-slate-900">{m.general?.name}</div>
+                              {m.general?.fullName && m.general?.fullName !== m.general?.name && (
+                                <div className="text-[10px] text-slate-400">{m.general?.fullName}</div>
                               )}
                             </div>
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="text-xs text-slate-600">{m.email}</div>
-                          <div className="text-xs text-slate-400">{m.phone}</div>
+                          <div className="text-xs text-slate-600">{m.contact?.email}</div>
+                          <div className="text-xs text-slate-400">{m.contact?.phone}</div>
                         </td>
                         <td className="px-6 py-4">
                           {hasIntroducer ? (
@@ -784,7 +784,7 @@ export const IntroducerManagement: React.FC<Props> = ({
                             size="sm"
                             onClick={() => {
                               setEditingMember(m);
-                              setNewIntroducerVal(m.introducer || '');
+                              setNewIntroducerVal(m.jciCareer?.introducer || '');
                             }}
                             className="inline-flex items-center gap-1.5"
                           >
@@ -940,7 +940,7 @@ export const IntroducerManagement: React.FC<Props> = ({
         <Modal
           isOpen={!!editingMember}
           onClose={() => setEditingMember(null)}
-          title={`Update Introducer for ${editingMember.name}`}
+          title={`Update Introducer for ${editingMember.general?.name}`}
           size="md"
           footer={
             <div className="flex gap-3 w-full">
@@ -965,7 +965,7 @@ export const IntroducerManagement: React.FC<Props> = ({
             <div className="space-y-1">
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">Current Value</label>
               <p className="text-sm font-semibold text-slate-800">
-                {editingMember.introducer ? `${editingMember.introducer} (${resolveIntroducerDisplay(editingMember.introducer)})` : 'None / Direct Join'}
+                {editingMember.jciCareer?.introducer ? `${editingMember.jciCareer?.introducer} (${resolveIntroducerDisplay(editingMember.jciCareer?.introducer)})` : 'None / Direct Join'}
               </p>
             </div>
 

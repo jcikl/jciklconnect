@@ -150,8 +150,8 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
     if (!introVal) return 'Direct Join';
     const foundMember = members.find(m => m.id === introVal);
     if (foundMember) {
-      const shortName = foundMember.name || '';
-      const fullName = foundMember.fullName || '';
+      const shortName = foundMember.general?.name || '';
+      const fullName = foundMember.general?.fullName || '';
       if (shortName && fullName && shortName !== fullName) {
         return `JCI KL Member: ${shortName} (${fullName})`;
       }
@@ -163,66 +163,66 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
   const resolveIntroducerShort = (introVal?: string) => {
     if (!introVal) return 'Direct Join';
     const foundMember = members.find(m => m.id === introVal);
-    if (foundMember) return foundMember.name || foundMember.fullName || 'Unnamed';
+    if (foundMember) return foundMember.general?.name || foundMember.general?.fullName || 'Unnamed';
     return introVal;
   };
 
   const startInlineEdit = (card: 'basic' | 'professional' | 'contact' | 'apparel' | 'career') => {
     setInlineValues({
-      name: member.name || '',
-      avatar: member.avatar || member.avatarUrl || member.general?.avatarUrl || '',
-      fullName: member.fullName || '',
-      idNumber: member.idNumber || member.general?.idNumber || '',
-      birthPlace: (() => { const ic = member.idNumber || member.general?.idNumber || ''; return isMalaysianIC(ic) ? (getBirthPlaceFromIC(ic) || member.birthPlace || member.general?.birthPlace || '') : (member.birthPlace || member.general?.birthPlace || ''); })(),
-      dateOfBirth: (() => { const ic = member.idNumber || member.general?.idNumber || ''; return isMalaysianIC(ic) ? (getDateOfBirthFromIC(ic) || member.dateOfBirth || member.general?.dob || '') : (member.dateOfBirth || member.general?.dob || ''); })(),
-      gender: (() => { const ic = member.idNumber || member.general?.idNumber || ''; return isMalaysianIC(ic) ? (getGenderFromIC(ic) || member.gender || member.general?.gender || '') : (member.gender || member.general?.gender || ''); })(),
+      name: member.general?.name || '',
+      avatar: member.general?.avatarUrl || member.general?.avatarUrl || member.general?.avatarUrl || '',
+      fullName: member.general?.fullName || '',
+      idNumber: member.general?.idNumber || member.general?.idNumber || '',
+      birthPlace: (() => { const ic = member.general?.idNumber || member.general?.idNumber || ''; return isMalaysianIC(ic) ? (getBirthPlaceFromIC(ic) || member.general?.birthPlace || member.general?.birthPlace || '') : (member.general?.birthPlace || member.general?.birthPlace || ''); })(),
+      dateOfBirth: (() => { const ic = member.general?.idNumber || member.general?.idNumber || ''; return isMalaysianIC(ic) ? (getDateOfBirthFromIC(ic) || member.general?.dob || member.general?.dob || '') : (member.general?.dob || member.general?.dob || ''); })(),
+      gender: (() => { const ic = member.general?.idNumber || member.general?.idNumber || ''; return isMalaysianIC(ic) ? (getGenderFromIC(ic) || member.general?.gender || member.general?.gender || '') : (member.general?.gender || member.general?.gender || ''); })(),
       ethnicity: member.general?.ethnicity || '',
       dietaryPreference: member.general?.dietaryPreference || '',
-      nationality: member.nationality || 'Malaysia',
-      introducer: member.introducer || '',
-      bio: member.bio || '',
-      hobbies: Array.isArray(member.hobbies) ? [...member.hobbies] : [],
+      nationality: member.general?.nationality || 'Malaysia',
+      introducer: member.jciCareer?.introducer || '',
+      bio: member.others?.bio || '',
+      hobbies: Array.isArray(member.others?.hobbies) ? [...member.others?.hobbies] : [],
       skills: Array.isArray(member.skills) ? member.skills.join(', ') : (member.skills || ''),
 
       companyName: member.companyName || '',
-      companyWebsite: member.companyWebsite || '',
+      companyWebsite: member.business?.companyWebsite || '',
       companyDescription: member.business?.companyDescription || '',
       departmentAndPosition: member.business?.departmentAndPosition || '',
-      acceptInternationalBusiness: member.acceptInternationalBusiness || '',
-      businessCategory: Array.isArray(member.businessCategory) ? [...member.businessCategory] : [],
+      acceptInternationalBusiness: member.business?.acceptInternationalBusiness || '',
+      businessCategory: Array.isArray(member.business?.businessCategory) ? [...member.business?.businessCategory] : [],
       industry: member.industry || '',
       interestedIndustries: Array.isArray(member.business?.interestedIndustries) ? [...member.business.interestedIndustries!] : [],
       levelOfManagement: member.business?.levelOfManagement || '',
       idealReferralIndustry: member.idealReferralIndustry || '',
-      idealReferral: member.idealReferral || (Array.isArray(member.idealReferrals) ? member.idealReferrals.join(', ') : ''),
+      idealReferral: member.business?.idealReferrals || (Array.isArray(member.business?.idealReferrals) ? member.business?.idealReferrals.join(', ') : ''),
       specialOffer: member.business?.specialOffer ?? '',
 
-      phone: member.phone || '',
-      alternatePhone: member.alternatePhone || '',
-      whatsappGroup: !!member.whatsappGroup,
-      email: member.email || '',
-      address: member.address || '',
-      linkedin: member.linkedin || '',
-      facebook: member.facebook || '',
-      instagram: member.instagram || '',
-      wechat: member.wechat || '',
-      emergencyContactName: member.emergencyContactName || '',
-      emergencyContactPhone: member.emergencyContactPhone || '',
-      emergencyContactRelationship: member.emergencyContactRelationship || '',
+      phone: member.contact?.phone || '',
+      alternatePhone: member.contact?.alternatePhone || '',
+      whatsappGroup: !!member.contact?.whatsappJoined,
+      email: member.contact?.email || '',
+      address: member.contact?.address || '',
+      linkedin: member.contact?.socials?.linkedin || '',
+      facebook: member.contact?.socials?.facebook || '',
+      instagram: member.contact?.socials?.instagram || '',
+      wechat: member.contact?.socials?.wechat || '',
+      emergencyContactName: member.contact?.emergency?.name || '',
+      emergencyContactPhone: member.contact?.emergency?.phone || '',
+      emergencyContactRelationship: member.contact?.emergency?.relationship || '',
 
-      cutStyle: member.cutStyle || '',
-      tshirtSize: member.tshirtSize || '',
-      jacketSize: member.jacketSize || '',
-      embroideredName: member.embroideredName || '',
-      tshirtStatus: member.tshirtStatus || 'NA',
+      cutStyle: member.others?.shirtStyle || '',
+      tshirtSize: member.others?.tshirtSize || '',
+      jacketSize: member.others?.jacketSize || '',
+      embroideredName: member.others?.embroideredName || '',
+      tshirtStatus: member.others?.tshirtStatus || 'NA',
 
-      senatorCertified: !!member.senatorCertified,
-      senatorshipId: member.senatorshipId || '',
-      senatorshipBoardValidated: !!member.senatorshipBoardValidated,
+      senatorCertified: !!member.jciCareer?.senatorship?.certified,
+      senatorshipId: member.jciCareer?.senatorship?.senatorNumber || '',
+      senatorshipBoardValidated: !!member.jciCareer?.senatorship?.boardValidated,
       senatorshipValidatedBy: member.jciCareer?.senatorshipValidatedBy || '',
       senatorshipValidatedAt: member.jciCareer?.senatorshipValidatedAt || '',
       role: member.role || '',
-      membershipType: member.membershipType || '',
+      membershipType: member.jciCareer?.membershipType || '',
     });
     setActiveInlineEditCard(card);
     setIsEditMode(true);
@@ -281,46 +281,46 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (updateMember as (id: string, updates: any) => Promise<void>)(member.id, {
-        avatar: inlineValues.avatar || '', avatarUrl: inlineValues.avatar || '',
-        name: inlineValues.name, fullName: inlineValues.fullName, idNumber: inlineValues.idNumber,
-        birthPlace: inlineValues.birthPlace || undefined,
-        'general.birthPlace': inlineValues.birthPlace || undefined,
-        dateOfBirth: inlineValues.dateOfBirth, gender: inlineValues.gender, ethnicity: inlineValues.ethnicity,
-        'general.ethnicity': inlineValues.ethnicity || undefined,
-        dietaryPreference: (inlineValues.dietaryPreference as Member['dietaryPreference']) || undefined,
-        'general.dietaryPreference': (inlineValues.dietaryPreference as Member['dietaryPreference']) || undefined,
-        nationality: inlineValues.nationality, introducer: inlineValues.introducer, bio: inlineValues.bio,
-        hobbies: inlineValues.hobbies, skills: skillsArr,
-        companyName: inlineValues.companyName, companyWebsite: inlineValues.companyWebsite,
-        companyDescription: inlineValues.companyDescription,
-        'business.companyDescription': inlineValues.companyDescription || undefined,
-        departmentAndPosition: inlineValues.departmentAndPosition,
-        'business.departmentAndPosition': inlineValues.departmentAndPosition || undefined,
-        acceptInternationalBusiness: inlineValues.acceptInternationalBusiness, businessCategory: inlineValues.businessCategory,
-        industry: inlineValues.industry, interestedIndustries: inlineValues.interestedIndustries,
-        'business.interestedIndustries': inlineValues.interestedIndustries,
-        levelOfManagement: inlineValues.levelOfManagement,
-        'business.levelOfManagement': inlineValues.levelOfManagement || undefined,
+        avatar: inlineValues.general?.avatarUrl || '', avatarUrl: inlineValues.general?.avatarUrl || '',
+        name: inlineValues.general?.name, fullName: inlineValues.general?.fullName, idNumber: inlineValues.general?.idNumber,
+        birthPlace: inlineValues.general?.birthPlace || undefined,
+        'general.birthPlace': inlineValues.general?.birthPlace || undefined,
+        dateOfBirth: inlineValues.general?.dob, gender: inlineValues.general?.gender, ethnicity: inlineValues.general?.ethnicity,
+        'general.ethnicity': inlineValues.general?.ethnicity || undefined,
+        dietaryPreference: (inlineValues.general?.dietaryPreference as any) || undefined,
+        'general.dietaryPreference': (inlineValues.general?.dietaryPreference as any) || undefined,
+        nationality: inlineValues.general?.nationality, introducer: inlineValues.jciCareer?.introducer, bio: inlineValues.others?.bio,
+        hobbies: inlineValues.others?.hobbies, skills: skillsArr,
+        companyName: inlineValues.companyName, companyWebsite: inlineValues.business?.companyWebsite,
+        companyDescription: inlineValues.business?.companyDescription,
+        'business.companyDescription': inlineValues.business?.companyDescription || undefined,
+        departmentAndPosition: inlineValues.business?.departmentAndPosition,
+        'business.departmentAndPosition': inlineValues.business?.departmentAndPosition || undefined,
+        acceptInternationalBusiness: inlineValues.business?.acceptInternationalBusiness, businessCategory: inlineValues.business?.businessCategory,
+        industry: inlineValues.industry, interestedIndustries: inlineValues.business?.interestedIndustries,
+        'business.interestedIndustries': inlineValues.business?.interestedIndustries,
+        levelOfManagement: inlineValues.business?.levelOfManagement,
+        'business.levelOfManagement': inlineValues.business?.levelOfManagement || undefined,
         idealReferralIndustry: inlineValues.idealReferralIndustry,
-        idealReferral: inlineValues.idealReferral, specialOffer: inlineValues.specialOffer,
-        phone: inlineValues.phone, alternatePhone: inlineValues.alternatePhone, email: inlineValues.email,
-        whatsappGroup: inlineValues.whatsappGroup, address: inlineValues.address,
-        emergencyContactName: inlineValues.emergencyContactName, emergencyContactRelationship: inlineValues.emergencyContactRelationship,
-        emergencyContactPhone: inlineValues.emergencyContactPhone, linkedin: inlineValues.linkedin,
-        facebook: inlineValues.facebook, instagram: inlineValues.instagram, wechat: inlineValues.wechat,
-        cutStyle: inlineValues.cutStyle, tshirtSize: inlineValues.tshirtSize, jacketSize: inlineValues.jacketSize,
-        tshirtStatus: inlineValues.tshirtStatus, embroideredName: inlineValues.embroideredName,
-        senatorshipId: inlineValues.senatorshipId?.trim(), senatorCertified: inlineValues.senatorCertified,
-        senatorshipBoardValidated: inlineValues.senatorshipBoardValidated,
-        senatorshipValidatedBy: inlineValues.senatorshipValidatedBy?.trim(),
-        'jciCareer.senatorshipValidatedBy': inlineValues.senatorshipValidatedBy?.trim(),
-        senatorshipValidatedAt: inlineValues.senatorshipValidatedAt?.trim(),
-        'jciCareer.senatorshipValidatedAt': inlineValues.senatorshipValidatedAt?.trim(),
+        idealReferral: inlineValues.business?.idealReferrals, specialOffer: inlineValues.business?.specialOffer,
+        phone: inlineValues.contact?.phone, alternatePhone: inlineValues.contact?.alternatePhone, email: inlineValues.contact?.email,
+        whatsappGroup: inlineValues.contact?.whatsappJoined, address: inlineValues.contact?.address,
+        emergencyContactName: inlineValues.contact?.emergency?.name, emergencyContactRelationship: inlineValues.contact?.emergency?.relationship,
+        emergencyContactPhone: inlineValues.contact?.emergency?.phone, linkedin: inlineValues.contact?.socials?.linkedin,
+        facebook: inlineValues.contact?.socials?.facebook, instagram: inlineValues.contact?.socials?.instagram, wechat: inlineValues.contact?.socials?.wechat,
+        cutStyle: inlineValues.others?.shirtStyle, tshirtSize: inlineValues.others?.tshirtSize, jacketSize: inlineValues.others?.jacketSize,
+        tshirtStatus: inlineValues.others?.tshirtStatus, embroideredName: inlineValues.others?.embroideredName,
+        senatorshipId: inlineValues.jciCareer?.senatorship?.senatorNumber?.trim(), senatorCertified: inlineValues.jciCareer?.senatorship?.certified,
+        senatorshipBoardValidated: inlineValues.jciCareer?.senatorship?.boardValidated,
+        senatorshipValidatedBy: inlineValues.jciCareer?.senatorshipValidatedBy?.trim(),
+        'jciCareer.senatorshipValidatedBy': inlineValues.jciCareer?.senatorshipValidatedBy?.trim(),
+        senatorshipValidatedAt: inlineValues.jciCareer?.senatorshipValidatedAt?.trim(),
+        'jciCareer.senatorshipValidatedAt': inlineValues.jciCareer?.senatorshipValidatedAt?.trim(),
         ...(inlineValues.role ? { role: inlineValues.role } : {}),
-        ...(inlineValues.membershipType ? { membershipType: inlineValues.membershipType } : {}),
+        ...(inlineValues.jciCareer?.membershipType ? { membershipType: inlineValues.jciCareer?.membershipType } : {}),
       });
-      const finalAvatar = inlineValues.avatar;
-      const originalAvatar = member.avatar || member.avatarUrl || member.general?.avatarUrl || '';
+      const finalAvatar = inlineValues.general?.avatarUrl;
+      const originalAvatar = member.general?.avatarUrl || member.general?.avatarUrl || member.general?.avatarUrl || '';
       // Delete original saved avatar if replaced
       if (originalAvatar && originalAvatar !== finalAvatar) {
         deleteFromCloudinary(originalAvatar).catch(console.error);
@@ -511,7 +511,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
               if (c.memberId === member.id) {
                 roles.push({
                   id: `comm-${proj.id}`,
-                  projectName: proj.name || 'Unnamed Project',
+                  projectName: proj.general?.name || 'Unnamed Project',
                   role: c.role || 'Committee Member',
                   type: 'Committee',
                   date: proj.startDate || proj.proposedDate || proj.eventStartDate || '',
@@ -526,7 +526,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
               if (t.memberId === member.id) {
                 roles.push({
                   id: `trainer-${proj.id}`,
-                  projectName: proj.name || 'Unnamed Project',
+                  projectName: proj.general?.name || 'Unnamed Project',
                   role: 'Trainer',
                   type: 'Trainer',
                   hours: parseFloat(t.durationHours) || 0,
@@ -572,10 +572,10 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
 
         // 4. Process Recruited Members
         const recruitList: any[] = [];
-        const memberName = member.name || '';
-        const memberFullName = member.fullName || member.general?.name || '';
+        const memberName = member.general?.name || '';
+        const memberFullName = member.general?.fullName || member.general?.name || '';
         allMembers.forEach((m: any) => {
-          const intro = (m.introducer || '').trim().toLowerCase();
+          const intro = (m.jciCareer?.introducer || '').trim().toLowerCase();
           if (intro) {
             if (
               intro === member.id.toLowerCase() ||
@@ -584,10 +584,10 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
             ) {
               recruitList.push({
                 id: m.id,
-                name: m.name,
-                email: m.email,
-                joinDate: m.joinDate,
-                avatar: m.avatar
+                name: m.general?.name,
+                email: m.contact?.email,
+                joinDate: m.jciCareer?.joinDate,
+                avatar: m.general?.avatarUrl
               });
             }
           }
@@ -737,7 +737,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
     const bizTagItems = ['JIB', 'CYEA', 'CYE', 'BCP', 'Networking', 'BSP', 'BSP Supercharge'];
     bizTagsScore += tags.filter(t => bizTagItems.includes(t)).length * 5;
     const bizBase = 40;
-    const bizWillingness = member.acceptInternationalBusiness === 'Yes' ? 25 : member.acceptInternationalBusiness === 'Willing to Explore' ? 12 : 0;
+    const bizWillingness = member.business?.acceptInternationalBusiness === 'Yes' ? 25 : member.business?.acceptInternationalBusiness === 'Willing to Explore' ? 12 : 0;
     const bizProfile = ((member.companyName || member.business?.position)) ? 5 : 0;
     const bizPersona = member.personaType?.includes('Practical') ? 10 : 0;
     const business = Math.min(99, Math.max(15, bizBase + Math.min(25, bizTagsScore) + bizWillingness + bizProfile + bizPersona));
@@ -747,7 +747,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
     const commTagItems = ['Project Management', 'Leadership Toolkit', 'Leaders School Program', 'Chairperson', 'Zero Waste', 'Blood Donation', 'SDA'];
     commTagsScore += tags.filter(t => commTagItems.includes(t)).length * 5;
     const commBase = 50;
-    const commRole = (member.role === UserRole.BOARD || member.role === UserRole.ADMIN || member.isCurrentBoardMember) ? 20 : member.role === UserRole.MEMBER ? 10 : 0;
+    const commRole = (member.role === UserRole.BOARD || member.role === UserRole.ADMIN || member.jciCareer?.isCurrentBoardMember) ? 20 : member.role === UserRole.MEMBER ? 10 : 0;
     const commPersona = member.personaType?.includes('Backbone') ? 10 : 0;
     const community = Math.min(99, Math.max(15, commBase + Math.min(25, commTagsScore) + commRole + commPersona));
 
@@ -756,7 +756,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
     const intTagItems = ['ASPAC', 'World Congress', 'Twin Chapter', 'National Convention', 'Conference'];
     intTagsScore += tags.filter(t => intTagItems.includes(t)).length * 5;
     const intBase = 30;
-    const intWillingness = member.acceptInternationalBusiness === 'Yes' ? 10 : member.acceptInternationalBusiness === 'Willing to Explore' ? 5 : 0;
+    const intWillingness = member.business?.acceptInternationalBusiness === 'Yes' ? 10 : member.business?.acceptInternationalBusiness === 'Willing to Explore' ? 5 : 0;
     const intConnections = (member.internationalConnections && member.internationalConnections.length > 0) ? 15 : 0;
     const intPersona = member.personaType?.includes('Explorer') ? 10 : 0;
     const international = Math.min(99, Math.max(15, intBase + Math.min(25, intTagsScore) + intWillingness + intConnections + intPersona));
@@ -827,10 +827,10 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
             <div className="relative shrink-0">
               <div className="p-0.5 bg-white/30 rounded-full shadow-lg">
                 <img
-                  src={member.avatar || undefined}
+                  src={member.general?.avatarUrl || undefined}
                   className="w-16 h-16 rounded-full border-2 border-white/50 bg-slate-200 object-cover"
-                  alt={member.name}
-                  onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = getInitialsSvg(member.name, 64); }}
+                  alt={member.general?.name}
+                  onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = getInitialsSvg(member.general?.name, 64); }}
                 />
               </div>
               <div className={`absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-jci-navy shadow ${(member.role === UserRole.MEMBER || member.role === UserRole.BOARD || member.role === UserRole.ADMIN) ? 'bg-green-400' : 'bg-slate-400'}`} title={member.role} />
@@ -838,7 +838,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
             {/* Name + meta */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-white font-black text-xl leading-tight">{member.name}</h1>
+                <h1 className="text-white font-black text-xl leading-tight">{member.general?.name}</h1>
               </div>
               {(member.companyName || member.business?.departmentAndPosition) && (
                 <p className="text-white/70 text-xs mt-0.5 truncate">
@@ -847,8 +847,8 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
                 </p>
               )}
               <div className="flex flex-col gap-0.5 mt-1 text-white/60 text-[10px]">
-                {member.email && <span className="flex items-center gap-1"><Mail size={9} />{member.email}</span>}
-                {member.phone && <span className="flex items-center gap-1"><Phone size={9} />{member.phone}</span>}
+                {member.contact?.email && <span className="flex items-center gap-1"><Mail size={9} />{member.contact?.email}</span>}
+                {member.contact?.phone && <span className="flex items-center gap-1"><Phone size={9} />{member.contact?.phone}</span>}
               </div>
             </div>
           </div>
@@ -860,24 +860,24 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
             <span className="flex items-center gap-1 text-[11px] bg-slate-50 border border-slate-100 rounded-lg px-2 py-1">
               <Shield size={10} className="text-jci-blue shrink-0" />
               <span className="text-jci-blue">{member.role}</span>
-              {member.introducer && (
+              {member.jciCareer?.introducer && (
                 <>
                   <span className="text-slate-300 mx-0.5">·</span>
-                  <span className="text-jci-blue">Introducer: {resolveIntroducerShort(member.introducer)}</span>
+                  <span className="text-jci-blue">Introducer: {resolveIntroducerShort(member.jciCareer?.introducer)}</span>
                 </>
               )}
             </span>
             <span className="flex items-center gap-2 px-2 py-1 bg-slate-50 border border-slate-100 rounded-lg">
-              {member.linkedin
-                ? <a href={member.linkedin} target="_blank" rel="noreferrer" className="text-[#0077B5]"><Linkedin size={13} /></a>
+              {member.contact?.socials?.linkedin
+                ? <a href={member.contact?.socials?.linkedin} target="_blank" rel="noreferrer" className="text-[#0077B5]"><Linkedin size={13} /></a>
                 : <Linkedin size={13} className="text-slate-400" />}
-              {member.facebook
-                ? <a href={member.facebook} target="_blank" rel="noreferrer" className="text-[#1877F2]"><Facebook size={13} /></a>
+              {member.contact?.socials?.facebook
+                ? <a href={member.contact?.socials?.facebook} target="_blank" rel="noreferrer" className="text-[#1877F2]"><Facebook size={13} /></a>
                 : <Facebook size={13} className="text-slate-400" />}
-              {member.instagram
-                ? <a href={member.instagram} target="_blank" rel="noreferrer" className="text-[#E1306C]"><Instagram size={13} /></a>
+              {member.contact?.socials?.instagram
+                ? <a href={member.contact?.socials?.instagram} target="_blank" rel="noreferrer" className="text-[#E1306C]"><Instagram size={13} /></a>
                 : <Instagram size={13} className="text-slate-400" />}
-              {member.wechat
+              {member.contact?.socials?.wechat
                 ? <span className="text-[#07C160] flex items-center gap-1 text-[10px]"><MessageCircle size={13} /></span>
                 : <MessageCircle size={13} className="text-slate-400" />}
             </span>
@@ -937,7 +937,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
             {/* Name, Tier Badge, position, company — pl-52 clears avatar */}
             <div className="absolute bottom-4 left-0 right-0 px-6 pl-52 flex flex-col justify-end gap-1">
               <div className="flex flex-row items-center gap-2 flex-wrap">
-                <h1 className="text-2xl font-black text-white tracking-tight leading-tight break-words drop-shadow">{member.name}</h1>
+                <h1 className="text-2xl font-black text-white tracking-tight leading-tight break-words drop-shadow">{member.general?.name}</h1>
               </div>
               {(member.companyName || member.business?.departmentAndPosition) && (
                 <p className="text-sm font-semibold text-white/70 flex items-center gap-1.5">
@@ -953,10 +953,10 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
             <div className="relative">
               <div className="p-1 bg-white rounded-full shadow-xl">
                 <img
-                  src={member.avatar || undefined}
+                  src={member.general?.avatarUrl || undefined}
                   className="w-32 h-32 rounded-full border-4 border-slate-50 bg-slate-100 object-cover"
-                  alt={member.name}
-                  onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = getInitialsSvg(member.name, 128); }}
+                  alt={member.general?.name}
+                  onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = getInitialsSvg(member.general?.name, 128); }}
                 />
               </div>
               <div className={`absolute bottom-2 right-2 w-8 h-8 rounded-full border-4 border-white shadow-sm ${(member.role === UserRole.MEMBER || member.role === UserRole.BOARD || member.role === UserRole.ADMIN) ? 'bg-green-500' : 'bg-slate-500'}`} title={member.role} />
@@ -969,32 +969,32 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
             <div className="flex-1 flex flex-col gap-1.5">
               {/* è¡Œä¸€ï¼šemail / phone */}
               <div className="flex flex-wrap gap-1.5 items-center">
-                <span className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100 text-xs font-medium text-slate-600"><Mail size={12} className="text-jci-blue shrink-0" />{member.email}</span>
-                {member.phone && <span className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100 text-xs font-medium text-slate-600"><Phone size={12} className="text-jci-blue shrink-0" />{member.phone}</span>}
+                <span className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100 text-xs font-medium text-slate-600"><Mail size={12} className="text-jci-blue shrink-0" />{member.contact?.email}</span>
+                {member.contact?.phone && <span className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100 text-xs font-medium text-slate-600"><Phone size={12} className="text-jci-blue shrink-0" />{member.contact?.phone}</span>}
               </div>
               {/* è¡ŒäºŒï¼šrole + introducer + ç¤¾äº¤åª’ä½“ */}
               <div className="flex flex-wrap gap-1.5 items-center">
                 <span className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100 text-xs font-medium">
                   <Shield size={12} className="text-jci-blue shrink-0" />
                   <span className="text-jci-blue">{member.role}</span>
-                  {member.introducer && (
+                  {member.jciCareer?.introducer && (
                     <>
                       <span className="text-slate-300 mx-0.5">·</span>
-                      <span className="text-jci-blue">Introducer: {resolveIntroducerShort(member.introducer)}</span>
+                      <span className="text-jci-blue">Introducer: {resolveIntroducerShort(member.jciCareer?.introducer)}</span>
                     </>
                   )}
                 </span>
                 <span className="flex items-center gap-2 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100">
-                  {member.linkedin
-                    ? <a href={member.linkedin} target="_blank" rel="noreferrer" className="text-[#0077B5]"><Linkedin size={14} /></a>
+                  {member.contact?.socials?.linkedin
+                    ? <a href={member.contact?.socials?.linkedin} target="_blank" rel="noreferrer" className="text-[#0077B5]"><Linkedin size={14} /></a>
                     : <Linkedin size={14} className="text-slate-400" />}
-                  {member.facebook
-                    ? <a href={member.facebook} target="_blank" rel="noreferrer" className="text-[#1877F2]"><Facebook size={14} /></a>
+                  {member.contact?.socials?.facebook
+                    ? <a href={member.contact?.socials?.facebook} target="_blank" rel="noreferrer" className="text-[#1877F2]"><Facebook size={14} /></a>
                     : <Facebook size={14} className="text-slate-400" />}
-                  {member.instagram
-                    ? <a href={member.instagram} target="_blank" rel="noreferrer" className="text-[#E1306C]"><Instagram size={14} /></a>
+                  {member.contact?.socials?.instagram
+                    ? <a href={member.contact?.socials?.instagram} target="_blank" rel="noreferrer" className="text-[#E1306C]"><Instagram size={14} /></a>
                     : <Instagram size={14} className="text-slate-400" />}
-                  {member.wechat
+                  {member.contact?.socials?.wechat
                     ? <span className="text-[#07C160] flex items-center gap-1 text-xs"><MessageCircle size={14} /></span>
                     : <MessageCircle size={14} className="text-slate-400" />}
                 </span>
@@ -1053,7 +1053,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
               <Calendar size={12} className="text-slate-400" />
               <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Join Date</p>
             </div>
-            <p className="text-xs md:text-base font-black text-slate-900 leading-snug">{formatDateToDDMMMYYYY(member.joinDate)}</p>
+            <p className="text-xs md:text-base font-black text-slate-900 leading-snug">{formatDateToDDMMMYYYY(member.jciCareer?.joinDate)}</p>
           </div>
           <div className="p-2 md:p-4 text-center hover:bg-white transition-colors">
             <div className="flex items-center justify-center gap-1.5 mb-1">
@@ -1077,13 +1077,13 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
             </div>
             <Badge
               variant={
-                (member.membership?.[String(new Date().getFullYear())]?.status === 'paid' ||
-                  member.membership?.[String(new Date().getFullYear())]?.status === 'over paid') ? 'success' :
-                  member.membership?.[String(new Date().getFullYear())]?.status === 'pending' ? 'warning' : 'error'
+                (member.jciCareer?.membershipDuesHistory?.[String(new Date().getFullYear())]?.status === 'paid' ||
+                  member.jciCareer?.membershipDuesHistory?.[String(new Date().getFullYear())]?.status === 'over paid') ? 'success' :
+                  member.jciCareer?.membershipDuesHistory?.[String(new Date().getFullYear())]?.status === 'pending' ? 'warning' : 'error'
               }
               className="px-4 font-black capitalize"
             >
-              {member.membership?.[String(new Date().getFullYear())]?.status || 'pending'}
+              {member.jciCareer?.membershipDuesHistory?.[String(new Date().getFullYear())]?.status || 'pending'}
             </Badge>
           </div>
         </div>
@@ -1333,7 +1333,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
         <Modal
           isOpen={showPaymentHistoryModal}
           onClose={() => setShowPaymentHistoryModal(false)}
-          title={`Membership Dues History — ${member.name}`}
+          title={`Membership Dues History — ${member.general?.name}`}
           size="md"
           bottomSheet
         >
@@ -1343,11 +1343,11 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
             </p>
 
             <div className="divide-y divide-slate-100">
-              {member.membership && Object.keys(member.membership).length > 0 ? (
-                Object.keys(member.membership)
+              {member.jciCareer?.membershipDuesHistory && Object.keys(member.jciCareer?.membershipDuesHistory).length > 0 ? (
+                Object.keys(member.jciCareer?.membershipDuesHistory)
                   .sort((a, b) => b.localeCompare(a))
                   .map((yr) => {
-                    const record = member.membership![yr];
+                    const record = member.jciCareer?.membershipDuesHistory![yr];
                     const isPaid = record.status === 'paid' || record.status === 'over paid';
                     const isPending = record.status === 'pending';
                     const statusColorClass = isPaid
@@ -1448,7 +1448,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
               <div>
                 <p className="text-sm font-bold text-red-900">Warning: This action is permanent.</p>
                 <p className="text-sm text-red-700 mt-1">
-                  Are you sure you want to delete member <strong>{member.name}</strong>? All their data, points, and history will be removed.
+                  Are you sure you want to delete member <strong>{member.general?.name}</strong>? All their data, points, and history will be removed.
                 </p>
               </div>
             </div>

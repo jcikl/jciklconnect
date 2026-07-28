@@ -51,9 +51,9 @@ const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) 
               <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Current Mentor</h4>
               {mentor ? (
                 <div className="flex items-center gap-3 p-3 border border-slate-100 rounded-lg hover:bg-slate-50 cursor-pointer">
-                  <img src={mentor.avatar || undefined} className="w-10 h-10 rounded-full" alt="" onError={(e) => { e.currentTarget.src = getInitialsSvg(mentor.name, 40); }} />
+                  <img src={mentor.general?.avatarUrl || undefined} className="w-10 h-10 rounded-full" alt="" onError={(e) => { e.currentTarget.src = getInitialsSvg(mentor.general?.name, 40); }} />
                   <div>
-                    <p className="text-sm font-semibold text-slate-900">{mentor.name}</p>
+                    <p className="text-sm font-semibold text-slate-900">{mentor.general?.name}</p>
                     <p className="text-xs text-slate-500">{mentor.role}</p>
                   </div>
                 </div>
@@ -73,8 +73,8 @@ const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) 
                 <div className="space-y-2">
                   {mentees.map(m => (
                     <div key={m.id} className="flex items-center gap-3 p-2 bg-slate-50 rounded-lg">
-                      <img src={m.avatar || undefined} className="w-8 h-8 rounded-full" alt="" onError={(e) => { e.currentTarget.src = getInitialsSvg(m.name, 32); }} />
-                      <span className="text-sm font-medium">{m.name}</span>
+                      <img src={m.general?.avatarUrl || undefined} className="w-8 h-8 rounded-full" alt="" onError={(e) => { e.currentTarget.src = getInitialsSvg(m.general?.name, 32); }} />
+                      <span className="text-sm font-medium">{m.general?.name}</span>
                     </div>
                   ))}
                 </div>
@@ -92,7 +92,7 @@ const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) 
                   <input
                     type="text"
                     placeholder="e.g. 12345"
-                    value={inlineValues.senatorshipId}
+                    value={inlineValues.jciCareer?.senatorship?.senatorNumber}
                     onChange={e => setInlineValues({ ...inlineValues, senatorshipId: e.target.value })}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                   />
@@ -101,7 +101,7 @@ const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) 
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={inlineValues.senatorCertified}
+                      checked={inlineValues.jciCareer?.senatorship?.certified}
                       onChange={e => setInlineValues({ ...inlineValues, senatorCertified: e.target.checked })}
                       className="w-4 h-4 rounded border-slate-300 text-jci-blue focus:ring-jci-blue/20"
                     />
@@ -112,20 +112,20 @@ const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) 
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={inlineValues.senatorshipBoardValidated}
+                      checked={inlineValues.jciCareer?.senatorship?.boardValidated}
                       onChange={e => setInlineValues({ ...inlineValues, senatorshipBoardValidated: e.target.checked })}
                       className="w-4 h-4 rounded border-slate-300 text-jci-blue focus:ring-jci-blue/20"
                     />
                     <span className="text-sm font-medium text-slate-700">Board Validated</span>
                   </label>
                 </div>
-                {inlineValues.senatorshipBoardValidated && (
+                {inlineValues.jciCareer?.senatorship?.boardValidated && (
                   <div className="grid grid-cols-2 gap-4 animate-in fade-in duration-200">
                     <div>
                       <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Validated By</label>
                       <input
                         type="text"
-                        value={inlineValues.senatorshipValidatedBy}
+                        value={inlineValues.jciCareer?.senatorshipValidatedBy}
                         onChange={e => setInlineValues({ ...inlineValues, senatorshipValidatedBy: e.target.value })}
                         className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                       />
@@ -134,7 +134,7 @@ const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) 
                       <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Validated At</label>
                       <Input
                         type="date"
-                        value={inlineValues.senatorshipValidatedAt}
+                        value={inlineValues.jciCareer?.senatorshipValidatedAt}
                         onChange={e => setInlineValues({ ...inlineValues, senatorshipValidatedAt: e.target.value })}
                       />
                     </div>
@@ -157,7 +157,7 @@ const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) 
                   <div>
                     <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Membership Type</label>
                     <select
-                      value={inlineValues.membershipType}
+                      value={inlineValues.jciCareer?.membershipType}
                       onChange={e => setInlineValues({ ...inlineValues, membershipType: e.target.value })}
                       className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                     >
@@ -177,16 +177,16 @@ const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) 
                   <span className="text-xs text-slate-500 uppercase font-bold">Type</span>
                   <MembershipTypeDisplay
                     member={{
-                      nationality: member.nationality,
-                      dateOfBirth: member.dateOfBirth,
-                      senatorCertified: member.senatorCertified,
-                      senatorshipId: member.senatorshipId,
+                      nationality: member.general?.nationality,
+                      dateOfBirth: member.general?.dob,
+                      senatorCertified: member.jciCareer?.senatorship?.certified,
+                      senatorshipId: member.jciCareer?.senatorship?.senatorNumber,
                       role: member.role,
-                      membershipType: member.membershipType,
+                      membershipType: member.jciCareer?.membershipType,
                     }}
                   />
                 </div>
-                {member.senatorCertified && (
+                {member.jciCareer?.senatorship?.certified && (
                   <Badge variant="success" className="animate-pulse">Senator Certified</Badge>
                 )}
               </div>
@@ -196,22 +196,22 @@ const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) 
                   <span className="text-slate-500">Current Status ({new Date().getFullYear()}):</span>
                   <Badge
                     variant={
-                      (member.membership?.[String(new Date().getFullYear())]?.status === 'paid' ||
-                        member.membership?.[String(new Date().getFullYear())]?.status === 'over paid') ? 'success' :
-                        member.membership?.[String(new Date().getFullYear())]?.status === 'pending' ? 'warning' : 'error'
+                      (member.jciCareer?.membershipDuesHistory?.[String(new Date().getFullYear())]?.status === 'paid' ||
+                        member.jciCareer?.membershipDuesHistory?.[String(new Date().getFullYear())]?.status === 'over paid') ? 'success' :
+                        member.jciCareer?.membershipDuesHistory?.[String(new Date().getFullYear())]?.status === 'pending' ? 'warning' : 'error'
                     }
                     className="capitalize"
                   >
-                    {member.membership?.[String(new Date().getFullYear())]?.status || 'pending'}
+                    {member.jciCareer?.membershipDuesHistory?.[String(new Date().getFullYear())]?.status || 'pending'}
                   </Badge>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-500">Last Payment Amount:</span>
-                  <span className="font-bold">RM {member.membership?.[String(new Date().getFullYear())]?.amount || 0}</span>
+                  <span className="font-bold">RM {member.jciCareer?.membershipDuesHistory?.[String(new Date().getFullYear())]?.amount || 0}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-500">Last Payment Date:</span>
-                  <span className="font-medium text-slate-900">{formatDateToDDMMMYYYY(member.membership?.[String(new Date().getFullYear())]?.paymentDate)}</span>
+                  <span className="font-medium text-slate-900">{formatDateToDDMMMYYYY(member.jciCareer?.membershipDuesHistory?.[String(new Date().getFullYear())]?.paymentDate)}</span>
                 </div>
                 <Button
                   size="sm"
@@ -225,9 +225,9 @@ const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) 
                 {/* Pay dues button — shown when dues are not paid for the current year */}
                 {(() => {
                   const currentYear = new Date().getFullYear();
-                  const rec = member.membership?.[String(currentYear)];
+                  const rec = member.jciCareer?.membershipDuesHistory?.[String(currentYear)];
                   const isPaid = rec?.status === 'paid' || rec?.status === 'over paid';
-                  const noPaymentNeeded = member.membershipType === 'Honorary' || member.membershipType === 'Senator';
+                  const noPaymentNeeded = member.jciCareer?.membershipType === 'Honorary' || member.jciCareer?.membershipType === 'Senator';
                   if (noPaymentNeeded) return null;
                   return (
                     <div className="mt-2 pt-3 border-t border-slate-100">
@@ -253,27 +253,27 @@ const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) 
                 <div className="grid grid-cols-1 gap-2 text-sm">
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500">Certified Senator:</span>
-                    <Badge variant={member.senatorCertified ? 'success' : 'neutral'}>
-                      {member.senatorCertified ? 'Yes' : 'No'}
+                    <Badge variant={member.jciCareer?.senatorship?.certified ? 'success' : 'neutral'}>
+                      {member.jciCareer?.senatorship?.certified ? 'Yes' : 'No'}
                     </Badge>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500">Senator Number:</span>
-                    <span className="font-semibold text-slate-900">{member.senatorshipId || 'N/A'}</span>
+                    <span className="font-semibold text-slate-900">{member.jciCareer?.senatorship?.senatorNumber || 'N/A'}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500">Board Validated:</span>
-                    <Badge variant={member.senatorshipBoardValidated ? 'success' : 'neutral'}>
-                      {member.senatorshipBoardValidated ? 'Validated' : 'Pending'}
+                    <Badge variant={member.jciCareer?.senatorship?.boardValidated ? 'success' : 'neutral'}>
+                      {member.jciCareer?.senatorship?.boardValidated ? 'Validated' : 'Pending'}
                     </Badge>
                   </div>
-                  {member.senatorshipBoardValidated && member.jciCareer?.senatorshipValidatedBy && (
+                  {member.jciCareer?.senatorship?.boardValidated && member.jciCareer?.senatorshipValidatedBy && (
                     <div className="flex items-center justify-between text-xs text-slate-500">
                       <span>Validated By:</span>
                       <span className="font-medium">{member.jciCareer.senatorshipValidatedBy}</span>
                     </div>
                   )}
-                  {member.senatorshipBoardValidated && member.jciCareer?.senatorshipValidatedAt && (
+                  {member.jciCareer?.senatorship?.boardValidated && member.jciCareer?.senatorshipValidatedAt && (
                     <div className="flex items-center justify-between text-xs text-slate-500">
                       <span>Validated At:</span>
                       <span className="font-medium">{formatDateToDDMMMYYYY(member.jciCareer.senatorshipValidatedAt!)}</span>
@@ -310,7 +310,7 @@ const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) 
                 <div className="absolute -left-8 bg-green-100 text-green-600 p-1 rounded-full border-4 border-white">
                   <UserPlus size={14} />
                 </div>
-                <span className="text-xs text-slate-400 font-mono mb-1 block">{member.joinDate}</span>
+                <span className="text-xs text-slate-400 font-mono mb-1 block">{member.jciCareer?.joinDate}</span>
                 <h4 className="text-sm font-bold text-slate-900">Joined JCI Local Chapter</h4>
               </div>
 

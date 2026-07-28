@@ -164,14 +164,14 @@ export class ProjectReportService {
 
       // Calculate member contributions
       const memberContributions = activeTeamMembers.map(member => {
-        const memberTasks = tasks.filter(t => t.assignee === member.id || t.assignee === member.name);
+        const memberTasks = tasks.filter(t => t.assignee === member.id || t.assignee === member.general?.name);
         const completed = memberTasks.filter(t => t.status === 'Done').length;
         const inProgress = memberTasks.filter(t => t.status === 'In Progress').length;
         const contributionPercentage = totalTasks > 0 ? (memberTasks.length / totalTasks) * 100 : 0;
 
         return {
           memberId: member.id,
-          memberName: member.name,
+          memberName: member.general?.name,
           tasksCompleted: completed,
           tasksInProgress: inProgress,
           contributionPercentage: Math.round(contributionPercentage * 10) / 10,
@@ -185,7 +185,7 @@ export class ProjectReportService {
           taskId: t.id,
           taskName: t.title,
           dueDate: t.dueDate!,
-          assignee: activeTeamMembers.find(m => m.id === t.assignee || m.name === t.assignee)?.name,
+          assignee: activeTeamMembers.find(m => m.id === t.assignee || m.general?.name === t.assignee)?.general?.name,
           priority: t.priority || 'Medium',
         }))
         .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
@@ -292,7 +292,7 @@ export class ProjectReportService {
 
       return {
         projectId: project.id,
-        projectName: project.name,
+        projectName: project.name || project.title,
         reportType,
         generatedAt: new Date().toISOString(),
         period: {
@@ -316,7 +316,7 @@ export class ProjectReportService {
         teamPerformance: {
           totalMembers: activeTeamMembers.length,
           activeMembers: activeTeamMembers.filter(m => {
-            const memberTasks = tasks.filter(t => t.assignee === m.id || t.assignee === m.name);
+            const memberTasks = tasks.filter(t => t.assignee === m.id || t.assignee === m.general?.name);
             return memberTasks.some(t => t.status !== 'Done');
           }).length,
           memberContributions,

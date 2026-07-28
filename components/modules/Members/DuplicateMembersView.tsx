@@ -142,20 +142,20 @@ function findDuplicateGroups(members: Member[]): DuplicateGroup[] {
     }
   };
 
-  addGroups(m => normalizeEmail(m.email || m.contact?.email || ''), 'Email');
+  addGroups(m => normalizeEmail(m.contact?.email || m.contact?.email || ''), 'Email');
   addGroups(m => {
-    const p = normalizePhone(m.phone || m.contact?.phone || '');
+    const p = normalizePhone(m.contact?.phone || m.contact?.phone || '');
     return p.length >= 8 ? p : '';
   }, 'Phone');
   addGroups(m => {
-    const id = normalizeId(m.idNumber || m.general?.idNumber || '');
+    const id = normalizeId(m.general?.idNumber || m.general?.idNumber || '');
     return id.length >= 6 ? id : '';
   }, 'National ID');
 
   // Sort: groups with abnormal IDs first, then by group size desc
   groups.sort((a, b) => {
-    const aHasAbnormal = a.members.some(m => isAbnormalId(m.idNumber || m.general?.idNumber || ''));
-    const bHasAbnormal = b.members.some(m => isAbnormalId(m.idNumber || m.general?.idNumber || ''));
+    const aHasAbnormal = a.members.some(m => isAbnormalId(m.general?.idNumber || m.general?.idNumber || ''));
+    const bHasAbnormal = b.members.some(m => isAbnormalId(m.general?.idNumber || m.general?.idNumber || ''));
     if (aHasAbnormal !== bHasAbnormal) return aHasAbnormal ? -1 : 1;
     return b.members.length - a.members.length;
   });
@@ -166,14 +166,14 @@ function findDuplicateGroups(members: Member[]): DuplicateGroup[] {
 function memberScore(m: Member): number {
   // Higher = more "complete" / likely the good record
   let score = 0;
-  const id = m.idNumber || m.general?.idNumber || '';
+  const id = m.general?.idNumber || m.general?.idNumber || '';
   if (id && !isAbnormalId(id)) score += 10;
-  if (m.fullName) score += 3;
-  if (m.name) score += 2;
-  if (m.email || m.contact?.email) score += 2;
-  if (m.phone || m.contact?.phone) score += 2;
+  if (m.general?.fullName) score += 3;
+  if (m.general?.name) score += 2;
+  if (m.contact?.email || m.contact?.email) score += 2;
+  if (m.contact?.phone || m.contact?.phone) score += 2;
   // Older join date = more established
-  const joined = m.joinDate || m.jciCareer?.joinDate || '';
+  const joined = m.jciCareer?.joinDate || m.jciCareer?.joinDate || '';
   if (joined) score += 1;
   return score;
 }
@@ -184,9 +184,9 @@ function MemberCard({ member, isKeep, onDelete, deleting }: {
   onDelete: () => void;
   deleting: boolean;
 }) {
-  const id = member.idNumber || member.general?.idNumber || '';
-  const email = member.email || member.contact?.email || '';
-  const phone = member.phone || member.contact?.phone || '';
+  const id = member.general?.idNumber || member.general?.idNumber || '';
+  const email = member.contact?.email || member.contact?.email || '';
+  const phone = member.contact?.phone || member.contact?.phone || '';
   const abnormal = isAbnormalId(id);
 
   return (
@@ -205,9 +205,9 @@ function MemberCard({ member, isKeep, onDelete, deleting }: {
           <AlertTriangle size={10} /> 异常
         </span>
       )}
-      <div className="font-semibold text-slate-800 text-sm truncate pr-16">{member.name || member.fullName || '—'}</div>
-      {member.fullName && member.fullName !== member.name && (
-        <div className="text-xs text-slate-500 truncate">{member.fullName}</div>
+      <div className="font-semibold text-slate-800 text-sm truncate pr-16">{member.general?.name || member.general?.fullName || '—'}</div>
+      {member.general?.fullName && member.general?.fullName !== member.general?.name && (
+        <div className="text-xs text-slate-500 truncate">{member.general?.fullName}</div>
       )}
       <div className="mt-2 space-y-1 text-xs text-slate-600">
         <div className="flex gap-1">
@@ -226,11 +226,11 @@ function MemberCard({ member, isKeep, onDelete, deleting }: {
         </div>
         <div className="flex gap-1">
           <span className="text-slate-400 w-16 shrink-0">加入</span>
-          <span>{member.joinDate || member.jciCareer?.joinDate || <span className="text-slate-300">—</span>}</span>
+          <span>{member.jciCareer?.joinDate || member.jciCareer?.joinDate || <span className="text-slate-300">—</span>}</span>
         </div>
         <div className="flex gap-1">
           <span className="text-slate-400 w-16 shrink-0">状态</span>
-          <span>{member.membershipStatus || <span className="text-slate-300">—</span>}</span>
+          <span>{member.jciCareer?.membershipStatus || <span className="text-slate-300">—</span>}</span>
         </div>
       </div>
       {!isKeep && (
@@ -352,7 +352,7 @@ export const DuplicateMembersView: React.FC<Props> = ({ members, onMembersChange
     );
   }
 
-  const abnormalCount = activeMembers.filter(m => isAbnormalId(m.idNumber || m.general?.idNumber || '')).length;
+  const abnormalCount = activeMembers.filter(m => isAbnormalId(m.general?.idNumber || m.general?.idNumber || '')).length;
 
   return (
     <div className="space-y-4">

@@ -427,8 +427,8 @@ export class DataImportExportService {
     if (entityType === 'members') {
       const allMembers = await MembersService.getAllMembers();
       for (const m of allMembers) {
-        if (m.email && m.id) {
-          existingMemberEmailToId.set(m.email.toLowerCase(), m.id);
+        if (m.contact?.email && m.id) {
+          existingMemberEmailToId.set(m.contact?.email.toLowerCase(), m.id);
         }
       }
     }
@@ -458,11 +458,11 @@ export class DataImportExportService {
       });
 
       if (entityType === 'members') {
-        const ic: string = normalizedRow.idNumber || normalizedRow.nationalId || '';
+        const ic: string = normalizedRow.general?.idNumber || normalizedRow.general?.idNumber || '';
         if (isMalaysianIC(ic)) {
-          if (!normalizedRow.birthPlace) { const bp = getBirthPlaceFromIC(ic); if (bp) normalizedRow.birthPlace = bp; }
-          if (!normalizedRow.dateOfBirth) { const dob = getDateOfBirthFromIC(ic); if (dob) normalizedRow.dateOfBirth = dob; }
-          if (!normalizedRow.gender) { const gender = getGenderFromIC(ic); if (gender) normalizedRow.gender = gender; }
+          if (!normalizedRow.general?.birthPlace) { const bp = getBirthPlaceFromIC(ic); if (bp) { if (!normalizedRow.general) (normalizedRow as any).general = {}; (normalizedRow.general as any).birthPlace = bp; } }
+          if (!normalizedRow.general?.dob) { const dob = getDateOfBirthFromIC(ic); if (dob) { if (!normalizedRow.general) (normalizedRow as any).general = {}; (normalizedRow.general as any).dob = dob; } }
+          if (!normalizedRow.general?.gender) { const gender = getGenderFromIC(ic); if (gender) { if (!normalizedRow.general) (normalizedRow as any).general = {}; (normalizedRow.general as any).gender = gender; } }
         }
       }
 
@@ -523,10 +523,10 @@ export class DataImportExportService {
           // bulk-imported members participate in the same email-uniqueness guarantee as
           // members created via MembersService.createMember().
           // TODO: wire up createRecord/updateRecord — bulk-imported members skip memberEmails dedup slots
-          if ((entityType === 'members' || entityType === COLLECTIONS.MEMBERS) && normalizedRow.email) {
-            const sanitized = String(normalizedRow.email).toLowerCase().replace(/[^a-z0-9@.]/g, '_');
+          if ((entityType === 'members' || entityType === COLLECTIONS.MEMBERS) && normalizedRow.contact?.email) {
+            const sanitized = String(normalizedRow.contact?.email).toLowerCase().replace(/[^a-z0-9@.]/g, '_');
             currentBatch.set(doc(db, COLLECTIONS.MEMBER_EMAILS, sanitized), {
-              email: normalizedRow.email,
+              email: normalizedRow.contact?.email,
               memberId: newDocRef.id,
               createdAt: Timestamp.now(),
             });
@@ -721,12 +721,12 @@ export class DataImportExportService {
     entityType: string,
     existingMemberEmailToId?: Map<string, string>
   ): Promise<string | null> {
-    if (entityType === 'members' && row.email) {
+    if (entityType === 'members' && row.contact?.email) {
       // Use the pre-fetched map when available (avoids one Firestore read per row)
       if (existingMemberEmailToId) {
-        return existingMemberEmailToId.get(row.email.toLowerCase()) ?? null;
+        return existingMemberEmailToId.get(row.contact?.email.toLowerCase()) ?? null;
       }
-      const member = await MembersService.getMemberByEmail(row.email);
+      const member = await MembersService.getMemberByEmail(row.contact?.email);
       return member ? (member.id ?? null) : null;
     }
 
@@ -801,7 +801,7 @@ export class DataImportExportService {
     // We check if the current user is the same as userId and rely on server-side role enforcement.
     // For a belt-and-suspenders client-side guard, restrict sensitive fields unless the caller is
     // authenticated as the same user performing the export (full role check requires async claims).
-    const sensitiveMemberFields = ['idNumber', 'contactInfo.phone', 'contactInfo.address', 'emergencyContact',
+    const sensitiveMemberFields = ['idNumber', 'contactInfo.contact?.phone', 'contactInfo.contact?.address', 'emergencyContact',
       'emergencyContactName', 'emergencyContactPhone', 'emergencyContactRelationship'];
     const currentUid = auth.currentUser?.uid;
     // If the current authenticated user is not recognised or is exporting someone else's data,

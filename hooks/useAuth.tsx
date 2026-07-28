@@ -402,28 +402,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         providerId: 'password',
       } as User;
 
-      const mockMember: Member = {
+      const mockMember = {
         id: mockUser.uid,
-        name,
-        email,
+        general: { name, avatarUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0097D7&color=fff` } as any,
+        contact: { email } as any,
         role: UserRole.SUPER_ADMIN,
         tier: 'Bronze' as any,
         points: 0,
-        joinDate: new Date().toISOString().split('T')[0],
-        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0097D7&color=fff`,
+        jciCareer: { joinDate: new Date().toISOString().split('T')[0] } as any,
         skills: additionalData?.skills || [],
-        hobbies: Array.isArray(additionalData?.hobbies) ? additionalData.hobbies : [],
+        others: { hobbies: Array.isArray(additionalData?.others?.hobbies) ? additionalData.others?.hobbies : [] } as any,
         churnRisk: 'Low',
         attendanceRate: 100,
         duesStatus: 'Pending',
         badges: [],
-        phone: additionalData?.phone,
-        bio: additionalData?.bio,
-        fullName: additionalData?.fullName,
-        gender: additionalData?.gender,
-        dateOfBirth: additionalData?.dateOfBirth,
-        nationality: additionalData?.nationality || 'Malaysia',
-      };
+      } as unknown as Member;
 
       setUser(mockUser);
       setMember(mockMember);
@@ -480,33 +473,36 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // 3. Create or Update member document
     // Self-registrations (no pre-imported profile) start as GUEST pending admin review
     const isNewSelfRegistration = !existingProfile;
-    const newMember: Partial<Member> = {
-      name,
-      email,
+    const newMember = {
+      general: {
+        name,
+        avatarUrl: existingProfile?.general?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0097D7&color=fff`,
+        fullName: existingProfile?.general?.fullName || additionalData?.general?.fullName,
+        gender: existingProfile?.general?.gender || additionalData?.general?.gender,
+        dob: existingProfile?.general?.dob || additionalData?.general?.dob,
+        nationality: existingProfile?.general?.nationality || additionalData?.general?.nationality || 'Malaysia',
+      } as any,
+      contact: { email, phone: existingProfile?.contact?.phone || additionalData?.contact?.phone } as any,
+      others: {
+        hobbies: existingProfile?.others?.hobbies || (Array.isArray(additionalData?.selectedHobbies) ? additionalData.selectedHobbies : (Array.isArray(additionalData?.others?.hobbies) ? additionalData.others?.hobbies : [])),
+        bio: existingProfile?.others?.bio || additionalData?.others?.bio,
+      } as any,
       role: existingProfile?.role || UserRole.GUEST,
       tier: existingProfile?.tier || ('Bronze' as any),
       points: existingProfile?.points || 0,
-      joinDate: existingProfile?.joinDate || new Date().toISOString().split('T')[0],
-      avatar: existingProfile?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0097D7&color=fff`,
+      jciCareer: { joinDate: existingProfile?.jciCareer?.joinDate || new Date().toISOString().split('T')[0] } as any,
       skills: existingProfile?.skills || additionalData?.skills || [],
-      hobbies: existingProfile?.hobbies || (Array.isArray(additionalData?.selectedHobbies) ? additionalData.selectedHobbies : (Array.isArray(additionalData?.hobbies) ? additionalData.hobbies : [])),
       churnRisk: existingProfile?.churnRisk || 'Low',
       attendanceRate: existingProfile?.attendanceRate || 100,
       duesStatus: existingProfile?.duesStatus || 'Pending',
       badges: existingProfile?.badges || [],
-      phone: existingProfile?.phone || additionalData?.phone,
-      bio: existingProfile?.bio || additionalData?.bio,
-      fullName: existingProfile?.fullName || additionalData?.fullName,
-      gender: existingProfile?.gender || additionalData?.gender,
-      dateOfBirth: existingProfile?.dateOfBirth || additionalData?.dateOfBirth,
-      nationality: existingProfile?.nationality || additionalData?.nationality || 'Malaysia',
       // Persona & survey data from registration form
       ...(additionalData?.surveyAnswers ? { surveyAnswers: additionalData.surveyAnswers } : {}),
       ...(additionalData?.personaType ? { personaType: additionalData.personaType } : {}),
       ...(additionalData?.tendencyTags ? { tendencyTags: additionalData.tendencyTags } : {}),
       // Carry over any other imported data if matched
       ...(existingProfile || {})
-    };
+    } as unknown as Partial<Member>;
 
     // Strip undefined fields — Firestore rejects them
     const cleanMember = Object.fromEntries(
@@ -552,7 +548,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const provider = new GoogleAuthProvider();
       userCredential = await signInWithPopup(auth, provider);
     }
-    const email = userCredential.user.email;
+    const email = userCredential.user.contact?.email;
 
     if (!email) {
       await firebaseSignOut(auth);

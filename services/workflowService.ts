@@ -528,8 +528,8 @@ export class WorkflowService {
 
           if (step.config.recipientId && !recipientEmail) {
             const member = await MembersService.getMemberById(step.config.recipientId);
-            if (member?.contact?.email ?? member?.email) {
-              recipientEmail = member.contact?.email ?? member.email!;
+            if (member?.contact?.email ?? member?.contact?.email) {
+              recipientEmail = member.contact?.email ?? member.contact?.email!;
             } else {
               throw new Error(`Member ${step.config.recipientId} not found or has no email`);
             }
@@ -541,7 +541,7 @@ export class WorkflowService {
                 MembersService.getMemberById(id)
               )
             );
-            recipientEmail = members.filter(m => m?.email).map(m => m!.email);
+            recipientEmail = members.filter(m => m?.contact?.email).map(m => m!.contact?.email);
           }
 
           if (!recipientEmail) throw new Error('No recipient email specified');
@@ -596,7 +596,7 @@ export class WorkflowService {
 
       case 'award_points': {
         const memberId = step.config.memberId || context.memberId;
-        const category = step.config.category || POINT_CATEGORIES.MEDIA_CONTRIBUTION;
+        const category = step.config.business?.businessCategory || POINT_CATEGORIES.MEDIA_CONTRIBUTION;
         const amount = step.config.amount || step.config.points || 10;
         const description =
           step.config.description || context.description || 'Automated points award';
@@ -623,7 +623,7 @@ export class WorkflowService {
         if (memberId) {
           await CommunicationService.createNotification({
             memberId,
-            title: step.config.title || 'Notification',
+            title: step.config.business?.position || 'Notification',
             message: step.config.message || step.config.body || '',
             type: (step.config.type as 'info' | 'success' | 'warning' | 'error') || 'info',
           });

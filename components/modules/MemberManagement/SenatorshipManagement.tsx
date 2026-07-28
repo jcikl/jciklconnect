@@ -33,26 +33,26 @@ export const SenatorshipManagement: React.FC<Props> = ({
   const term = (searchQuery || localSearch).toLowerCase().trim();
 
   const { pending, validated } = useMemo(() => {
-    const withNumber = members.filter((m) => m.senatorshipId?.trim());
+    const withNumber = members.filter((m) => m.jciCareer?.senatorship?.senatorNumber?.trim());
     const matches = (m: Member) =>
       !term ||
-      (m.name ?? '').toLowerCase().includes(term) ||
-      (m.email ?? '').toLowerCase().includes(term) ||
-      (m.fullName ?? '').toLowerCase().includes(term) ||
-      (m.senatorshipId ?? '').toLowerCase().includes(term);
+      (m.general?.name ?? '').toLowerCase().includes(term) ||
+      (m.contact?.email ?? '').toLowerCase().includes(term) ||
+      (m.general?.fullName ?? '').toLowerCase().includes(term) ||
+      (m.jciCareer?.senatorship?.senatorNumber ?? '').toLowerCase().includes(term);
 
     const sortFn = (a: Member, b: Member) => {
       if (sortBy === 'date') {
-        const dateA = (a.jciCareer?.senatorshipValidatedAt ?? a.senatorshipValidatedAt) ? new Date((a.jciCareer?.senatorshipValidatedAt ?? a.senatorshipValidatedAt)!).getTime() : 0;
-        const dateB = (b.jciCareer?.senatorshipValidatedAt ?? b.senatorshipValidatedAt) ? new Date((b.jciCareer?.senatorshipValidatedAt ?? b.senatorshipValidatedAt)!).getTime() : 0;
+        const dateA = (a.jciCareer?.senatorshipValidatedAt ?? a.jciCareer?.senatorshipValidatedAt) ? new Date((a.jciCareer?.senatorshipValidatedAt ?? a.jciCareer?.senatorshipValidatedAt)!).getTime() : 0;
+        const dateB = (b.jciCareer?.senatorshipValidatedAt ?? b.jciCareer?.senatorshipValidatedAt) ? new Date((b.jciCareer?.senatorshipValidatedAt ?? b.jciCareer?.senatorshipValidatedAt)!).getTime() : 0;
         return dateB - dateA;
       }
-      return (a.name || '').localeCompare(b.name || '');
+      return (a.general?.name || '').localeCompare(b.general?.name || '');
     };
 
     return {
-      pending: withNumber.filter((m) => !m.senatorshipBoardValidated && matches(m)).sort(sortFn),
-      validated: withNumber.filter((m) => m.senatorshipBoardValidated && matches(m)).sort(sortFn),
+      pending: withNumber.filter((m) => !m.jciCareer?.senatorship?.boardValidated && matches(m)).sort(sortFn),
+      validated: withNumber.filter((m) => m.jciCareer?.senatorship?.boardValidated && matches(m)).sort(sortFn),
     };
   }, [members, term, sortBy]);
 
@@ -63,9 +63,9 @@ export const SenatorshipManagement: React.FC<Props> = ({
       await MembersService.validateSenatorshipByBoard(
         member.id,
         currentUser?.id || 'unknown',
-        currentUser?.name
+        currentUser?.general?.name
       );
-      showToast(`Validated senatorship for ${member.name}`, 'success');
+      showToast(`Validated senatorship for ${member.general?.name}`, 'success');
       onMembersChanged?.();
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Validation failed', 'error');
@@ -79,14 +79,14 @@ export const SenatorshipManagement: React.FC<Props> = ({
     setConfirmState({
       open: true,
       title: 'Revoke Board Validation',
-      message: `Revoke board validation for ${member.name}? The senatorship number will become editable again.`,
+      message: `Revoke board validation for ${member.general?.name}? The senatorship number will become editable again.`,
       variant: 'warning',
       onConfirm: async () => {
         setConfirmState(CONFIRM_CLOSED);
         setBusyId(member.id);
         try {
           await MembersService.revokeSenatorshipValidation(member.id, currentUser?.id);
-          showToast(`Revoked validation for ${member.name}`, 'success');
+          showToast(`Revoked validation for ${member.general?.name}`, 'success');
           onMembersChanged?.();
         } catch (err) {
           showToast(err instanceof Error ? err.message : 'Revoke failed', 'error');
@@ -104,23 +104,23 @@ export const SenatorshipManagement: React.FC<Props> = ({
     >
       <div className="flex items-center gap-3 min-w-0">
         <div className="w-10 h-10 rounded-xl bg-jci-blue flex items-center justify-center text-white font-semibold shrink-0 text-sm">
-          {(member.name || '?').split(' ').map((n) => n[0]).join('').slice(0, 2)}
+          {(member.general?.name || '?').split(' ').map((n) => n[0]).join('').slice(0, 2)}
         </div>
         <div className="min-w-0">
-          <div className="font-medium text-slate-900 text-sm truncate">{member.name}</div>
-          {member.fullName && member.fullName !== member.name && (
-            <div className="text-xs text-slate-500 truncate">{member.fullName}</div>
+          <div className="font-medium text-slate-900 text-sm truncate">{member.general?.name}</div>
+          {member.general?.fullName && member.general?.fullName !== member.general?.name && (
+            <div className="text-xs text-slate-500 truncate">{member.general?.fullName}</div>
           )}
           <div className="flex items-center gap-2 flex-wrap mt-0.5">
-            <span className="text-xs font-mono text-indigo-700">No. {member.senatorshipId}</span>
+            <span className="text-xs font-mono text-indigo-700">No. {member.jciCareer?.senatorship?.senatorNumber}</span>
             <MembershipTypeDisplay
               member={{
-                nationality: member.nationality,
-                dateOfBirth: member.dateOfBirth,
-                senatorCertified: member.senatorCertified,
-                senatorshipId: member.senatorshipId,
+                nationality: member.general?.nationality,
+                dateOfBirth: member.general?.dob,
+                senatorCertified: member.jciCareer?.senatorship?.certified,
+                senatorshipId: member.jciCareer?.senatorship?.senatorNumber,
                 role: member.role,
-                membershipType: member.membershipType,
+                membershipType: member.jciCareer?.membershipType,
               }}
               showDetails={false}
             />

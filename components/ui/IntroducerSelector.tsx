@@ -33,8 +33,8 @@ function parseValue(val: string, members: Member[]) {
   if (event) return { type: 'event', detail: event[1] };
   const found = members.find(m =>
     m.id.toLowerCase() === v.toLowerCase() ||
-    (m.name || '').trim().toLowerCase() === v.toLowerCase() ||
-    (m.fullName || '').trim().toLowerCase() === v.toLowerCase()
+    (m.general?.name || '').trim().toLowerCase() === v.toLowerCase() ||
+    (m.general?.fullName || '').trim().toLowerCase() === v.toLowerCase()
   );
   if (found) return { type: 'member', detail: found.id };
   return { type: 'direct', detail: v };
@@ -55,7 +55,7 @@ function displayLabel(type: string, detail: string, members: Member[]): string {
   if (type === 'social_media') return `Social Media · ${detail || 'Facebook'}`;
   if (type === 'member') {
     const m = members.find(x => x.id === detail);
-    return m ? `Member · ${m.name || m.fullName}` : 'JCI KL Member';
+    return m ? `Member · ${m.general?.name || m.general?.fullName}` : 'JCI KL Member';
   }
   if (type === 'event') return detail ? `Event · ${detail}` : 'Chapter Event / Project';
   return '';
@@ -136,14 +136,14 @@ export const IntroducerSelector: React.FC<IntroducerSelectorProps> = ({
     setSearch('');
   };
 
-  const sortedMembers = [...members].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const sortedMembers = [...members].sort((a, b) => (a.general?.name || '').localeCompare(b.general?.name || ''));
   const filteredMembers = sortedMembers.filter(m =>
-    (m.name || '').toLowerCase().includes(search.toLowerCase()) ||
-    (m.fullName || '').toLowerCase().includes(search.toLowerCase())
+    (m.general?.name || '').toLowerCase().includes(search.toLowerCase()) ||
+    (m.general?.fullName || '').toLowerCase().includes(search.toLowerCase())
   );
-  const sortedProjects = [...projects].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const sortedProjects = [...projects].sort((a, b) => (a.name || a.title || '').localeCompare(b.name || b.title || ''));
   const filteredProjects = sortedProjects.filter(p =>
-    (p.name || '').toLowerCase().includes(search.toLowerCase())
+    (p.name || p.title || '').toLowerCase().includes(search.toLowerCase())
   );
 
   const label = displayLabel(type, detail, members);
@@ -226,7 +226,7 @@ export const IntroducerSelector: React.FC<IntroducerSelectorProps> = ({
                       className={`w-full text-left px-3 py-2 text-sm transition-colors
                         ${detail === m.id ? 'bg-jci-blue/10 text-jci-navy font-medium' : 'text-slate-700 hover:bg-slate-50'}`}
                     >
-                      {m.name || m.fullName}
+                      {m.general?.name || m.general?.fullName}
                     </button>
                   ))
                 }
@@ -255,11 +255,11 @@ export const IntroducerSelector: React.FC<IntroducerSelectorProps> = ({
                     <button
                       key={p.id}
                       type="button"
-                      onMouseDown={(e) => { e.preventDefault(); selectDetail(p.name); }}
+                      onMouseDown={(e) => { e.preventDefault(); selectDetail(p.name || p.title || ''); }}
                       className={`w-full text-left px-3 py-2 text-sm transition-colors
-                        ${detail === p.name ? 'bg-jci-blue/10 text-jci-navy font-medium' : 'text-slate-700 hover:bg-slate-50'}`}
+                        ${detail === (p.name || p.title) ? 'bg-jci-blue/10 text-jci-navy font-medium' : 'text-slate-700 hover:bg-slate-50'}`}
                     >
-                      {p.name}
+                      {p.name || p.title}
                     </button>
                   ))
                 }

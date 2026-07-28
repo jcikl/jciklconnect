@@ -314,13 +314,13 @@ export class CommunicationService {
       const { MembersService } = await import('./membersService');
       const member = await MembersService.getMemberById(memberId);
       
-      if (!(member?.contact?.email ?? member?.email)) {
+      if (!(member?.contact?.email ?? member?.contact?.email)) {
         throw new Error(`Member ${memberId} not found or has no email`);
       }
 
       // Send email
       const emailMessage: EmailMessage = {
-        to: (member.contact?.email ?? member.email)!,
+        to: (member.contact?.email ?? member.contact?.email)!,
         subject,
         text: message,
         html: options?.html || message.replace(/\n/g, '<br>'),
@@ -363,8 +363,8 @@ export class CommunicationService {
       );
       
       const validEmails = members
-        .filter(m => m?.email)
-        .map(m => m!.email);
+        .filter(m => m?.contact?.email)
+        .map(m => m!.contact?.email);
 
       if (validEmails.length === 0) {
         return { success: 0, failed: memberIds.length };
@@ -449,8 +449,8 @@ export class CommunicationService {
       const postData: Omit<NewsPost, 'id' | 'timestamp'> = {
         author: {
           id: authorId,  // FIX 1: persist author ID so posts can be attributed and edited
-          name: author?.name || 'System',
-          avatar: author?.avatar || '',
+          name: author?.general?.name || 'System',
+          avatar: author?.general?.avatarUrl || '',
           role: author?.role || 'Admin',
         },
         content: `${announcementData.title}\n\n${announcementData.content}`,
@@ -468,8 +468,8 @@ export class CommunicationService {
       // Send email notifications if requested
       if (announcementData.sendEmail) {
         const emailAddresses = targetMembers
-          .filter(m => m?.email)
-          .map(m => m.email);
+          .filter(m => m?.contact?.email)
+          .map(m => m.contact?.email);
 
         if (emailAddresses.length > 0) {
           // FIX 3: send each email individually so partial failures are counted, not swallowed
@@ -585,8 +585,8 @@ export class CommunicationService {
       const todayDate = today.getDate();
       
       const birthdayMembers = allMembers.filter(m => {
-        if (!m.dateOfBirth) return false;
-        const [y, mStr, dStr] = m.dateOfBirth.split('-');
+        if (!m.general?.dob) return false;
+        const [y, mStr, dStr] = m.general?.dob.split('-');
         return parseInt(mStr) === todayMonth && parseInt(dStr) === todayDate;
       });
 
@@ -599,7 +599,7 @@ export class CommunicationService {
       }
 
       // Create a persistent announcement for all members
-      const birthdayNames = birthdayMembers.map(m => m.name).join(', ');
+      const birthdayNames = birthdayMembers.map(m => m.general?.name).join(', ');
       await this.createAnnouncement({
         title: `🎂 Happy Birthday!`,
         content: `Today we celebrate the birthday${birthdayMembers.length > 1 ? 's' : ''} of: ${birthdayNames}. Let's wish them a fantastic day!`,

@@ -29,11 +29,11 @@ export const useMemberSearch = ({
 
     if (term) {
       list = list.filter(m =>
-        (m.name ?? '').toLowerCase().includes(term) ||
-        (m.email ?? '').toLowerCase().includes(term) ||
-        (m.phone ?? '').toLowerCase().includes(term) ||
-        (m.fullName ?? '').toLowerCase().includes(term) ||
-        (m.address ?? '').toLowerCase().includes(term)
+        (m.general?.name ?? '').toLowerCase().includes(term) ||
+        (m.contact?.email ?? '').toLowerCase().includes(term) ||
+        (m.contact?.phone ?? '').toLowerCase().includes(term) ||
+        (m.general?.fullName ?? '').toLowerCase().includes(term) ||
+        (m.contact?.address ?? '').toLowerCase().includes(term)
       );
     }
 

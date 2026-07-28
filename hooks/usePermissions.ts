@@ -112,7 +112,7 @@ export const usePermissions = () => {
   // canAccessWorkspaceModules is set here for UI-layer consistency.
   const isHonoraryOrSenator =
     !simulatedRole &&
-    (member?.membershipType === 'Honorary' || member?.membershipType === 'Senator');
+    (member?.jciCareer?.membershipType === 'Honorary' || member?.jciCareer?.membershipType === 'Senator');
   const canAccessWorkspaceModules =
     effectiveRole !== UserRole.GUEST &&
     effectiveRole !== UserRole.INACTIVE &&
@@ -127,7 +127,7 @@ export const usePermissions = () => {
     effectiveRole !== UserRole.INACTIVE;
 
   // B-3: Derive board-position flags from currentBoardPosition field
-  const boardPosition = (member?.currentBoardPosition ?? '').toLowerCase();
+  const boardPosition = (member?.jciCareer?.currentBoardPosition ?? '').toLowerCase();
   const isOrganizationSecretary = isBoardUser && boardPosition.includes('secretary');
   const isPresident = isBoardUser && boardPosition.includes('president') && !boardPosition.includes('vice');
   const isOrganizationFinance =
@@ -144,7 +144,7 @@ export const usePermissions = () => {
     hasAllPermissions,
     isGuest: effectiveRole === UserRole.GUEST,
     // B-2: Derive from actual membershipType field instead of hardcoded false
-    isProbationMember: member?.membershipType === 'Probation' && effectiveRole !== UserRole.INACTIVE,
+    isProbationMember: member?.jciCareer?.membershipType === 'Probation' && effectiveRole !== UserRole.INACTIVE,
     isMember: effectiveRole === UserRole.MEMBER,
     isPlainMember,
     isCurrentBoardMember: isBoardUser,

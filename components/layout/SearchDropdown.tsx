@@ -26,7 +26,7 @@ export const SearchDropdown: React.FC<{
 
   const q = searchQuery.toLowerCase().trim();
   const filteredMembers = q ? members.filter(m =>
-    (m.name || '').toLowerCase().includes(q) || (m.email || '').toLowerCase().includes(q)
+    (m.general?.name || '').toLowerCase().includes(q) || (m.contact?.email || '').toLowerCase().includes(q)
   ).slice(0, 4) : [];
   const filteredEvents = q ? events.filter(e =>
     (e.title || '').toLowerCase().includes(q)
@@ -93,9 +93,9 @@ export const SearchDropdown: React.FC<{
               {filteredMembers.map(m => (
                 <ResultRow key={m.id}
                   onClick={() => { onNavigate('MEMBERS', m.id); onClose(); }}
-                  icon={<img src={m.avatar || getInitialsSvg(m.name || '')} className="w-9 h-9 rounded-xl object-cover" alt="" />}
-                  title={m.name}
-                  meta={m.email}
+                  icon={<img src={m.general?.avatarUrl || getInitialsSvg(m.general?.name || '')} className="w-9 h-9 rounded-xl object-cover" alt="" />}
+                  title={m.general?.name ?? ''}
+                  meta={m.contact?.email}
                 />
               ))}
             </div>
@@ -120,7 +120,7 @@ export const SearchDropdown: React.FC<{
                 <ResultRow key={p.id}
                   onClick={() => { onNavigate('PROJECTS', p.id); onClose(); }}
                   icon={p.logoUrl ? <img src={p.logoUrl} alt="" className="w-9 h-9 rounded-xl object-cover shrink-0" /> : <div className="w-9 h-9 rounded-xl bg-green-50 text-green-600 flex items-center justify-center"><Briefcase size={16} /></div>}
-                  title={p.name || p.title || ''}
+                  title={p.name || ''}
                   meta={p.status}
                 />
               ))}

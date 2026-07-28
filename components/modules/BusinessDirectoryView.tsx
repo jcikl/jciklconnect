@@ -205,10 +205,10 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
       if (bizToSelect) {
         setSelectedBiz(bizToSelect);
         setInquiryForm({
-          name: currentUser?.name || '',
+          name: currentUser?.general?.name || '',
           jobTitle: currentUser?.business?.position || '',
           company: currentUser?.companyName || '',
-          phone: currentUser?.phone || '',
+          phone: currentUser?.contact?.phone || '',
           requirements: ''
         });
         setInquiryErrors({});
@@ -332,10 +332,10 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
   const handleContact = () => {
     // Auto-fill form from current user info
     setInquiryForm({
-      name: currentUser?.name || '',
+      name: currentUser?.general?.name || '',
       jobTitle: currentUser?.business?.position || '',
       company: currentUser?.companyName || '',
-      phone: currentUser?.phone || '',
+      phone: currentUser?.contact?.phone || '',
       requirements: ''
     });
     setInquiryErrors({});
@@ -344,8 +344,8 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
 
   const handleSendInquiry = async () => {
     const errors: Record<string, string> = {};
-    if (!inquiryForm.name.trim()) errors.name = 'Name is required';
-    if (!inquiryForm.phone.trim()) errors.phone = 'Phone number is required';
+    if (!inquiryForm.name.trim()) errors['name'] = 'Name is required';
+    if (!inquiryForm.phone.trim()) errors['phone'] = 'Phone number is required';
     if (!inquiryForm.requirements.trim()) errors.requirements = 'Requirements are required';
 
     if (Object.keys(errors).length > 0) {
@@ -360,11 +360,11 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
       // Find recipient member to get phone + WhatsApp group status
       const recipient = members.find(m => m.id === selectedBiz.memberId);
       const recipientPhone =
-        recipient?.contact?.phone || recipient?.phone || '';
+        recipient?.contact?.phone || recipient?.contact?.phone || '';
       const recipientInGroup =
-        recipient?.whatsappGroup ?? recipient?.whatsappJoined ?? recipient?.contact?.whatsappJoined ?? false;
+        recipient?.contact?.whatsappJoined ?? recipient?.contact?.whatsappJoined ?? recipient?.contact?.whatsappJoined ?? false;
       const senderInGroup =
-        currentUser.whatsappGroup ?? currentUser.whatsappJoined ?? currentUser.contact?.whatsappJoined ?? false;
+        currentUser.contact?.whatsappJoined ?? currentUser.contact?.whatsappJoined ?? currentUser.contact?.whatsappJoined ?? false;
 
       const { channel, waUrl } = await submitInquiry({
         senderId: currentUser.id,
@@ -475,7 +475,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                       const mobileDividerLabel = thisMobileScore === 1 ? 'Suggested for You' : 'All Businesses';
                       const mobileDividerStyle = thisMobileScore === 1 ? 'text-sky-500' : 'text-slate-400';
                       const ownerMember = members.find(m => m.id === biz.memberId);
-                      const avatarUrl = ownerMember?.avatarUrl || ownerMember?.general?.avatarUrl || ownerMember?.avatar || getInitialsSvg(biz.ownerName || '');
+                      const avatarUrl = ownerMember?.general?.avatarUrl || ownerMember?.general?.avatarUrl || ownerMember?.general?.avatarUrl || getInitialsSvg(biz.ownerName || '');
                       const chineseName = ownerMember?.general?.chineseName;
                       const position = ownerMember?.business?.position || 'Representative';
                       const intlStatus = biz.acceptsInternationalBusiness;
@@ -624,7 +624,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                         const dividerLabel = thisScore === 1 ? 'Suggested for You' : 'All Businesses';
                         const dividerStyle = thisScore === 1 ? 'text-sky-500' : 'text-slate-400';
                         const ownerMember = members.find(m => m.id === biz.memberId);
-                        const avatarUrl = ownerMember?.avatarUrl || ownerMember?.general?.avatarUrl || ownerMember?.avatar || getInitialsSvg(biz.ownerName || '');
+                        const avatarUrl = ownerMember?.general?.avatarUrl || ownerMember?.general?.avatarUrl || ownerMember?.general?.avatarUrl || getInitialsSvg(biz.ownerName || '');
                         const chineseName = ownerMember?.general?.chineseName;
                         const position = ownerMember?.business?.position || 'Representative';
                         const intlStatus = biz.acceptsInternationalBusiness;
@@ -718,10 +718,10 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
               onContact={(biz) => {
                 setSelectedBiz(biz);
                 setInquiryForm({
-                  name: currentUser?.name || '',
+                  name: currentUser?.general?.name || '',
                   jobTitle: currentUser?.business?.position || '',
                   company: currentUser?.companyName || '',
-                  phone: currentUser?.phone || '',
+                  phone: currentUser?.contact?.phone || '',
                   requirements: ''
                 });
                 setInquiryErrors({});
@@ -759,7 +759,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                 onClick={() => {
                   setIsDetailOpen(false);
                   setSelectedBiz(detailBiz);
-                  setInquiryForm({ name: currentUser?.name || '', jobTitle: currentUser?.business?.position || '', company: currentUser?.companyName || '', phone: currentUser?.phone || '', requirements: '' });
+                  setInquiryForm({ name: currentUser?.general?.name || '', jobTitle: currentUser?.business?.position || '', company: currentUser?.companyName || '', phone: currentUser?.contact?.phone || '', requirements: '' });
                   setInquiryErrors({});
                   setInquiryModalOpen(true);
                 }}
@@ -772,7 +772,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
           {(() => {
             const biz = detailBiz;
             const ownerMember = members.find(m => m.id === biz.memberId);
-            const avatarUrl = ownerMember?.avatarUrl || ownerMember?.general?.avatarUrl || ownerMember?.avatar || getInitialsSvg(biz.ownerName || '');
+            const avatarUrl = ownerMember?.general?.avatarUrl || ownerMember?.general?.avatarUrl || ownerMember?.general?.avatarUrl || getInitialsSvg(biz.ownerName || '');
             const chineseName = ownerMember?.general?.chineseName;
             const position = ownerMember?.business?.position || 'Representative';
             const intlStatus = biz.acceptsInternationalBusiness;
@@ -905,7 +905,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                   <div className="flex flex-wrap gap-1.5">
                     {(() => {
                       const owner = members.find(m => m.id === selectedBiz.memberId);
-                      const industries = owner?.business?.interestedIndustries ?? owner?.interestedIndustries;
+                      const industries = owner?.business?.interestedIndustries;
                       return (Array.isArray(industries) && industries.length > 0) ? (
                         industries.map((ind: string, idx: number) => (
                           <Badge key={idx} variant="neutral" className="bg-purple-50/50 text-purple-600 border border-purple-100 font-bold">{ind}</Badge>

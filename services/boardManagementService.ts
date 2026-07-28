@@ -490,16 +490,16 @@ export class BoardManagementService {
         memberName: firstText(
           member.general?.name,
           member.general?.fullName,
-          member.fullName,
-          member.name
+          member.general?.fullName,
+          member.general?.name
         ),
         avatarUrl: firstText(
-          member.general?.avatar,
           member.general?.avatarUrl,
-          member.avatarUrl,
-          member.avatar,
-          member.profilePicture,
-          member.photoUrl
+          member.general?.avatarUrl,
+          member.general?.avatarUrl,
+          member.general?.avatarUrl,
+          member.general?.avatarUrl,
+          member.general?.avatarUrl
         ),
         companyName: firstText(
           member.business?.companyName,
@@ -786,7 +786,7 @@ export class BoardManagementService {
     const clearNow = new Date().toISOString();
     for (const memberId of newMemberIds) {
       const member = await MembersService.getMemberById(memberId);
-      if (member?.currentBoardYear === yearNum) {
+      if (member?.jciCareer?.currentBoardYear === yearNum) {
         clearBatch.update(doc(db, COLLECTIONS.MEMBERS, memberId), {
           currentBoardYear: deleteField(),
           currentBoardPosition: deleteField(),
@@ -881,21 +881,21 @@ export class BoardManagementService {
 
         const shouldBeOnBoard = !!activeRecord;
         const flaggedOnBoard =
-          member.isCurrentBoardMember === true || member.currentBoardYear === currentYear;
+          member.jciCareer?.isCurrentBoardMember === true || member.jciCareer?.currentBoardYear === currentYear;
 
         if (shouldBeOnBoard) {
           const needsUpdate =
             !flaggedOnBoard ||
-            member.currentBoardPosition !== activeRecord.position ||
-            member.currentBoardYear !== currentYear;
+            member.jciCareer?.currentBoardPosition !== activeRecord.position ||
+            member.jciCareer?.currentBoardYear !== currentYear;
 
           if (!needsUpdate) return null;
 
-          const updates: Partial<Member> = {
-            currentBoardYear: currentYear,
-            currentBoardPosition: activeRecord.position,
-            isCurrentBoardMember: true,
-          };
+          const updates = {
+            'jciCareer.currentBoardYear': currentYear,
+            'jciCareer.currentBoardPosition': activeRecord.position,
+            'jciCareer.isCurrentBoardMember': true,
+          } as unknown as Partial<Member>;
           await MembersService.updateMember(member.id, updates);
           return updates;
         }
@@ -989,14 +989,14 @@ export class BoardManagementService {
 
           for (const member of currentBoardMembers) {
             try {
-              const boardHistory = [...(member.boardHistory || [])];
-              if (member.currentBoardYear && member.currentBoardPosition) {
+              const boardHistory = [...(member.jciCareer?.boardHistory || [])];
+              if (member.jciCareer?.currentBoardYear && member.jciCareer?.currentBoardPosition) {
                 const archivedPosition: BoardPosition = {
-                  year: member.currentBoardYear,
-                  role: member.currentBoardPosition,
-                  position: member.currentBoardPosition,
-                  startDate: `${member.currentBoardYear}-01-01`,
-                  endDate: `${member.currentBoardYear}-12-31`,
+                  year: member.jciCareer?.currentBoardYear,
+                  role: member.jciCareer?.currentBoardPosition,
+                  position: member.jciCareer?.currentBoardPosition,
+                  startDate: `${member.jciCareer?.currentBoardYear}-01-01`,
+                  endDate: `${member.jciCareer?.currentBoardYear}-12-31`,
                 };
                 boardHistory.push(archivedPosition);
                 archived++;
@@ -1013,8 +1013,8 @@ export class BoardManagementService {
 
               notificationPayloads.push({
                 memberId: member.id,
-                title: `Board Term Completion - ${member.currentBoardYear || 'Previous Year'}`,
-                message: `Your board term for ${member.currentBoardYear || 'the previous year'} has been completed. Thank you for your leadership! Your board position has been archived.`,
+                title: `Board Term Completion - ${member.jciCareer?.currentBoardYear || 'Previous Year'}`,
+                message: `Your board term for ${member.jciCareer?.currentBoardYear || 'the previous year'} has been completed. Thank you for your leadership! Your board position has been archived.`,
                 type: 'info',
               });
             } catch (error) {
@@ -1078,7 +1078,7 @@ export class BoardManagementService {
               continue;
             }
 
-            const boardHistory = [...(member.boardHistory || [])];
+            const boardHistory = [...(member.jciCareer?.boardHistory || [])];
             const newPosition: BoardPosition = {
               year,
               role: assignment.position,
@@ -1129,13 +1129,13 @@ export class BoardManagementService {
     return withDevMode(
       async () => {
         const allMembers = await MembersService.getAllMembers();
-        return allMembers.filter(m => m.currentBoardYear === year);
+        return allMembers.filter(m => m.jciCareer?.currentBoardYear === year);
       },
       async () => {
         try {
           const allMembers = await MembersService.getAllMembers();
           return allMembers.filter(m =>
-            m.currentBoardYear === year &&
+            m.jciCareer?.currentBoardYear === year &&
             (m.role === UserRole.BOARD || m.role === UserRole.ADMIN)
           );
         } catch (error) {
@@ -1203,7 +1203,7 @@ export class BoardManagementService {
   static async getMemberBoardHistory(memberId: string): Promise<BoardPosition[]> {
     try {
       const member = await MembersService.getMemberById(memberId);
-      return member?.boardHistory || [];
+      return member?.jciCareer?.boardHistory || [];
     } catch (error) {
       logServiceError(
         error instanceof Error ? error : new Error(String(error)),

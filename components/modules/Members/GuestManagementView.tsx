@@ -17,7 +17,7 @@ import { GuestApprovalModal } from './GuestApprovalModal';
 const norm = (s?: string | null) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 const findMatchingTransaction = (guest: Member, txs: Transaction[]): Transaction | null => {
-  const names = [norm(guest.name), norm(guest.fullName)].filter(n => n.length >= 3);
+  const names = [norm(guest.general?.name), norm(guest.general?.fullName)].filter(n => n.length >= 3);
   for (const tx of txs) {
     const desc = norm(tx.description);
     const ref = norm(tx.referenceNumber ?? '');
@@ -29,7 +29,7 @@ const findMatchingTransaction = (guest: Member, txs: Transaction[]): Transaction
 };
 
 const hasPaidFee = (guest: Member) =>
-  !!(guest.jciCareer?.hasPaidInitiationFee ?? guest.hasPaidInitiationFee);
+  !!(guest.jciCareer?.hasPaidInitiationFee ?? guest.jciCareer?.hasPaidInitiationFee);
 
 const makeDefaultTasks = (): ProbationTask[] => [
   { id: `task-${Date.now()}-1`, title: 'Attend Orientation Session', description: 'Attend the new member orientation session', status: 'Pending', assignedAt: new Date().toISOString(), category: 'Training' },
@@ -62,8 +62,8 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
   const GUEST_APPROVER_TITLES = ['President', 'Secretary', 'Honorary Treasurer'];
   const canApprove = isAdmin || (
     isBoard &&
-    !!currentMember?.currentBoardPosition &&
-    GUEST_APPROVER_TITLES.some(t => (currentMember.currentBoardPosition ?? '').includes(t))
+    !!currentMember?.jciCareer?.currentBoardPosition &&
+    GUEST_APPROVER_TITLES.some(t => (currentMember.jciCareer?.currentBoardPosition ?? '').includes(t))
   );
 
   useEffect(() => {
@@ -71,15 +71,15 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
     const filterFn = (m: Member) => {
       if (!term) return true;
       return (
-        (m.name ?? '').toLowerCase().includes(term) ||
-        (m.email ?? '').toLowerCase().includes(term) ||
-        (m.phone ?? '').toLowerCase().includes(term) ||
-        (m.fullName ?? '').toLowerCase().includes(term) ||
-        (m.address ?? '').toLowerCase().includes(term)
+        (m.general?.name ?? '').toLowerCase().includes(term) ||
+        (m.contact?.email ?? '').toLowerCase().includes(term) ||
+        (m.contact?.phone ?? '').toLowerCase().includes(term) ||
+        (m.general?.fullName ?? '').toLowerCase().includes(term) ||
+        (m.contact?.address ?? '').toLowerCase().includes(term)
       );
     };
 
-    const guestList = members.filter(m => (m.role === UserRole.GUEST || m.membershipType === 'Guest') && filterFn(m));
+    const guestList = members.filter(m => (m.role === UserRole.GUEST || m.jciCareer?.membershipType === 'Guest') && filterFn(m));
     setGuests(guestList);
   }, [members, searchQuery]);
 
@@ -130,7 +130,7 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
         if (!guest) continue;
 
         // Each guest gets their own initiation year based on their join date
-        const guestYear = getInitiationYear(guest.joinDate);
+        const guestYear = getInitiationYear(guest.jciCareer?.joinDate);
         const yearStr = String(guestYear);
 
         // Find match from remaining unlinked txs (exclude already used in this batch)
@@ -148,14 +148,14 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
         const paidAmount = tx.amount;
         const membershipStatus = paidAmount >= dues ? 'paid' : 'partial';
 
-        const memberUpdates: Partial<Member> = {
+        const memberUpdates = {
           role: UserRole.MEMBER,
-          membershipType: 'Probation' as any,
-          probationTasks: makeDefaultTasks(),
+          'jciCareer.membershipType': 'Probation',
+          'jciCareer.probationTasks': makeDefaultTasks(),
           probationApprovedBy: currentMember?.id,
           probationApprovedAt: new Date().toISOString(),
           membership: {
-            ...(guest.membership || {}),
+            ...(guest.jciCareer?.membershipDuesHistory || {}),
             [yearStr]: {
               year: guestYear,
               dues,
@@ -166,7 +166,7 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
           }
         };
 
-        await updateMember(id, memberUpdates);
+        await updateMember(id, memberUpdates as unknown as Partial<Member>);
 
         try {
           await FinanceService.updateTransaction(tx.id, {
@@ -178,7 +178,7 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
           });
         } catch (txErr) {
           // Roll back the member role change so data stays consistent (E10)
-          await updateMember(id, { role: UserRole.GUEST, membershipType: 'Guest' as any });
+          await updateMember(id, { role: UserRole.GUEST, 'jciCareer.membershipType': 'Guest' } as unknown as Partial<Member>);
           console.error(`Batch approve: tx update failed for guest ${id}, rolled back`, txErr);
           skippedCount++;
           usedTxIds.delete(tx.id);
@@ -268,12 +268,12 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
                       />
                     )}
                     <div className="relative">
-                      <img src={guest.avatar || undefined} className="w-12 h-12 rounded-full border border-slate-100" alt={guest.name} />
+                      <img src={guest.general?.avatarUrl || undefined} className="w-12 h-12 rounded-full border border-slate-100" alt={guest.general?.name} />
                       <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-slate-500 border-2 border-white rounded-full"></div>
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2 mb-1">
-                        <div className="font-bold text-slate-900 break-words">{guest.name}</div>
+                        <div className="font-bold text-slate-900 break-words">{guest.general?.name}</div>
                         <div className="flex items-center gap-1.5 shrink-0">
                           {paid ? (
                             <Badge variant="success" icon={<CheckCircle size={10} />} className="text-[10px] py-0.5">Fee Paid</Badge>
@@ -284,9 +284,9 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
                         </div>
                       </div>
                       <div className="flex flex-col gap-0.5 text-xs text-slate-500">
-                        <span className="flex items-center gap-1"><Mail size={12} className="shrink-0" /> {guest.email}</span>
-                        {guest.phone && <span className="flex items-center gap-1"><Phone size={12} className="shrink-0" /> {guest.phone}</span>}
-                        <span className="flex items-center gap-1"><Calendar size={12} className="shrink-0" /> Joined: {formatDateToDDMMMYYYY(guest.joinDate)}</span>
+                        <span className="flex items-center gap-1"><Mail size={12} className="shrink-0" /> {guest.contact?.email}</span>
+                        {guest.contact?.phone && <span className="flex items-center gap-1"><Phone size={12} className="shrink-0" /> {guest.contact?.phone}</span>}
+                        <span className="flex items-center gap-1"><Calendar size={12} className="shrink-0" /> Joined: {formatDateToDDMMMYYYY(guest.jciCareer?.joinDate)}</span>
                       </div>
                     </div>
                   </div>

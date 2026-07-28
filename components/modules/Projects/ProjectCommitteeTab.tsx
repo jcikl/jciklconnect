@@ -90,7 +90,7 @@ export const ProjectCommitteeTab: React.FC<ProjectCommitteeTabProps> = ({ projec
         .map(r => {
           const cleanedTasks = (r.tasks || [])
             .map(t => {
-              const title = t.title.trim();
+              const title = (t.title || '').trim();
               if (!title && !t.dueDate) {
                 return null; // 跳过完全空白的 task
               }
@@ -128,7 +128,7 @@ export const ProjectCommitteeTab: React.FC<ProjectCommitteeTabProps> = ({ projec
 
       for (const committeeMember of committee) {
         if (committeeMember.memberId && committeeMember.tasks && committeeMember.tasks.length > 0) {
-          const committeeMemberName = members.find(m => m.id === committeeMember.memberId)?.name || '';
+          const committeeMemberName = members.find(m => m.id === committeeMember.memberId)?.general?.name || '';
 
           for (const committeeTask of committeeMember.tasks) {
             if (committeeTask.taskId && committeeTask.title && committeeTask.title.trim()) {
@@ -214,7 +214,7 @@ export const ProjectCommitteeTab: React.FC<ProjectCommitteeTabProps> = ({ projec
           ) : rows.map((row, rowIndex) => {
             const member = members.find(m => m.id === row.memberId);
             const initials = member
-              ? (member.name || member.fullName || '?').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
+              ? (member.general?.name || member.general?.fullName || '?').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
               : '?';
             const visibleTasks = row.tasks.filter(t => t.title.trim());
             return (
@@ -227,7 +227,7 @@ export const ProjectCommitteeTab: React.FC<ProjectCommitteeTabProps> = ({ projec
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap items-center gap-2 mb-0.5">
                     <span className="text-sm font-medium text-slate-900 truncate">
-                      {member ? (member.fullName || member.name) : <span className="italic text-slate-400">Unassigned</span>}
+                      {member ? (member.general?.fullName || member.general?.name) : <span className="italic text-slate-400">Unassigned</span>}
                     </span>
                     {row.role && (
                       <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">
@@ -288,7 +288,7 @@ export const ProjectCommitteeTab: React.FC<ProjectCommitteeTabProps> = ({ projec
                         }}
                         selfOption={false}
                         showLookupFields={false}
-                        getOptionLabel={(m) => m.fullName ? `${m.name} (${m.fullName})` : m.name}
+                        getOptionLabel={(m) => m.general?.fullName ? `${m.general?.name} (${m.general?.fullName})` : m.general?.name}
                       />
                     </div>
                     {row.memberId && (

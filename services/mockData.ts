@@ -1,6 +1,6 @@
 import { Member, Event, Project, FlagshipProject, UserRole, MemberTier, DashboardStats, Notification, Transaction, BankAccount, PaymentRequest, InventoryItem, BusinessProfile, AutomationRule, HobbyClub, TrainingModule, Document, NewsPost, Task, Survey, MembershipType, ProjectFinancialAccount, ProjectTransaction, BudgetCategory, AlertThreshold } from '../types';
 
-export const CURRENT_USER: Member = {
+export const CURRENT_USER = {
   id: 'u1',
   name: 'Alex Rivera',
   email: 'alex.rivera@jci.local',
@@ -41,7 +41,7 @@ export const MOCK_STATS: DashboardStats = {
 };
 
 /** admin@jcikl.com 完整会员数据（dev login 使用） */
-export const MOCK_DEV_ADMIN: Member = {
+export const MOCK_DEV_ADMIN = {
   id: 'dev-admin-001',
   name: 'Admin User',
   email: 'admin@jcikl.com',
@@ -104,7 +104,7 @@ export const MOCK_DEV_ADMIN: Member = {
   tshirtStatus: 'Received',
 };
 
-export const MOCK_MEMBERS: Member[] = [
+export const MOCK_MEMBERS: any[] = [
   { ...CURRENT_USER },
   { ...MOCK_DEV_ADMIN },
   {

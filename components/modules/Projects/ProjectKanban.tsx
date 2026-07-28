@@ -197,7 +197,7 @@ export const ProjectKanban: React.FC<{ projectId: string; projectName: string; p
 
   const getMemberName = (memberId: string) => {
     const member = members.find(m => m.id === memberId);
-    return member?.name || memberId;
+    return member?.general?.name || memberId;
   };
 
   const COL_STYLE: Record<string, { border: string; badge: string; dot: string }> = {
@@ -452,7 +452,7 @@ export const ProjectKanban: React.FC<{ projectId: string; projectName: string; p
               label="Assign To"
               options={[
                 { label: 'Unassigned', value: '' },
-                ...members.map(m => ({ label: m.name, value: m.id }))
+                ...members.map(m => ({ label: m.general?.name, value: m.id }))
               ]}
             />
             <div className="pt-2 flex gap-3">

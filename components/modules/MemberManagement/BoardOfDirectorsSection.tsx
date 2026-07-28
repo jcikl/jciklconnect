@@ -164,7 +164,7 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
           }
         }));
       }
-      showToast(`Photo updated for ${member.name}`, 'success');
+      showToast(`Photo updated for ${member.general?.name}`, 'success');
     } catch (err) {
       showToast('Failed to upload photo', 'error');
     } finally {
@@ -187,7 +187,7 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
       const url = await uploadBoardAvatarToCloudinary(file, member, selectedTerm, p => setUploadProgress(p));
       const setter = type === 'area' ? setAreaOfficers : setNationalOfficers;
       setter(prev => prev.map(o => o.localId === localId ? { ...o, boardAvatarUrl: url } : o));
-      showToast(`Photo updated for ${member.name}`, 'success');
+      showToast(`Photo updated for ${member.general?.name}`, 'success');
     } catch {
       showToast('Failed to upload photo', 'error');
     } finally {
@@ -224,7 +224,7 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
           const board = byYear[year] || [];
           const president = board.find(m => m.position === 'President' && m.isActive);
           const presidentName = president
-            ? members.find(m => m.id === president.memberId)?.name || 'Unknown'
+            ? members.find(m => m.id === president.memberId)?.general?.name || 'Unknown'
             : 'Not Set';
           return {
             year,
@@ -405,17 +405,17 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
 
   const sortedMembers = useMemo(() => {
     return [...members].sort((a, b) => {
-      const nameA = (a.fullName || a.name || '').toLowerCase();
-      const nameB = (b.fullName || b.name || '').toLowerCase();
+      const nameA = (a.general?.fullName || a.general?.name || '').toLowerCase();
+      const nameB = (b.general?.fullName || b.general?.name || '').toLowerCase();
       return nameA.localeCompare(nameB);
     });
   }, [members]);
 
   const getMemberLabel = (m: Member) => {
     if (!m) return '';
-    const namePart = m.name;
-    const fullNamePart = m.fullName || '';
-    const idPart = m.idNumber ? `(${m.idNumber})` : '';
+    const namePart = m.general?.name;
+    const fullNamePart = m.general?.fullName || '';
+    const idPart = m.general?.idNumber ? `(${m.general?.idNumber})` : '';
 
     if (fullNamePart || idPart) {
       return `${fullNamePart} ${idPart} - ${namePart}`.trim();
@@ -470,7 +470,7 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
   const renderPositionCard = (position: string) => {
     const sel = members.find(m => m.id === assignments[position]?.memberId);
     const boardAvatar = assignments[position]?.boardAvatarUrl || '';
-    const avatarSrc = boardAvatar || sel?.avatar || sel?.avatarUrl || '';
+    const avatarSrc = boardAvatar || sel?.general?.avatarUrl || sel?.general?.avatarUrl || '';
     const isUp = uploadingKey === `${position}:board`;
 
     return (
@@ -504,11 +504,11 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
           <div className="flex items-center gap-3 pt-3 border-t border-slate-100">
             <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
               {avatarSrc
-                ? <img src={avatarSrc} alt={sel.name} className="w-full h-full object-cover" />
-                : <div className="w-full h-full flex items-center justify-center text-slate-400 font-bold text-sm">{sel.name.charAt(0)}</div>}
+                ? <img src={avatarSrc} alt={sel.general?.name} className="w-full h-full object-cover" />
+                : <div className="w-full h-full flex items-center justify-center text-slate-400 font-bold text-sm">{sel.general?.name.charAt(0)}</div>}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-slate-700 truncate">{sel.name}</p>
+              <p className="text-xs font-semibold text-slate-700 truncate">{sel.general?.name}</p>
               {boardAvatar && <p className="text-[10px] text-jci-blue font-medium">Board photo set</p>}
               {isUp && <div className="mt-1 h-1 rounded-full bg-slate-200 overflow-hidden"><div className="h-full bg-jci-blue transition-all" style={{ width: `${uploadProgress}%` }} /></div>}
             </div>
@@ -546,16 +546,16 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                 assignments[position].commissionDirectorIds.map(id => {
                   const m = members.find(mem => mem.id === id);
                   const dirBoardAvatar = assignments[position]?.commissionDirectorAvatars?.[id] || '';
-                  const dirAvatar = dirBoardAvatar || m?.avatar || m?.avatarUrl || '';
+                  const dirAvatar = dirBoardAvatar || m?.general?.avatarUrl || m?.general?.avatarUrl || '';
                   const isDirUp = uploadingKey === `${position}:commission:${id}`;
                   return (
                     <div key={id} className="flex items-center gap-1.5 bg-slate-50 pl-1.5 pr-1 py-1 rounded-full border border-slate-200">
                       <div className="w-6 h-6 rounded-full overflow-hidden bg-slate-200 shrink-0">
                         {dirAvatar
-                          ? <img src={dirAvatar} alt={m?.name} className="w-full h-full object-cover" />
-                          : <div className="w-full h-full flex items-center justify-center text-[9px] font-bold text-slate-500">{m?.name?.charAt(0)}</div>}
+                          ? <img src={dirAvatar} alt={m?.general?.name} className="w-full h-full object-cover" />
+                          : <div className="w-full h-full flex items-center justify-center text-[9px] font-bold text-slate-500">{m?.general?.name?.charAt(0)}</div>}
                       </div>
-                      <span className="text-xs font-medium text-slate-700">{m?.name || 'Unknown'}</span>
+                      <span className="text-xs font-medium text-slate-700">{m?.general?.name || 'Unknown'}</span>
                       {canManage && (
                         <>
                           <label className={`transition-colors rounded-full p-0.5 ${isDirUp ? 'text-slate-200 cursor-not-allowed' : 'text-slate-300 hover:text-jci-blue cursor-pointer'}`} title="Upload photo">
@@ -659,12 +659,12 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
               {sel && (
                 <div className="flex items-center gap-3 pt-3 border-t border-slate-100">
                   <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
-                    {(officer.boardAvatarUrl || sel.avatar || sel.avatarUrl)
-                      ? <img src={officer.boardAvatarUrl || sel.avatar || sel.avatarUrl || undefined} alt={sel.name} className="w-full h-full object-cover" />
-                      : <div className="w-full h-full flex items-center justify-center text-slate-400 font-bold text-sm">{sel.name.charAt(0)}</div>}
+                    {(officer.boardAvatarUrl || sel.general?.avatarUrl || sel.general?.avatarUrl)
+                      ? <img src={officer.boardAvatarUrl || sel.general?.avatarUrl || sel.general?.avatarUrl || undefined} alt={sel.general?.name} className="w-full h-full object-cover" />
+                      : <div className="w-full h-full flex items-center justify-center text-slate-400 font-bold text-sm">{sel.general?.name.charAt(0)}</div>}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-slate-700 truncate">{sel.name}</p>
+                    <p className="text-xs font-semibold text-slate-700 truncate">{sel.general?.name}</p>
                     {officer.boardAvatarUrl && <p className="text-[10px] text-jci-blue font-medium">Board photo set</p>}
                     {isUp && <div className="mt-1 h-1 rounded-full bg-slate-200 overflow-hidden"><div className="h-full bg-jci-blue transition-all" style={{ width: `${uploadProgress}%` }} /></div>}
                   </div>
@@ -1132,17 +1132,17 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                         )}
                         <div className="flex items-center gap-4">
                           <img
-                            src={boardAvatarUrl || bm.avatar || bm.avatarUrl || undefined}
-                            alt={bm.name}
+                            src={boardAvatarUrl || bm.general?.avatarUrl || bm.general?.avatarUrl || undefined}
+                            alt={bm.general?.name}
                             className={`rounded-xl object-cover bg-slate-100 border shrink-0 ${isPresident ? 'w-16 h-16 border-blue-300' : 'w-12 h-12 border-slate-200'
                               }`}
                           />
                           <div className="min-w-0 flex-1">
                             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{position}</p>
                             <h4 className={`font-black text-slate-900 truncate ${isPresident ? 'text-lg' : 'text-sm'}`}>
-                              {bm.fullName || bm.name}
+                              {bm.general?.fullName || bm.general?.name}
                             </h4>
-                            <p className="text-xs text-slate-500 truncate">{bm.companyName || (bm.business?.position) || 'JCI Member'}</p>
+                            <p className="text-xs text-slate-500 truncate">{bm.companyName || bm.jciCareer?.currentBoardPosition || 'JCI Member'}</p>
                           </div>
                         </div>
 
@@ -1152,8 +1152,8 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
                             <div className="flex flex-wrap gap-2">
                               {directors.map(dir => (
                                 <div key={dir.id} className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/60 rounded-full pl-1.5 pr-3 py-0.5 max-w-[200px] truncate">
-                                  <img src={commissionDirectorAvatars?.[dir.id] || dir.avatar || dir.avatarUrl || undefined} className="w-5 h-5 rounded-full object-cover shrink-0" alt="" />
-                                  <span className="text-[10px] font-semibold text-slate-600 truncate">{dir.name}</span>
+                                  <img src={commissionDirectorAvatars?.[dir.id] || dir.general?.avatarUrl || dir.general?.avatarUrl || undefined} className="w-5 h-5 rounded-full object-cover shrink-0" alt="" />
+                                  <span className="text-[10px] font-semibold text-slate-600 truncate">{dir.general?.name}</span>
                                 </div>
                               ))}
                             </div>

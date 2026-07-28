@@ -32,19 +32,19 @@ interface MemberRow {
 }
 
 function getMemberIC(m: Member): string {
-  return (m.idNumber || (m.general as any)?.idNumber || '').replace(/[\s\-]/g, '');
+  return (m.general?.idNumber || (m.general as any)?.general?.idNumber || '').replace(/[\s\-]/g, '');
 }
 
 function getMemberDOB(m: Member): string {
-  return (m.dateOfBirth || m.dob || (m.general as any)?.dob || '').trim();
+  return (m.general?.dob || m.general?.dob || (m.general as any)?.general?.dob || '').trim();
 }
 
 function getMemberGender(m: Member): string {
-  return (m.gender || (m.general as any)?.gender || '').trim();
+  return (m.general?.gender || (m.general as any)?.general?.gender || '').trim();
 }
 
 function getMemberBirthPlace(m: Member): string {
-  return (m.general?.birthPlace ?? m.birthPlace ?? '').trim();
+  return (m.general?.birthPlace ?? m.general?.birthPlace ?? '').trim();
 }
 
 export const BackfillFromICScript: React.FC<Props> = ({ members, onMembersChanged }) => {
@@ -94,7 +94,7 @@ export const BackfillFromICScript: React.FC<Props> = ({ members, onMembersChange
 
         return {
           id: m.id,
-          name: m.name || m.fullName || m.id,
+          name: m.general?.name || m.general?.fullName || m.id,
           ic,
           fields,
           hasChanges: fields.some(f => f.changed),

@@ -967,7 +967,7 @@ export class PaymentRequestService {
       const { MembersService } = await import('./membersService');
       const members = await MembersService.getAllMembers();
       const approvers = members.filter(m =>
-        m.currentBoardPosition && APPROVER_BOARD_TITLES.some(t => (m.currentBoardPosition ?? '').includes(t))
+        m.jciCareer?.currentBoardPosition && APPROVER_BOARD_TITLES.some(t => (m.jciCareer?.currentBoardPosition ?? '').includes(t))
       );
       for (const approver of approvers) {
         await this._writeNotification(

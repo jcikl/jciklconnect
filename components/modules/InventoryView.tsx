@@ -342,7 +342,7 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                       <tbody className="divide-y divide-slate-100">
                         {paginatedItems.map(item => {
                           const rowColor = item.status === 'Available' ? 'border-l-green-400' : item.status === 'Checked Out' ? 'border-l-amber-400' : 'border-l-red-400';
-                          const custodianName = item.custodian ? members.find(m => m.id === item.custodian)?.name || item.custodian : '—';
+                          const custodianName = item.custodian ? members.find(m => m.id === item.custodian)?.general?.name || item.custodian : '—';
                           return (
                             <tr key={item.id} className={`border-l-2 ${rowColor} hover:bg-slate-50/60 transition-colors`}>
                               <td className="py-2.5 px-3 max-w-[200px]">
@@ -411,7 +411,7 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                   <div className="md:hidden space-y-2">
                     {paginatedItems.map(item => {
                       const barColor = item.status === 'Available' ? 'bg-green-400' : item.status === 'Checked Out' ? 'bg-amber-400' : 'bg-red-400';
-                      const custodianName = item.custodian ? members.find(m => m.id === item.custodian)?.name || item.custodian : null;
+                      const custodianName = item.custodian ? members.find(m => m.id === item.custodian)?.general?.name || item.custodian : null;
                       return (
                         <div key={item.id} className="relative bg-white border border-slate-100 rounded-xl overflow-hidden shadow-sm">
                           <div className={`absolute left-0 top-0 bottom-0 w-1 ${barColor}`} />
@@ -559,7 +559,7 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                 formData.get('variant') as string || undefined,
                 parseInt(formData.get('adjustment') as string),
                 formData.get('reason') as string,
-                member?.name || 'Admin'
+                member?.general?.name || 'Admin'
               );
               showToast('Stock adjusted successfully', 'success');
               await loadItems();
@@ -932,7 +932,7 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
             <p className="text-sm text-slate-600 mb-4">Checking out: <strong>{selectedItem.name}</strong></p>
             <Select name="memberId" label="Assign To" options={[
               { label: 'Select member...', value: '' },
-              ...members.map(m => ({ label: m.name, value: m.id })),
+              ...members.map(m => ({ label: m.general?.name ?? m.id, value: m.id })),
             ]} required />
             <Input name="expectedReturnDate" label="Expected Return Date" type="date" />
             <div className="pt-4">

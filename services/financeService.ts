@@ -2439,10 +2439,10 @@ export class FinanceService {
         const memberDoc = await memberTxn.get(memberRef);
         if (!memberDoc.exists()) return;
         const member = memberDoc.data() as any;
-        const currentMembership = member.membership || {};
+        const currentMembership = member.jciCareer?.membershipDuesHistory || {};
         const yearStr = year;
 
-        const type = member.membershipType || 'Probation';
+        const type = member.jciCareer?.membershipType || 'Probation';
         const duesAmount = currentMembership[yearStr]?.dues ?? configRules[type]?.duesAmount ?? MembershipDues[type as keyof typeof MembershipDues] ?? 0;
 
         // No linked membership transactions for this member/year:
@@ -2476,16 +2476,15 @@ export class FinanceService {
           // Revert to Guest only when: promoted via approval flow AND entry fee not yet confirmed paid.
           // If hasPaidInitiationFee=true the RM350 was already collected — deleting a renewal tx
           // must never strip their Probation status.
-          const hasPaidFee = member.jciCareer?.hasPaidInitiationFee ?? member.hasPaidInitiationFee ?? false;
-          if (member.membershipType === 'Probation'
+          const hasPaidFee = member.jciCareer?.hasPaidInitiationFee ?? member.jciCareer?.hasPaidInitiationFee ?? false;
+          if (member.jciCareer?.membershipType === 'Probation'
               && member.role === 'MEMBER'
               && member.probationApprovedAt
               && !hasPaidFee) {
             zeroTxUpdates.role = 'GUEST';
-            zeroTxUpdates.membershipType = 'Guest';
+            Object.assign(zeroTxUpdates, { 'jciCareer.membershipType': 'Guest', 'jciCareer.probationTasks': null });
             zeroTxUpdates.probationApprovedBy = null;
             zeroTxUpdates.probationApprovedAt = null;
-            zeroTxUpdates.probationTasks = null;
           }
 
           memberTxn.update(memberRef, zeroTxUpdates);
@@ -2507,7 +2506,7 @@ export class FinanceService {
           status = 'partial';
         }
 
-        // 6. Update member.membership[year]
+        // 6. Update member.jciCareer?.membershipDuesHistory[year]
         currentMembership[yearStr] = {
           year: yearNum,
           dues: duesAmount,
@@ -2537,9 +2536,8 @@ export class FinanceService {
         //    requires explicit board approval (President / Secretary / Honorary Treasurer)
         //    via GuestManagementView. Do NOT auto-promote here.
         if (status === 'paid' || status === 'over paid') {
-          if (!(member.jciCareer?.hasPaidInitiationFee ?? member.hasPaidInitiationFee)) {
+          if (!(member.jciCareer?.hasPaidInitiationFee ?? member.jciCareer?.hasPaidInitiationFee)) {
             updates['jciCareer.hasPaidInitiationFee'] = true;
-            updates.hasPaidInitiationFee = true;
           }
         }
 
@@ -2981,7 +2979,7 @@ export class FinanceService {
           if (alreadyRenewed) continue;
 
           // Determine membership type (default to 'Official' if not set)
-          const membershipType = member.membershipType || 'Official';
+          const membershipType = member.jciCareer?.membershipType || 'Official';
 
           // Guest pays a one-time entry fee when joining — no annual renewal dues
           if (membershipType === 'Guest') continue;
@@ -2992,18 +2990,18 @@ export class FinanceService {
             if (nationality === 'Malaysia' || !nationality) {
               validationErrors.push({
                 memberId,
-                error: `Visiting member ${member.general?.name ?? member.name} must be a non-Malaysian citizen`,
+                error: `Visiting member ${member.general?.name ?? member.general?.name} must be a non-Malaysian citizen`,
               });
               continue;
             }
           }
 
           if (membershipType === 'Senator') {
-            const isSenatorCertified = member.jciCareer?.senatorship?.certified ?? member.senatorCertified ?? false;
+            const isSenatorCertified = member.jciCareer?.senatorship?.certified ?? member.jciCareer?.senatorship?.certified ?? false;
             if (!isSenatorCertified) {
               validationErrors.push({
                 memberId,
-                error: `Senator ${member.general?.name ?? member.name} does not have valid senator certification`,
+                error: `Senator ${member.general?.name ?? member.general?.name} does not have valid senator certification`,
               });
               continue;
             }
@@ -3012,7 +3010,7 @@ export class FinanceService {
           const baseDuesAmount = rules[membershipType]?.duesAmount ?? MembershipDues[membershipType as keyof typeof MembershipDues] ?? 0;
           if (baseDuesAmount === 0) continue;
 
-          const hasPaidFee = member.jciCareer?.hasPaidInitiationFee ?? member.hasPaidInitiationFee ?? false;
+          const hasPaidFee = member.jciCareer?.hasPaidInitiationFee ?? member.jciCareer?.hasPaidInitiationFee ?? false;
           const registrationFee = hasPaidFee ? 0 : 50;
           const duesAmount = baseDuesAmount + registrationFee;
 
@@ -3067,7 +3065,7 @@ export class FinanceService {
       }
       if (batchCount > 0) await batch.commit();
 
-      // Phase 3: Sync members.membership.{year} for each created transaction (D-2 fix)
+      // Phase 3: Sync members.jciCareer?.membershipDuesHistory.{year} for each created transaction (D-2 fix)
       for (const item of toCreate) {
         await this.syncMemberMembership(item.memberId, `${year} membership`).catch(err =>
           errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { context: 'financeService.initiateDuesRenewal:membershipSync', additionalData: { memberId: item.memberId } })
@@ -3136,7 +3134,7 @@ export class FinanceService {
           .map(async t => {
             const member = await MembersService.getMemberById(t.memberId!).catch(() => null);
             if (!member) return null;
-            if (member.membershipType === 'Senator' || member.membershipType === 'Honorary' || member.membershipType === 'Guest') return null;
+            if (member.jciCareer?.membershipType === 'Senator' || member.jciCareer?.membershipType === 'Honorary' || member.jciCareer?.membershipType === 'Guest') return null;
             return { transaction: t, member };
           })
       );
@@ -3148,7 +3146,7 @@ export class FinanceService {
           CommunicationService.createNotification({
             memberId: transaction.memberId!,
             title: `Reminder: Membership Dues Payment Overdue`,
-            message: `Your ${member.membershipType || 'membership'} dues of RM${transaction.amount} for ${year} are overdue. Please complete payment to avoid membership suspension.`,
+            message: `Your ${member.jciCareer?.membershipType || 'membership'} dues of RM${transaction.amount} for ${year} are overdue. Please complete payment to avoid membership suspension.`,
             type: 'warning',
           })
         )
@@ -3228,7 +3226,7 @@ export class FinanceService {
         const member = memberMap.get(transaction.memberId);
         if (!member) continue;
 
-        const membershipType = member.membershipType || 'Official';
+        const membershipType = member.jciCareer?.membershipType || 'Official';
         if (!byType[membershipType]) byType[membershipType] = { total: 0, paid: 0, pending: 0, overdue: 0 };
         byType[membershipType].total++;
 
@@ -3310,13 +3308,13 @@ export class FinanceService {
       }> = [];
 
       for (const member of allMembers) {
-        const membershipType = (member.jciCareer?.membershipType ?? member.membershipType) || 'Official';
+        const membershipType = (member.jciCareer?.membershipType ?? member.jciCareer?.membershipType) || 'Official';
         // Guest pays a one-time entry fee only — no annual renewal dues to list.
         if (membershipType === 'Guest') continue;
         const duesYear = filters?.duesYear ?? getMYTYear();
         const baseDues = configRules[membershipType as keyof typeof configRules]?.duesAmount ?? MembershipDues[membershipType as keyof typeof MembershipDues] ?? 0;
-        const hasPaidFee = member.jciCareer?.hasPaidInitiationFee ?? member.hasPaidInitiationFee ?? false;
-        const joinYear = (member.jciCareer?.joinDate ?? member.joinDate) ? new Date((member.jciCareer?.joinDate ?? member.joinDate)!).getFullYear() : null;
+        const hasPaidFee = member.jciCareer?.hasPaidInitiationFee ?? member.jciCareer?.hasPaidInitiationFee ?? false;
+        const joinYear = (member.jciCareer?.joinDate ?? member.jciCareer?.joinDate) ? new Date((member.jciCareer?.joinDate ?? member.jciCareer?.joinDate)!).getFullYear() : null;
         const isFirstYear = joinYear === duesYear;
         const duesAmount = baseDues + (isFirstYear && !hasPaidFee ? 50 : 0);
 
@@ -3363,7 +3361,7 @@ export class FinanceService {
 
         membersDuesList.push({
           memberId: member.id,
-          memberName: member.general?.name ?? member.name,
+          memberName: member.general?.name ?? member.general?.name,
           membershipType,
           duesYear,
           duesAmount,
@@ -3376,7 +3374,7 @@ export class FinanceService {
       // Sort by dues year (descending), then by membership type, then by name
       return membersDuesList.sort((a, b) => {
         if (a.duesYear !== b.duesYear) return b.duesYear - a.duesYear;
-        if (a.membershipType !== b.membershipType) return a.membershipType.localeCompare(b.membershipType);
+        if (a.membershipType !== b.membershipType) return (a.membershipType ?? '').localeCompare(b.membershipType ?? '');
         return a.memberName.localeCompare(b.memberName);
       });
     } catch (error) {
@@ -3409,12 +3407,12 @@ export class FinanceService {
         return { success: false, error: 'Member not found' };
       }
 
-      const membershipType = member.membershipType || 'Official';
+      const membershipType = member.jciCareer?.membershipType || 'Official';
       // Same source of truth as initiateDuesRenewal — a configured rule always wins over
       // the static fallback, otherwise a dues-amount change in config breaks every payment.
       const rules = await MembershipConfigService.getRules();
       const baseDues = rules[membershipType]?.duesAmount ?? MembershipDues[membershipType as keyof typeof MembershipDues] ?? 0;
-      const hasPaidFeeFlag = member.jciCareer?.hasPaidInitiationFee ?? member.hasPaidInitiationFee ?? false;
+      const hasPaidFeeFlag = member.jciCareer?.hasPaidInitiationFee ?? member.jciCareer?.hasPaidInitiationFee ?? false;
       const surcharge = (!hasPaidFeeFlag && membershipType !== 'Guest') ? 50 : 0;
       const expectedAmount = baseDues + surcharge;
 
@@ -4257,7 +4255,7 @@ export class FinanceService {
         const accounts = await this.getAllBankAccounts();
         lines.push('Account Name,Balance,Currency');
         accounts.forEach(acc => {
-          lines.push(`${acc.name},${acc.balance.toFixed(2)},${acc.currency}`);
+          lines.push(`${acc.name},${acc.balance?.toFixed(2) ?? '0.00'},${acc.currency}`);
         });
         // FIN-007: group totals by currency to avoid meaningless cross-currency sums.
         const totalsByCurrency: Record<string, number> = {};

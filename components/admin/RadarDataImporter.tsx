@@ -311,8 +311,8 @@ export const RadarDataImporter: React.FC = () => {
       // Fuzzy match member
       const matchedMember = members.find(m =>
         (m.general?.name || '').toLowerCase() === rawName.toLowerCase() ||
-        (m.name || '').toLowerCase() === rawName.toLowerCase() ||
-        (m.chiName || '') === rawName
+        (m.general?.name || '').toLowerCase() === rawName.toLowerCase() ||
+        (m.general?.chineseName || '') === rawName
       );
 
       return {
@@ -329,7 +329,7 @@ export const RadarDataImporter: React.FC = () => {
         hostingLO,
         chapterLO,
         matchedMemberId: matchedMember ? matchedMember.id : '',
-        matchedMemberName: matchedMember ? (matchedMember.general?.name || matchedMember.name) : 'Unmatched',
+        matchedMemberName: matchedMember ? (matchedMember.general?.name || matchedMember.general?.name) : 'Unmatched',
       };
     });
 
@@ -345,7 +345,7 @@ export const RadarDataImporter: React.FC = () => {
     setParsedRows(prev => prev.map(r => r.id === rowId ? {
       ...r,
       matchedMemberId: memberId,
-      matchedMemberName: matched ? (matched.general?.name || matched.name) : 'Unmatched'
+      matchedMemberName: matched ? (matched.general?.name || matched.general?.name) : 'Unmatched'
     } : r));
   };
 
@@ -392,7 +392,7 @@ export const RadarDataImporter: React.FC = () => {
   };
 
   const commitData = async () => {
-    const validRows = parsedRows.filter(r => r && !r.isIgnored && r.matchedMemberId && getRadarKey(r.category, r.resolvedType));
+    const validRows = parsedRows.filter(r => r && !r.isIgnored && r.matchedMemberId && getRadarKey(r.business?.businessCategory, r.resolvedType));
     if (validRows.length === 0) {
       setFeedback('No valid rows to commit. Make sure members are matched and categories are correct.');
       return;
@@ -409,10 +409,10 @@ export const RadarDataImporter: React.FC = () => {
       let skippedCount = 0;
 
       for (const row of validRows) {
-        const points = calculatePoints(row.category, row.value, row.mappedScore);
-        const radarKey = getRadarKey(row.category, row.resolvedType);
+        const points = calculatePoints(row.business?.businessCategory, row.value, row.mappedScore);
+        const radarKey = getRadarKey(row.business?.businessCategory, row.resolvedType);
         const year = row.eventYear || new Date().getFullYear().toString();
-        const finalEventTitle = row.eventTitle || row.category;
+        const finalEventTitle = row.eventTitle || row.business?.businessCategory;
 
         if (!radarKey) continue;
 
@@ -444,7 +444,7 @@ export const RadarDataImporter: React.FC = () => {
         await addDoc(collection(db, 'RadarContributions'), {
           memberId: row.matchedMemberId,
           memberName: row.matchedMemberName,
-          rawCategory: row.category,
+          rawCategory: row.business?.businessCategory,
           eventTitle: finalEventTitle,
           radarKey,
           rawValue: row.value,
@@ -565,7 +565,7 @@ export const RadarDataImporter: React.FC = () => {
 
                     const isLineEmpty = !line.replace(/\t/g, '').trim();
                     const isIgnored = parsed.isIgnored;
-                    const isValid = !isIgnored && parsed.matchedMemberId && getRadarKey(parsed.category, parsed.resolvedType);
+                    const isValid = !isIgnored && parsed.matchedMemberId && getRadarKey(parsed.business?.businessCategory, parsed.resolvedType);
                     const isMissing = !isLineEmpty && !isIgnored && !isValid;
 
                     if (!isLineEmpty) {
@@ -596,10 +596,10 @@ export const RadarDataImporter: React.FC = () => {
                         ) : (
                           <>
                             <td className="p-2 border-r border-slate-100 text-slate-500 text-[10px] bg-slate-50">{parsed.parent_category}</td>
-                            <td className="p-2 border-r border-slate-100 text-slate-900 font-medium bg-slate-50">{parsed.category}</td>
+                            <td className="p-2 border-r border-slate-100 text-slate-900 font-medium bg-slate-50">{parsed.business?.businessCategory}</td>
                             <td className="p-2 border-r border-slate-100 bg-slate-50">
                               <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-bold whitespace-nowrap">
-                                {calculatePoints(parsed.category || '', parsed.value || '', parsed.mappedScore)} pts
+                                {calculatePoints(parsed.business?.businessCategory || '', parsed.value || '', parsed.mappedScore)} pts
                               </span>
                             </td>
                             <td className="p-2 bg-slate-50 min-w-[150px]">
@@ -610,7 +610,7 @@ export const RadarDataImporter: React.FC = () => {
                               >
                                 <option value="">-- Select --</option>
                                 {members.map(m => (
-                                  <option key={m.id} value={m.id}>{m.general?.name || m.name}</option>
+                                  <option key={m.id} value={m.id}>{m.general?.name || m.general?.name}</option>
                                 ))}
                               </select>
                             </td>
@@ -632,7 +632,7 @@ export const RadarDataImporter: React.FC = () => {
             if (totalDataRows === 0) return null;
 
             const ignoredCount = parsedRows.filter(r => r && r.isIgnored).length;
-            const validCount = parsedRows.filter(r => r && !r.isIgnored && r.matchedMemberId && getRadarKey(r.category, r.resolvedType)).length;
+            const validCount = parsedRows.filter(r => r && !r.isIgnored && r.matchedMemberId && getRadarKey(r.business?.businessCategory, r.resolvedType)).length;
             const errorCount = totalDataRows - ignoredCount - validCount;
 
             return (
@@ -903,7 +903,7 @@ const RadarSponsorshipManager: React.FC<{ members: Member[] }> = ({ members }) =
     }
     setSubmitting(true);
     const matchedMember = members.find(m => m.id === selectedMemberId);
-    const memberName = matchedMember ? (matchedMember.fullName || matchedMember.general?.name || matchedMember.name || '') : '';
+    const memberName = matchedMember ? (matchedMember.general?.fullName || matchedMember.general?.name || matchedMember.general?.name || '') : '';
 
     const payload = { memberId: selectedMemberId, memberName, sponsorName, amount, date, description };
 
@@ -1038,9 +1038,9 @@ const RadarSponsorshipManager: React.FC<{ members: Member[] }> = ({ members }) =
               >
                 <option value="">— Select Member —</option>
                 {members
-                  .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                  .sort((a, b) => (a.general?.name || '').localeCompare(b.general?.name || ''))
                   .map(m => (
-                    <option key={m.id} value={m.id}>{m.fullName || m.general?.name || m.name || m.email || m.id}</option>
+                    <option key={m.id} value={m.id}>{m.general?.fullName || m.general?.name || m.general?.name || m.contact?.email || m.id}</option>
                   ))
                 }
               </select>
@@ -1385,7 +1385,7 @@ const RadarMemberScoresView: React.FC<RadarMemberScoresViewProps> = ({ members, 
   const [recalculatingId, setRecalculatingId] = useState<string | null>(null);
   const { showToast } = useToast();
 
-  const getMemberName = (m: Member) => m.fullName || m.general?.name || m.name || '';
+  const getMemberName = (m: Member) => m.general?.fullName || m.general?.name || m.general?.name || '';
   const getInitials = (name: string) => name.trim().split(/\s+/).map(n => n[0]).slice(0, 2).join('').toUpperCase() || '?';
 
   const handleRecalculateSingle = async (memberId: string) => {
@@ -1437,7 +1437,7 @@ const RadarMemberScoresView: React.FC<RadarMemberScoresViewProps> = ({ members, 
   // 2. Filter & Sort
   const filtered = members.filter(m => {
     const name = getMemberName(m).toLowerCase();
-    const email = (m.contact?.email || m.email || '').toLowerCase();
+    const email = (m.contact?.email || m.contact?.email || '').toLowerCase();
     const query = searchQuery.toLowerCase();
     const matchesSearch = name.includes(query) || email.includes(query);
 
@@ -1459,8 +1459,8 @@ const RadarMemberScoresView: React.FC<RadarMemberScoresViewProps> = ({ members, 
       aVal = a.points ?? a.jciCareer?.points ?? 0;
       bVal = b.points ?? b.jciCareer?.points ?? 0;
     } else {
-      aVal = (a.jciCareer?.radarStats ?? a.radarStats)?.[sortBy] ?? 0;
-      bVal = (b.jciCareer?.radarStats ?? b.radarStats)?.[sortBy] ?? 0;
+      aVal = (a.jciCareer?.radarStats ?? a.jciCareer?.radarStats)?.[sortBy] ?? 0;
+      bVal = (b.jciCareer?.radarStats ?? b.jciCareer?.radarStats)?.[sortBy] ?? 0;
     }
 
     if (aVal === bVal) {
@@ -1623,7 +1623,7 @@ const RadarMemberScoresView: React.FC<RadarMemberScoresViewProps> = ({ members, 
             ) : (
               paginatedItems.map(m => {
                 const totalPoints = m.points || m.jciCareer?.points || 0;
-                const stats = (m.jciCareer?.radarStats ?? m.radarStats) || { leadership: 0, training: 0, recruitment: 0, sponsorship: 0, events: 0 };
+                const stats = (m.jciCareer?.radarStats ?? m.jciCareer?.radarStats) || { leadership: 0, training: 0, recruitment: 0, sponsorship: 0, events: 0 };
                 const name = getMemberName(m);
                 const isRecalculating = recalculatingId === m.id;
 
@@ -1645,7 +1645,7 @@ const RadarMemberScoresView: React.FC<RadarMemberScoresViewProps> = ({ members, 
                             <span className="text-[10px] text-slate-400 font-normal">({m.general.chineseName})</span>
                           )}
                         </div>
-                        <div className="text-[10px] text-slate-400">{m.contact?.email || m.email || '—'}</div>
+                        <div className="text-[10px] text-slate-400">{m.contact?.email || m.contact?.email || '—'}</div>
                       </div>
                     </td>
 

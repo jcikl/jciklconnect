@@ -3,6 +3,7 @@ import { Settings, Shield, MessageSquare, CheckCircle, ExternalLink, Save, Activ
 import { Card, Button, Badge, useToast, ProgressBar } from '../ui/Common';
 import { Input } from '../ui/Form';
 import { useMembers } from '../../hooks/useMembers';
+import type { Member } from '../../types';
 import { Combobox } from '../ui/Combobox';
 import { getAuth } from 'firebase/auth';
 
@@ -139,9 +140,9 @@ export const WhapiConfigView: React.FC<{ embedded?: boolean }> = ({ embedded }) 
       setSyncStatus({ type: 'info', message: `Updating ${members.length} members in database...` });
 
       const promises = members.map(async (m) => {
-        if (!m.phone) return;
+        if (!m.contact?.phone) return;
         
-        const memberDigits = m.phone.replace(/\D/g, '');
+        const memberDigits = m.contact?.phone.replace(/\D/g, '');
         const normalized = memberDigits.length >= 9 ? memberDigits.slice(-9) : memberDigits;
         const isInGroup = participantPhones.has(normalized);
 
@@ -150,8 +151,8 @@ export const WhapiConfigView: React.FC<{ embedded?: boolean }> = ({ embedded }) 
         }
 
         // Only update if status actually changed to optimize DB writes
-        if (m.whatsappGroup !== isInGroup) {
-          await updateMember(m.id, { whatsappGroup: isInGroup });
+        if (m.contact?.whatsappJoined !== isInGroup) {
+          await updateMember(m.id, { 'contact.whatsappJoined': isInGroup } as unknown as Partial<Member>);
           updatedCount++;
         }
       });
@@ -195,7 +196,7 @@ export const WhapiConfigView: React.FC<{ embedded?: boolean }> = ({ embedded }) 
   };
 
   const handleSendTestPush = async () => {
-    const pushMember = members.find(m => m.name === pushMemberName);
+    const pushMember = members.find(m => m.general?.name === pushMemberName);
     if (!pushMember) {
       showToast('Please select a member', 'warning');
       return;
@@ -423,7 +424,7 @@ export const WhapiConfigView: React.FC<{ embedded?: boolean }> = ({ embedded }) 
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-700 uppercase">Member</label>
                 <Combobox
-                  options={members.map(m => m.name || m.id)}
+                  options={members.map(m => m.general?.name || m.id)}
                   value={pushMemberName}
                   onChange={setPushMemberName}
                   placeholder="Search member..."

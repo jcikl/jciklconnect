@@ -44,14 +44,14 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
   const members = useMemo(() => {
     const currentYear = new Date().getFullYear();
     return rawMembers.map(m => {
-      const record = (m.membership as any)?.[currentYear];
+      const record = (m.jciCareer?.membershipDuesHistory as any)?.[currentYear];
       const isPaid = record?.status === 'paid' || record?.status === 'over paid';
       const isOverdue = record?.status === 'overdue';
 
       // Find the latest paid year in membership history
       let latestPaidYear: string | null = null;
-      if (m.membership) {
-        const paidYears = Object.entries(m.membership)
+      if (m.jciCareer?.membershipDuesHistory) {
+        const paidYears = Object.entries(m.jciCareer?.membershipDuesHistory)
           .filter(([_, rec]: [string, any]) => rec.status === 'paid' || rec.status === 'over paid')
           .map(([year]) => parseInt(year, 10));
         if (paidYears.length > 0) {
@@ -275,7 +275,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
     const totalMembers = members.length;
     const activeMembers = members.filter(m => m.role !== UserRole.GUEST && m.duesStatus === 'Paid').length;
     const newMembersThisMonth = members.filter(m => {
-      const joinDate = new Date(m.joinDate);
+      const joinDate = new Date(m.jciCareer?.joinDate);
       const now = new Date();
       return joinDate.getMonth() === now.getMonth() && joinDate.getFullYear() === now.getFullYear();
     }).length;
@@ -359,7 +359,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
 
       // Count members joined in this month
       const membersInMonth = members.filter(m => {
-        const joinDate = new Date(m.joinDate);
+        const joinDate = new Date(m.jciCareer?.joinDate);
         return joinDate.getMonth() === date.getMonth() &&
           joinDate.getFullYear() === date.getFullYear();
       }).length;
@@ -406,14 +406,14 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
     const filtered = members.filter(m => {
       const matchDues = duesStatusFilter === 'All' || m.duesStatus === duesStatusFilter;
       const matchSearch = !insightSearch ||
-        (m.name ?? '').toLowerCase().includes(insightSearch.toLowerCase()) ||
-        (m.email ?? '').toLowerCase().includes(insightSearch.toLowerCase());
+        (m.general?.name ?? '').toLowerCase().includes(insightSearch.toLowerCase()) ||
+        (m.contact?.email ?? '').toLowerCase().includes(insightSearch.toLowerCase());
       return matchDues && matchSearch;
     });
 
     filtered.forEach(m => {
-      if (m.dateOfBirth) {
-        const date = new Date(m.dateOfBirth);
+      if (m.general?.dob) {
+        const date = new Date(m.general?.dob);
         if (!isNaN(date.getTime())) {
           groups[date.getMonth()].push(m);
         }
@@ -427,8 +427,8 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
     const myt = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }));
     const mmdd = `${String(myt.getMonth() + 1).padStart(2, '0')}-${String(myt.getDate()).padStart(2, '0')}`;
     return members.filter(m => {
-      if (!m.dateOfBirth) return false;
-      return m.dateOfBirth.slice(5, 10) === mmdd;
+      if (!m.general?.dob) return false;
+      return m.general?.dob.slice(5, 10) === mmdd;
     });
   }, [members]);
 
@@ -662,16 +662,16 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
                             {birthdaysToday.map(member => (
                               <div key={member.id} className="flex items-center gap-3 p-2.5 rounded-xl bg-white border border-slate-100 group hover:border-pink-200 hover:shadow-sm transition-all">
                                 <div className="w-10 h-10 rounded-full bg-slate-50 border-2 border-white shadow-sm flex items-center justify-center text-slate-400 font-bold overflow-hidden">
-                                  {member.avatar ? (
-                                    <img src={member.avatar} alt={member.name} className="w-full h-full object-cover" />
+                                  {member.general?.avatarUrl ? (
+                                    <img src={member.general?.avatarUrl} alt={member.general?.name} className="w-full h-full object-cover" />
                                   ) : (
                                     <div className="w-full h-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-slate-500">
-                                      {member.name.charAt(0)}
+                                      {member.general?.name.charAt(0)}
                                     </div>
                                   )}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-bold text-slate-900 truncate group-hover:text-pink-600 transition-colors">{member.name}</p>
+                                  <p className="text-sm font-bold text-slate-900 truncate group-hover:text-pink-600 transition-colors">{member.general?.name}</p>
                                   <span className="text-[10px] text-pink-600 font-semibold flex items-center gap-1">
                                     <Gift size={10} /> Happy Birthday!
                                   </span>
@@ -702,7 +702,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
                       {projects.slice(0, 5).map(project => (
                         <div key={project.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                           <div className="flex-1">
-                            <h4 className="font-semibold text-slate-900">{project.name ?? project.title ?? 'Project'}</h4>
+                            <h4 className="font-semibold text-slate-900">{project.name ?? 'Project'}</h4>
                             <p className="text-sm text-slate-500">{project.status} • {project.completion ?? 0}% Complete</p>
                           </div>
                           <Badge variant={project.status === 'Active' ? 'success' : 'neutral'}>
@@ -778,7 +778,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
                           {bankAccounts.map(account => (
                             <div key={account.id} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
                               <div>
-                                <p className="text-sm font-medium text-slate-900">{account.name}</p>
+                                <p className="text-sm font-medium text-slate-900">{account.general?.name}</p>
                                 <p className="text-xs text-slate-500">{account.accountNumber}</p>
                               </div>
                               <div className="text-right">
@@ -1002,9 +1002,9 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
                             }`}>
                             {index + 1}
                           </div>
-                          <img src={member.avatar || undefined} alt={member.name} className="w-8 h-8 rounded-full" />
+                          <img src={member.general?.avatarUrl || undefined} alt={member.general?.name} className="w-8 h-8 rounded-full" />
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-slate-900 truncate">{member.name}</p>
+                            <p className="text-sm font-semibold text-slate-900 truncate">{member.general?.name}</p>
                             <p className="text-xs text-slate-500">{member.points} points</p>
                           </div>
                         </div>
@@ -1245,10 +1245,10 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
                     </div>
                     <div className="flex items-center gap-3">
                       <Badge variant="success" className="bg-green-50 text-green-700 border-green-100 text-xs">
-                        {members.filter(m => m.whatsappGroup).length} In Group
+                        {members.filter(m => m.contact?.whatsappJoined).length} In Group
                       </Badge>
                       <Badge variant="neutral" className="bg-slate-50 text-slate-600 border-slate-200 text-xs">
-                        {members.filter(m => !m.whatsappGroup).length} Not In Group
+                        {members.filter(m => !m.contact?.whatsappJoined).length} Not In Group
                       </Badge>
                     </div>
                   </div>
@@ -1269,12 +1269,12 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
                     .filter(m => {
                       if (!insightSearch) return true;
                       const q = insightSearch.toLowerCase();
-                      return (m.name ?? '').toLowerCase().includes(q) || (m.phone ?? '').toLowerCase().includes(q);
+                      return (m.general?.name ?? '').toLowerCase().includes(q) || (m.contact?.phone ?? '').toLowerCase().includes(q);
                     })
                     .sort((a, b) => {
                       // 1. WhatsApp Group Priority (In Group > Not In Group)
-                      if (a.whatsappGroup && !b.whatsappGroup) return -1;
-                      if (!a.whatsappGroup && b.whatsappGroup) return 1;
+                      if (a.contact?.whatsappJoined && !b.contact?.whatsappJoined) return -1;
+                      if (!a.contact?.whatsappJoined && b.contact?.whatsappJoined) return 1;
 
                       // 2. Paid Status Priority (Paid > Pending > Overdue)
                       const getDuesScore = (status: string) => {
@@ -1289,20 +1289,20 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
                       }
 
                       // 3. Name Alphabetical
-                      return (a.name ?? '').localeCompare(b.name ?? '');
+                      return (a.general?.name ?? '').localeCompare(b.general?.name ?? '');
                     })
                     .map(m => (
                       <div key={m.id} className="grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-4 px-6 py-3 hover:bg-slate-50/80 transition-colors items-center">
                         {/* Name & Phone */}
                         <div className="col-span-6 flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-jci-blue to-blue-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                            {(m.name ?? '?')[0]?.toUpperCase()}
+                            {(m.general?.name ?? '?')[0]?.toUpperCase()}
                           </div>
                           <div className="min-w-0">
-                            <p className="font-semibold text-sm text-slate-900 truncate">{m.name}</p>
+                            <p className="font-semibold text-sm text-slate-900 truncate">{m.general?.name}</p>
                             <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
                               <Phone size={11} className="text-slate-400 flex-shrink-0" />
-                              <span className="truncate">{m.phone || '—'}</span>
+                              <span className="truncate">{m.contact?.phone || '—'}</span>
                             </p>
                           </div>
                         </div>
@@ -1322,7 +1322,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
 
                         {/* WhatsApp Status */}
                         <div className="col-span-3 flex justify-center">
-                          {m.whatsappGroup ? (
+                          {m.contact?.whatsappJoined ? (
                             <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 border border-green-100">
                               <CheckCircle size={12} className="text-green-500" />
                               <span className="text-[11px] font-semibold text-green-700">In Group</span>
@@ -1341,7 +1341,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
                 {/* Footer */}
                 <div className="px-6 py-3 bg-slate-50/50 border-t border-slate-100 flex justify-between items-center text-xs text-slate-500 font-medium">
                   <span>Total: {members.length} members</span>
-                  <span>In Group: {members.filter(m => m.whatsappGroup).length} / {members.length}</span>
+                  <span>In Group: {members.filter(m => m.contact?.whatsappJoined).length} / {members.length}</span>
                 </div>
               </Card>
             </div>
@@ -1380,7 +1380,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
                 <div className="flex flex-wrap gap-2">
                   {HOBBY_OPTIONS.map(hobby => {
                     const isSelected = selectedHobbies.includes(hobby);
-                    const count = members.filter(m => Array.isArray(m.hobbies) && m.hobbies.includes(hobby)).length;
+                    const count = members.filter(m => Array.isArray(m.others?.hobbies) && m.others?.hobbies.includes(hobby)).length;
                     return (
                       <button
                         key={hobby}
@@ -1412,7 +1412,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
                 <div className="divide-y divide-slate-100 max-h-[400px] overflow-y-auto">
                   {(() => {
                     const filteredMembers = members.filter(m =>
-                      Array.isArray(m.hobbies) && selectedHobbies.some(h => m.hobbies!.includes(h))
+                      Array.isArray(m.others?.hobbies) && selectedHobbies.some(h => m.others?.hobbies!.includes(h))
                     );
                     if (filteredMembers.length === 0) {
                       return (
@@ -1423,20 +1423,20 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
                       );
                     }
                     return filteredMembers
-                      .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''))
+                      .sort((a, b) => (a.general?.name ?? '').localeCompare(b.general?.name ?? ''))
                       .map(m => {
-                        const matchingHobbies = selectedHobbies.filter(h => Array.isArray(m.hobbies) && m.hobbies.includes(h));
+                        const matchingHobbies = selectedHobbies.filter(h => Array.isArray(m.others?.hobbies) && m.others?.hobbies.includes(h));
                         return (
                           <div key={m.id} className="px-6 py-3 hover:bg-slate-50/80 transition-colors flex items-center justify-between gap-4">
                             <div className="flex items-center gap-3 min-w-0">
                               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-pink-400 to-pink-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                                {(m.name ?? '?')[0]?.toUpperCase()}
+                                {(m.general?.name ?? '?')[0]?.toUpperCase()}
                               </div>
                               <div className="min-w-0">
-                                <p className="font-semibold text-sm text-slate-900 truncate">{m.name}</p>
+                                <p className="font-semibold text-sm text-slate-900 truncate">{m.general?.name}</p>
                                 <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
                                   <Phone size={11} className="text-slate-400 flex-shrink-0" />
-                                  <span className="truncate">{m.phone || '—'}</span>
+                                  <span className="truncate">{m.contact?.phone || '—'}</span>
                                 </p>
                               </div>
                             </div>
@@ -1462,7 +1462,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
               {/* Footer */}
               {selectedHobbies.length > 0 && (
                 <div className="px-6 py-3 bg-slate-50/50 border-t border-slate-100 flex justify-between items-center text-xs text-slate-500 font-medium">
-                  <span>Matching: {members.filter(m => Array.isArray(m.hobbies) && selectedHobbies.some(h => m.hobbies!.includes(h))).length} members</span>
+                  <span>Matching: {members.filter(m => Array.isArray(m.others?.hobbies) && selectedHobbies.some(h => m.others?.hobbies!.includes(h))).length} members</span>
                   <span>{selectedHobbies.length} hobbies selected</span>
                 </div>
               )}

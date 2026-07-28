@@ -26,12 +26,10 @@ const SAMPLE_TEST_DATA: Record<string, RuleTestData> = {
   member_scenario: {
     member: {
       id: 'member_123',
-      name: 'John Doe',
-      email: 'john.doe@example.com',
+      general: { name: 'John Doe', idNumber: '', dob: '', gender: 'Male', race: 'Chinese', nationality: 'Malaysian' },
+      contact: { email: 'john.doe@example.com', phone: '', address: '', whatsappJoined: false, socials: {}, emergency: { name: '', relationship: '', phone: '' } },
       points: 150,
-      membershipType: 'Official',
-      joinDate: '2023-01-15',
-      // lastLogin: '2024-12-19',
+      jciCareer: { membershipType: 'Official', membershipStatus: 'paid' as import('../../../types').MembershipStatus, joinDate: '2023-01-15', senatorship: { certified: false, boardValidated: false }, isCurrentBoardMember: false, boardHistory: [], points: 150, attendanceRate: 0, badgesCount: 0, projectsCount: 0, trainingsCount: 0, probationTasks: [] },
     },
   },
   event_scenario: {

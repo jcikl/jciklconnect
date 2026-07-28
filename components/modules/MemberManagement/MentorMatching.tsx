@@ -90,10 +90,10 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
     const term = (searchQuery || searchTerm).toLowerCase();
     if (!term) return unassignedMentees;
     return unassignedMentees.filter(m =>
-      (m.name ?? '').toLowerCase().includes(term) ||
-      (m.email ?? '').toLowerCase().includes(term) ||
-      (m.phone ?? '').toLowerCase().includes(term) ||
-      (m.fullName ?? '').toLowerCase().includes(term)
+      (m.general?.name ?? '').toLowerCase().includes(term) ||
+      (m.contact?.email ?? '').toLowerCase().includes(term) ||
+      (m.contact?.phone ?? '').toLowerCase().includes(term) ||
+      (m.general?.fullName ?? '').toLowerCase().includes(term)
     );
   }, [unassignedMentees, searchTerm, searchQuery]);
 
@@ -316,12 +316,12 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                       <div key={mentee.id} className="border border-slate-100 rounded-2xl p-4 hover:shadow-sm hover:border-jci-blue/20 transition-all">
                         <div className="flex items-center gap-3 mb-3">
                           <img
-                            src={mentee.avatar || undefined}
-                            alt={mentee.name}
+                            src={mentee.general?.avatarUrl || undefined}
+                            alt={mentee.general?.name}
                             className="w-10 h-10 rounded-full"
                           />
                           <div>
-                            <h4 className="font-medium text-slate-900">{mentee.name}</h4>
+                            <h4 className="font-medium text-slate-900">{mentee.general?.name}</h4>
                             <p className="text-sm text-slate-500">{mentee.business?.position}</p>
                           </div>
                         </div>
@@ -388,12 +388,12 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <img
-                          src={selectedMentee.avatar || undefined}
-                          alt={selectedMentee.name}
+                          src={selectedMentee.general?.avatarUrl || undefined}
+                          alt={selectedMentee.general?.name}
                           className="w-12 h-12 rounded-full"
                         />
                         <div>
-                          <h3 className="font-medium text-slate-900">Finding matches for {selectedMentee.name}</h3>
+                          <h3 className="font-medium text-slate-900">Finding matches for {selectedMentee.general?.name}</h3>
                           <p className="text-sm text-slate-500">{selectedMentee.business?.position}</p>
                         </div>
                       </div>
@@ -487,13 +487,13 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                             <div className="flex items-start justify-between">
                               <div className="flex items-start gap-4">
                                 <img
-                                  src={match.mentor.avatar || undefined}
-                                  alt={match.mentor.name}
+                                  src={match.mentor.general?.avatarUrl || undefined}
+                                  alt={match.mentor.general?.name}
                                   className="w-12 h-12 rounded-full"
                                 />
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2 mb-1">
-                                    <h5 className="font-medium text-slate-900">{match.mentor.name}</h5>
+                                    <h5 className="font-medium text-slate-900">{match.mentor.general?.name}</h5>
                                     <span className={`px-2 py-1 rounded text-xs font-medium ${getScoreColor(match.matchScore)}`}>
                                       {match.matchScore}% {getScoreLabel(match.matchScore)}
                                     </span>
@@ -567,19 +567,19 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
                   return (
                     <div key={mentee.id} className="flex items-center gap-3 p-3 border border-slate-100 rounded-2xl hover:shadow-sm transition-all">
                       <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <img src={mentor?.avatar || undefined} className="w-8 h-8 rounded-full bg-jci-blue/20" alt="" />
+                        <img src={mentor?.general?.avatarUrl || undefined} className="w-8 h-8 rounded-full bg-jci-blue/20" alt="" />
                         <div className="min-w-0">
                           <p className="text-xs font-black text-slate-500 uppercase tracking-wider">Mentor</p>
-                          <p className="text-sm font-bold text-slate-800 truncate">{mentor?.name || 'Unknown'}</p>
+                          <p className="text-sm font-bold text-slate-800 truncate">{mentor?.general?.name || 'Unknown'}</p>
                         </div>
                       </div>
                       <Heart size={14} className="text-jci-blue/40 shrink-0" />
                       <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
                         <div className="min-w-0 text-right">
                           <p className="text-xs font-black text-slate-500 uppercase tracking-wider">Mentee</p>
-                          <p className="text-sm font-bold text-slate-800 truncate">{mentee.name}</p>
+                          <p className="text-sm font-bold text-slate-800 truncate">{mentee.general?.name}</p>
                         </div>
-                        <img src={mentee.avatar || undefined} className="w-8 h-8 rounded-full bg-slate-200 shrink-0" alt="" />
+                        <img src={mentee.general?.avatarUrl || undefined} className="w-8 h-8 rounded-full bg-slate-200 shrink-0" alt="" />
                       </div>
                     </div>
                   );

@@ -29,7 +29,7 @@ export function isActiveBoardRecordForYear(record: BoardMember, year: number): b
 /**
  * Whether the member is an active board member this calendar year.
  *
- * Source of truth: `member.isCurrentBoardMember` flag on the member doc.
+ * Source of truth: `member.jciCareer?.isCurrentBoardMember` flag on the member doc.
  * This flag is kept in sync by `boardManagementService.syncMemberDocumentsForTerm`
  * whenever a board roster is saved. If you find members where this flag is stale,
  * run `BoardManagementService.selfHealBoardMembership()` to repair legacy data.
@@ -40,7 +40,7 @@ export function isActiveBoardRecordForYear(record: BoardMember, year: number): b
  */
 export function isMemberCurrentBoard(member: Member | null | undefined): boolean {
   if (!member) return false;
-  return member.isCurrentBoardMember === true;
+  return member.jciCareer?.isCurrentBoardMember === true;
 }
 
 /** Whether any boardMembers record is active for the current calendar year. */

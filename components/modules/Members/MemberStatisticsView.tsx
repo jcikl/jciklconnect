@@ -41,7 +41,7 @@ export const MemberStatisticsView: React.FC<{
     let other = 0;
 
     members.forEach(m => {
-      const dobStr = m.general?.dob || m.dob || m.dateOfBirth;
+      const dobStr = m.general?.dob || m.general?.dob || m.general?.dob;
       if (!dobStr) {
         other++;
         return;
@@ -79,7 +79,7 @@ export const MemberStatisticsView: React.FC<{
     let unknown = 0;
 
     members.forEach(m => {
-      const g = (m.general?.gender || m.gender || '').toLowerCase().trim();
+      const g = (m.general?.gender || m.general?.gender || '').toLowerCase().trim();
       if (g === 'male') {
         male++;
       } else if (g === 'female') {
@@ -216,7 +216,7 @@ export const MemberStatisticsView: React.FC<{
             colorOffset={0}
             onSegmentClick={name => {
               const filtered = members.filter(m => {
-                const dobStr = m.general?.dob || m.dob || m.dateOfBirth;
+                const dobStr = m.general?.dob || m.general?.dob || m.general?.dob;
                 const age = calculateAge(dobStr);
                 if (name === 'Other / Unknown') return age === null || age < 18 || age > 40;
                 if (name === '18 - 25') return age !== null && age >= 18 && age <= 25;
@@ -234,7 +234,7 @@ export const MemberStatisticsView: React.FC<{
             colorOffset={2}
             onSegmentClick={name => {
               const filtered = members.filter(m => {
-                const g = (m.general?.gender || m.gender || '').toLowerCase().trim();
+                const g = (m.general?.gender || m.general?.gender || '').toLowerCase().trim();
                 if (name === 'Male') return g === 'male';
                 if (name === 'Female') return g === 'female';
                 return g !== 'male' && g !== 'female';
@@ -248,7 +248,7 @@ export const MemberStatisticsView: React.FC<{
             const types = ['Official', 'Probation', 'Guest', 'Senator', 'Honorary'];
             const labels: Record<string, string> = { Official: 'Official Member', Probation: 'Probation', Guest: 'Guest', Senator: 'Senator', Honorary: 'Honorary' };
             const data = types
-              .map(key => ({ name: labels[key], value: members.filter(m => m.membershipType === key || m.role?.toUpperCase() === key.toUpperCase()).length }))
+              .map(key => ({ name: labels[key], value: members.filter(m => m.jciCareer?.membershipType === key || m.role?.toUpperCase() === key.toUpperCase()).length }))
               .filter(d => d.value > 0);
             return (
               <DonutChart
@@ -257,7 +257,7 @@ export const MemberStatisticsView: React.FC<{
                 onSegmentClick={name => {
                   const keyMap: Record<string, string> = { 'Official Member': 'Official', 'Probation': 'Probation', 'Guest': 'Guest', 'Senator': 'Senator', 'Honorary': 'Honorary' };
                   const key = keyMap[name] || name;
-                  const filtered = members.filter(m => m.membershipType === key || m.role?.toUpperCase() === key.toUpperCase());
+                  const filtered = members.filter(m => m.jciCareer?.membershipType === key || m.role?.toUpperCase() === key.toUpperCase());
                   setDrawerSegment({ label: `Membership: ${name}`, members: filtered });
                 }}
               />
@@ -266,10 +266,10 @@ export const MemberStatisticsView: React.FC<{
         </Card>
         <Card title="Level of Management">
           {(() => {
-            const activeMembers = members.filter(m => m.membershipType !== 'Guest');
+            const activeMembers = members.filter(m => m.jciCareer?.membershipType !== 'Guest');
             const counts: Record<string, number> = {};
             activeMembers.forEach(m => {
-              const lvl = (m.business?.levelOfManagement ?? m.levelOfManagement)?.trim() || 'Not Specified';
+              const lvl = (m.business?.levelOfManagement ?? m.business?.levelOfManagement)?.trim() || 'Not Specified';
               counts[lvl] = (counts[lvl] || 0) + 1;
             });
             const knownOrder = ['Top Management', 'Senior Management', 'Middle Management', 'Junior Management', 'Non-Management'];
@@ -283,7 +283,7 @@ export const MemberStatisticsView: React.FC<{
                 data={data}
                 colorOffset={1}
                 onSegmentClick={name => {
-                  const filtered = members.filter(m => m.membershipType !== 'Guest' && (((m.business?.levelOfManagement ?? m.levelOfManagement)?.trim() || 'Not Specified') === name));
+                  const filtered = members.filter(m => m.jciCareer?.membershipType !== 'Guest' && (((m.business?.levelOfManagement ?? m.business?.levelOfManagement)?.trim() || 'Not Specified') === name));
                   setDrawerSegment({ label: `Management: ${name}`, members: filtered });
                 }}
               />
@@ -314,21 +314,21 @@ export const MemberStatisticsView: React.FC<{
                 <p className="text-slate-400 text-sm text-center py-8">No members in this segment</p>
               ) : (
                 drawerSegment.members
-                  .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                  .sort((a, b) => (a.general?.name || '').localeCompare(b.general?.name || ''))
                   .map(m => (
                     <div key={m.id} className="flex items-center gap-3 py-2 border-b border-slate-50 last:border-0">
-                      {m.avatar ? (
-                        <img src={m.avatar} alt={m.name} className="w-9 h-9 rounded-full object-cover shrink-0" />
+                      {m.general?.avatarUrl ? (
+                        <img src={m.general?.avatarUrl} alt={m.general?.name} className="w-9 h-9 rounded-full object-cover shrink-0" />
                       ) : (
                         <div className="w-9 h-9 rounded-full bg-jci-blue/10 flex items-center justify-center shrink-0 text-jci-blue font-bold text-sm">
-                          {(m.name || m.fullName || '?')[0].toUpperCase()}
+                          {(m.general?.name || m.general?.fullName || '?')[0].toUpperCase()}
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-slate-800 text-sm truncate">{m.name || m.fullName}</p>
-                        <p className="text-xs text-slate-400 truncate">{m.email || m.contact?.email || m.phone || m.contact?.phone || ''}</p>
+                        <p className="font-semibold text-slate-800 text-sm truncate">{m.general?.name || m.general?.fullName}</p>
+                        <p className="text-xs text-slate-400 truncate">{m.contact?.email || m.contact?.email || m.contact?.phone || m.contact?.phone || ''}</p>
                       </div>
-                      <span className="text-xs text-slate-400 shrink-0">{m.membershipType || m.role || ''}</span>
+                      <span className="text-xs text-slate-400 shrink-0">{m.jciCareer?.membershipType || m.role || ''}</span>
                     </div>
                   ))
               )}

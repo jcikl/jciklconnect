@@ -279,16 +279,16 @@ export function useFinanceData(searchQuery?: string) {
       if (stale()) return [];
       const mappedMembers = list.map(m => ({
         id: m.id,
-        name: m.fullName && m.name
-          ? `${m.fullName} (${m.name})`
-          : (m.fullName || m.name || m.email || m.id),
-        fullName: m.fullName,
-        membershipType: m.membershipType,
-        tshirtSize: m.tshirtSize,
-        jacketSize: m.jacketSize,
-        introducer: m.introducer,
-        joinDate: m.joinDate,
-        membership: m.membership,
+        name: m.general?.fullName && m.general?.name
+          ? `${m.general?.fullName} (${m.general?.name})`
+          : (m.general?.fullName || m.general?.name || m.contact?.email || m.id),
+        fullName: m.general?.fullName,
+        membershipType: m.jciCareer?.membershipType,
+        tshirtSize: m.others?.tshirtSize,
+        jacketSize: m.others?.jacketSize,
+        introducer: m.jciCareer?.introducer,
+        joinDate: m.jciCareer?.joinDate,
+        membership: m.jciCareer?.membershipDuesHistory,
       }));
       if (!stale()) setMembers(mappedMembers);
       return mappedMembers;
@@ -807,7 +807,7 @@ export function useFinanceData(searchQuery?: string) {
       const year = pDate ? new Date(pDate).getFullYear() : currentYear;
 
       if (!grouped[year]) grouped[year] = [];
-      grouped[year].push(p.name || p.id);
+      grouped[year].push(p.name || p.title || p.id);
     });
 
     const sortedYears = Object.keys(grouped)
@@ -976,7 +976,7 @@ export function useFinanceData(searchQuery?: string) {
             (tx.projectId || '').toLowerCase(),
             (tx.memberId || '').toLowerCase(),
             (accounts.find(a => a.id === tx.bankAccountId)?.name || '').toLowerCase(),
-            (projects.find(p => p.id === tx.projectId)?.name || '').toLowerCase()
+            (projects.find(p => p.id === tx.projectId)?.name || projects.find(p => p.id === tx.projectId)?.title || '').toLowerCase()
           ];
           if (parentFields.some(field => field.includes(term))) return true;
           return transactionSplits[tx.id]?.some(s =>
@@ -986,7 +986,7 @@ export function useFinanceData(searchQuery?: string) {
             String(s.amount).includes(term) ||
             (s.projectId || '').toLowerCase().includes(term) ||
             (s.memberId || '').toLowerCase().includes(term) ||
-            (projects.find(p => p.id === s.projectId)?.name || '').toLowerCase().includes(term)
+            (projects.find(p => p.id === s.projectId)?.name || projects.find(p => p.id === s.projectId)?.title || '').toLowerCase().includes(term)
           );
         });
       }

@@ -61,7 +61,7 @@ export class MemberStatsService {
       // Filter members by year if specified
       const membersInPeriod = year
         ? allMembers.filter(m => {
-            const joinDate = new Date(m.joinDate);
+            const joinDate = new Date(m.jciCareer?.joinDate);
             return joinDate.getFullYear() <= year;
           })
         : allMembers;
@@ -70,12 +70,12 @@ export class MemberStatsService {
       const totalMembers = membersInPeriod.length;
       const currentYearStr = String(currentYear);
       const activeMembers = membersInPeriod.filter(
-        m => m.membership?.[currentYearStr]?.status === 'paid'
+        m => m.jciCareer?.membershipDuesHistory?.[currentYearStr]?.status === 'paid'
       ).length;
 
       // New members
       const newMembersThisMonth = allMembers.filter(m => {
-        const joinDate = new Date(m.joinDate);
+        const joinDate = new Date(m.jciCareer?.joinDate);
         return (
           joinDate.getFullYear() === currentYear &&
           joinDate.getMonth() === currentMonth
@@ -83,7 +83,7 @@ export class MemberStatsService {
       }).length;
 
       const newMembersThisYear = allMembers.filter(m => {
-        const joinDate = new Date(m.joinDate);
+        const joinDate = new Date(m.jciCareer?.joinDate);
         return joinDate.getFullYear() === currentYear;
       }).length;
 
@@ -110,8 +110,8 @@ export class MemberStatsService {
       const averagePoints = totalMembers > 0 ? totalPoints / totalMembers : 0;
 
       const totalAttendance = membersInPeriod.reduce((sum, m) => {
-        const checkins = m.attendanceCheckins ?? 0;
-        const months = Math.max(m.attendanceMonths ?? 1, 1);
+        const checkins = m.jciCareer?.attendanceCheckins ?? 0;
+        const months = Math.max(m.jciCareer?.attendanceMonths ?? 1, 1);
         return sum + (checkins / months) * 100;
       }, 0);
       const averageAttendanceRate = totalMembers > 0 ? totalAttendance / totalMembers : 0;
@@ -129,7 +129,7 @@ export class MemberStatsService {
         const date = new Date(currentYear, currentMonth - i, 1);
         const monthStr = date.toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
         const count = allMembers.filter(m => {
-          const joinDate = new Date(m.joinDate);
+          const joinDate = new Date(m.jciCareer?.joinDate);
           return (
             joinDate.getFullYear() === date.getFullYear() &&
             joinDate.getMonth() === date.getMonth()
@@ -141,7 +141,7 @@ export class MemberStatsService {
       // Engagement metrics
       // Fix 11: prefer computed attendanceCheckins/attendanceMonths fields over legacy attendanceRate
       const getEffectiveAttendanceRate = (m: any): number => {
-        const rate = ((m.attendanceCheckins ?? 0) / Math.max(m.attendanceMonths ?? 1, 1)) * 100;
+        const rate = ((m.jciCareer?.attendanceCheckins ?? 0) / Math.max(m.jciCareer?.attendanceMonths ?? 1, 1)) * 100;
         return rate > 0 ? rate : (m.attendanceRate ?? 0);
       };
       const engagementMetrics = {
@@ -159,7 +159,7 @@ export class MemberStatsService {
       const topPerformers = membersInPeriod
         .map(m => ({
           memberId: m.id,
-          name: m.name,
+          name: m.general?.name,
           points: m.points,
           attendanceRate: getEffectiveAttendanceRate(m),
         }))

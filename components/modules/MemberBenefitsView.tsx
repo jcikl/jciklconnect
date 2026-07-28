@@ -325,7 +325,7 @@ const UsageHistoryModal: React.FC<UsageHistoryModalProps> = ({ isOpen, onClose, 
               <Card key={usage.id} className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-semibold text-slate-900">{m?.name || 'Unknown Member'}</p>
+                    <p className="font-semibold text-slate-900">{m?.general?.name || 'Unknown Member'}</p>
                     <p className="text-sm text-slate-500">{formatDate(toDate(usage.usedAt).toISOString())}</p>
                     {usage.details && <p className="text-sm text-slate-600 mt-1">{usage.details}</p>}
                   </div>

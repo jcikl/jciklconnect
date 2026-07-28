@@ -303,7 +303,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   const [showRegForm, setShowRegForm] = useState(false);
   const [isRegSubmitting, setIsRegSubmitting] = useState(false);
   const [regForm, setRegForm] = useState<RegistrationFormData>({
-    dietary: ((member?.general?.dietaryPreference ?? member?.dietaryPreference) as 'normal' | 'vegetarian' | 'halal') ?? 'normal',
+    dietary: ((member?.general?.dietaryPreference ?? member?.general?.dietaryPreference) as 'normal' | 'vegetarian' | 'halal') ?? 'normal',
     emergencyContactName: '',
     emergencyContactPhone: '',
     tshirtSize: '',
@@ -338,7 +338,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   }, []);
 
   const currentYear = new Date().getFullYear();
-  const getBoardPos = (m: Member) => boardPositions.get(m.id) ?? m.currentBoardPosition ?? m.jciCareer?.currentBoardPosition ?? '';
+  const getBoardPos = (m: Member) => boardPositions.get(m.id) ?? m.jciCareer?.currentBoardPosition ?? m.jciCareer?.currentBoardPosition ?? '';
   const shortPos = (pos: string): string => {
     const p = pos.toLowerCase();
     if (p.includes('immediate past')) return 'IPP';
@@ -408,7 +408,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
           memberId: `guest-${d.id}`,
           status: (data.status === 'Cancelled' ? 'cancelled' : 'registered') as any,
           createdAt: data.registeredAt?.toDate?.()?.toISOString?.() ?? new Date().toISOString(),
-          memberName: data.name ?? null,
+          memberName: data.general?.name ?? null,
         } as EventRegistration;
       });
       // Supplement with synthetic entries for members registered before EventRegistration docs existed
@@ -468,8 +468,8 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     // Pre-fill registration form from member profile
     setRegForm({
       dietary: (member.general?.dietaryPreference as 'normal' | 'vegetarian' | 'halal') ?? 'normal',
-      emergencyContactName: member.emergencyContactName ?? member.emergencyContact ?? '',
-      emergencyContactPhone: member.emergencyContactPhone ?? '',
+      emergencyContactName: member.contact?.emergency?.name ?? member.contact?.emergency?.name ?? '',
+      emergencyContactPhone: member.contact?.emergency?.phone ?? '',
       tshirtSize: member.tshirtSize ?? '',
     });
   }, [event.id, member?.id]);
@@ -495,7 +495,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     setLocalRegistered(false);
     setUpdatingRegId('self');
     try {
-      await onCancelRegistration(member.id, member.id, (member.general?.name ?? member.name) ?? member.id, 'self');
+      await onCancelRegistration(member.id, member.id, (member.general?.name ?? member.general?.name) ?? member.id, 'self');
       setMyRegistration((prev) => prev ? { ...prev, status: 'cancelled', cancelledByRole: 'self' } : { id: '', eventId: event.id, memberId: member.id, status: 'cancelled', cancelledByRole: 'self', createdAt: new Date().toISOString() });
       showToast('Registration cancelled', 'success');
     } catch {
@@ -511,11 +511,11 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     setUpdatingRegId(reg.id);
     const role: 'admin' | 'board' | 'committee' = isAdmin ? 'admin' : isBoard ? 'board' : 'committee';
     try {
-      await onCancelRegistration(reg.memberId, member.id, (member.general?.name ?? member.name) ?? member.id, role);
+      await onCancelRegistration(reg.memberId, member.id, (member.general?.name ?? member.general?.name) ?? member.id, role);
       setParticipations((prev) =>
         prev.map((r) =>
           r.id === reg.id
-            ? { ...r, status: 'cancelled' as const, cancelledByRole: role, cancelledByName: (member.general?.name ?? member.name) ?? member.id, cancelledAt: new Date().toISOString() }
+            ? { ...r, status: 'cancelled' as const, cancelledByRole: role, cancelledByName: (member.general?.name ?? member.general?.name) ?? member.id, cancelledAt: new Date().toISOString() }
             : r
         )
       );
@@ -538,19 +538,19 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     try {
       const added = members.find(m => m.id === addMemberId);
       await EventsService.registerForEvent(event.id, addMemberId, {
-        memberName: added?.name,
+        memberName: added?.general?.name,
         registeredBy: member?.id,
-        registeredByName: member?.name ?? member?.id,
+        registeredByName: member?.general?.name ?? member?.id,
         dietary: addForm.dietary,
         tshirtSize: addForm.tshirtSize || undefined,
       });
       const profileUpdate: Record<string, unknown> = { dietaryPreference: addForm.dietary, 'general.dietaryPreference': addForm.dietary };
-      if (addForm.tshirtSize) profileUpdate.tshirtSize = addForm.tshirtSize;
+      if (addForm.tshirtSize) profileUpdate['others.tshirtSize'] = addForm.tshirtSize;
       MembersService.updateMember(addMemberId, profileUpdate as Parameters<typeof MembersService.updateMember>[1]).catch(() => {
         showToast('Member added, but failed to update their dietary/t-shirt preference — please update manually.', 'warning');
       });
       await loadParticipations();
-      showToast(`${added?.name ?? 'Member'} added`, 'success');
+      showToast(`${added?.general?.name ?? 'Member'} added`, 'success');
       setAddMemberId('');
       setAddForm({ dietary: 'normal', tshirtSize: '' });
       setShowAddParticipant(false);
@@ -572,7 +572,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     setUpdatingRegId(reg.id);
     try {
       const now = new Date().toISOString();
-      const actorName = member?.name ?? member?.id ?? 'Admin';
+      const actorName = member?.general?.name ?? member?.id ?? 'Admin';
       const today = now.split('T')[0];
 
       // Create income transaction (Pending) — only for paid events (amount > 0).
@@ -656,7 +656,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     setUpdatingRegId(reg.id);
     try {
       const now = new Date().toISOString();
-      const actorName = member?.name ?? member?.id ?? 'Admin';
+      const actorName = member?.general?.name ?? member?.id ?? 'Admin';
       await EventRegistrationService.updateStatus(reg.id, 'checked_in', { checkedInAt: now, checkedInByName: actorName });
       EventsService.invalidateEventsCache();
       setParticipations((prev) => prev.map((r) => (r.id === reg.id ? { ...r, status: 'checked_in' as const, checkedInAt: now, checkedInByName: actorName } : r)));
@@ -953,7 +953,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                             const posDiff = posRank(a) - posRank(b);
                             if (posDiff !== 0) return posDiff;
                           }
-                          return (a.name ?? '').localeCompare(b.name ?? '');
+                          return (a.general?.name ?? '').localeCompare(b.general?.name ?? '');
                         }).map(m => {
                           const reg = participations.find(r => r.memberId === m.id && r.status !== 'cancelled');
                           const regStatus = reg?.status;
@@ -961,11 +961,11 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                             <div key={m.id} className="px-3 py-2.5 bg-white">
                               <div className="flex items-start gap-2.5">
                                 {memberAvatar(m) ? (
-                                  <img src={memberAvatar(m)} alt={m.name ?? ''} className="w-7 h-7 rounded-full object-cover shrink-0 mt-0.5"
+                                  <img src={memberAvatar(m)} alt={m.general?.name ?? ''} className="w-7 h-7 rounded-full object-cover shrink-0 mt-0.5"
                                     onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.style.display = 'none'; }} />
                                 ) : (
                                   <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-bold ${initialsColor(m.id)}`}>
-                                    {nameInitials(m.name ?? '')}
+                                    {nameInitials(m.general?.name ?? '')}
                                   </div>
                                 )}
                                 <div className="flex-1 min-w-0">
@@ -973,7 +973,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                                     {getBoardPos(m) && (
                                       <span className="shrink-0 inline-flex items-center justify-center text-[8px] font-semibold w-10 h-5 rounded-full bg-jci-blue/10 text-jci-blue">{shortPos(getBoardPos(m))}</span>
                                     )}
-                                    <p className="text-sm font-semibold truncate text-slate-900">{m.name}</p>
+                                    <p className="text-sm font-semibold truncate text-slate-900">{m.general?.name}</p>
                                     {(reg?.dietary === 'vegetarian' || (!reg?.dietary && reg?.isVegetarian)) && <Leaf size={11} className="shrink-0 text-emerald-500" />}
                                     {reg?.dietary === 'halal' && <span className="shrink-0 text-[10px]" title="Halal">☪️</span>}
                                     {reg?.tshirtSize && <span className="shrink-0 text-[10px] font-medium text-slate-400">{reg.tshirtSize}</span>}
@@ -1002,10 +1002,10 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                                         <Button size="sm" variant="outline" className="h-5 px-1" title="Register" disabled={updatingRegId !== null} onClick={async () => {
                                           setUpdatingRegId(m.id);
                                           try {
-                                            await EventsService.registerForEvent(event.id, m.id, { memberName: m.name, registeredBy: member?.id, registeredByName: member?.name ?? member?.id });
-                                            const newReg: EventRegistration = { id: `manual-${Date.now()}`, eventId: event.id, memberId: m.id, status: 'registered', createdAt: new Date().toISOString(), loId: null, memberName: m.name, registeredBy: member?.id, registeredByName: member?.name ?? member?.id };
+                                            await EventsService.registerForEvent(event.id, m.id, { memberName: m.general?.name, registeredBy: member?.id, registeredByName: member?.general?.name ?? member?.id });
+                                            const newReg: EventRegistration = { id: `manual-${Date.now()}`, eventId: event.id, memberId: m.id, status: 'registered', createdAt: new Date().toISOString(), loId: null, memberName: m.general?.name, registeredBy: member?.id, registeredByName: member?.general?.name ?? member?.id };
                                             setParticipations(prev => [newReg, ...prev]);
-                                            showToast(`${m.name} added`, 'success');
+                                            showToast(`${m.general?.name} added`, 'success');
                                           } catch (err) { showToast(err instanceof Error ? err.message : 'Failed', 'error'); } finally { setUpdatingRegId(null); }
                                         }}><Plus size={14} /></Button>
                                       )}
@@ -1046,8 +1046,8 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                       if (cancelledDiff !== 0) return cancelledDiff;
                       const roleDiff = roleOrder(a) - roleOrder(b);
                       if (roleDiff !== 0) return roleDiff;
-                      const nameA = members.find(x => x.id === a.memberId)?.name ?? a.memberName ?? '';
-                      const nameB = members.find(x => x.id === b.memberId)?.name ?? b.memberName ?? '';
+                      const nameA = members.find(x => x.id === a.memberId)?.general?.name ?? a.memberName ?? '';
+                      const nameB = members.find(x => x.id === b.memberId)?.general?.name ?? b.memberName ?? '';
                       return nameA.localeCompare(nameB);
                     });
                     return (
@@ -1084,7 +1084,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                               const m = members.find(x => x.id === id);
                               if (m) setAddForm({
                                 dietary: (m.general?.dietaryPreference as 'normal' | 'vegetarian' | 'halal') ?? 'normal',
-                                tshirtSize: m.tshirtSize ?? '',
+                                tshirtSize: m.others?.tshirtSize ?? '',
                               });
                             }}
                             placeholder="Search members..."
@@ -1157,10 +1157,10 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                                   className={`relative w-7 h-7 rounded-full shrink-0 mt-0.5 overflow-hidden ${hasDetails ? 'cursor-pointer' : 'cursor-default'}`}
                                 >
                                   {mem && memberAvatar(mem) ? (
-                                    <img src={memberAvatar(mem)} alt={mem.name ?? ''} className="w-full h-full object-cover" />
+                                    <img src={memberAvatar(mem)} alt={mem.general?.name ?? ''} className="w-full h-full object-cover" />
                                   ) : (
                                     <div className={`w-full h-full flex items-center justify-center text-[10px] font-bold ${initialsColor(mem?.id ?? r.memberId ?? '')}`}>
-                                      {nameInitials(mem?.name ?? r.memberName ?? '?')}
+                                      {nameInitials(mem?.general?.name ?? r.memberName ?? '?')}
                                     </div>
                                   )}
                                   {hasDetails && (
@@ -1178,7 +1178,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                                       roleLabel === 'Public' ? 'bg-orange-100 text-orange-700' :
                                       'bg-slate-100 text-slate-400'
                                     }`}>{roleLabel}</span>
-                                    <p className={`text-sm font-semibold truncate ${isCancelled ? 'text-slate-400 line-through' : 'text-slate-900'}`}>{mem?.name ?? r.memberName ?? 'Unknown'}</p>
+                                    <p className={`text-sm font-semibold truncate ${isCancelled ? 'text-slate-400 line-through' : 'text-slate-900'}`}>{mem?.general?.name ?? r.memberName ?? 'Unknown'}</p>
                                     {(r.dietary === 'vegetarian' || (!r.dietary && r.isVegetarian)) && <Leaf size={11} className="shrink-0 text-emerald-500" />}
                                     {r.dietary === 'halal' && <span className="shrink-0 text-[10px]" title="Halal">☪️</span>}
                                     {r.tshirtSize && <span className="shrink-0 text-[10px] font-medium text-slate-400">{r.tshirtSize}</span>}
@@ -1197,9 +1197,9 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                                       {isCancelled && isCommitteeMember && (
                                         <Button size="sm" variant="outline" className="h-5 px-1" title="Re-register" disabled={updatingRegId !== null} onClick={async () => {
                                           try {
-                                            await EventsService.registerForEvent(event.id, r.memberId, { memberName: mem?.name ?? r.memberName, registeredBy: member?.id, registeredByName: member?.name ?? member?.id });
-                                            setParticipations(prev => prev.map(x => x.id === r.id ? { ...x, status: 'registered' as const, cancelledAt: null, cancelledBy: null, cancelledByName: null, cancelledByRole: null, registeredBy: member?.id, registeredByName: member?.name ?? member?.id } : x));
-                                            showToast(`${mem?.name ?? r.memberName ?? 'Member'} re-registered`, 'success');
+                                            await EventsService.registerForEvent(event.id, r.memberId, { memberName: mem?.general?.name ?? r.memberName, registeredBy: member?.id, registeredByName: member?.general?.name ?? member?.id });
+                                            setParticipations(prev => prev.map(x => x.id === r.id ? { ...x, status: 'registered' as const, cancelledAt: null, cancelledBy: null, cancelledByName: null, cancelledByRole: null, registeredBy: member?.id, registeredByName: member?.general?.name ?? member?.id } : x));
+                                            showToast(`${mem?.general?.name ?? r.memberName ?? 'Member'} re-registered`, 'success');
                                           } catch (err) { showToast(err instanceof Error ? err.message : 'Failed', 'error'); }
                                         }}><RefreshCw size={12} /></Button>
                                       )}
