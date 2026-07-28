@@ -2,8 +2,8 @@ import * as React from 'react';
 import { ArrowUpRight } from 'lucide-react';
 import { Card, Badge } from '../../ui/Common';
 import { MultiSelectDropdown } from '../../ui/MultiSelectDropdown';
-import type { Member, SpecialOffer, SpecialOfferType } from '../../../types';
-import { SPECIAL_OFFER_TYPE_LABELS, getSpecialOfferSummary, hasSpecialOffer } from '../../../types/member';
+import type { Member, SpecialOffer } from '../../../types';
+import { getSpecialOfferSummary, hasSpecialOffer } from '../../../types/member';
 import { INDUSTRY_OPTIONS, IDEAL_REFERRAL_OPTIONS, BUSINESS_CATEGORIES_OPTIONS } from '../../../config/constants';
 
 interface MemberDetailProfessionalTabProps {
@@ -158,20 +158,11 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                   const raw = inlineValues.business?.specialOffer;
                   const structured: SpecialOffer = typeof raw === 'object' && raw !== null
                     ? raw as SpecialOffer
-                    : { type: 'percentage_discount' as SpecialOfferType, description: typeof raw === 'string' ? raw : '', terms: '', expiryDate: '' };
+                    : { type: 'percentage_discount', description: typeof raw === 'string' ? raw : '', terms: '', expiryDate: '' } as SpecialOffer;
                   const update = (patch: Partial<SpecialOffer>) =>
                     setInlineValues({ ...inlineValues, specialOffer: { ...structured, ...patch } });
                   return (
                     <>
-                      <select
-                        value={structured.type}
-                        onChange={e => update({ type: e.target.value as SpecialOfferType })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
-                      >
-                        {(Object.entries(SPECIAL_OFFER_TYPE_LABELS) as [SpecialOfferType, string][]).map(([v, label]) => (
-                          <option key={v} value={v}>{label}</option>
-                        ))}
-                      </select>
                       <input
                         type="text"
                         placeholder="e.g. 10% off first order for JCI KL members"
@@ -319,9 +310,6 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                     return (
                       <div className="space-y-1.5">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="inline-block text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
-                            {SPECIAL_OFFER_TYPE_LABELS[offer.type]}
-                          </span>
                           {offer.status && (
                             <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${offer.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
                               {offer.status}
