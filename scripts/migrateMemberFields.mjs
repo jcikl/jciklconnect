@@ -6,6 +6,15 @@
  * Usage:
  *   node scripts/migrateMemberFields.mjs            # live run
  *   node scripts/migrateMemberFields.mjs --dry-run  # preview only
+ *
+ * Each MIGRATIONS entry:
+ *   flatField  — top-level flat key that may exist on old documents
+ *   nestedPath — Firestore dot-notation write path (e.g. "contact.socials.linkedin")
+ *   existsFn   — returns true when the destination is already populated (skip)
+ *   deleteFlat — whether to delete the flat field after copying (default true)
+ *                Set to false for fields kept as intentional denorm index keys
+ *                (e.g. companyName, industry) or fields still used in WHERE queries
+ *                without a nested alternative.
  */
 
 import { initializeApp, cert } from 'firebase-admin/app';
@@ -29,46 +38,118 @@ const DRY_RUN = process.argv.includes('--dry-run');
 // ---------------------------------------------------------------------------
 // Migration map
 // ---------------------------------------------------------------------------
-// Each entry: { flatField, nestedPath, subObject, nestedField, conditionFn? }
-// conditionFn(doc) → true means "only migrate if this condition is met"
 
 const MIGRATIONS = [
-  // general.*
-  { flatField: 'ethnicity',         subObject: 'general',    nestedField: 'ethnicity' },
-  { flatField: 'dietaryPreference', subObject: 'general',    nestedField: 'dietaryPreference' },
-  {
-    flatField: 'birthPlace',
-    subObject: 'general',
-    nestedField: 'birthPlace',
-    // Only migrate birthPlace when general sub-object exists AND general.birthPlace is absent
-    conditionFn: (data) =>
-      data.general != null && data.general.birthPlace == null,
-  },
+  // ── general.* ─────────────────────────────────────────────────────────────
+  // Core identity fields: copy to nested, keep flat (still used as query index by
+  // some WHERE clauses and as backward-compat aliases — Phase 3 will stop the
+  // double-write; for now we just ensure nested is populated).
+  { flatField: 'name',             nestedPath: 'general.name',             existsFn: (d) => d.general?.name != null,             deleteFlat: false },
+  { flatField: 'fullName',         nestedPath: 'general.fullName',         existsFn: (d) => d.general?.fullName != null,         deleteFlat: false },
+  { flatField: 'chineseName',      nestedPath: 'general.chineseName',      existsFn: (d) => d.general?.chineseName != null,      deleteFlat: false },
+  { flatField: 'chiName',          nestedPath: 'general.chineseName',      existsFn: (d) => d.general?.chineseName != null,      deleteFlat: false },
+  { flatField: 'idNumber',         nestedPath: 'general.idNumber',         existsFn: (d) => d.general?.idNumber != null,         deleteFlat: false },
+  { flatField: 'nationalId',       nestedPath: 'general.idNumber',         existsFn: (d) => d.general?.idNumber != null,         deleteFlat: false },
+  { flatField: 'dob',              nestedPath: 'general.dob',              existsFn: (d) => d.general?.dob != null,              deleteFlat: false },
+  { flatField: 'dateOfBirth',      nestedPath: 'general.dob',              existsFn: (d) => d.general?.dob != null,              deleteFlat: false },
+  { flatField: 'gender',           nestedPath: 'general.gender',           existsFn: (d) => d.general?.gender != null,           deleteFlat: false },
+  { flatField: 'race',             nestedPath: 'general.race',             existsFn: (d) => d.general?.race != null,             deleteFlat: false },
+  { flatField: 'nationality',      nestedPath: 'general.nationality',      existsFn: (d) => d.general?.nationality != null,      deleteFlat: false },
+  { flatField: 'avatarUrl',        nestedPath: 'general.avatarUrl',        existsFn: (d) => d.general?.avatarUrl != null,        deleteFlat: false },
+  { flatField: 'avatar',           nestedPath: 'general.avatarUrl',        existsFn: (d) => d.general?.avatarUrl != null,        deleteFlat: false },
+  // Secondary general fields — safe to delete after copying
+  { flatField: 'ethnicity',        nestedPath: 'general.ethnicity',        existsFn: (d) => d.general?.ethnicity != null,        deleteFlat: true  },
+  { flatField: 'dietaryPreference',nestedPath: 'general.dietaryPreference',existsFn: (d) => d.general?.dietaryPreference != null,deleteFlat: true  },
+  { flatField: 'birthPlace',       nestedPath: 'general.birthPlace',       existsFn: (d) => d.general?.birthPlace != null,       deleteFlat: true  },
 
-  // business.*
-  // business.title → business.position (nested field rename)
-  // profession → business.position (flat field migration, only when business.position is absent)
+  // ── contact.* ─────────────────────────────────────────────────────────────
+  { flatField: 'email',            nestedPath: 'contact.email',            existsFn: (d) => d.contact?.email != null,            deleteFlat: false },
+  { flatField: 'phone',            nestedPath: 'contact.phone',            existsFn: (d) => d.contact?.phone != null,            deleteFlat: false },
+  { flatField: 'alternatePhone',   nestedPath: 'contact.alternatePhone',   existsFn: (d) => d.contact?.alternatePhone != null,   deleteFlat: true  },
+  { flatField: 'address',          nestedPath: 'contact.address',          existsFn: (d) => d.contact?.address != null,          deleteFlat: false },
+  { flatField: 'whatsappJoined',   nestedPath: 'contact.whatsappJoined',   existsFn: (d) => d.contact?.whatsappJoined != null,   deleteFlat: true  },
+  { flatField: 'whatsappGroup',    nestedPath: 'contact.whatsappJoined',   existsFn: (d) => d.contact?.whatsappJoined != null,   deleteFlat: true  },
+  // Socials (2-level nesting)
+  { flatField: 'linkedin',         nestedPath: 'contact.socials.linkedin', existsFn: (d) => d.contact?.socials?.linkedin != null,deleteFlat: true  },
+  { flatField: 'linkedIn',         nestedPath: 'contact.socials.linkedin', existsFn: (d) => d.contact?.socials?.linkedin != null,deleteFlat: true  },
+  { flatField: 'facebook',         nestedPath: 'contact.socials.facebook', existsFn: (d) => d.contact?.socials?.facebook != null,deleteFlat: true  },
+  { flatField: 'instagram',        nestedPath: 'contact.socials.instagram',existsFn: (d) => d.contact?.socials?.instagram != null,deleteFlat: true  },
+  { flatField: 'wechat',           nestedPath: 'contact.socials.wechat',   existsFn: (d) => d.contact?.socials?.wechat != null,  deleteFlat: true  },
+  { flatField: 'weChat',           nestedPath: 'contact.socials.wechat',   existsFn: (d) => d.contact?.socials?.wechat != null,  deleteFlat: true  },
+  // Emergency contact (2-level nesting)
+  { flatField: 'emergencyContactName',         nestedPath: 'contact.emergency.name',        existsFn: (d) => d.contact?.emergency?.name != null,        deleteFlat: true  },
+  { flatField: 'emergencyContact',             nestedPath: 'contact.emergency.name',        existsFn: (d) => d.contact?.emergency?.name != null,        deleteFlat: true  },
+  { flatField: 'emergencyContactPhone',        nestedPath: 'contact.emergency.phone',       existsFn: (d) => d.contact?.emergency?.phone != null,       deleteFlat: true  },
+  { flatField: 'emergencyContactRelationship', nestedPath: 'contact.emergency.relationship',existsFn: (d) => d.contact?.emergency?.relationship != null, deleteFlat: true  },
+
+  // ── others.* ──────────────────────────────────────────────────────────────
+  { flatField: 'bio',              nestedPath: 'others.bio',              existsFn: (d) => d.others?.bio != null,              deleteFlat: true  },
+  { flatField: 'hobbies',          nestedPath: 'others.hobbies',          existsFn: (d) => d.others?.hobbies != null,          deleteFlat: true  },
+  { flatField: 'shirtStyle',       nestedPath: 'others.shirtStyle',       existsFn: (d) => d.others?.shirtStyle != null,       deleteFlat: true  },
+  { flatField: 'cutStyle',         nestedPath: 'others.shirtStyle',       existsFn: (d) => d.others?.shirtStyle != null,       deleteFlat: true  },
+  { flatField: 'tshirtSize',       nestedPath: 'others.tshirtSize',       existsFn: (d) => d.others?.tshirtSize != null,       deleteFlat: true  },
+  { flatField: 'jacketSize',       nestedPath: 'others.jacketSize',       existsFn: (d) => d.others?.jacketSize != null,       deleteFlat: true  },
+  { flatField: 'embroideredName',  nestedPath: 'others.embroideredName',  existsFn: (d) => d.others?.embroideredName != null,  deleteFlat: true  },
+  { flatField: 'tshirtStatus',     nestedPath: 'others.tshirtStatus',     existsFn: (d) => d.others?.tshirtStatus != null,     deleteFlat: true  },
+
+  // ── business.* ────────────────────────────────────────────────────────────
+  // companyName + industry intentionally kept flat as denorm query-index fields
+  { flatField: 'companyName',      nestedPath: 'business.companyName',      existsFn: (d) => d.business?.companyName != null,      deleteFlat: false },
+  { flatField: 'industry',         nestedPath: 'business.industry',         existsFn: (d) => d.business?.industry != null,         deleteFlat: false },
+  { flatField: 'companyWebsite',   nestedPath: 'business.companyWebsite',   existsFn: (d) => d.business?.companyWebsite != null,   deleteFlat: true  },
+  { flatField: 'companyLogoUrl',   nestedPath: 'business.companyLogoUrl',   existsFn: (d) => d.business?.companyLogoUrl != null,   deleteFlat: true  },
+  { flatField: 'introduction',     nestedPath: 'business.introduction',     existsFn: (d) => d.business?.introduction != null,     deleteFlat: true  },
+  { flatField: 'companyDescription',nestedPath:'business.companyDescription',existsFn:(d) => d.business?.companyDescription != null,deleteFlat: true  },
+  { flatField: 'businessCategory', nestedPath: 'business.businessCategory', existsFn: (d) => d.business?.businessCategory != null, deleteFlat: true  },
+  { flatField: 'category',         nestedPath: 'business.businessCategory', existsFn: (d) => d.business?.businessCategory != null, deleteFlat: true  },
+  { flatField: 'specialOffer',     nestedPath: 'business.specialOffer',     existsFn: (d) => d.business?.specialOffer != null,     deleteFlat: true  },
+  { flatField: 'offerToMember',    nestedPath: 'business.specialOffer',     existsFn: (d) => d.business?.specialOffer != null,     deleteFlat: true  },
+  { flatField: 'acceptInternationalBusiness', nestedPath: 'business.acceptInternationalBusiness', existsFn: (d) => d.business?.acceptInternationalBusiness != null, deleteFlat: true },
+  { flatField: 'idealReferral',    nestedPath: 'business.idealReferrals',   existsFn: (d) => d.business?.idealReferrals != null,   deleteFlat: true  },
+  { flatField: 'idealReferrals',   nestedPath: 'business.idealReferrals',   existsFn: (d) => d.business?.idealReferrals != null,   deleteFlat: true  },
+  { flatField: 'connections',      nestedPath: 'business.connections',      existsFn: (d) => d.business?.connections != null,      deleteFlat: true  },
+  { flatField: 'levelOfManagement',     nestedPath: 'business.levelOfManagement',     existsFn: (d) => d.business?.levelOfManagement != null,     deleteFlat: true  },
+  { flatField: 'departmentAndPosition', nestedPath: 'business.departmentAndPosition', existsFn: (d) => d.business?.departmentAndPosition != null, deleteFlat: true  },
+  { flatField: 'interestedIndustries',  nestedPath: 'business.interestedIndustries',  existsFn: (d) => d.business?.interestedIndustries != null,  deleteFlat: true  },
+  { flatField: 'idealReferralTypes',    nestedPath: 'business.idealReferralTypes',    existsFn: (d) => d.business?.idealReferralTypes != null,    deleteFlat: true  },
   {
     flatField: 'profession',
-    subObject: 'business',
-    nestedField: 'position',
-    conditionFn: (data) => data.business != null && (data.business.position == null || data.business.position === ''),
+    nestedPath: 'business.position',
+    existsFn: (d) => d.business?.position != null && d.business.position !== '',
+    deleteFlat: true,
   },
-  { flatField: 'levelOfManagement',     subObject: 'business', nestedField: 'levelOfManagement' },
-  { flatField: 'departmentAndPosition', subObject: 'business', nestedField: 'departmentAndPosition' },
-  { flatField: 'companyDescription',    subObject: 'business', nestedField: 'companyDescription' },
-  { flatField: 'interestedIndustries',  subObject: 'business', nestedField: 'interestedIndustries' },
-  { flatField: 'idealReferralTypes',    subObject: 'business', nestedField: 'idealReferralTypes' },
 
-  // jciCareer.*
-  { flatField: 'engagementProgress',      subObject: 'jciCareer', nestedField: 'engagementProgress' },
-  { flatField: 'radarStats',              subObject: 'jciCareer', nestedField: 'radarStats' },
-  { flatField: 'radarStatsByYear',        subObject: 'jciCareer', nestedField: 'radarStatsByYear' },
-  { flatField: 'membershipDuesHistory',   subObject: 'jciCareer', nestedField: 'membershipDuesHistory' },
-  { flatField: 'leaderboardVisibility',   subObject: 'jciCareer', nestedField: 'leaderboardVisibility' },
-  { flatField: 'hasPaidInitiationFee',    subObject: 'jciCareer', nestedField: 'hasPaidInitiationFee' },
-  { flatField: 'senatorshipValidatedAt',  subObject: 'jciCareer', nestedField: 'senatorshipValidatedAt' },
-  { flatField: 'senatorshipValidatedBy',  subObject: 'jciCareer', nestedField: 'senatorshipValidatedBy' },
+  // ── jciCareer.* ───────────────────────────────────────────────────────────
+  { flatField: 'joinDate',         nestedPath: 'jciCareer.joinDate',        existsFn: (d) => d.jciCareer?.joinDate != null,        deleteFlat: false },
+  { flatField: 'joinedDate',       nestedPath: 'jciCareer.joinDate',        existsFn: (d) => d.jciCareer?.joinDate != null,        deleteFlat: true  },
+  { flatField: 'membershipType',   nestedPath: 'jciCareer.membershipType',  existsFn: (d) => d.jciCareer?.membershipType != null,  deleteFlat: false },
+  { flatField: 'introducer',       nestedPath: 'jciCareer.introducer',      existsFn: (d) => d.jciCareer?.introducer != null,      deleteFlat: true  },
+  { flatField: 'probationTasks',   nestedPath: 'jciCareer.probationTasks',  existsFn: (d) => d.jciCareer?.probationTasks != null,  deleteFlat: true  },
+  { flatField: 'promotionProgress',nestedPath: 'jciCareer.promotionProgress',existsFn:(d) => d.jciCareer?.promotionProgress != null,deleteFlat: true  },
+  { flatField: 'isDuesPaidCurrentYear', nestedPath: 'jciCareer.isDuesPaidCurrentYear', existsFn: (d) => d.jciCareer?.isDuesPaidCurrentYear != null, deleteFlat: true },
+  { flatField: 'attendanceCheckins',nestedPath: 'jciCareer.attendanceCheckins',existsFn:(d) => d.jciCareer?.attendanceCheckins != null,deleteFlat: true },
+  { flatField: 'attendanceMonths', nestedPath: 'jciCareer.attendanceMonths',existsFn: (d) => d.jciCareer?.attendanceMonths != null, deleteFlat: true  },
+  { flatField: 'attendanceYear',   nestedPath: 'jciCareer.attendanceYear',  existsFn: (d) => d.jciCareer?.attendanceYear != null,  deleteFlat: true  },
+  { flatField: 'badgesCount',      nestedPath: 'jciCareer.badgesCount',     existsFn: (d) => d.jciCareer?.badgesCount != null,     deleteFlat: true  },
+  { flatField: 'projectsCount',    nestedPath: 'jciCareer.projectsCount',   existsFn: (d) => d.jciCareer?.projectsCount != null,   deleteFlat: true  },
+  { flatField: 'trainingsCount',   nestedPath: 'jciCareer.trainingsCount',  existsFn: (d) => d.jciCareer?.trainingsCount != null,  deleteFlat: true  },
+  { flatField: 'currentBoardYear',     nestedPath: 'jciCareer.currentBoardYear',     existsFn: (d) => d.jciCareer?.currentBoardYear != null,     deleteFlat: true  },
+  { flatField: 'currentBoardPosition', nestedPath: 'jciCareer.currentBoardPosition', existsFn: (d) => d.jciCareer?.currentBoardPosition != null, deleteFlat: true  },
+  { flatField: 'isCurrentBoardMember', nestedPath: 'jciCareer.isCurrentBoardMember', existsFn: (d) => d.jciCareer?.isCurrentBoardMember != null, deleteFlat: true  },
+  { flatField: 'boardHistory',     nestedPath: 'jciCareer.boardHistory',    existsFn: (d) => d.jciCareer?.boardHistory != null,    deleteFlat: true  },
+  { flatField: 'points',           nestedPath: 'jciCareer.points',          existsFn: (d) => d.jciCareer?.points != null,          deleteFlat: false },
+  { flatField: 'engagementProgress',    nestedPath: 'jciCareer.engagementProgress',    existsFn: (d) => d.jciCareer?.engagementProgress != null,    deleteFlat: true  },
+  { flatField: 'radarStats',            nestedPath: 'jciCareer.radarStats',            existsFn: (d) => d.jciCareer?.radarStats != null,            deleteFlat: true  },
+  { flatField: 'radarStatsByYear',      nestedPath: 'jciCareer.radarStatsByYear',      existsFn: (d) => d.jciCareer?.radarStatsByYear != null,      deleteFlat: true  },
+  { flatField: 'membershipDuesHistory', nestedPath: 'jciCareer.membershipDuesHistory', existsFn: (d) => d.jciCareer?.membershipDuesHistory != null, deleteFlat: true  },
+  { flatField: 'leaderboardVisibility', nestedPath: 'jciCareer.leaderboardVisibility', existsFn: (d) => d.jciCareer?.leaderboardVisibility != null, deleteFlat: true  },
+  { flatField: 'hasPaidInitiationFee',  nestedPath: 'jciCareer.hasPaidInitiationFee',  existsFn: (d) => d.jciCareer?.hasPaidInitiationFee != null,  deleteFlat: true  },
+  { flatField: 'senatorshipValidatedAt',nestedPath: 'jciCareer.senatorshipValidatedAt',existsFn: (d) => d.jciCareer?.senatorshipValidatedAt != null, deleteFlat: true  },
+  { flatField: 'senatorshipValidatedBy',nestedPath: 'jciCareer.senatorshipValidatedBy',existsFn: (d) => d.jciCareer?.senatorshipValidatedBy != null, deleteFlat: true  },
+  // Senatorship sub-fields (2-level nesting inside jciCareer.senatorship)
+  { flatField: 'senatorCertified',          nestedPath: 'jciCareer.senatorship.senatorCertified',          existsFn: (d) => d.jciCareer?.senatorship?.senatorCertified != null,          deleteFlat: true },
+  { flatField: 'senatorshipId',             nestedPath: 'jciCareer.senatorship.senatorshipId',             existsFn: (d) => d.jciCareer?.senatorship?.senatorshipId != null,             deleteFlat: true },
+  { flatField: 'senatorshipBoardValidated', nestedPath: 'jciCareer.senatorship.senatorshipBoardValidated', existsFn: (d) => d.jciCareer?.senatorship?.senatorshipBoardValidated != null, deleteFlat: true },
 ];
 
 // ---------------------------------------------------------------------------
@@ -88,24 +169,20 @@ function buildUpdate(data) {
     update['business.title'] = FieldValue.delete();
   }
 
-  for (const rule of MIGRATIONS) {
-    const { flatField, subObject, nestedField, conditionFn } = rule;
+  for (const { flatField, nestedPath, existsFn, deleteFlat = true } of MIGRATIONS) {
+    // Flat field must exist and have a non-null value
+    if (!(flatField in data) || data[flatField] == null) continue;
 
-    // Flat field must exist on the document
-    if (!(flatField in data)) continue;
+    // Skip if destination is already populated
+    if (existsFn(data)) continue;
 
-    // Nested field must NOT already be populated (avoid overwriting)
-    const sub = data[subObject];
-    if (sub != null && nestedField in sub) continue;
+    // Copy value to nested path (Firestore dot-notation)
+    update[nestedPath] = data[flatField];
 
-    // Optional extra condition (e.g. birthPlace special case)
-    if (conditionFn && !conditionFn(data)) continue;
-
-    // Copy value to nested path (dot-notation for Firestore merge)
-    update[`${subObject}.${nestedField}`] = data[flatField];
-
-    // Schedule deletion of the flat field
-    update[flatField] = FieldValue.delete();
+    // Optionally delete the flat field
+    if (deleteFlat) {
+      update[flatField] = FieldValue.delete();
+    }
   }
 
   return Object.keys(update).length > 0 ? update : null;
