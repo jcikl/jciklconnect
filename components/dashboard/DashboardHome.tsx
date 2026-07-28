@@ -119,7 +119,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       {
         label: 'Basic', checks: [
           { label: 'Profile photo', done: !!(member.general?.avatarUrl || (member as any).general?.avatarUrl) },
-          { label: 'Phone number', done: !!member.contact?.phone },
           { label: 'Apparel & Items', done: !!(member.others?.tshirtSize && member.others?.shirtStyle) || !!(member.others?.tshirtSize && member.others?.shirtStyle) },
         ]
       },
@@ -131,14 +130,13 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       },
       {
         label: 'Professional', checks: [
+          { label: 'Phone number', done: !!member.contact?.phone },
           { label: 'Company name', done: !!member.companyName },
           { label: 'Industry', done: !!member.industry },
           { label: 'Position / title', done: !!(member.business?.departmentAndPosition ?? member.business?.departmentAndPosition) },
           { label: 'Business categories', done: Array.isArray(member.business?.businessCategory) && member.business?.businessCategory.length > 0 },
           { label: 'Company description', done: !!(member.business?.companyDescription ?? member.business?.companyDescription) },
           { label: 'Ideal referral', done: !!(member.idealReferralIndustry || member.business?.idealReferrals) },
-          { label: 'Special member offer', done: !!(member.business?.specialOffer ?? (member as any).business?.specialOffer) },
-          { label: 'Company website', done: !!member.business?.companyWebsite },
           { label: 'International business', done: !!member.business?.acceptInternationalBusiness },
           { label: 'Level of management', done: !!member.business?.levelOfManagement },
         ]
@@ -1412,9 +1410,9 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         const { done, total, pct, missing } = profileCompleteness;
         const set = (key: string, v: string) => setProfileDraft(d => ({ ...d, [key]: v }));
         const val = (key: string, fallback = '') => profileDraft[key] ?? fallback;
-        const basicLabels = ['Profile photo', 'Phone number', 'Apparel & Items'];
+        const basicLabels = ['Profile photo', 'Apparel & Items'];
         const contactLabels = ['Address', 'Emergency contact'];
-        const professionalLabels = ['Company name', 'Industry', 'Position / title', 'Business categories', 'Company description', 'Ideal referral', 'Special member offer', 'Company website', 'International business', 'Level of management'];
+        const professionalLabels = ['Phone number', 'Company name', 'Industry', 'Position / title', 'Business categories', 'Company description', 'Ideal referral', 'International business', 'Level of management'];
         const basicCount = missing.filter(f => basicLabels.includes(f.label)).length;
         const contactCount = missing.filter(f => contactLabels.includes(f.label)).length;
         const professionalCount = missing.filter(f => professionalLabels.includes(f.label)).length;
@@ -1540,7 +1538,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                           <p className="text-xs font-semibold text-emerald-400">All basic info filled</p>
                         </div>
                         {[
-                          { label: 'Phone Number', value: member?.contact?.phone },
                           { label: 'Shirt Style', value: member?.others?.shirtStyle },
                           { label: 'T-Shirt Size', value: member?.others?.tshirtSize },
                           { label: 'Jacket Size', value: member?.others?.jacketSize },
@@ -1552,11 +1549,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                         ))}
                       </div>
                     : <div className="space-y-3">
-                      {missing.find(f => f.label === 'Phone number') && (
-                        <Input label="Phone Number" type="tel"
-                          value={val('phone', member?.contact?.phone ?? '')}
-                          onChange={e => set('phone', e.target.value)} />
-                      )}
                       {missing.find(f => f.label === 'Apparel & Items') && (
                         <div className="space-y-3">
                           <p className="text-xs font-semibold text-white/40 uppercase tracking-wider">Apparel & Items</p>
@@ -1625,14 +1617,13 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                   <div className="space-y-3">
                     {/* Filled fields — always shown as read-only */}
                     {[
+                      { label: 'Phone Number', value: member?.contact?.phone },
                       { label: 'Company Name', value: member?.companyName },
                       { label: 'Industry', value: member?.industry },
                       { label: 'Position / Title', value: member?.business?.departmentAndPosition },
                       { label: 'Business Categories', value: Array.isArray(member?.business?.businessCategory) && member.business!.businessCategory!.length > 0 ? member.business!.businessCategory!.join(', ') : undefined },
                       { label: 'Company Description', value: member?.business?.companyDescription },
                       { label: 'Ideal Referral', value: Array.isArray(member?.business?.idealReferrals) ? member.business!.idealReferrals!.join(', ') : (member?.idealReferralIndustry ?? undefined) },
-                      { label: 'Special Offer', value: (() => { const o = member?.business?.specialOffer ?? (member as any)?.specialOffer; return o ? getSpecialOfferSummary(o as SpecialOffer) : undefined; })() },
-                      { label: 'Company Website', value: member?.business?.companyWebsite },
                       { label: 'International Business', value: member?.business?.acceptInternationalBusiness },
                       { label: 'Level of Management', value: member?.business?.levelOfManagement },
                     ].filter(r => r.value).map(r => (
@@ -1648,6 +1639,11 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                           <p className="text-xs font-semibold text-emerald-400">All professional info filled</p>
                         </div>
                       : <>
+                          {missing.find(f => f.label === 'Phone number') && (
+                            <Input label="Phone Number" type="tel"
+                              value={val('phone', member?.contact?.phone ?? '')}
+                              onChange={e => set('phone', e.target.value)} />
+                          )}
                           {missing.find(f => f.label === 'Company name') && (
                             <Input label="Company Name"
                               value={val('companyName', member?.companyName ?? '')}
@@ -1673,47 +1669,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                               value={val('idealReferral', Array.isArray(member?.business?.idealReferrals) ? member.business!.idealReferrals!.join(', ') : '')}
                               onChange={e => set('idealReferral', e.target.value)} />
                           )}
-                          {missing.find(f => f.label === 'Special member offer') && (() => {
-                            const rawOffer = (profileDraft.specialOffer as unknown) ?? member?.business?.specialOffer ?? (member as any)?.specialOffer;
-                            const offerObj = ((rawOffer && typeof rawOffer === 'object') ? rawOffer : { type: 'percentage_discount' as SpecialOfferType, description: typeof rawOffer === 'string' ? rawOffer : '', terms: '', expiryDate: '', logoUrl: '', imageUrl: '', status: 'Active' as const }) as SpecialOffer;
-                            const patch = (k: string, v: string) => setProfileDraft(d => ({ ...d, specialOffer: { ...offerObj, [k]: v } } as unknown as typeof d));
-                            return (
-                              <div className="space-y-2">
-                                <div className="flex items-center justify-between py-2 px-3 rounded-xl bg-white/5">
-                                  <span className="text-xs text-white/40 shrink-0">Partner Name</span>
-                                  <span className="text-xs text-white/70 font-medium">{member?.companyName || '—'}</span>
-                                </div>
-                                <Select label="Member Benefit"
-                                  value={offerObj.type}
-                                  onChange={e => patch('type', e.target.value)}
-                                  options={Object.entries(SPECIAL_OFFER_TYPE_LABELS).map(([v, l]) => ({ value: v, label: l }))} />
-                                <Input label="Benefit Description" placeholder="e.g. 10% discount for JCI KL members"
-                                  value={offerObj.description ?? ''}
-                                  onChange={e => patch('description', e.target.value)} />
-                                <Textarea label="Terms & Conditions" rows={2} placeholder="e.g. Valid for new clients only"
-                                  value={offerObj.terms ?? ''}
-                                  onChange={e => patch('terms', e.target.value)} />
-                                <Input label="Logo URL" type="url" placeholder="https://your-logo.png"
-                                  value={offerObj.logoUrl ?? ''}
-                                  onChange={e => patch('logoUrl', e.target.value)} />
-                                <Input label="Ad Banner URL" type="url" placeholder="https://your-banner.png"
-                                  value={offerObj.imageUrl ?? ''}
-                                  onChange={e => patch('imageUrl', e.target.value)} />
-                                <Select label="Status"
-                                  value={offerObj.status ?? 'Active'}
-                                  onChange={e => patch('status', e.target.value)}
-                                  options={[{ value: 'Active', label: 'Active' }, { value: 'Paused', label: 'Paused' }]} />
-                                <Input label="Expiry Date (optional)" type="date"
-                                  value={offerObj.expiryDate ?? ''}
-                                  onChange={e => patch('expiryDate', e.target.value)} />
-                              </div>
-                            );
-                          })()}
-                          {missing.find(f => f.label === 'Company website') && (
-                            <Input label="Company Website" type="url" placeholder="https://"
-                              value={val('companyWebsite', member?.business?.companyWebsite ?? '')}
-                              onChange={e => set('companyWebsite', e.target.value)} />
-                          )}
                           {missing.find(f => f.label === 'International business') && (
                             <Select label="International Business"
                               value={val('acceptInternationalBusiness', member?.business?.acceptInternationalBusiness ?? '')}
@@ -1721,10 +1676,22 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                               options={[{ value: '', label: 'Select…' }, { value: 'Yes', label: 'Yes' }, { value: 'No', label: 'No' }, { value: 'Willing to Explore', label: 'Willing to Explore' }]} />
                           )}
                           {missing.find(f => f.label === 'Level of management') && (
-                            <Select label="Level of Management"
-                              value={val('levelOfManagement', member?.business?.levelOfManagement ?? '')}
-                              onChange={e => set('levelOfManagement', e.target.value)}
-                              options={[{ value: '', label: 'Select…' }, { value: 'Top', label: 'Top' }, { value: 'Middle', label: 'Middle' }, { value: 'Frontline', label: 'Frontline' }]} />
+                            <div className="space-y-1.5">
+                              <span className="text-xs text-white/60">Level of Management</span>
+                              <div className="flex gap-2">
+                                {['Top', 'Middle', 'Frontline'].map(opt => (
+                                  <button key={opt} type="button"
+                                    onClick={() => set('levelOfManagement', opt)}
+                                    className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                                      val('levelOfManagement', member?.business?.levelOfManagement ?? '') === opt
+                                        ? 'bg-blue-500 text-white'
+                                        : 'bg-white/10 text-white/60 hover:bg-white/20'
+                                    }`}>
+                                    {opt}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
                           )}
                         </>
                     }
