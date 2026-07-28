@@ -98,10 +98,10 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
                                     <div className="flex gap-3">
                                         {member ? (
                                             <img
-                                                src={member.avatar || getInitialsSvg(member.name, 36)}
-                                                alt={member.name}
+                                                src={(member.general?.avatarUrl ?? member.avatarUrl ?? member.avatar) || getInitialsSvg(member.general?.name ?? member.name, 36)}
+                                                alt={member.general?.name ?? member.name}
                                                 className="w-9 h-9 rounded-full bg-slate-200 flex-shrink-0 mt-0.5"
-                                                onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = getInitialsSvg(member.name, 36); }}
+                                                onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = getInitialsSvg(member.general?.name ?? member.name, 36); }}
                                             />
                                         ) : (
                                             <div className="w-9 h-9 rounded-full bg-slate-200 flex-shrink-0 mt-0.5" />
@@ -124,7 +124,7 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
                                                         setIsPosting(true);
                                                         try {
                                                             await createPost({
-                                                                author: { name: member.name, avatar: member.avatar, role: member.role },
+                                                                author: { name: member.general?.name ?? member.name, avatar: member.general?.avatarUrl ?? member.avatarUrl ?? member.avatar, role: member.role },
                                                                 content: postContent,
                                                                 likes: 0,
                                                                 comments: 0,
@@ -215,7 +215,7 @@ export const CommunicationView: React.FC<{ searchQuery?: string }> = ({ searchQu
                     if (!member || !selectedAnnouncement) return;
                     try {
                         await CommunicationService.updatePost(selectedAnnouncement.id, {
-                            author: { name: member.name, avatar: member.avatar, role: member.role },
+                            author: { name: member.general?.name ?? member.name, avatar: member.general?.avatarUrl ?? member.avatarUrl ?? member.avatar, role: member.role },
                             content: data.content,
                             likes: selectedAnnouncement.likes,
                             comments: selectedAnnouncement.comments,
