@@ -9,6 +9,9 @@ import { useMembers } from '../../hooks/useMembers';
 import { Advertisement, BenefitUsage } from '../../services/advertisementService';
 import { formatDate, toDate } from '../../utils/dateUtils';
 import { PartnershipDetailModal } from '../dashboard/PartnershipDetailModal';
+import { hasSpecialOffer, getSpecialOfferSummary, SPECIAL_OFFER_TYPE_LABELS, SpecialOffer } from '../../types/member';
+
+type BenefitItem = Advertisement & { _isMemberOffer?: boolean; _memberId?: string; _memberName?: string };
 
 type FilterTab = 'all' | 'new' | 'expiring' | 'unclaimed' | 'claimed';
 
@@ -36,14 +39,47 @@ function isNewBenefit(startDate: Advertisement['startDate']): boolean {
 
 export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
   const [claimedBenefitIds, setClaimedBenefitIds] = useState<Set<string>>(new Set());
-  const [selectedBenefitForDetail, setSelectedBenefitForDetail] = useState<Advertisement | null>(null);
-  const [selectedBenefitForUsage, setSelectedBenefitForUsage] = useState<Advertisement | null>(null);
+  const [selectedBenefitForDetail, setSelectedBenefitForDetail] = useState<BenefitItem | null>(null);
+  const [selectedBenefitForUsage, setSelectedBenefitForUsage] = useState<BenefitItem | null>(null);
   const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
   const [recordedImpressions, setRecordedImpressions] = useState<Set<string>>(new Set());
   const { advertisements, loading, error, recordClick, recordImpression, getBenefitUsageHistory } = useAdvertisements();
   const { member } = useAuth();
+  const { members } = useMembers();
   const { showToast } = useToast();
+
+  const memberOffers = useMemo((): BenefitItem[] => {
+    return members
+      .filter(m => hasSpecialOffer(m.business?.specialOffer) && m.id !== member?.id)
+      .map(m => {
+        const offer = m.business!.specialOffer!;
+        const offerObj = typeof offer === 'object' ? offer as SpecialOffer : null;
+        const summary = getSpecialOfferSummary(offer);
+        const offerTypeLabel = offerObj ? (SPECIAL_OFFER_TYPE_LABELS[offerObj.type] ?? '') : '';
+        return {
+          id: `member_offer_${m.id}`,
+          title: offerTypeLabel ? `${offerTypeLabel}: ${summary}` : summary,
+          description: offerObj?.terms || offerObj?.description || (typeof offer === 'string' ? offer : ''),
+          type: 'Banner' as const,
+          placement: [],
+          imageUrl: m.general?.avatarUrl || (m as any).avatarUrl || '',
+          logoUrl: m.general?.avatarUrl || (m as any).avatarUrl || '',
+          status: 'Active' as const,
+          impressions: 0,
+          clicks: 0,
+          priority: 0,
+          startDate: m.createdAt || new Date(),
+          provider: m.companyName || '',
+          termsAndConditions: offerObj?.terms,
+          createdAt: m.createdAt || new Date(),
+          updatedAt: m.updatedAt || new Date(),
+          _isMemberOffer: true,
+          _memberId: m.id,
+          _memberName: m.general?.name || (m as any).name || '',
+        } as BenefitItem;
+      });
+  }, [members, member?.id]);
 
   useEffect(() => {
     if (member) loadClaimedBenefits();
@@ -62,30 +98,39 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
     setSelectedBenefitForDetail(benefit);
   };
 
-  const allActive = useMemo(() => {
-    let filtered = advertisements.filter(ad => ad.status === 'Active');
+  const allActive = useMemo((): BenefitItem[] => {
+    let filtered: BenefitItem[] = advertisements.filter(ad => ad.status === 'Active') as BenefitItem[];
     const term = (searchQuery || '').toLowerCase();
     if (term) {
-      filtered = filtered.filter(b =>
+      const matchedAds = filtered.filter(b =>
         (b.title ?? '').toLowerCase().includes(term) ||
         (b.description ?? '').toLowerCase().includes(term) ||
         (b.provider ?? '').toLowerCase().includes(term)
       );
+      const matchedOffers = memberOffers.filter(b =>
+        (b.title ?? '').toLowerCase().includes(term) ||
+        (b._memberName ?? '').toLowerCase().includes(term) ||
+        (b.provider ?? '').toLowerCase().includes(term)
+      );
+      return [...matchedAds, ...matchedOffers].sort((a, b) => (b.priority || 0) - (a.priority || 0));
     }
-    return filtered.sort((a, b) => (b.priority || 0) - (a.priority || 0));
-  }, [advertisements, searchQuery]);
+    return [...filtered.sort((a, b) => (b.priority || 0) - (a.priority || 0)), ...memberOffers];
+  }, [advertisements, memberOffers, searchQuery]);
 
   const featuredBenefits = useMemo(() =>
-    allActive.filter(b => (b.priority || 0) >= 5).slice(0, 3),
+    allActive.filter(b => !b._isMemberOffer && (b.priority || 0) >= 5).slice(0, 3),
     [allActive]
   );
 
   const displayBenefits = useMemo(() => {
     let list = allActive;
     if (activeFilter === 'new') {
-      list = list.filter(b => isNewBenefit(b.startDate));
+      // member offers don't have a meaningful "new" window — exclude them
+      list = list.filter(b => !b._isMemberOffer && isNewBenefit(b.startDate));
     } else if (activeFilter === 'expiring') {
+      // member offers don't expire — exclude them
       list = list.filter(b => {
+        if (b._isMemberOffer) return false;
         const days = getDaysRemaining(b.endDate);
         return days !== null && days <= 30 && days > 0;
       });
@@ -187,23 +232,24 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
       <LoadingState loading={loading} error={error} empty={displayBenefits.length === 0} emptyMessage="No benefits match this filter">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
           {displayBenefits.map(benefit => {
-            const claimed = claimedBenefitIds.has(benefit.id!);
-            const days = getDaysRemaining(benefit.endDate);
+            const b = benefit as BenefitItem;
+            const claimed = claimedBenefitIds.has(b.id!);
+            const days = getDaysRemaining(b.endDate);
             const isExpiringSoon = days !== null && days <= 30 && days > 0;
-            const isNew = isNewBenefit(benefit.startDate);
+            const isNew = isNewBenefit(b.startDate);
 
             return (
               <div
-                key={benefit.id}
+                key={b.id}
                 className="relative bg-white rounded-xl border border-slate-200 overflow-hidden cursor-pointer hover:shadow-md transition-shadow flex flex-col"
-                onClick={() => openDetail(benefit)}
+                onClick={() => openDetail(b)}
               >
                 {/* Image */}
                 <div className="relative aspect-[4/3] bg-slate-100 overflow-hidden">
-                  {(benefit.imageUrl || benefit.logoUrl) ? (
+                  {(b.imageUrl || b.logoUrl) ? (
                     <img
-                      src={benefit.imageUrl || benefit.logoUrl}
-                      alt={benefit.title}
+                      src={b.imageUrl || b.logoUrl}
+                      alt={b.title}
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -224,12 +270,17 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
 
                   {/* Badges on image */}
                   <div className="absolute top-2 left-2 flex flex-col gap-1">
-                    {isExpiringSoon && (
+                    {b._isMemberOffer && (
+                      <span className="flex items-center gap-0.5 text-[9px] font-bold bg-violet-600 text-white px-1.5 py-0.5 rounded-full shadow">
+                        <Users size={8} /> Member Offer
+                      </span>
+                    )}
+                    {isExpiringSoon && !b._isMemberOffer && (
                       <span className="flex items-center gap-0.5 text-[9px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full shadow">
                         <Clock size={8} /> {days}d left
                       </span>
                     )}
-                    {isNew && !claimed && (
+                    {isNew && !claimed && !b._isMemberOffer && (
                       <span className="flex items-center gap-0.5 text-[9px] font-bold bg-jci-blue text-white px-1.5 py-0.5 rounded-full shadow">
                         <Sparkles size={8} /> New
                       </span>
@@ -239,19 +290,31 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
 
                 {/* Content */}
                 <div className="flex flex-col flex-1 p-3">
-                  {benefit.provider && (
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5 truncate">{benefit.provider}</p>
+                  {b._isMemberOffer ? (
+                    <>
+                      {b._memberName && <p className="text-[9px] font-black text-violet-500 uppercase tracking-widest mb-0.5 truncate">{b._memberName}</p>}
+                      {b.provider && <p className="text-[9px] text-slate-400 mb-0.5 truncate">{b.provider}</p>}
+                    </>
+                  ) : (
+                    b.provider && <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5 truncate">{b.provider}</p>
                   )}
-                  <h3 className="font-bold text-sm text-slate-900 leading-snug line-clamp-2 mb-1">{benefit.title}</h3>
-                  <p className="text-[11px] text-slate-500 line-clamp-2 flex-1">{benefit.description}</p>
+                  <h3 className="font-bold text-sm text-slate-900 leading-snug line-clamp-2 mb-1">{b.title}</h3>
+                  <p className="text-[11px] text-slate-500 line-clamp-2 flex-1">{b.description}</p>
                   <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100">
-                    <div className="flex items-center gap-1 text-[10px] text-slate-400">
-                      <Users size={10} />
-                      <span>{benefit.clicks || 0} claims</span>
-                    </div>
+                    {b._isMemberOffer ? (
+                      <div className="flex items-center gap-1 text-[10px] text-violet-400">
+                        <Users size={10} />
+                        <span>Member offer</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 text-[10px] text-slate-400">
+                        <Users size={10} />
+                        <span>{b.clicks || 0} claims</span>
+                      </div>
+                    )}
                     <div className="flex items-center gap-1 text-[10px] text-slate-400">
                       <Calendar size={10} />
-                      <span>{benefit.endDate ? formatDate(toDate(benefit.endDate).toISOString()) : 'Ongoing'}</span>
+                      <span>{b.endDate ? formatDate(toDate(b.endDate).toISOString()) : 'Ongoing'}</span>
                     </div>
                   </div>
                 </div>
@@ -264,7 +327,7 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
       {/* Benefit Detail Modal */}
       {selectedBenefitForDetail && (
         <PartnershipDetailModal
-          ad={selectedBenefitForDetail}
+          ad={selectedBenefitForDetail as Advertisement}
           onClose={() => setSelectedBenefitForDetail(null)}
         />
       )}
