@@ -2974,7 +2974,7 @@ export class FinanceService {
             if (nationality === 'Malaysia' || !nationality) {
               validationErrors.push({
                 memberId,
-                error: `Visiting member ${member.name} must be a non-Malaysian citizen`,
+                error: `Visiting member ${member.general?.name ?? member.name} must be a non-Malaysian citizen`,
               });
               continue;
             }
@@ -2985,7 +2985,7 @@ export class FinanceService {
             if (!isSenatorCertified) {
               validationErrors.push({
                 memberId,
-                error: `Senator ${member.name} does not have valid senator certification`,
+                error: `Senator ${member.general?.name ?? member.name} does not have valid senator certification`,
               });
               continue;
             }
@@ -3292,13 +3292,13 @@ export class FinanceService {
       }> = [];
 
       for (const member of allMembers) {
-        const membershipType = member.membershipType || 'Official';
+        const membershipType = (member.jciCareer?.membershipType ?? member.membershipType) || 'Official';
         // Guest pays a one-time entry fee only — no annual renewal dues to list.
         if (membershipType === 'Guest') continue;
         const duesYear = filters?.duesYear ?? getMYTYear();
         const baseDues = configRules[membershipType as keyof typeof configRules]?.duesAmount ?? MembershipDues[membershipType as keyof typeof MembershipDues] ?? 0;
         const hasPaidFee = member.jciCareer?.hasPaidInitiationFee ?? member.hasPaidInitiationFee ?? false;
-        const joinYear = member.joinDate ? new Date(member.joinDate).getFullYear() : null;
+        const joinYear = (member.jciCareer?.joinDate ?? member.joinDate) ? new Date((member.jciCareer?.joinDate ?? member.joinDate)!).getFullYear() : null;
         const isFirstYear = joinYear === duesYear;
         const duesAmount = baseDues + (isFirstYear && !hasPaidFee ? 50 : 0);
 
@@ -3345,7 +3345,7 @@ export class FinanceService {
 
         membersDuesList.push({
           memberId: member.id,
-          memberName: member.name,
+          memberName: member.general?.name ?? member.name,
           membershipType,
           duesYear,
           duesAmount,

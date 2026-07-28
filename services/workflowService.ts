@@ -528,8 +528,8 @@ export class WorkflowService {
 
           if (step.config.recipientId && !recipientEmail) {
             const member = await MembersService.getMemberById(step.config.recipientId);
-            if (member?.email) {
-              recipientEmail = member.email;
+            if (member?.contact?.email ?? member?.email) {
+              recipientEmail = member.contact?.email ?? member.email!;
             } else {
               throw new Error(`Member ${step.config.recipientId} not found or has no email`);
             }

@@ -322,7 +322,7 @@ export class PromotionService {
     return {
       id: `progress_${member.id}`,
       memberId: member.id,
-      memberName: member.name,
+      memberName: member.general?.name ?? member.name,
       currentMembershipType: 'Probation',
       requirements,
       overallProgress,
@@ -373,7 +373,7 @@ export class PromotionService {
     return {
       year,
       memberId: member.id,
-      memberName: member.fullName || member.name,
+      memberName: (member.general?.fullName ?? member.fullName) || (member.general?.name ?? member.name),
       requirements,
       completedCount,
       totalCount,
@@ -527,7 +527,7 @@ export class PromotionService {
     const promotion: PromotionHistory = {
       id: promotionRef.id,
       memberId,
-      memberName: member.name,
+      memberName: member.general?.name ?? member.name,
       fromMembershipType: 'Probation',
       toMembershipType: 'Official',
       promotionDate: new Date(),
@@ -639,7 +639,7 @@ export class PromotionService {
       const request: ManualPromotionRequest = {
         id: requestRef.id,
         memberId,
-        memberName: member.name,
+        memberName: member.general?.name ?? member.name,
         requestedBy,
         requestedAt: new Date(),
         reason,
@@ -658,7 +658,7 @@ export class PromotionService {
       const request: ManualPromotionRequest = {
         id: `dev-override-${memberId}-${Date.now()}`,
         memberId,
-        memberName: member.name,
+        memberName: member.general?.name ?? member.name,
         requestedBy,
         requestedAt: new Date(),
         reason,
@@ -674,7 +674,7 @@ export class PromotionService {
     const request: ManualPromotionRequest = {
       id: `manual_promotion_${memberId}_${Date.now()}`,
       memberId,
-      memberName: member.name,
+      memberName: member.general?.name ?? member.name,
       requestedBy,
       requestedAt: new Date(),
       reason,
