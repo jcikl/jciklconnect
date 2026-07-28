@@ -1082,7 +1082,7 @@ export class MembersService {
       if (!member) return;
       const now = new Date();
       const year = now.getFullYear();
-      const joinDate = member.jciCareer?.joinDate || member.joinDate;
+      const joinDate = member.jciCareer?.joinDate;
       const months = this.computeAttendanceMonths(joinDate, now);
 
       const { EventRegistrationService } = await import('./eventRegistrationService');
@@ -1094,9 +1094,9 @@ export class MembersService {
       ).length;
 
       await updateDoc(doc(db, COLLECTIONS.MEMBERS, memberId), {
-        attendanceCheckins: checkins,
-        attendanceMonths: months,
-        attendanceYear: year,
+        'jciCareer.attendanceCheckins': checkins,
+        'jciCareer.attendanceMonths': months,
+        'jciCareer.attendanceYear': year,
         updatedAt: Timestamp.now(),
       });
       logWrite(CACHE_KEY_ALL_MEMBERS, 'membersService.recalculateAttendance');

@@ -259,7 +259,7 @@ export class PromotionService {
     details: Record<string, string | number | boolean | string[]>;
     evidence?: string[];
   } | null {
-    const progress = member.promotionProgress ?? member.jciCareer?.promotionProgress;
+    const progress = member.jciCareer?.promotionProgress;
 
     switch (requirementType) {
       case 'bod_meeting_attendance': {
@@ -351,7 +351,7 @@ export class PromotionService {
   }
 
   static buildEngagementProgress(member: Member, year: EngagementYear): MemberEngagementProgressSummary {
-    const storedProgress = (member.jciCareer?.engagementProgress ?? member.engagementProgress)?.[year] || {};
+    const storedProgress = member.jciCareer?.engagementProgress?.[year] || {};
 
     const requirements = this.ENGAGEMENT_REQUIREMENTS[year].map((definition) => {
       const progress = storedProgress[definition.key] || {};
@@ -391,7 +391,7 @@ export class PromotionService {
     const member = await this.getMemberById(memberId);
     if (!member) throw new Error('Member not found');
 
-    const currentEngagement = member.jciCareer?.engagementProgress ?? member.engagementProgress ?? {};
+    const currentEngagement = member.jciCareer?.engagementProgress ?? {};
     const yearProgress = currentEngagement[year] || {};
     const cleanProgress: Record<string, any> = {
       detail: progress.detail || '',
@@ -882,7 +882,7 @@ export class PromotionService {
       role: m.role,
       membershipType: m.membershipType,
       computedMembershipType: this.getComputedMembershipTypeWithRules(m, rules),
-      promotionProgress: m.promotionProgress ?? m.jciCareer?.promotionProgress,
+      promotionProgress: m.jciCareer?.promotionProgress,
     }));
   }
 
@@ -894,9 +894,10 @@ export class PromotionService {
     field: 'bodMeetingAttended' | 'eventOrganizerParticipation' | 'eventParticipation' | 'jciInspireCompleted',
     value: string
   ): Promise<void> {
+    const m = await this.getMemberById(memberId);
     await MembersService.updateMember(memberId, {
       promotionProgress: {
-        ...((await this.getMemberById(memberId))?.promotionProgress || {}),
+        ...(m?.jciCareer?.promotionProgress ?? m?.promotionProgress ?? {}),
         [field]: value
       }
     } as unknown as Partial<Member>); // computed field key not statically checkable against MemberPromotionProgress
