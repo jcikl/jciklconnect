@@ -899,20 +899,6 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                   </div>
                 </div>
 
-                {/* Seeking Partnerships */}
-                <div className="pt-3 border-t border-slate-50">
-                  <span className="font-bold text-slate-700 block mb-2 uppercase text-[10px] tracking-widest">Seeking Partnerships</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedBiz.internationalPartnershipTypes && selectedBiz.internationalPartnershipTypes.length > 0 ? (
-                      selectedBiz.internationalPartnershipTypes.map((type, idx) => (
-                        <Badge key={idx} variant="neutral" className="bg-sky-50/50 text-sky-600 border border-sky-100 font-bold">{type}</Badge>
-                      ))
-                    ) : (
-                      <span className="text-[11px] text-slate-400 italic">Open to all partnership opportunities</span>
-                    )}
-                  </div>
-                </div>
-
                 {/* Interested Industries */}
                 <div className="pt-3 border-t border-slate-50">
                   <span className="font-bold text-slate-700 block mb-2 uppercase text-[10px] tracking-widest">Interested Industries</span>
@@ -928,6 +914,20 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                         <span className="text-[11px] text-slate-400 italic">Exploring various industries and connections</span>
                       );
                     })()}
+                  </div>
+                </div>
+
+                {/* Seeking Partnerships */}
+                <div className="pt-3 border-t border-slate-50">
+                  <span className="font-bold text-slate-700 block mb-2 uppercase text-[10px] tracking-widest">Seeking Partnerships</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedBiz.internationalPartnershipTypes && selectedBiz.internationalPartnershipTypes.length > 0 ? (
+                      selectedBiz.internationalPartnershipTypes.map((type, idx) => (
+                        <Badge key={idx} variant="neutral" className="bg-sky-50/50 text-sky-600 border border-sky-100 font-bold">{type}</Badge>
+                      ))
+                    ) : (
+                      <span className="text-[11px] text-slate-400 italic">Open to all partnership opportunities</span>
+                    )}
                   </div>
                 </div>
 
