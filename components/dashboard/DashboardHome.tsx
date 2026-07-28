@@ -135,7 +135,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
           { label: 'Position / title', done: !!(member.business?.departmentAndPosition ?? member.business?.departmentAndPosition) },
           { label: 'Business categories', done: Array.isArray(member.business?.businessCategory) && member.business?.businessCategory.length > 0 },
           { label: 'Company description', done: !!(member.business?.companyDescription ?? member.business?.companyDescription) },
-          { label: 'Ideal referral', done: !!(member.idealReferralIndustry || member.business?.idealReferrals) },
+          { label: 'Ideal referral', done: !!(member.idealReferralIndustry || (Array.isArray(member.business?.idealReferrals) ? member.business!.idealReferrals!.length > 0 : !!member.business?.idealReferrals)) },
           { label: 'International business', done: !!member.business?.acceptInternationalBusiness },
           { label: 'Level of management', done: !!member.business?.levelOfManagement },
         ]
@@ -1633,7 +1633,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                       { label: 'Position / Title', value: member?.business?.departmentAndPosition },
                       { label: 'Business Categories', value: Array.isArray(member?.business?.businessCategory) && member.business!.businessCategory!.length > 0 ? member.business!.businessCategory!.join(', ') : undefined },
                       { label: 'Company Description', value: member?.business?.companyDescription },
-                      { label: 'Ideal Referral', value: Array.isArray(member?.business?.idealReferrals) ? member.business!.idealReferrals!.join(', ') : (member?.idealReferralIndustry ?? undefined) },
+                      { label: 'Ideal Referral', value: (Array.isArray(member?.business?.idealReferrals) && member.business!.idealReferrals!.length > 0) ? member.business!.idealReferrals!.join(', ') : (member?.idealReferralIndustry || undefined) },
                       { label: 'International Business', value: member?.business?.acceptInternationalBusiness },
                       { label: 'Level of Management', value: member?.business?.levelOfManagement },
                     ].filter(r => r.value).map(r => (
