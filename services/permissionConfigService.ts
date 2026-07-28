@@ -1,5 +1,6 @@
 ﻿import { collection, doc, getDocs, setDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { COLLECTIONS } from '../config/constants';
 
 export interface PermissionCatalogItem {
   id: string;
@@ -64,7 +65,7 @@ export function permissionRuleId(principal: string, permissionKey: string): stri
 }
 
 async function readCatalog(): Promise<PermissionCatalogItem[]> {
-  const snap = await getDocs(collection(db, 'permissionCatalog'));
+  const snap = await getDocs(collection(db, COLLECTIONS.PERMISSION_CATALOG));
   const items = snap.docs.map((entry) => {
     const data = entry.data();
     return {
@@ -133,7 +134,7 @@ export const PermissionConfigService = {
   async saveCatalogItem(item: PermissionCatalogItem): Promise<void> {
     const id = item.id || item.key;
     await setDoc(
-      doc(db, 'permissionCatalog', id),
+      doc(db, COLLECTIONS.PERMISSION_CATALOG, id),
       {
         key: item.key,
         name: item.name,

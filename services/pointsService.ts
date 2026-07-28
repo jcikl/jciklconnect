@@ -179,7 +179,6 @@ export class PointsService {
             });
           } catch (notifErr) {
             errorLoggingService.logError(notifErr as Error, { component: 'PointsService', action: 'awardPoints.notification' });
-            console.warn('[pointsService] Notification after awardPoints failed:', notifErr);
           }
 
           return pointsDocRef.id;
@@ -1681,7 +1680,6 @@ export class PointsService {
             await GamificationService.checkEligibleBadgesForMember(cs.memberId);
           } catch (err) {
             errorLoggingService.logError(err as Error, { component: 'PointsService', action: 'approveClaim.badgeCheck', additionalData: { memberId: cs.memberId } });
-            console.warn('[approveClaim] Badge/achievement check failed (non-critical):', err);
           }
         }
       }
@@ -1767,7 +1765,6 @@ export class PointsService {
           });
         } catch (reversalErr) {
           errorLoggingService.logError(reversalErr as Error, { component: 'PointsService', action: 'rejectClaim.reversalHistoryWrite', additionalData: { submissionId } });
-          console.error('[rejectClaim] Points reversal history write failed (non-fatal):', reversalErr);
         }
       }
 
@@ -1996,8 +1993,7 @@ export class PointsService {
               loStarErr instanceof Error ? loStarErr : new Error(String(loStarErr)),
               { action: 'deleteIncentiveProgram.loStarProgressCascade', additionalData: { programId: id, year: programYear } }
             );
-          } catch { /* errorLoggingService unavailable — fall back to console */ }
-          console.warn('[deleteIncentiveProgram] loStarProgress cascade-delete failed (non-fatal):', loStarErr);
+          } catch { /* errorLoggingService unavailable */ }
         }
       }
 
@@ -2269,7 +2265,6 @@ export class PointsService {
             { action: 'getLOStarProgress.persistSnapshot', additionalData: { loId, year } }
           );
         } catch { /* errorLoggingService unavailable */ }
-        console.warn('[loStarProgress] Failed to persist progress snapshot:', persistErr);
       }
 
       // P2 FIX: store computed result in cache (3-minute TTL)
@@ -2440,7 +2435,7 @@ export class PointsService {
       // 4. Calculate Events Points (from RadarContributions)
       let events = 0;
       const contributionsSnap = await getDocs(
-        query(collection(db, 'RadarContributions'), where('memberId', '==', memberId))
+        query(collection(db, COLLECTIONS.RADAR_CONTRIBUTIONS), where('memberId', '==', memberId))
       );
       contributionsSnap.forEach(cDoc => {
         const c = cDoc.data();

@@ -111,6 +111,12 @@ export const COLLECTIONS = {
   SYSTEM: 'system',
   /** Birthday-processor and other server-side runtime config */
   SYSTEM_CONFIG: 'system_config',
+  /** Membership rules and campaign settings (systemSettings/{docId}) */
+  SYSTEM_SETTINGS: 'systemSettings',
+  /** Per-user radar contribution snapshots */
+  RADAR_CONTRIBUTIONS: 'RadarContributions',
+  /** Configurable role-permission catalog (permissionCatalog/{id}) */
+  PERMISSION_CATALOG: 'permissionCatalog',
 } as const;
 
 /** 付款申请参考编号前缀：PR-{loId}-{YYYYMMDD}-{序号}，与银行备注约定一致（Story 2.1） */

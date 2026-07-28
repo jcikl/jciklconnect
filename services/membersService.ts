@@ -457,7 +457,7 @@ export class MembersService {
       // member document does not (or vice-versa). Two concurrent calls with the
       // same email both attempt to set the same emailSlot doc — only the first wins.
       const sanitizedEmail = memberData.email.toLowerCase().replace(/[^a-z0-9@.]/g, '_');
-      const emailSlotRef = doc(db, 'memberEmails', sanitizedEmail);
+      const emailSlotRef = doc(db, COLLECTIONS.MEMBER_EMAILS, sanitizedEmail);
 
       const payload = {
         ...memberData,
@@ -628,8 +628,8 @@ export class MembersService {
         const sanitizedNew = newEmail.toLowerCase().replace(/[^a-z0-9@.]/g, '_');
         const emailBatch = writeBatch(db);
         emailBatch.update(memberRef, normalizedUpdates);
-        emailBatch.delete(doc(db, 'memberEmails', sanitizedOld));
-        emailBatch.set(doc(db, 'memberEmails', sanitizedNew), {
+        emailBatch.delete(doc(db, COLLECTIONS.MEMBER_EMAILS, sanitizedOld));
+        emailBatch.set(doc(db, COLLECTIONS.MEMBER_EMAILS, sanitizedNew), {
           email: newEmail,
           memberId,
           createdAt: Timestamp.now(),
@@ -919,7 +919,7 @@ export class MembersService {
       }
       if (targetEmailRaw) {
         const sanitizedDelEmail = targetEmailRaw.toLowerCase().replace(/[^a-z0-9@.]/g, '_');
-        primaryBatch.delete(doc(db, 'memberEmails', sanitizedDelEmail));
+        primaryBatch.delete(doc(db, COLLECTIONS.MEMBER_EMAILS, sanitizedDelEmail));
       }
       boardSnap.docs.forEach(d => primaryBatch.delete(d.ref));
       bizSnap.docs.forEach(d => primaryBatch.delete(d.ref));
@@ -1426,7 +1426,7 @@ export class MembersService {
         for (let i = 0; i < memberEmailsToRelease.length; i += 400) {
           const emailBatch = writeBatch(db);
           memberEmailsToRelease.slice(i, i + 400).forEach(sanitizedEmail => {
-            emailBatch.delete(doc(db, 'memberEmails', sanitizedEmail));
+            emailBatch.delete(doc(db, COLLECTIONS.MEMBER_EMAILS, sanitizedEmail));
           });
           await this.commitWithRetry(emailBatch);
         }

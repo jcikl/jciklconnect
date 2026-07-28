@@ -271,7 +271,7 @@ export class ProjectsService {
               }
             } catch (syncErr) {
               // Non-fatal: dev-mode in-memory sync only. Budget reads in production are always live.
-              console.warn('SYNC-006: dev-mode projectFinancialAccount budget sync failed (non-fatal):', syncErr);
+              errorLoggingService.logWarning('SYNC-006: dev-mode projectFinancialAccount budget sync failed (non-fatal)', { action: 'syncProjectFinancialAccount', additionalData: { error: String(syncErr) } });
             }
           }
           // TODO (SYNC-006): If a separate projectFinancialAccounts Firestore collection is ever
@@ -710,7 +710,7 @@ export class ProjectsService {
               await this.updateProjectCompletion(mergedTask.projectId);
             } catch (completionErr) {
               // Non-fatal: completion percentage is derived data; log but don't fail the task update
-              console.warn('[updateTask] updateProjectCompletion failed (non-fatal):', completionErr);
+              errorLoggingService.logWarning('[updateTask] updateProjectCompletion failed (non-fatal)', { action: 'updateTask', additionalData: { error: String(completionErr) } });
             }
           }
         } catch (error) {
@@ -742,7 +742,7 @@ export class ProjectsService {
             try {
               await this.updateProjectCompletion(projectId);
             } catch (completionErr) {
-              console.warn('[deleteTask] updateProjectCompletion failed (non-fatal):', completionErr);
+              errorLoggingService.logWarning('[deleteTask] updateProjectCompletion failed (non-fatal)', { action: 'deleteTask', additionalData: { error: String(completionErr) } });
             }
           }
         } catch (error) {

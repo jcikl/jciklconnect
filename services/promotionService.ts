@@ -576,7 +576,7 @@ export class PromotionService {
     try {
       await (MembersService as any).syncBoardMemberDisplayFields(memberId, { ...member, membershipType: 'Official', role: 'MEMBER' });
     } catch (syncErr) {
-      console.warn('[promoteToOfficialMember] syncBoardMemberDisplayFields failed (non-fatal):', syncErr);
+      errorLoggingService.logWarning('[promoteToOfficialMember] syncBoardMemberDisplayFields failed (non-fatal)', { action: 'promoteToOfficialMember', additionalData: { error: String(syncErr) } });
     }
 
     // Fix 10 (P1): notification failure must not make the caller believe the promotion failed —

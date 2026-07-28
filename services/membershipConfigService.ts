@@ -1,4 +1,5 @@
 import { collection, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { COLLECTIONS } from '../config/constants';
 import { errorLoggingService } from './errorLoggingService';
 import { db } from '../config/firebase';
 import { MembershipDues, MembershipRuleConfig, MembershipType, UserRole } from '../types';
@@ -273,7 +274,7 @@ export const DEFAULT_MEMBERSHIP_RULES: Record<MembershipType, MembershipRuleConf
   Associate: { type: 'Associate', duesAmount: 50, nationalityLimit: 'Malaysian', ageLimit: { min: 41 }, requiresSenatorship: false },
 };
 
-const DOC_REF = doc(db, 'systemSettings', 'membershipRules');
+const DOC_REF = doc(db, COLLECTIONS.SYSTEM_SETTINGS, 'membershipRules');
 
 export const MembershipConfigService = {
   getConfig: async (): Promise<{
@@ -352,7 +353,7 @@ export async function getMembershipPurpose(amount: number, year: number): Promis
 
 // ─── WhatsApp campaign flag (written by Jan 1 Cloud Function) ─────────────────
 
-const WA_CAMPAIGN_DOC = doc(db, 'systemSettings', 'pendingWhatsAppCampaign');
+const WA_CAMPAIGN_DOC = doc(db, COLLECTIONS.SYSTEM_SETTINGS, 'pendingWhatsAppCampaign');
 
 export interface WhatsAppCampaign {
   year: number;

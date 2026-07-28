@@ -1,5 +1,6 @@
 import { collection, getDocs, query, where, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { COLLECTIONS } from '../config/constants';
 import { ProjectsService } from './projectsService';
 import { PromotionService } from './promotionService';
 import { MembersService } from './membersService';
@@ -364,7 +365,7 @@ export const EngagementAutoSuggestService = {
 
   async _fetchRadarForMember(memberId: string): Promise<RadarContributionDoc[]> {
     const snap = await getDocs(
-      query(collection(db, 'RadarContributions'), where('memberId', '==', memberId))
+      query(collection(db, COLLECTIONS.RADAR_CONTRIBUTIONS), where('memberId', '==', memberId))
     );
     return snap.docs.map(d => ({
       id: d.id,
