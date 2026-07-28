@@ -125,10 +125,10 @@ export const SenatorshipManagement: React.FC<Props> = ({
               showDetails={false}
             />
           </div>
-          {mode === 'validated' && (member.jciCareer?.senatorshipValidatedAt ?? member.senatorshipValidatedAt) && (
+          {mode === 'validated' && member.jciCareer?.senatorshipValidatedAt && (
             <p className="text-xs text-slate-400 mt-0.5">
-              {new Date((member.jciCareer?.senatorshipValidatedAt ?? member.senatorshipValidatedAt)!).toLocaleDateString()}
-              {(member.jciCareer?.senatorshipValidatedBy ?? member.senatorshipValidatedBy) ? ` · ${member.jciCareer?.senatorshipValidatedBy ?? member.senatorshipValidatedBy}` : ''}
+              {new Date(member.jciCareer.senatorshipValidatedAt!).toLocaleDateString()}
+              {member.jciCareer?.senatorshipValidatedBy ? ` · ${member.jciCareer.senatorshipValidatedBy}` : ''}
             </p>
           )}
         </div>

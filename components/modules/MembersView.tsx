@@ -41,7 +41,7 @@ import { MembersService } from '../../services/membersService';
 /** å‡ºå¸­å¯¹æ¯"ï¼šå½"å¹´ç­¾åˆ°æ¬¡æ•° vs å·²è¿‡æœˆä»½ï¼ˆå…¥ä¼šå¹´ä»½ä»Žå…¥ä¼šæœˆèµ·ç®—ï¼‰ï¼Œæ¯å¹´é‡ç®— */
 const getAttendanceDisplay = (m: Member) => {
   const year = new Date().getFullYear();
-  const months = MembersService.computeAttendanceMonths(m.jciCareer?.joinDate || m.joinDate);
+  const months = MembersService.computeAttendanceMonths(m.jciCareer?.joinDate);
   const checkins = m.attendanceYear === year ? (m.attendanceCheckins || 0) : 0;
   return { checkins, months, text: `${checkins} / ${months}`, ratio: Math.min(100, (checkins / months) * 100) };
 };

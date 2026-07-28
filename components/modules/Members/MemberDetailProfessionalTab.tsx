@@ -24,7 +24,7 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-5 bg-gradient-to-r from-slate-50 to-white rounded-2xl border border-slate-200">
             <div className="flex-1 min-w-0">
               <h3 className="text-lg font-black text-slate-900 truncate">{member.companyName || '—'}</h3>
-              <p className="text-sm text-slate-500 mt-0.5">{[(member.business?.departmentAndPosition ?? member.departmentAndPosition), member.industry].filter(Boolean).join(' · ')}</p>
+              <p className="text-sm text-slate-500 mt-0.5">{[member.business?.departmentAndPosition, member.industry].filter(Boolean).join(' · ')}</p>
             </div>
             <div className="flex flex-wrap gap-2 shrink-0">
               {member.industry && (
@@ -217,11 +217,11 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
               <div className="grid grid-cols-2 gap-x-4 gap-y-4">
                 <div>
                   <span className="text-slate-500 text-xs uppercase font-medium">Position</span>
-                  <p className="font-medium text-slate-900 mt-0.5">{(member.business?.departmentAndPosition ?? member.departmentAndPosition) || 'Not provided'}</p>
+                  <p className="font-medium text-slate-900 mt-0.5">{member.business?.departmentAndPosition || 'Not provided'}</p>
                 </div>
                 <div>
                   <span className="text-slate-500 text-xs uppercase font-medium">Level of Mgmt</span>
-                  <p className="font-medium text-slate-900 mt-0.5">{(member.business?.levelOfManagement ?? member.levelOfManagement) || 'Not provided'}</p>
+                  <p className="font-medium text-slate-900 mt-0.5">{member.business?.levelOfManagement || 'Not provided'}</p>
                 </div>
                 <div>
                   <span className="text-slate-500 text-xs uppercase font-medium">Industry</span>
@@ -276,10 +276,10 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                 </div>
 
                 {/* Company Description */}
-                {(member.business?.companyDescription ?? member.companyDescription) && (
+                {member.business?.companyDescription && (
                   <div className="p-3 bg-slate-50 rounded-lg border-l-4 border-slate-300">
                     <span className="text-slate-500 text-xs uppercase font-bold mb-1 block">Company Description</span>
-                    <p className="text-xs text-slate-600 leading-relaxed">{member.business?.companyDescription ?? member.companyDescription}</p>
+                    <p className="text-xs text-slate-600 leading-relaxed">{member.business.companyDescription}</p>
                   </div>
                 )}
 
@@ -287,7 +287,7 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                 <div className="p-3 bg-jci-blue/5 rounded-lg border-l-4 border-jci-blue">
                   <span className="text-jci-blue text-xs uppercase font-bold mb-1 block">Special Member Offer</span>
                   {(() => {
-                    const offer = member.business?.specialOffer ?? member.specialOffer;
+                    const offer = member.business?.specialOffer;
                     if (!hasSpecialOffer(offer)) return <p className="text-sm italic text-slate-400">No special offer listed</p>;
                     if (typeof offer === 'string') return <p className="text-sm font-medium text-slate-800">{offer}</p>;
                     return (

@@ -52,14 +52,14 @@ function initFormValues(member: Member) {
     birthPlace: (() => { const ic = member.idNumber || member.general?.idNumber || ''; return isMalaysianIC(ic) ? (getBirthPlaceFromIC(ic) || member.birthPlace || member.general?.birthPlace || '') : (member.birthPlace || member.general?.birthPlace || ''); })(),
     dateOfBirth: (() => { const ic = member.idNumber || member.general?.idNumber || ''; return isMalaysianIC(ic) ? (getDateOfBirthFromIC(ic) || member.dateOfBirth || member.general?.dob || '') : (member.dateOfBirth || member.general?.dob || ''); })(),
     gender: (() => { const ic = member.idNumber || member.general?.idNumber || ''; return normalizeGender(isMalaysianIC(ic) ? (getGenderFromIC(ic) || member.gender || member.general?.gender || '') : (member.gender || member.general?.gender || '')); })(),
-    ethnicity: member.general?.ethnicity ?? member.ethnicity ?? '',
+    ethnicity: member.general?.ethnicity ?? '',
     nationality: member.nationality || 'Malaysia',
     introducer: member.introducer || '',
     bio: member.bio || '',
     avatar: member.avatar || member.avatarUrl || member.general?.avatarUrl || '',
     hobbies: Array.isArray(member.hobbies) ? member.hobbies : (member.hobbies ? [member.hobbies] : []),
     skills: Array.isArray(member.skills) ? member.skills.join(', ') : (member.skills || ''),
-    dietaryPreference: member.general?.dietaryPreference ?? member.dietaryPreference ?? '',
+    dietaryPreference: member.general?.dietaryPreference ?? '',
 
     // Membership & Status
     role: member.role,
@@ -74,15 +74,15 @@ function initFormValues(member: Member) {
     // Professional & Business
     companyName: member.companyName || '',
     companyWebsite: member.companyWebsite || '',
-    companyDescription: member.business?.companyDescription ?? member.companyDescription ?? '',
-    departmentAndPosition: member.business?.departmentAndPosition ?? member.departmentAndPosition ?? '',
-    levelOfManagement: member.business?.levelOfManagement ?? member.levelOfManagement ?? '',
+    companyDescription: member.business?.companyDescription ?? '',
+    departmentAndPosition: member.business?.departmentAndPosition ?? '',
+    levelOfManagement: member.business?.levelOfManagement ?? '',
     idealReferralIndustry: member.idealReferralIndustry || '',
     idealReferral: member.idealReferral || (Array.isArray(member.idealReferrals) ? member.idealReferrals.join(', ') : ''),
     acceptInternationalBusiness: member.acceptInternationalBusiness || '',
     businessCategory: Array.isArray(member.businessCategory) ? member.businessCategory : (member.businessCategory ? [member.businessCategory] : []),
     industry: member.industry || '',
-    interestedIndustries: (() => { const v = member.business?.interestedIndustries ?? member.interestedIndustries; return Array.isArray(v) ? v : (v ? [v as string] : []); })(),
+    interestedIndustries: (() => { const v = member.business?.interestedIndustries; return Array.isArray(v) ? v : (v ? [v as string] : []); })(),
     internationalPartnershipTypes: Array.isArray(member.internationalPartnershipTypes) ? member.internationalPartnershipTypes : (member.internationalPartnershipTypes ? [member.internationalPartnershipTypes] : []),
 
     // Contact Information
@@ -291,7 +291,7 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
         ...(member.membership || {}),
         [yearStr]: {
           year: formValues.membershipYear,
-          dues: ((member.jciCareer?.hasPaidInitiationFee ?? member.hasPaidInitiationFee) ? 0 : 50) + (membershipRules?.Probation?.duesAmount ?? MembershipDues.Probation),
+          dues: (member.jciCareer?.hasPaidInitiationFee ? 0 : 50) + (membershipRules?.Probation?.duesAmount ?? MembershipDues.Probation),
           amount: 0,
           status: 'pending',
           transactionId: []
@@ -543,11 +543,11 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                     {member.senatorshipBoardValidated && (
                       <p className="text-xs text-green-700 leading-snug">
                         <span className="font-medium">Board validated</span>
-                        {(member.jciCareer?.senatorshipValidatedAt ?? member.senatorshipValidatedAt) && (
+                        {member.jciCareer?.senatorshipValidatedAt && (
                           <span className="text-slate-500">
                             {' '}
-                            · {new Date((member.jciCareer?.senatorshipValidatedAt ?? member.senatorshipValidatedAt)!).toLocaleDateString()}
-                            {(member.jciCareer?.senatorshipValidatedBy ?? member.senatorshipValidatedBy) ? ` by ${member.jciCareer?.senatorshipValidatedBy ?? member.senatorshipValidatedBy}` : ''}
+                            · {new Date(member.jciCareer.senatorshipValidatedAt!).toLocaleDateString()}
+                            {member.jciCareer?.senatorshipValidatedBy ? ` by ${member.jciCareer.senatorshipValidatedBy}` : ''}
                           </span>
                         )}
                       </p>

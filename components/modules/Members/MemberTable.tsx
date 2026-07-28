@@ -28,7 +28,7 @@ const getMemberAge = (member: Member): number | null => {
 /** 出席对比：当年签到次数 vs 已过月份（入会年份从入会月起算），每年重算 */
 export const getAttendanceDisplay = (m: Member) => {
   const year = new Date().getFullYear();
-  const months = MembersService.computeAttendanceMonths(m.jciCareer?.joinDate || m.joinDate);
+  const months = MembersService.computeAttendanceMonths(m.jciCareer?.joinDate);
   const checkins = m.attendanceYear === year ? (m.attendanceCheckins || 0) : 0;
   return { checkins, months, text: `${checkins} / ${months}`, ratio: Math.min(100, (checkins / months) * 100) };
 };

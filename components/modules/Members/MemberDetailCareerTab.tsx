@@ -267,16 +267,16 @@ const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) 
                       {member.senatorshipBoardValidated ? 'Validated' : 'Pending'}
                     </Badge>
                   </div>
-                  {member.senatorshipBoardValidated && (member.jciCareer?.senatorshipValidatedBy ?? member.senatorshipValidatedBy) && (
+                  {member.senatorshipBoardValidated && member.jciCareer?.senatorshipValidatedBy && (
                     <div className="flex items-center justify-between text-xs text-slate-500">
                       <span>Validated By:</span>
-                      <span className="font-medium">{member.jciCareer?.senatorshipValidatedBy ?? member.senatorshipValidatedBy}</span>
+                      <span className="font-medium">{member.jciCareer.senatorshipValidatedBy}</span>
                     </div>
                   )}
-                  {member.senatorshipBoardValidated && (member.jciCareer?.senatorshipValidatedAt ?? member.senatorshipValidatedAt) && (
+                  {member.senatorshipBoardValidated && member.jciCareer?.senatorshipValidatedAt && (
                     <div className="flex items-center justify-between text-xs text-slate-500">
                       <span>Validated At:</span>
-                      <span className="font-medium">{formatDateToDDMMMYYYY((member.jciCareer?.senatorshipValidatedAt ?? member.senatorshipValidatedAt)!)}</span>
+                      <span className="font-medium">{formatDateToDDMMMYYYY(member.jciCareer.senatorshipValidatedAt!)}</span>
                     </div>
                   )}
                 </div>
