@@ -29,6 +29,7 @@ import { AdvertisementService, Advertisement } from '../../services/advertisemen
 import type { Event } from '../../types';
 import { EventRow } from '../modules/Events/EventRow';
 import { UserRole } from '../../types';
+import { SpecialOfferType, SPECIAL_OFFER_TYPE_LABELS, getSpecialOfferSummary } from '../../types/member';
 import { motion, AnimatePresence } from 'framer-motion';
 import { EventDetailModal } from '../modules/EventsView';
 import { PartnershipDetailModal } from './PartnershipDetailModal';
@@ -1618,11 +1619,29 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                           value={val('idealReferral', member?.idealReferral ?? '')}
                           onChange={e => set('idealReferral', e.target.value)} />
                       )}
-                      {missing.find(f => f.label === 'Special member offer') && (
-                        <Textarea label="Special Member Offer" rows={2} placeholder="e.g. 10% discount for JCI KL members"
-                          value={val('specialOffer', member?.business?.specialOffer ?? '')}
-                          onChange={e => set('specialOffer', e.target.value)} />
-                      )}
+                      {missing.find(f => f.label === 'Special member offer') && (() => {
+                        const rawOffer = profileDraft.specialOffer ?? member?.business?.specialOffer ?? member?.specialOffer;
+                        const offerObj = (rawOffer && typeof rawOffer === 'object') ? rawOffer : { type: 'percentage_discount' as SpecialOfferType, description: typeof rawOffer === 'string' ? rawOffer : '', terms: '', expiryDate: '' };
+                        const patch = (k: string, v: string) => setProfileDraft(d => ({ ...d, specialOffer: { ...offerObj, [k]: v } }));
+                        return (
+                          <div className="space-y-2">
+                            <label className="block text-xs font-semibold text-slate-600">Special Member Offer</label>
+                            <Select label="Offer Type"
+                              value={offerObj.type}
+                              onChange={e => patch('type', e.target.value)}
+                              options={Object.entries(SPECIAL_OFFER_TYPE_LABELS).map(([v, l]) => ({ value: v, label: l }))} />
+                            <Input label="Description" placeholder="e.g. 10% discount for JCI KL members"
+                              value={offerObj.description}
+                              onChange={e => patch('description', e.target.value)} />
+                            <Textarea label="Terms & Conditions (optional)" rows={2} placeholder="e.g. Valid for new clients only"
+                              value={offerObj.terms ?? ''}
+                              onChange={e => patch('terms', e.target.value)} />
+                            <Input label="Expiry Date (optional)" type="date"
+                              value={offerObj.expiryDate ?? ''}
+                              onChange={e => patch('expiryDate', e.target.value)} />
+                          </div>
+                        );
+                      })()}
                       {missing.find(f => f.label === 'Company website') && (
                         <Input label="Company Website" type="url" placeholder="https://"
                           value={val('companyWebsite', member?.business?.companyWebsite ?? '')}

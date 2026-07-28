@@ -8,6 +8,8 @@ const BUSINESS_CATEGORIES = [
   'Distributor / Exporter / Importer',
 ];
 import { Card, Button, Badge, Modal, useToast, Tabs } from '../ui/Common';
+import { getSpecialOfferSummary, hasSpecialOffer, SPECIAL_OFFER_TYPE_LABELS } from '../../types/member';
+import type { SpecialOffer } from '../../types';
 import { MembersOnlyOverlay } from '../ui/MembersOnlyOverlay';
 import { LoadingState } from '../ui/Loading';
 import { useBusinessDirectory } from '../../hooks/useBusinessDirectory';
@@ -1310,7 +1312,7 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onCon
         (selectedChapter === 'All' || member.jciChapter === selectedChapter) &&
         (selectedCountry === 'All' || member.country === selectedCountry) &&
         (selectedIndustry === 'All' || member.industry === selectedIndustry) &&
-        (!showDealsOnly || !!member.specialOffer);
+        (!showDealsOnly || hasSpecialOffer(member.specialOffer));
     });
   }, [searchTerm, selectedChapter, selectedCountry, selectedIndustry, showDealsOnly]);
 
@@ -1320,7 +1322,7 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onCon
     companyName: member.companyName,
     industry: `${member.jciChapter} (${member.country})`,
     description: member.description, website: member.email,
-    offer: member.specialOffer || '', logo: member.avatarUrl,
+    offer: getSpecialOfferSummary(member.specialOffer), logo: member.avatarUrl,
     internationalPartnershipTypes: member.collaborationNeeds,
     businessCategory: member.businessCategory, acceptsInternationalBusiness: 'Yes'
   });
@@ -1369,7 +1371,7 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onCon
                   <p className="text-xs text-slate-500 truncate">{member.position} · {member.companyName}</p>
                   <div className="flex items-center gap-1.5 mt-1">
                     <span className="text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-100 px-1.5 py-0.5 rounded-full">{member.businessCategory}</span>
-                    {member.specialOffer && <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Gift size={9} /> Deal</span>}
+                    {hasSpecialOffer(member.specialOffer) && <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Gift size={9} /> Deal</span>}
                     <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 px-1.5 py-0.5 rounded-full">{member.country}</span>
                   </div>
                 </div>
@@ -1472,7 +1474,7 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onCon
                   <div className="p-4 flex-1 flex flex-col gap-3">
                     <div className="flex flex-wrap gap-1.5">
                       <span className="text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-100 px-2 py-0.5 rounded-full">{member.businessCategory}</span>
-                      {member.specialOffer && <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 px-2 py-0.5 rounded-full flex items-center gap-0.5"><Gift size={9} /> Deal</span>}
+                      {hasSpecialOffer(member.specialOffer) && <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 px-2 py-0.5 rounded-full flex items-center gap-0.5"><Gift size={9} /> Deal</span>}
                     </div>
                     <p className="text-xs text-slate-500 line-clamp-2 flex-1 leading-relaxed">{member.description}</p>
                     {member.collaborationNeeds.length > 0 && (
@@ -1485,10 +1487,10 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onCon
                         </div>
                       </div>
                     )}
-                    {member.specialOffer && (
+                    {hasSpecialOffer(member.specialOffer) && (
                       <div className="bg-amber-50 rounded-lg px-3 py-2 border border-amber-100">
                         <p className="text-[9px] font-black text-amber-700 uppercase tracking-wider mb-0.5 flex items-center gap-1"><Gift size={9} /> Sister Deal</p>
-                        <p className="text-[11px] text-amber-800 line-clamp-2 leading-snug">{member.specialOffer}</p>
+                        <p className="text-[11px] text-amber-800 line-clamp-2 leading-snug">{getSpecialOfferSummary(member.specialOffer)}</p>
                       </div>
                     )}
                   </div>
@@ -1642,7 +1644,7 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onCon
             </div>
             <div className="flex flex-wrap gap-1.5">
               <span className="text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-100 px-2 py-1 rounded-full">{detailMember.businessCategory}</span>
-              {detailMember.specialOffer && <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 px-2 py-1 rounded-full flex items-center gap-0.5"><Gift size={9} /> Deal</span>}
+              {hasSpecialOffer(detailMember.specialOffer) && <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 px-2 py-1 rounded-full flex items-center gap-0.5"><Gift size={9} /> Deal</span>}
             </div>
             {detailMember.description && <p className="text-sm text-slate-600 leading-relaxed">{detailMember.description}</p>}
             {detailMember.collaborationNeeds.length > 0 && (
@@ -1655,10 +1657,10 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onCon
                 </div>
               </div>
             )}
-            {detailMember.specialOffer && (
+            {hasSpecialOffer(detailMember.specialOffer) && (
               <div className="bg-amber-50 p-3 rounded-xl border border-amber-100">
                 <span className="text-[10px] font-black text-amber-700 uppercase tracking-wider flex items-center gap-1 mb-1"><Gift size={11} /> Sister Chapter Deal</span>
-                <p className="text-sm font-semibold text-amber-900 leading-snug">{detailMember.specialOffer}</p>
+                <p className="text-sm font-semibold text-amber-900 leading-snug">{getSpecialOfferSummary(detailMember.specialOffer)}</p>
               </div>
             )}
           </div>
@@ -1676,7 +1678,7 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onCon
                   companyName: detailMember.companyName,
                   industry: `${detailMember.jciChapter} (${detailMember.country})`,
                   description: detailMember.description, website: detailMember.email,
-                  offer: detailMember.specialOffer || '', logo: detailMember.avatarUrl,
+                  offer: getSpecialOfferSummary(detailMember.specialOffer), logo: detailMember.avatarUrl,
                   internationalPartnershipTypes: detailMember.collaborationNeeds,
                   businessCategory: detailMember.businessCategory, acceptsInternationalBusiness: 'Yes'
                 };

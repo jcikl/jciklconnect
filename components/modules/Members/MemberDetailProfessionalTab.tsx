@@ -2,7 +2,8 @@ import * as React from 'react';
 import { ArrowUpRight } from 'lucide-react';
 import { Card, Badge } from '../../ui/Common';
 import { MultiSelectDropdown } from '../../ui/MultiSelectDropdown';
-import type { Member } from '../../../types';
+import type { Member, SpecialOffer, SpecialOfferType } from '../../../types';
+import { SPECIAL_OFFER_TYPE_LABELS, getSpecialOfferSummary, hasSpecialOffer } from '../../../types/member';
 import { INDUSTRY_OPTIONS, IDEAL_REFERRAL_OPTIONS, BUSINESS_CATEGORIES_OPTIONS } from '../../../config/constants';
 
 interface MemberDetailProfessionalTabProps {
@@ -151,14 +152,52 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                 </div>
               </div>
 
-              <div className="border-t pt-3">
-                <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Special Member Offer</label>
-                <input
-                  type="text"
-                  value={inlineValues.specialOffer}
-                  onChange={e => setInlineValues({ ...inlineValues, specialOffer: e.target.value })}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
-                />
+              <div className="border-t pt-3 space-y-2">
+                <label className="text-slate-500 block text-xs uppercase font-medium">Special Member Offer</label>
+                {(() => {
+                  const raw = inlineValues.specialOffer;
+                  const structured: SpecialOffer = typeof raw === 'object' && raw !== null
+                    ? raw as SpecialOffer
+                    : { type: 'percentage_discount' as SpecialOfferType, description: typeof raw === 'string' ? raw : '', terms: '', expiryDate: '' };
+                  const update = (patch: Partial<SpecialOffer>) =>
+                    setInlineValues({ ...inlineValues, specialOffer: { ...structured, ...patch } });
+                  return (
+                    <>
+                      <select
+                        value={structured.type}
+                        onChange={e => update({ type: e.target.value as SpecialOfferType })}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
+                      >
+                        {(Object.entries(SPECIAL_OFFER_TYPE_LABELS) as [SpecialOfferType, string][]).map(([v, label]) => (
+                          <option key={v} value={v}>{label}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="text"
+                        placeholder="e.g. 10% off first order for JCI KL members"
+                        value={structured.description}
+                        onChange={e => update({ description: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                      />
+                      <textarea
+                        rows={2}
+                        placeholder="Terms & conditions (optional)"
+                        value={structured.terms ?? ''}
+                        onChange={e => update({ terms: e.target.value })}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue resize-none"
+                      />
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-slate-500 whitespace-nowrap">Expiry date</label>
+                        <input
+                          type="date"
+                          value={structured.expiryDate ?? ''}
+                          onChange={e => update({ expiryDate: e.target.value })}
+                          className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                        />
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           ) : (
@@ -247,9 +286,25 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                 {/* Special Member Offer */}
                 <div className="p-3 bg-jci-blue/5 rounded-lg border-l-4 border-jci-blue">
                   <span className="text-jci-blue text-xs uppercase font-bold mb-1 block">Special Member Offer</span>
-                  {(member.business?.specialOffer ?? member.specialOffer)
-                    ? <p className="text-sm font-medium text-slate-800">{member.business?.specialOffer ?? member.specialOffer}</p>
-                    : <p className="text-sm italic text-slate-400">No special offer listed</p>}
+                  {(() => {
+                    const offer = member.business?.specialOffer ?? member.specialOffer;
+                    if (!hasSpecialOffer(offer)) return <p className="text-sm italic text-slate-400">No special offer listed</p>;
+                    if (typeof offer === 'string') return <p className="text-sm font-medium text-slate-800">{offer}</p>;
+                    return (
+                      <div className="space-y-1">
+                        <span className="inline-block text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                          {SPECIAL_OFFER_TYPE_LABELS[offer.type]}
+                        </span>
+                        <p className="text-sm font-medium text-slate-800">{offer.description}</p>
+                        {offer.terms && <p className="text-xs text-slate-500 leading-snug">{offer.terms}</p>}
+                        {offer.expiryDate && (
+                          <p className="text-[11px] text-slate-400">
+                            Expires: {new Date(offer.expiryDate).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
