@@ -127,7 +127,7 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Business Categories</label>
                   <MultiSelectDropdown
                     options={BUSINESS_CATEGORIES_OPTIONS}
-                    selected={inlineValues.business?.businessCategory}
+                    selected={inlineValues.business?.businessCategory ?? []}
                     onChange={selected => setInlineValues({ ...inlineValues, businessCategory: selected })}
                     placeholder="Select categories..."
                   />
