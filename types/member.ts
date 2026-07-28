@@ -24,6 +24,9 @@ export interface SpecialOffer {
   description: string;
   terms?: string;
   expiryDate?: string;
+  logoUrl?: string;
+  imageUrl?: string;
+  status?: 'Active' | 'Paused';
 }
 
 export interface MembershipRecord {

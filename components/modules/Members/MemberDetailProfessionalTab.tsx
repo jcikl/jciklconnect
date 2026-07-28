@@ -291,12 +291,25 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                     if (!hasSpecialOffer(offer)) return <p className="text-sm italic text-slate-400">No special offer listed</p>;
                     if (typeof offer === 'string') return <p className="text-sm font-medium text-slate-800">{offer}</p>;
                     return (
-                      <div className="space-y-1">
-                        <span className="inline-block text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
-                          {SPECIAL_OFFER_TYPE_LABELS[offer.type]}
-                        </span>
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="inline-block text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                            {SPECIAL_OFFER_TYPE_LABELS[offer.type]}
+                          </span>
+                          {offer.status && (
+                            <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${offer.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                              {offer.status}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-sm font-medium text-slate-800">{offer.description}</p>
                         {offer.terms && <p className="text-xs text-slate-500 leading-snug">{offer.terms}</p>}
+                        {(offer.imageUrl || offer.logoUrl) && (
+                          <div className="flex gap-2 mt-1">
+                            {offer.imageUrl && <img src={offer.imageUrl} alt="Ad banner" className="h-10 rounded object-cover border border-slate-200" />}
+                            {offer.logoUrl && <img src={offer.logoUrl} alt="Logo" className="h-10 w-10 rounded object-contain border border-slate-200 bg-white p-0.5" />}
+                          </div>
+                        )}
                         {offer.expiryDate && (
                           <p className="text-[11px] text-slate-400">
                             Expires: {new Date(offer.expiryDate).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })}
