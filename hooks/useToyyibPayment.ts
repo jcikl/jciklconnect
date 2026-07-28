@@ -59,9 +59,9 @@ export function useToyyibPayment() {
       // 4. Bill description
       const isGuest = member.membershipType === 'Guest';
       const billDesc = ToyyibService.formatMembershipBillDescription(
-        member.name,
-        member.nationalId,
-        member.phone || '',
+        member.general?.name ?? member.name,
+        member.general?.idNumber ?? member.nationalId ?? member.idNumber,
+        (member.contact?.phone ?? member.phone) || '',
         year,
         isGuest,
       );
@@ -71,9 +71,9 @@ export function useToyyibPayment() {
         billName: `${year} Renewal Membership`,
         billDescription: billDesc,
         billAmount: amount,
-        billTo: member.name,
-        billEmail: member.email || '',
-        billPhone: member.phone || '',
+        billTo: member.general?.name ?? member.name,
+        billEmail: (member.contact?.email ?? member.email) || '',
+        billPhone: (member.contact?.phone ?? member.phone) || '',
         categoryCode,
         memberId: member.id,
       });
@@ -115,18 +115,18 @@ export function useToyyibPayment() {
 
       const billDesc = ToyyibService.formatEventBillDescription(
         project.title,
-        member.name,
-        member.nationalId,
-        member.phone || '',
+        member.general?.name ?? member.name,
+        member.general?.idNumber ?? member.nationalId ?? member.idNumber,
+        (member.contact?.phone ?? member.phone) || '',
       );
 
       const bill = await ToyyibService.createBill({
         billName: 'Ticketing',
         billDescription: billDesc,
         billAmount: project.ticketPrice,
-        billTo: member.name,
-        billEmail: member.email || '',
-        billPhone: member.phone || '',
+        billTo: member.general?.name ?? member.name,
+        billEmail: (member.contact?.email ?? member.email) || '',
+        billPhone: (member.contact?.phone ?? member.phone) || '',
         categoryCode,
         memberId: member.id,
         projectId: project.id,
