@@ -1536,6 +1536,12 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                           <CheckCircle size={16} className="text-emerald-400 shrink-0" />
                           <p className="text-xs font-semibold text-emerald-400">All basic info filled</p>
                         </div>
+                        {(member?.general?.avatarUrl || (member as any).avatarUrl) && (
+                          <div className="flex items-center justify-between py-2 px-3 rounded-xl bg-white/5">
+                            <span className="text-xs text-white/40">Profile Photo</span>
+                            <img src={member?.general?.avatarUrl || (member as any).avatarUrl} alt="avatar" className="w-8 h-8 rounded-full object-cover border border-white/20" />
+                          </div>
+                        )}
                         {[
                           { label: 'Shirt Style', value: member?.others?.shirtStyle },
                           { label: 'T-Shirt Size', value: member?.others?.tshirtSize },
