@@ -8,7 +8,7 @@ const BUSINESS_CATEGORIES = [
   'Distributor / Exporter / Importer',
 ];
 import { Card, Button, Badge, Modal, useToast, Tabs } from '../ui/Common';
-import { getSpecialOfferSummary, hasSpecialOffer, SPECIAL_OFFER_TYPE_LABELS } from '../../types/member';
+import { getSpecialOfferSummary, hasSpecialOffer } from '../../types/member';
 import type { SpecialOffer } from '../../types';
 import { MembersOnlyOverlay } from '../ui/MembersOnlyOverlay';
 import { LoadingState } from '../ui/Loading';

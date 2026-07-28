@@ -158,7 +158,7 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                   const raw = inlineValues.business?.specialOffer;
                   const structured: SpecialOffer = typeof raw === 'object' && raw !== null
                     ? raw as SpecialOffer
-                    : { type: 'percentage_discount', description: typeof raw === 'string' ? raw : '', terms: '', expiryDate: '' } as SpecialOffer;
+                    : { description: typeof raw === 'string' ? raw : '', terms: '', expiryDate: '' } as SpecialOffer;
                   const update = (patch: Partial<SpecialOffer>) =>
                     setInlineValues({ ...inlineValues, specialOffer: { ...structured, ...patch } });
                   return (

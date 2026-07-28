@@ -17,10 +17,7 @@ export type ShirtSize = 'XS' | 'S' | 'M' | 'L' | 'XL' | '2XL' | '3XL' | '5XL' | 
 export type MembershipStatus = 'paid_due' | 'unpaid_due' | 'terminated' | 'pending' | 'paid' | 'overdue' | 'partial' | 'over paid';
 export type JciSenatorship = { certified: boolean; senatorNumber?: string; boardValidated?: boolean };
 
-export type SpecialOfferType = 'percentage_discount' | 'amount_discount' | 'complimentary_item';
-
 export interface SpecialOffer {
-  type: SpecialOfferType;
   description: string;
   terms?: string;
   expiryDate?: string;
@@ -303,18 +300,11 @@ export interface Member {
   internationalPartnershipTypes?: string[];
 }
 
-export const SPECIAL_OFFER_TYPE_LABELS: Record<SpecialOfferType, string> = {
-  percentage_discount: '% Discount',
-  amount_discount: 'Amount Discount',
-  complimentary_item: 'Complimentary Item',
-};
-
 /** Returns a short display string for any specialOffer value (structured or legacy string). */
 export function getSpecialOfferSummary(offer: SpecialOffer | string | undefined): string {
   if (!offer) return '';
   if (typeof offer === 'string') return offer;
-  const label = SPECIAL_OFFER_TYPE_LABELS[offer.type] ?? offer.type;
-  return `${label}: ${offer.description}`;
+  return offer.description;
 }
 
 /** Returns true if a member has any special offer set. */

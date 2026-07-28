@@ -9,7 +9,7 @@ import { useMembers } from '../../hooks/useMembers';
 import { Advertisement, BenefitUsage } from '../../services/advertisementService';
 import { formatDate, toDate } from '../../utils/dateUtils';
 import { PartnershipDetailModal } from '../dashboard/PartnershipDetailModal';
-import { hasSpecialOffer, getSpecialOfferSummary, SPECIAL_OFFER_TYPE_LABELS, SpecialOffer } from '../../types/member';
+import { hasSpecialOffer, getSpecialOfferSummary, SpecialOffer } from '../../types/member';
 
 type BenefitItem = Advertisement & { _isMemberOffer?: boolean; _memberId?: string; _memberName?: string; _isSelf?: boolean };
 
@@ -57,10 +57,9 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
         const offer = m.business?.specialOffer || (m as any).specialOffer as SpecialOffer | string;
         const offerObj = typeof offer === 'object' ? offer as SpecialOffer : null;
         const summary = getSpecialOfferSummary(offer);
-        const offerTypeLabel = offerObj ? (SPECIAL_OFFER_TYPE_LABELS[offerObj.type] ?? '') : '';
         return {
           id: `member_offer_${m.id}`,
-          title: offerTypeLabel ? `${offerTypeLabel}: ${summary}` : summary,
+          title: summary,
           description: offerObj?.terms || offerObj?.description || (typeof offer === 'string' ? offer : ''),
           type: 'Banner' as const,
           placement: [],

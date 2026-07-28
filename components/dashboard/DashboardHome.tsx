@@ -29,7 +29,7 @@ import { AdvertisementService, Advertisement } from '../../services/advertisemen
 import type { Event } from '../../types';
 import { EventRow } from '../modules/Events/EventRow';
 import { UserRole } from '../../types';
-import { SpecialOffer, SpecialOfferType, SPECIAL_OFFER_TYPE_LABELS, getSpecialOfferSummary } from '../../types/member';
+import { SpecialOffer, getSpecialOfferSummary } from '../../types/member';
 import { motion, AnimatePresence } from 'framer-motion';
 import { EventDetailModal } from '../modules/EventsView';
 import { PartnershipDetailModal } from './PartnershipDetailModal';
