@@ -19,7 +19,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
-import { withDevMode } from '../utils/devMode';
+import { withDevMode, isDevMode } from '../utils/devMode';
 import { calculateAwardProgress as calculateAwardProgressUtil } from '../utils/gamificationUtils';
 import {
     AwardDefinition,
@@ -324,6 +324,7 @@ export class GamificationService {
      * recruitment_count) are silently skipped — they require richer data sources.
      */
     static async checkEligibleBadgesForMember(memberId: string): Promise<void> {
+        if (isDevMode()) return;
         const [awards, existingAwardsSnap, memberDoc] = await Promise.all([
             GamificationService.getAllAwards(),
             getDocs(query(
