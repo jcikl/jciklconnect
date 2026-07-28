@@ -82,7 +82,7 @@ export const ActivityPlansView: React.FC<{ searchQuery?: string }> = ({ searchQu
       resources: formData.get('resources') ? (formData.get('resources') as string).split(',').map(r => r.trim()) : undefined,
       timeline: formData.get('timeline') as string || undefined,
       status: 'Draft',
-      submittedBy: member.name,
+      submittedBy: member.general?.name ?? member.name,
     };
 
     setIsSaving(true);
@@ -108,7 +108,7 @@ export const ActivityPlansView: React.FC<{ searchQuery?: string }> = ({ searchQu
       return;
     }
     try {
-      await submitPlan(planId, member.name);
+      await submitPlan(planId, member.general?.name ?? member.name);
     } catch (err) {
       // Error handled by hook
     }
@@ -124,7 +124,7 @@ export const ActivityPlansView: React.FC<{ searchQuery?: string }> = ({ searchQu
 
     setIsSaving(true);
     try {
-      await reviewPlan(selectedPlan.id!, decision, member.name, comments);
+      await reviewPlan(selectedPlan.id!, decision, member.general?.name ?? member.name, comments);
       setIsReviewModalOpen(false);
       setSelectedPlan(null);
     } catch (err) {
@@ -150,7 +150,7 @@ export const ActivityPlansView: React.FC<{ searchQuery?: string }> = ({ searchQu
 
     setIsSaving(true);
     try {
-      await createNewVersion(selectedPlan.id!, updates, member.name);
+      await createNewVersion(selectedPlan.id!, updates, member.general?.name ?? member.name);
       setIsVersionModalOpen(false);
       setSelectedPlan(null);
     } catch (err) {
@@ -263,7 +263,7 @@ export const ActivityPlansView: React.FC<{ searchQuery?: string }> = ({ searchQu
                       >
                         <Eye size={14} />
                       </Button>
-                      {plan.status === 'Draft' && member && plan.submittedBy === member.name && (
+                      {plan.status === 'Draft' && member && plan.submittedBy === (member.general?.name ?? member.name) && (
                         <>
                           <Button
                             variant="ghost"
@@ -296,7 +296,7 @@ export const ActivityPlansView: React.FC<{ searchQuery?: string }> = ({ searchQu
                           <CheckCircle size={14} />
                         </Button>
                       )}
-                      {plan.status === 'Rejected' && member && plan.submittedBy === member.name && (
+                      {plan.status === 'Rejected' && member && plan.submittedBy === (member.general?.name ?? member.name) && (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -308,7 +308,7 @@ export const ActivityPlansView: React.FC<{ searchQuery?: string }> = ({ searchQu
                           <History size={14} />
                         </Button>
                       )}
-                      {member && plan.submittedBy === member.name && plan.status === 'Draft' && (
+                      {member && plan.submittedBy === (member.general?.name ?? member.name) && plan.status === 'Draft' && (
                         <Button
                           variant="ghost"
                           size="sm"

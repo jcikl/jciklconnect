@@ -601,7 +601,7 @@ const ClubMembersModal: React.FC<ClubMembersModalProps> = ({ isOpen, onClose, cl
     };
 
     const clubMembers = members.filter(m => clubMemberIds.includes(m.id));
-    const isOwner = currentMember && club.lead === currentMember.name;
+    const isOwner = currentMember && club.lead === (currentMember.general?.name ?? currentMember.name);
 
     return (
         <>
@@ -621,18 +621,18 @@ const ClubMembersModal: React.FC<ClubMembersModalProps> = ({ isOpen, onClose, cl
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 rounded-full bg-jci-blue text-white flex items-center justify-center font-semibold">
-                                            {member.name.charAt(0).toUpperCase()}
+                                            {(member.general?.name ?? member.name).charAt(0).toUpperCase()}
                                         </div>
                                         <div>
-                                            <p className="font-semibold text-slate-900">{member.name}</p>
-                                            <p className="text-xs text-slate-500">{member.email}</p>
+                                            <p className="font-semibold text-slate-900">{member.general?.name ?? member.name}</p>
+                                            <p className="text-xs text-slate-500">{member.contact?.email ?? member.email}</p>
                                         </div>
                                     </div>
                                     {isOwner && member.id !== currentMember?.id && (
                                         <Button
                                             variant="ghost"
                                             size="sm"
-                                            onClick={() => setConfirmState({ open: true, title: 'Remove Member', message: `Remove ${member.name} from ${club.name}?`, variant: 'warning', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); try { await onRemoveMember(member.id); await loadMembers(); } catch (err) { /* Error handled */ } } })}
+                                            onClick={() => setConfirmState({ open: true, title: 'Remove Member', message: `Remove ${member.general?.name ?? member.name} from ${club.name}?`, variant: 'warning', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); try { await onRemoveMember(member.id); await loadMembers(); } catch (err) { /* Error handled */ } } })}
                                             className="text-red-500 hover:text-red-700"
                                         >
                                             Remove

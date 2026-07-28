@@ -495,7 +495,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     setLocalRegistered(false);
     setUpdatingRegId('self');
     try {
-      await onCancelRegistration(member.id, member.id, member.name ?? member.id, 'self');
+      await onCancelRegistration(member.id, member.id, (member.general?.name ?? member.name) ?? member.id, 'self');
       setMyRegistration((prev) => prev ? { ...prev, status: 'cancelled', cancelledByRole: 'self' } : { id: '', eventId: event.id, memberId: member.id, status: 'cancelled', cancelledByRole: 'self', createdAt: new Date().toISOString() });
       showToast('Registration cancelled', 'success');
     } catch {
@@ -511,11 +511,11 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     setUpdatingRegId(reg.id);
     const role: 'admin' | 'board' | 'committee' = isAdmin ? 'admin' : isBoard ? 'board' : 'committee';
     try {
-      await onCancelRegistration(reg.memberId, member.id, member.name ?? member.id, role);
+      await onCancelRegistration(reg.memberId, member.id, (member.general?.name ?? member.name) ?? member.id, role);
       setParticipations((prev) =>
         prev.map((r) =>
           r.id === reg.id
-            ? { ...r, status: 'cancelled' as const, cancelledByRole: role, cancelledByName: member.name ?? member.id, cancelledAt: new Date().toISOString() }
+            ? { ...r, status: 'cancelled' as const, cancelledByRole: role, cancelledByName: (member.general?.name ?? member.name) ?? member.id, cancelledAt: new Date().toISOString() }
             : r
         )
       );
