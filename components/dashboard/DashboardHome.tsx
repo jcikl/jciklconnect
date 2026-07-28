@@ -1681,11 +1681,10 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                                 {['Top', 'Middle', 'Frontline'].map(opt => (
                                   <button key={opt} type="button"
                                     onClick={() => set('levelOfManagement', opt)}
-                                    className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${
-                                      val('levelOfManagement', member?.business?.levelOfManagement ?? '') === opt
-                                        ? 'bg-blue-500 text-white'
-                                        : 'bg-white/10 text-white/60 hover:bg-white/20'
-                                    }`}>
+                                    className="flex-1 py-2 rounded-lg text-xs font-semibold transition-colors"
+                                    style={val('levelOfManagement', member?.business?.levelOfManagement ?? '') === opt
+                                      ? { backgroundColor: '#0097D7', color: '#fff' }
+                                      : { backgroundColor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)' }}>
                                     {opt}
                                   </button>
                                 ))}
