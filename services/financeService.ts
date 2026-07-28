@@ -2460,8 +2460,16 @@ export class FinanceService {
             transactionId: [],
           };
 
+          const zeroRecord = {
+            year: yearNum,
+            dues: duesAmount,
+            amount: 0,
+            status: 'pending',
+            transactionId: [],
+          };
           const zeroTxUpdates: Record<string, unknown> = {
             membership: currentMembership,
+            [`jciCareer.membershipDuesHistory.${yearStr}`]: zeroRecord,
             updatedAt: Timestamp.now(),
           };
 
@@ -2510,8 +2518,18 @@ export class FinanceService {
           paymentDate: paymentDate ?? null,
         };
 
+        const duesHistoryRecord = {
+          year: yearNum,
+          dues: duesAmount,
+          amount: totalAmount,
+          status: status,
+          transactionId: transactionIds,
+          purpose: membershipPurpose,
+          paymentDate: paymentDate ?? null,
+        };
         const updates: Record<string, unknown> = {
           membership: currentMembership,
+          [`jciCareer.membershipDuesHistory.${yearStr}`]: duesHistoryRecord,
           updatedAt: Timestamp.now()
         };
 
@@ -2970,7 +2988,7 @@ export class FinanceService {
 
           // Validate membership type eligibility
           if (membershipType === 'Visiting') {
-            const nationality = member.general?.nationality ?? member.nationality;
+            const nationality = member.general?.nationality;
             if (nationality === 'Malaysia' || !nationality) {
               validationErrors.push({
                 memberId,
