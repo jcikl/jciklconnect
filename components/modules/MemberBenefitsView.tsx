@@ -11,7 +11,7 @@ import { formatDate, toDate } from '../../utils/dateUtils';
 import { PartnershipDetailModal } from '../dashboard/PartnershipDetailModal';
 import { hasSpecialOffer, getSpecialOfferSummary, SPECIAL_OFFER_TYPE_LABELS, SpecialOffer } from '../../types/member';
 
-type BenefitItem = Advertisement & { _isMemberOffer?: boolean; _memberId?: string; _memberName?: string };
+type BenefitItem = Advertisement & { _isMemberOffer?: boolean; _memberId?: string; _memberName?: string; _isSelf?: boolean };
 
 type FilterTab = 'all' | 'new' | 'expiring' | 'unclaimed' | 'claimed';
 
@@ -51,8 +51,9 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
 
   const memberOffers = useMemo((): BenefitItem[] => {
     return members
-      .filter(m => hasSpecialOffer(m.business?.specialOffer || (m as any).specialOffer) && m.id !== member?.id)
+      .filter(m => hasSpecialOffer(m.business?.specialOffer || (m as any).specialOffer))
       .map(m => {
+        const isSelf = m.id === member?.id;
         const offer = m.business?.specialOffer || (m as any).specialOffer as SpecialOffer | string;
         const offerObj = typeof offer === 'object' ? offer as SpecialOffer : null;
         const summary = getSpecialOfferSummary(offer);
@@ -76,7 +77,7 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
           updatedAt: m.updatedAt || new Date(),
           _isMemberOffer: true,
           _memberId: m.id,
-          _memberName: m.general?.name || (m as any).name || '',
+          _memberName: isSelf ? 'Your Offer' : (m.general?.name || (m as any).name || ''),
         } as BenefitItem;
       });
   }, [members, member?.id]);
