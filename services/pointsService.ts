@@ -487,10 +487,10 @@ export class PointsService {
               return requestingMemberId ? m.id === requestingMemberId : false;
             }
             if (visibility === 'members_only') {
-              const lbVis = m.jciCareer?.leaderboardVisibility ?? m.leaderboardVisibility;
+              const lbVis = m.jciCareer?.leaderboardVisibility;
               return lbVis === 'members_only' || lbVis === 'public';
             }
-            return (m.jciCareer?.leaderboardVisibility ?? m.leaderboardVisibility) !== 'private';
+            return m.jciCareer?.leaderboardVisibility !== 'private';
           })
           .map(m => {
             let hash = 0;
@@ -520,11 +520,11 @@ export class PointsService {
             return requestingMemberId ? m.id === requestingMemberId : false;
           }
           if (visibility === 'members_only') {
-            const lbVis = m.jciCareer?.leaderboardVisibility ?? m.leaderboardVisibility;
+            const lbVis = m.jciCareer?.leaderboardVisibility;
             return lbVis === 'members_only' || lbVis === 'public';
           }
           // For public view, display anyone unless they explicitly opted out to 'private'
-          return (m.jciCareer?.leaderboardVisibility ?? m.leaderboardVisibility) !== 'private';
+          return m.jciCareer?.leaderboardVisibility !== 'private';
         })
         .map(m => {
           if (year) {
