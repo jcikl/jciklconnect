@@ -1630,98 +1630,101 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                     </div>
                 )}
                 {profileTab === 'professional' && (
-                  professionalCount === 0
-                    ? <div className="space-y-2">
-                        <div className="flex items-center gap-2 pb-1 mb-1">
-                          <CheckCircle size={16} className="text-emerald-400 shrink-0" />
+                  <div className="space-y-3">
+                    {/* Filled fields — always shown as read-only */}
+                    {[
+                      { label: 'Position / Title', value: member?.business?.departmentAndPosition },
+                      { label: 'Business Categories', value: Array.isArray(member?.business?.businessCategory) && member.business!.businessCategory!.length > 0 ? member.business!.businessCategory!.join(', ') : undefined },
+                      { label: 'Company Description', value: member?.business?.companyDescription },
+                      { label: 'Ideal Referral', value: Array.isArray(member?.business?.idealReferrals) ? member.business!.idealReferrals!.join(', ') : (member?.idealReferralIndustry ?? undefined) },
+                      { label: 'Special Offer', value: (() => { const o = member?.business?.specialOffer ?? (member as any)?.specialOffer; return o ? getSpecialOfferSummary(o as SpecialOffer) : undefined; })() },
+                      { label: 'Company Website', value: member?.business?.companyWebsite },
+                      { label: 'International Business', value: member?.business?.acceptInternationalBusiness },
+                      { label: 'Level of Management', value: member?.business?.levelOfManagement },
+                    ].filter(r => r.value).map(r => (
+                      <div key={r.label} className="flex items-start justify-between gap-3 py-2 px-3 rounded-xl bg-white/5">
+                        <span className="text-xs text-white/40 shrink-0">{r.label}</span>
+                        <span className="text-xs text-white/80 font-medium text-right">{r.value}</span>
+                      </div>
+                    ))}
+                    {/* Missing fields — inputs */}
+                    {professionalCount === 0
+                      ? <div className="flex items-center gap-2 pt-1">
+                          <CheckCircle size={14} className="text-emerald-400 shrink-0" />
                           <p className="text-xs font-semibold text-emerald-400">All professional info filled</p>
                         </div>
-                        {[
-                          { label: 'Position / Title', value: member?.business?.departmentAndPosition },
-                          { label: 'Business Categories', value: Array.isArray(member?.business?.businessCategory) ? member!.business!.businessCategory!.join(', ') : undefined },
-                          { label: 'Company Description', value: member?.business?.companyDescription },
-                          { label: 'Ideal Referral', value: Array.isArray(member?.business?.idealReferrals) ? member!.business!.idealReferrals!.join(', ') : (member?.idealReferralIndustry ?? undefined) },
-                          { label: 'Company Website', value: member?.business?.companyWebsite },
-                          { label: 'International Business', value: member?.business?.acceptInternationalBusiness },
-                          { label: 'Level of Management', value: member?.business?.levelOfManagement },
-                        ].filter(r => r.value).map(r => (
-                          <div key={r.label} className="flex items-start justify-between gap-3 py-2 px-3 rounded-xl bg-white/5">
-                            <span className="text-xs text-white/40 shrink-0">{r.label}</span>
-                            <span className="text-xs text-white/80 font-medium text-right">{r.value}</span>
-                          </div>
-                        ))}
-                      </div>
-                    : <div className="space-y-3">
-                      {missing.find(f => f.label === 'Position / title') && (
-                        <Input label="Position / Title"
-                          value={val('departmentAndPosition', member?.business?.departmentAndPosition ?? member?.business?.departmentAndPosition ?? '')}
-                          onChange={e => set('departmentAndPosition', e.target.value)} />
-                      )}
-                      {missing.find(f => f.label === 'Company description') && (
-                        <Textarea label="Company Description" rows={2}
-                          value={val('companyDescription', member?.business?.companyDescription ?? '')}
-                          onChange={e => set('companyDescription', e.target.value)} />
-                      )}
-                      {missing.find(f => f.label === 'Ideal referral') && (
-                        <Input label="Ideal Referral" placeholder="e.g. SME owners in F&B industry"
-                          value={val('idealReferral', Array.isArray(member?.business?.idealReferrals) ? member.business!.idealReferrals!.join(', ') : '')}
-                          onChange={e => set('idealReferral', e.target.value)} />
-                      )}
-                      {missing.find(f => f.label === 'Special member offer') && (() => {
-                        const rawOffer = (profileDraft.specialOffer as unknown) ?? member?.business?.specialOffer ?? (member as any)?.specialOffer;
-                        const offerObj = ((rawOffer && typeof rawOffer === 'object') ? rawOffer : { type: 'percentage_discount' as SpecialOfferType, description: typeof rawOffer === 'string' ? rawOffer : '', terms: '', expiryDate: '', logoUrl: '', imageUrl: '', status: 'Active' as const }) as SpecialOffer;
-                        const patch = (k: string, v: string) => setProfileDraft(d => ({ ...d, specialOffer: { ...offerObj, [k]: v } } as unknown as typeof d));
-                        return (
-                          <div className="space-y-2">
-                            <label className="block text-xs font-semibold text-slate-600">Special Member Offer</label>
-                            <div className="flex items-center justify-between py-2 px-3 rounded-xl bg-white/5">
-                              <span className="text-xs text-white/40 shrink-0">Partner Name</span>
-                              <span className="text-xs text-white/70 font-medium">{member?.companyName || '—'}</span>
-                            </div>
-                            <Select label="Member Benefit"
-                              value={offerObj.type}
-                              onChange={e => patch('type', e.target.value)}
-                              options={Object.entries(SPECIAL_OFFER_TYPE_LABELS).map(([v, l]) => ({ value: v, label: l }))} />
-                            <Input label="Benefit Description" placeholder="e.g. 10% discount for JCI KL members"
-                              value={offerObj.description ?? ''}
-                              onChange={e => patch('description', e.target.value)} />
-                            <Textarea label="Terms & Conditions" rows={2} placeholder="e.g. Valid for new clients only"
-                              value={offerObj.terms ?? ''}
-                              onChange={e => patch('terms', e.target.value)} />
-                            <Input label="Logo URL" type="url" placeholder="https://your-logo.png"
-                              value={offerObj.logoUrl ?? ''}
-                              onChange={e => patch('logoUrl', e.target.value)} />
-                            <Input label="Ad Banner URL" type="url" placeholder="https://your-banner.png"
-                              value={offerObj.imageUrl ?? ''}
-                              onChange={e => patch('imageUrl', e.target.value)} />
-                            <Select label="Status"
-                              value={offerObj.status ?? 'Active'}
-                              onChange={e => patch('status', e.target.value)}
-                              options={[{ value: 'Active', label: 'Active' }, { value: 'Paused', label: 'Paused' }]} />
-                            <Input label="Expiry Date (optional)" type="date"
-                              value={offerObj.expiryDate ?? ''}
-                              onChange={e => patch('expiryDate', e.target.value)} />
-                          </div>
-                        );
-                      })()}
-                      {missing.find(f => f.label === 'Company website') && (
-                        <Input label="Company Website" type="url" placeholder="https://"
-                          value={val('companyWebsite', member?.business?.companyWebsite ?? '')}
-                          onChange={e => set('companyWebsite', e.target.value)} />
-                      )}
-                      {missing.find(f => f.label === 'International business') && (
-                        <Select label="International Business"
-                          value={val('acceptInternationalBusiness', member?.business?.acceptInternationalBusiness ?? '')}
-                          onChange={e => set('acceptInternationalBusiness', e.target.value)}
-                          options={[{ value: '', label: 'Select…' }, { value: 'Yes', label: 'Yes' }, { value: 'No', label: 'No' }, { value: 'Willing to Explore', label: 'Willing to Explore' }]} />
-                      )}
-                      {missing.find(f => f.label === 'Level of management') && (
-                        <Select label="Level of Management"
-                          value={val('levelOfManagement', member?.business?.levelOfManagement ?? '')}
-                          onChange={e => set('levelOfManagement', e.target.value)}
-                          options={[{ value: '', label: 'Select…' }, { value: 'Top', label: 'Top' }, { value: 'Middle', label: 'Middle' }, { value: 'Frontline', label: 'Frontline' }]} />
-                      )}
-                    </div>
+                      : <>
+                          {missing.find(f => f.label === 'Position / title') && (
+                            <Input label="Position / Title"
+                              value={val('departmentAndPosition', member?.business?.departmentAndPosition ?? '')}
+                              onChange={e => set('departmentAndPosition', e.target.value)} />
+                          )}
+                          {missing.find(f => f.label === 'Company description') && (
+                            <Textarea label="Company Description" rows={2}
+                              value={val('companyDescription', member?.business?.companyDescription ?? '')}
+                              onChange={e => set('companyDescription', e.target.value)} />
+                          )}
+                          {missing.find(f => f.label === 'Ideal referral') && (
+                            <Input label="Ideal Referral" placeholder="e.g. SME owners in F&B industry"
+                              value={val('idealReferral', Array.isArray(member?.business?.idealReferrals) ? member.business!.idealReferrals!.join(', ') : '')}
+                              onChange={e => set('idealReferral', e.target.value)} />
+                          )}
+                          {missing.find(f => f.label === 'Special member offer') && (() => {
+                            const rawOffer = (profileDraft.specialOffer as unknown) ?? member?.business?.specialOffer ?? (member as any)?.specialOffer;
+                            const offerObj = ((rawOffer && typeof rawOffer === 'object') ? rawOffer : { type: 'percentage_discount' as SpecialOfferType, description: typeof rawOffer === 'string' ? rawOffer : '', terms: '', expiryDate: '', logoUrl: '', imageUrl: '', status: 'Active' as const }) as SpecialOffer;
+                            const patch = (k: string, v: string) => setProfileDraft(d => ({ ...d, specialOffer: { ...offerObj, [k]: v } } as unknown as typeof d));
+                            return (
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between py-2 px-3 rounded-xl bg-white/5">
+                                  <span className="text-xs text-white/40 shrink-0">Partner Name</span>
+                                  <span className="text-xs text-white/70 font-medium">{member?.companyName || '—'}</span>
+                                </div>
+                                <Select label="Member Benefit"
+                                  value={offerObj.type}
+                                  onChange={e => patch('type', e.target.value)}
+                                  options={Object.entries(SPECIAL_OFFER_TYPE_LABELS).map(([v, l]) => ({ value: v, label: l }))} />
+                                <Input label="Benefit Description" placeholder="e.g. 10% discount for JCI KL members"
+                                  value={offerObj.description ?? ''}
+                                  onChange={e => patch('description', e.target.value)} />
+                                <Textarea label="Terms & Conditions" rows={2} placeholder="e.g. Valid for new clients only"
+                                  value={offerObj.terms ?? ''}
+                                  onChange={e => patch('terms', e.target.value)} />
+                                <Input label="Logo URL" type="url" placeholder="https://your-logo.png"
+                                  value={offerObj.logoUrl ?? ''}
+                                  onChange={e => patch('logoUrl', e.target.value)} />
+                                <Input label="Ad Banner URL" type="url" placeholder="https://your-banner.png"
+                                  value={offerObj.imageUrl ?? ''}
+                                  onChange={e => patch('imageUrl', e.target.value)} />
+                                <Select label="Status"
+                                  value={offerObj.status ?? 'Active'}
+                                  onChange={e => patch('status', e.target.value)}
+                                  options={[{ value: 'Active', label: 'Active' }, { value: 'Paused', label: 'Paused' }]} />
+                                <Input label="Expiry Date (optional)" type="date"
+                                  value={offerObj.expiryDate ?? ''}
+                                  onChange={e => patch('expiryDate', e.target.value)} />
+                              </div>
+                            );
+                          })()}
+                          {missing.find(f => f.label === 'Company website') && (
+                            <Input label="Company Website" type="url" placeholder="https://"
+                              value={val('companyWebsite', member?.business?.companyWebsite ?? '')}
+                              onChange={e => set('companyWebsite', e.target.value)} />
+                          )}
+                          {missing.find(f => f.label === 'International business') && (
+                            <Select label="International Business"
+                              value={val('acceptInternationalBusiness', member?.business?.acceptInternationalBusiness ?? '')}
+                              onChange={e => set('acceptInternationalBusiness', e.target.value)}
+                              options={[{ value: '', label: 'Select…' }, { value: 'Yes', label: 'Yes' }, { value: 'No', label: 'No' }, { value: 'Willing to Explore', label: 'Willing to Explore' }]} />
+                          )}
+                          {missing.find(f => f.label === 'Level of management') && (
+                            <Select label="Level of Management"
+                              value={val('levelOfManagement', member?.business?.levelOfManagement ?? '')}
+                              onChange={e => set('levelOfManagement', e.target.value)}
+                              options={[{ value: '', label: 'Select…' }, { value: 'Top', label: 'Top' }, { value: 'Middle', label: 'Middle' }, { value: 'Frontline', label: 'Frontline' }]} />
+                          )}
+                        </>
+                    }
+                  </div>
                 )}
               </div>
 
