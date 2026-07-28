@@ -314,13 +314,13 @@ export class CommunicationService {
       const { MembersService } = await import('./membersService');
       const member = await MembersService.getMemberById(memberId);
       
-      if (!member?.email) {
+      if (!(member?.contact?.email ?? member?.email)) {
         throw new Error(`Member ${memberId} not found or has no email`);
       }
 
       // Send email
       const emailMessage: EmailMessage = {
-        to: member.email,
+        to: (member.contact?.email ?? member.email)!,
         subject,
         text: message,
         html: options?.html || message.replace(/\n/g, '<br>'),

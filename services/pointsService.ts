@@ -2361,8 +2361,8 @@ export class PointsService {
       }
 
       const member = memberSnap.data() as Member;
-      const memberName = member.name || '';
-      const memberFullName = member.fullName || member.general?.name || '';
+      const memberName = (member.general?.name ?? member.name) || '';
+      const memberFullName = (member.general?.fullName ?? member.fullName) || (member.general?.name ?? '') || '';
 
       // 1. Calculate Leadership & Training Points from Projects
       let leadership = 0;

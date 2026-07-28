@@ -125,7 +125,7 @@ export class AIPredictionService {
         : 20; // Default if no history
 
       // Calculate member interest (based on past attendance to similar events)
-      const activeMembers = allMembers.filter(m => m.attendanceRate > 50);
+      const activeMembers = allMembers.filter(m => (m.jciCareer?.attendanceCheckins ?? m.attendanceCheckins ?? m.attendanceRate ?? 0) > 50);
       const memberInterest = activeMembers.length * 0.3; // 30% of active members typically attend
 
       // Time of year factor (events in Q1 and Q4 tend to have higher attendance)
@@ -238,7 +238,7 @@ export class AIPredictionService {
 
       // Member engagement (average attendance rate of team)
       const memberEngagement = teamMembers.length > 0
-        ? teamMembers.reduce((sum, m) => sum + m.attendanceRate, 0) / teamMembers.length
+        ? teamMembers.reduce((sum, m) => sum + (m.jciCareer?.attendanceCheckins ?? m.attendanceCheckins ?? m.attendanceRate ?? 0), 0) / teamMembers.length
         : 50;
 
       // Calculate success probability
@@ -573,19 +573,20 @@ export class AIPredictionService {
       let churnScore = 0;
 
       // Attendance rate factor
-      if (member.attendanceRate < 30) {
+      const attendanceScore = member.jciCareer?.attendanceCheckins ?? member.attendanceCheckins ?? member.attendanceRate ?? 0;
+      if (attendanceScore < 30) {
         churnScore += 40;
         riskFactors.push({
           factor: 'Low Attendance Rate',
           severity: 'High',
-          description: `Attendance rate is ${member.attendanceRate}%, well below average`,
+          description: `Attendance score is ${attendanceScore}, well below average`,
         });
-      } else if (member.attendanceRate < 50) {
+      } else if (attendanceScore < 50) {
         churnScore += 20;
         riskFactors.push({
           factor: 'Below Average Attendance',
           severity: 'Medium',
-          description: `Attendance rate is ${member.attendanceRate}%, below average`,
+          description: `Attendance score is ${attendanceScore}, below average`,
         });
       }
 
