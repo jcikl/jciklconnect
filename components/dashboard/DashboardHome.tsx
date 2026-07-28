@@ -1716,9 +1716,10 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                           options={[{ value: '', label: 'Select…' }, { value: 'Yes', label: 'Yes' }, { value: 'No', label: 'No' }, { value: 'Willing to Explore', label: 'Willing to Explore' }]} />
                       )}
                       {missing.find(f => f.label === 'Level of management') && (
-                        <Input label="Level of Management" placeholder="e.g. Senior Management"
+                        <Select label="Level of Management"
                           value={val('levelOfManagement', member?.business?.levelOfManagement ?? '')}
-                          onChange={e => set('levelOfManagement', e.target.value)} />
+                          onChange={e => set('levelOfManagement', e.target.value)}
+                          options={[{ value: '', label: 'Select…' }, { value: 'Top', label: 'Top' }, { value: 'Middle', label: 'Middle' }, { value: 'Frontline', label: 'Frontline' }]} />
                       )}
                     </div>
                 )}
