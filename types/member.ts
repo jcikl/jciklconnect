@@ -536,6 +536,8 @@ export interface BusinessProfile {
   description: string;
   website: string;
   offer: string;
+  offerTerms?: string;
+  offerExpiry?: string;
   logo: string;
   internationalConnections?: InternationalConnection[];
   globalNetworkEnabled?: boolean;

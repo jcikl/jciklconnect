@@ -828,6 +828,12 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                       <Gift size={11} /> JCI Member Deal
                     </p>
                     <p className="text-sm font-semibold text-amber-900 leading-snug">{biz.offer}</p>
+                    {biz.offerTerms && (
+                      <p className="text-xs text-amber-700/70 mt-1.5 leading-relaxed"><span className="font-semibold">T&C:</span> {biz.offerTerms}</p>
+                    )}
+                    {biz.offerExpiry && (
+                      <p className="text-xs text-amber-600/60 mt-1">Valid until {biz.offerExpiry}</p>
+                    )}
                   </div>
                 )}
               </div>
@@ -931,6 +937,12 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                       JCI Member Deal
                     </span>
                     <p className="text-slate-700 font-medium leading-relaxed">{selectedBiz.offer}</p>
+                    {selectedBiz.offerTerms && (
+                      <p className="text-xs text-slate-500 mt-1.5 leading-relaxed"><span className="font-semibold">T&C:</span> {selectedBiz.offerTerms}</p>
+                    )}
+                    {selectedBiz.offerExpiry && (
+                      <p className="text-xs text-slate-400 mt-1">Valid until {selectedBiz.offerExpiry}</p>
+                    )}
                   </div>
                 )}
               </div>
