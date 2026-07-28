@@ -225,6 +225,13 @@ export class MembersService {
       for (const d of snap3.docs) {
         await PointsService.recalculateMemberRadarStats(d.id);
       }
+
+      // 5. Also check general.fullName (nested path)
+      const q4 = query(collection(db, COLLECTIONS.MEMBERS), where('general.fullName', '==', trimmed));
+      const snap4 = await getDocs(q4);
+      for (const d of snap4.docs) {
+        await PointsService.recalculateMemberRadarStats(d.id);
+      }
     } catch (e) {
       errorLoggingService.logError(e instanceof Error ? e : new Error(String(e)), { context: 'MembersService.recalculateIntroducerStats' });
     }
@@ -433,6 +440,43 @@ export class MembersService {
       existing?.business?.industry;
     if (industry !== undefined) {
       result.industry = industry;
+    }
+
+    // Remove flat fields that have been migrated to nested sub-objects.
+    // Kept flat intentionally: loId, role, churnRisk, companyName, industry,
+    // birthdayMMDD (denorm query-index fields), and fields with no nested equivalent
+    // (skills, tier, mentorId, menteeIds, badges, etc.).
+    const MIGRATED_FLAT_FIELDS = [
+      // general.*
+      'name', 'fullName', 'chineseName', 'chiName',
+      'idNumber', 'nationalId', 'dob', 'dateOfBirth',
+      'gender', 'race', 'ethnicity', 'nationality', 'birthPlace', 'dietaryPreference',
+      'avatarUrl', 'avatar',
+      // contact.*
+      'email', 'phone', 'alternatePhone', 'address',
+      'whatsappJoined', 'whatsappGroup', 'whatsappgroup',
+      'linkedin', 'linkedIn', 'facebook', 'instagram', 'wechat', 'weChat',
+      'emergencyContactName', 'emergencyContact', 'emergencyContactPhone', 'emergencyContactRelationship',
+      // others.*
+      'bio', 'hobbies', 'shirtStyle', 'cutStyle', 'tshirtSize', 'jacketSize', 'embroideredName', 'tshirtStatus',
+      // business.*
+      'companyWebsite', 'companyLogoUrl', 'introduction', 'companyDescription',
+      'businessCategory', 'category', 'specialOffer', 'offerToMember',
+      'acceptInternationalBusiness', 'idealReferral', 'idealReferrals', 'connections',
+      'levelOfManagement', 'departmentAndPosition', 'interestedIndustries', 'idealReferralTypes',
+      'profession', 'title', 'position',
+      // jciCareer.*
+      'joinDate', 'joinedDate', 'membershipType', 'introducer', 'probationTasks',
+      'promotionProgress', 'isDuesPaidCurrentYear',
+      'attendanceCheckins', 'attendanceMonths', 'attendanceYear',
+      'badgesCount', 'projectsCount', 'trainingsCount',
+      'senatorCertified', 'senatorshipId', 'senatorshipBoardValidated',
+      'currentBoardYear', 'currentBoardPosition', 'isCurrentBoardMember', 'boardHistory',
+      'points', 'engagementProgress', 'radarStats', 'radarStatsByYear', 'membershipDuesHistory',
+      'leaderboardVisibility', 'hasPaidInitiationFee', 'senatorshipValidatedAt', 'senatorshipValidatedBy',
+    ];
+    for (const key of MIGRATED_FLAT_FIELDS) {
+      delete (result as Record<string, unknown>)[key];
     }
 
     return result;
