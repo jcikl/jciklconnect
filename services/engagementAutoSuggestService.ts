@@ -132,7 +132,7 @@ export const EngagementAutoSuggestService = {
 
     if (!member) throw new Error('Member not found');
 
-    const existingProgress = (member.jciCareer?.engagementProgress ?? member.engagementProgress)?.[year] ?? {};
+    const existingProgress = member.jciCareer?.engagementProgress?.[year] ?? {};
     const results: AutoSuggestResult[] = [];
 
     // Track which requirement keys have already been handled (first match wins)

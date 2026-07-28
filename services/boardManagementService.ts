@@ -505,7 +505,7 @@ export class BoardManagementService {
           member.business?.companyName,
           member.companyName,
           member.business?.position,
-          member.business?.departmentAndPosition ?? member.departmentAndPosition
+          member.business?.departmentAndPosition
         ),
       };
 
