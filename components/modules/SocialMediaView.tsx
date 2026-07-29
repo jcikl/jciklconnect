@@ -1,14 +1,16 @@
 import React, { useState, useMemo } from 'react';
 import {
   Share2, Plus, X, Check, ChevronRight, Sparkles, Facebook,
-  Clock, Eye, Send, RotateCcw, Calendar, Megaphone, Loader2,
+  Clock, Eye, Send, RotateCcw, Calendar, Megaphone, Loader2, Settings, Zap,
 } from 'lucide-react';
 import { Button, Modal, Badge, Drawer, useToast } from '../ui/Common';
 import { Input, Textarea, Select } from '../ui/Form';
 import { useAuth } from '../../hooks/useAuth';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useSocialPosts } from '../../hooks/useSocialPosts';
+import { useSocialPersonas } from '../../hooks/useSocialPersonas';
 import { SocialPostService } from '../../services/socialPostService';
+import { SocialPersonaConfig } from './SocialPersonaConfig';
 import type { SocialPost, SocialPostStatus, SocialPostPlatform, SocialPostCreateInput } from '../../types/socialPost';
 import { SOCIAL_POST_STATUS_LABELS, SOCIAL_POST_PLATFORM_LABELS } from '../../types/socialPost';
 
@@ -51,9 +53,9 @@ function formatDateTime(iso?: string) {
 
 // ── Tab definition ─────────────────────────────────────────────────────────────
 
-type TabKey = 'all' | SocialPostStatus;
+type TabKey = 'all' | SocialPostStatus | 'settings';
 
-const BOD_TABS: { key: TabKey; label: string }[] = [
+const BOD_TABS: { key: TabKey; label: string; icon?: React.ReactNode }[] = [
   { key: 'all', label: 'All' },
   { key: 'pending_review', label: 'Pending Review' },
   { key: 'approved', label: 'Approved' },
@@ -61,6 +63,7 @@ const BOD_TABS: { key: TabKey; label: string }[] = [
   { key: 'published', label: 'Published' },
   { key: 'draft', label: 'Drafts' },
   { key: 'rejected', label: 'Rejected' },
+  { key: 'settings', label: 'AI Personas', icon: <Settings size={11} /> },
 ];
 
 const MEMBER_TABS: { key: TabKey; label: string }[] = [
@@ -149,8 +152,8 @@ export const SocialMediaView: React.FC = () => {
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
-            {tab.label}
-            {(counts[tab.key] ?? 0) > 0 && (
+            {tab.icon}{tab.label}
+            {tab.key !== 'settings' && (counts[tab.key] ?? 0) > 0 && (
               <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${activeTab === tab.key ? 'bg-white/20' : 'bg-slate-200'}`}>
                 {counts[tab.key]}
               </span>
@@ -159,8 +162,10 @@ export const SocialMediaView: React.FC = () => {
         ))}
       </div>
 
-      {/* Post list */}
-      {loading ? (
+      {/* Post list / Settings panel */}
+      {activeTab === 'settings' ? (
+        <SocialPersonaConfig />
+      ) : loading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 size={24} className="animate-spin text-slate-400" />
         </div>
@@ -234,6 +239,12 @@ export const SocialMediaView: React.FC = () => {
             try {
               await updatePost(selectedPost.id, { editedContent });
               setSelectedPost(p => p ? { ...p, editedContent } : p);
+            } catch { showToast('Failed to save', 'error'); }
+          }}
+          onUpdatePlatformContent={async (platformContent) => {
+            try {
+              await updatePost(selectedPost.id, { platformContent, aiGenerated: true });
+              setSelectedPost(p => p ? { ...p, platformContent, aiGenerated: true } : p);
             } catch { showToast('Failed to save', 'error'); }
           }}
           onDelete={async () => {
@@ -421,25 +432,55 @@ const ReviewDrawer: React.FC<{
   onSchedule: (scheduledAt: string) => Promise<void>;
   onMarkPublished: () => Promise<void>;
   onUpdateContent: (content: string) => Promise<void>;
+  onUpdatePlatformContent: (platformContent: Partial<Record<SocialPostPlatform, string>>) => Promise<void>;
   onDelete: () => Promise<void>;
-}> = ({ post, isBod, isAdmin, memberId, onClose, onSubmitForReview, onApprove, onReject, onSchedule, onMarkPublished, onUpdateContent, onDelete }) => {
+}> = ({ post, isBod, isAdmin, memberId, onClose, onSubmitForReview, onApprove, onReject, onSchedule, onMarkPublished, onUpdateContent, onUpdatePlatformContent, onDelete }) => {
+  const isMultiPlatform = post.platforms.length > 1;
+  const [activePlatform, setActivePlatform] = useState<SocialPostPlatform>(post.platforms[0]);
   const [editedContent, setEditedContent] = useState(post.editedContent ?? post.rawContent);
+  const [platformContent, setPlatformContent] = useState<Partial<Record<SocialPostPlatform, string>>>(post.platformContent ?? {});
   const [tone, setTone] = useState('professional and engaging');
   const [rewriting, setRewriting] = useState(false);
+  const [generatingAll, setGeneratingAll] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectForm, setShowRejectForm] = useState(false);
   const [scheduledAt, setScheduledAt] = useState(post.scheduledAt?.slice(0, 16) ?? '');
   const [showScheduleForm, setShowScheduleForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const { showToast } = useToast();
+  const { getPersona } = useSocialPersonas();
+
+  const activePlatformContent = isMultiPlatform
+    ? (platformContent[activePlatform] ?? post.rawContent)
+    : editedContent;
+
+  const setActivePlatformContent = (value: string) => {
+    if (isMultiPlatform) {
+      setPlatformContent(prev => ({ ...prev, [activePlatform]: value }));
+    } else {
+      setEditedContent(value);
+    }
+  };
 
   const handleAiRewrite = async () => {
     setRewriting(true);
     try {
-      const result = await SocialPostService.aiRewrite(post.rawContent, post.platforms[0] ?? 'Facebook', tone);
-      setEditedContent(result);
-      await onUpdateContent(result);
-      showToast('AI rewrite complete', 'success');
+      const persona = getPersona(activePlatform);
+      const result = await SocialPostService.aiRewrite(
+        post.rawContent,
+        SOCIAL_POST_PLATFORM_LABELS[activePlatform],
+        persona?.defaultTone ?? tone,
+        persona?.systemPrompt,
+      );
+      if (isMultiPlatform) {
+        const updated = { ...platformContent, [activePlatform]: result };
+        setPlatformContent(updated);
+        await onUpdatePlatformContent(updated);
+      } else {
+        setEditedContent(result);
+        await onUpdateContent(result);
+      }
+      showToast(`AI rewrite complete for ${SOCIAL_POST_PLATFORM_LABELS[activePlatform]}`, 'success');
     } catch {
       showToast('AI rewrite failed', 'error');
     } finally {
@@ -447,9 +488,39 @@ const ReviewDrawer: React.FC<{
     }
   };
 
+  const handleGenerateAll = async () => {
+    setGeneratingAll(true);
+    try {
+      const results = await Promise.allSettled(
+        post.platforms.map(async (platform) => {
+          const persona = getPersona(platform);
+          const result = await SocialPostService.aiRewrite(
+            post.rawContent,
+            SOCIAL_POST_PLATFORM_LABELS[platform],
+            persona?.defaultTone ?? tone,
+            persona?.systemPrompt,
+          );
+          return { platform, result };
+        })
+      );
+      const updated: Partial<Record<SocialPostPlatform, string>> = { ...platformContent };
+      let successCount = 0;
+      results.forEach(r => {
+        if (r.status === 'fulfilled') { updated[r.value.platform] = r.value.result; successCount++; }
+      });
+      setPlatformContent(updated);
+      await onUpdatePlatformContent(updated);
+      showToast(`Generated ${successCount}/${post.platforms.length} platform versions`, 'success');
+    } catch {
+      showToast('Failed to generate all', 'error');
+    } finally {
+      setGeneratingAll(false);
+    }
+  };
+
   const handleApprove = async () => {
     setSaving(true);
-    try { await onApprove(editedContent); }
+    try { await onApprove(isMultiPlatform ? (platformContent[activePlatform] ?? editedContent) : editedContent); }
     finally { setSaving(false); }
   };
 
@@ -516,16 +587,28 @@ const ReviewDrawer: React.FC<{
             <div className="flex items-center justify-between mb-1.5">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Edited Caption</p>
               <div className="flex items-center gap-2">
-                <select
-                  value={tone}
-                  onChange={e => setTone(e.target.value)}
-                  className="text-xs border border-slate-300 rounded-lg px-2 py-1 text-slate-600 bg-white"
-                >
-                  {TONE_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
+                {!isMultiPlatform && (
+                  <select
+                    value={tone}
+                    onChange={e => setTone(e.target.value)}
+                    className="text-xs border border-slate-300 rounded-lg px-2 py-1 text-slate-600 bg-white"
+                  >
+                    {TONE_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                )}
+                {isMultiPlatform && (
+                  <button
+                    onClick={handleGenerateAll}
+                    disabled={generatingAll || rewriting}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-sky-600 bg-sky-50 hover:bg-sky-100 px-3 py-1.5 rounded-lg border border-sky-200 transition-colors disabled:opacity-50"
+                  >
+                    {generatingAll ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
+                    {generatingAll ? 'Generating…' : 'Generate All'}
+                  </button>
+                )}
                 <button
                   onClick={handleAiRewrite}
-                  disabled={rewriting}
+                  disabled={rewriting || generatingAll}
                   className="flex items-center gap-1.5 text-xs font-semibold text-purple-600 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-lg border border-purple-200 transition-colors disabled:opacity-50"
                 >
                   {rewriting ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
@@ -533,10 +616,37 @@ const ReviewDrawer: React.FC<{
                 </button>
               </div>
             </div>
+
+            {/* Platform tabs for multi-platform posts */}
+            {isMultiPlatform && (
+              <div className="flex gap-1 mb-2">
+                {post.platforms.map(p => (
+                  <button
+                    key={p}
+                    onClick={() => setActivePlatform(p)}
+                    className={`flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-colors ${
+                      activePlatform === p
+                        ? 'border-purple-300 bg-purple-50 text-purple-700'
+                        : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                    }`}
+                  >
+                    {PLATFORM_ICONS[p]} {SOCIAL_POST_PLATFORM_LABELS[p]}
+                    {platformContent[p] && <span className="ml-0.5 w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />}
+                  </button>
+                ))}
+                <span className="text-[10px] text-slate-400 self-center ml-1">
+                  {post.platforms.filter(p => platformContent[p]).length}/{post.platforms.length} generated
+                </span>
+              </div>
+            )}
+
             <textarea
-              value={editedContent}
-              onChange={e => setEditedContent(e.target.value)}
-              onBlur={() => onUpdateContent(editedContent)}
+              value={activePlatformContent}
+              onChange={e => setActivePlatformContent(e.target.value)}
+              onBlur={() => {
+                if (isMultiPlatform) onUpdatePlatformContent({ ...platformContent, [activePlatform]: activePlatformContent });
+                else onUpdateContent(editedContent);
+              }}
               rows={6}
               className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 resize-none"
             />

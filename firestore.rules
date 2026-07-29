@@ -1347,6 +1347,12 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Social personas — BOD can read/write; members can read for display
+    match /socialPersonas/{platform} {
+      allow read: if isActiveMember();
+      allow write: if isBoard();
+    }
+
     // Default: deny all other access
     match /{document=**} {
       allow read, write: if false;

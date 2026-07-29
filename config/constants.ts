@@ -6,6 +6,7 @@ export const COLLECTIONS = {
   MEMBERS: 'members',
   ZOOM_BOOKINGS: 'zoomBookings',
   SOCIAL_POSTS: 'socialPosts',
+  SOCIAL_PERSONAS: 'socialPersonas',
   EVENTS: 'events',
   EVENT_BUDGETS: 'eventBudgets',
   PROJECTS: 'projects',

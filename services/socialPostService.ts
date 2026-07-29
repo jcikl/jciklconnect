@@ -148,14 +148,14 @@ export class SocialPostService {
     await deleteDoc(doc(db, COL, id));
   }
 
-  static async aiRewrite(content: string, platform: string, tone: string): Promise<string> {
+  static async aiRewrite(content: string, platform: string, tone: string, customSystemPrompt?: string): Promise<string> {
     if (isDevMode()) {
       return `✨ [AI Rewritten for ${platform}]\n\n${content}\n\n#JCIKL #Leadership #Community`;
     }
     const res = await fetch('/.netlify/functions/social-ai-rewrite', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content, platform, tone }),
+      body: JSON.stringify({ content, platform, tone, customSystemPrompt }),
     });
     if (!res.ok) throw new Error('AI rewrite failed');
     const data = await res.json();

@@ -29,6 +29,7 @@ export interface SocialPost {
   title: string;
   rawContent: string;
   editedContent?: string;
+  platformContent?: Partial<Record<SocialPostPlatform, string>>;
   platforms: SocialPostPlatform[];
   status: SocialPostStatus;
   submittedBy: string;
