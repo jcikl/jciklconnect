@@ -126,18 +126,13 @@ export const SocialMediaView: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-            <Share2 size={20} className="text-jci-blue" /> Social Media
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            {isBod ? 'Review and publish member-submitted content.' : 'Submit content for the JCI KL official social media pages.'}
-          </p>
-        </div>
-        <Button variant="primary" onClick={() => setCreateOpen(true)} className="flex items-center gap-2">
-          <Plus size={15} /> New Post
-        </Button>
+      <div>
+        <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+          <Share2 size={20} className="text-jci-blue" /> Social Media
+        </h2>
+        <p className="text-xs text-slate-500 mt-0.5">
+          {isBod ? 'Review and publish member-submitted content.' : 'Submit content for the JCI KL official social media pages.'}
+        </p>
       </div>
 
       {/* Tabs */}
@@ -179,6 +174,17 @@ export const SocialMediaView: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-2">
+          {activeTab !== 'settings' && (
+            <button
+              onClick={() => setCreateOpen(true)}
+              className="w-full flex items-center gap-3 bg-white border border-dashed border-jci-blue/40 hover:border-jci-blue hover:bg-jci-blue/5 rounded-xl px-4 py-3 transition-colors group"
+            >
+              <div className="w-7 h-7 rounded-full bg-jci-blue/10 group-hover:bg-jci-blue/20 flex items-center justify-center flex-shrink-0 transition-colors">
+                <Plus size={15} className="text-jci-blue" />
+              </div>
+              <span className="text-sm font-semibold text-jci-blue">New Post</span>
+            </button>
+          )}
           {filtered.map(post => (
             <PostCard
               key={post.id}
