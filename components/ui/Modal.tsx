@@ -56,6 +56,16 @@ export const Modal: React.FC<ModalProps> = ({
   subHeader,
 }) => {
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const previousFocusRef = React.useRef<HTMLElement | null>(null);
+
+  // Save pre-modal focus and restore it on close — tied to isOpen only so
+  // inline onClose arrow functions (which change every parent render) never
+  // trigger spurious focus restoration while the modal is open.
+  React.useEffect(() => {
+    if (!isOpen) return;
+    previousFocusRef.current = document.activeElement as HTMLElement | null;
+    return () => { previousFocusRef.current?.focus(); };
+  }, [isOpen]);
 
   // Initial focus — runs only when modal opens/closes, not on every render
   React.useEffect(() => {
@@ -68,10 +78,9 @@ export const Modal: React.FC<ModalProps> = ({
     (firstInput ?? focusable[0])?.focus();
   }, [isOpen]);
 
-  // Keyboard trap + body scroll lock — kept separate so onClose identity changes don't retrigger focus
+  // Keyboard trap + body scroll lock — onClose can change freely without side-effecting focus
   React.useEffect(() => {
     if (!isOpen) return;
-    const previousFocus = document.activeElement as HTMLElement | null;
     document.body.style.overflow = 'hidden';
     const container = containerRef.current;
 
@@ -94,7 +103,6 @@ export const Modal: React.FC<ModalProps> = ({
     return () => {
       window.removeEventListener('keydown', handler);
       document.body.style.overflow = '';
-      previousFocus?.focus();
     };
   }, [isOpen, onClose]);
 

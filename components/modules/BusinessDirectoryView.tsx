@@ -10,6 +10,8 @@ const BUSINESS_CATEGORIES = [
 import { Card, Button, Badge, Modal, useToast, Tabs } from '../ui/Common';
 import { getSpecialOfferSummary, hasSpecialOffer } from '../../types/member';
 import type { SpecialOffer } from '../../types';
+import { useSisterChapterMembers } from '../../hooks/useSisterChapterMembers';
+import type { SisterChapterMember } from '../../hooks/useSisterChapterMembers';
 import { MembersOnlyOverlay } from '../ui/MembersOnlyOverlay';
 import { LoadingState } from '../ui/Loading';
 import { useBusinessDirectory } from '../../hooks/useBusinessDirectory';
@@ -1281,23 +1283,62 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
 
 
 // International Network Tab Component
+type IntlMemberView = {
+  id: string;
+  name: string;
+  chineseName?: string;
+  avatarUrl: string;
+  jciChapter: string;
+  flagEmoji?: string;
+  country: string;
+  companyName: string;
+  industry: string;
+  businessCategory: string;
+  position: string;
+  email: string;
+  description: string;
+  specialOffer: SpecialOffer | string | undefined;
+};
+
+function toIntlView(m: SisterChapterMember): IntlMemberView {
+  return {
+    id: m.id,
+    name: m.general?.name ?? '',
+    chineseName: m.general?.chineseName,
+    avatarUrl: m.general?.avatarUrl ?? '',
+    jciChapter: m.sisterChapter.name,
+    flagEmoji: m.sisterChapter.flagEmoji,
+    country: m.sisterChapter.country,
+    companyName: m.business?.companyName ?? (m as any).companyName ?? '',
+    industry: m.business?.industry ?? (m as any).industry ?? '',
+    businessCategory: (m.business?.businessCategory ?? []).join(', '),
+    position: m.business?.position ?? '',
+    email: m.contact?.email ?? '',
+    description: m.business?.companyDescription ?? (m.business as any)?.introduction ?? '',
+    specialOffer: m.business?.specialOffer,
+  };
+}
+
 interface InternationalNetworkTabProps {
   onContact: (biz: BusinessProfile) => void;
 }
 
 const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onContact }) => {
+  const { members: rawMembers, loading: membersLoading } = useSisterChapterMembers();
+  const views = useMemo(() => rawMembers.map(toIntlView), [rawMembers]);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedChapter, setSelectedChapter] = useState('All');
   const [selectedCountry, setSelectedCountry] = useState('All');
   const [selectedIndustry, setSelectedIndustry] = useState('All');
   const [showDealsOnly, setShowDealsOnly] = useState(false);
-  const [detailMember, setDetailMember] = useState<typeof MOCK_SISTER_CHAPTER_MEMBERS[0] | null>(null);
+  const [detailMember, setDetailMember] = useState<IntlMemberView | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
 
-  const allChapters = useMemo(() => ['All', ...Array.from(new Set(MOCK_SISTER_CHAPTER_MEMBERS.map(m => m.jciChapter)))], []);
-  const allCountries = useMemo(() => ['All', ...Array.from(new Set(MOCK_SISTER_CHAPTER_MEMBERS.map(m => m.country)))], []);
-  const allIndustries = useMemo(() => ['All', ...Array.from(new Set(MOCK_SISTER_CHAPTER_MEMBERS.map(m => m.industry)))], []);
+  const allChapters = useMemo(() => ['All', ...Array.from(new Set(views.map(m => m.jciChapter)))], [views]);
+  const allCountries = useMemo(() => ['All', ...Array.from(new Set(views.map(m => m.country)))], [views]);
+  const allIndustries = useMemo(() => ['All', ...Array.from(new Set(views.map(m => m.industry).filter(Boolean)))], [views]);
 
   const activeFiltersCount = useMemo(() => {
     let n = 0;
@@ -1311,7 +1352,7 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onCon
   const clearFilters = () => { setSelectedChapter('All'); setSelectedCountry('All'); setSelectedIndustry('All'); setShowDealsOnly(false); };
 
   const filteredMembers = useMemo(() => {
-    return MOCK_SISTER_CHAPTER_MEMBERS.filter(member => {
+    return views.filter(member => {
       const term = searchTerm.toLowerCase();
       const matchesSearch = !term ||
         member.name.toLowerCase().includes(term) ||
@@ -1326,16 +1367,16 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onCon
         (selectedIndustry === 'All' || member.industry === selectedIndustry) &&
         (!showDealsOnly || hasSpecialOffer(member.specialOffer));
     });
-  }, [searchTerm, selectedChapter, selectedCountry, selectedIndustry, showDealsOnly]);
+  }, [views, searchTerm, selectedChapter, selectedCountry, selectedIndustry, showDealsOnly]);
 
-  const getMappedBiz = (member: typeof MOCK_SISTER_CHAPTER_MEMBERS[0]): BusinessProfile => ({
+  const getMappedBiz = (member: IntlMemberView): BusinessProfile => ({
     id: member.id, memberId: member.id,
     ownerName: member.chineseName ? `${member.name} (${member.chineseName})` : member.name,
     companyName: member.companyName,
     industry: `${member.jciChapter} (${member.country})`,
     description: member.description, website: member.email,
     offer: getSpecialOfferSummary(member.specialOffer), logo: member.avatarUrl,
-    internationalPartnershipTypes: member.collaborationNeeds,
+    internationalPartnershipTypes: [],
     businessCategory: member.businessCategory, acceptsInternationalBusiness: 'Yes'
   });
 
@@ -1402,7 +1443,7 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onCon
           <div className="bg-white rounded-xl border border-slate-200 p-4">
             <p className="text-3xl font-black text-slate-900">{filteredMembers.length}</p>
             <p className="text-xs text-slate-500 mt-0.5">
-              {filteredMembers.length === MOCK_SISTER_CHAPTER_MEMBERS.length ? 'international partners' : `of ${MOCK_SISTER_CHAPTER_MEMBERS.length} partners`}
+              {filteredMembers.length === views.length ? 'international partners' : `of ${views.length} partners`}
             </p>
             {activeFiltersCount > 0 && (
               <button onClick={clearFilters} className="mt-2 text-[10px] font-bold text-jci-blue hover:underline">
@@ -1470,7 +1511,11 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onCon
                   onClick={() => { setDetailMember(member); setIsDetailOpen(true); }}>
                   {/* Header */}
                   <div className="p-4 flex gap-3 items-start border-b border-slate-50">
+                    {member.avatarUrl ? (
                     <img src={member.avatarUrl} alt={member.name} className="w-12 h-12 rounded-xl object-cover border border-slate-100 flex-shrink-0 shadow-sm" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-100 flex-shrink-0 shadow-sm flex items-center justify-center text-lg font-bold text-slate-400">{member.flagEmoji || member.name.charAt(0)}</div>
+                  )}
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-1">
                         <p className="font-bold text-sm text-slate-900 truncate leading-tight">{member.name}</p>
@@ -1489,16 +1534,6 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onCon
                       {hasSpecialOffer(member.specialOffer) && <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 px-2 py-0.5 rounded-full flex items-center gap-0.5"><Gift size={9} /> Deal</span>}
                     </div>
                     <p className="text-xs text-slate-500 line-clamp-2 flex-1 leading-relaxed">{member.description}</p>
-                    {member.collaborationNeeds.length > 0 && (
-                      <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">Seeking</p>
-                        <div className="flex flex-wrap gap-1">
-                          {member.collaborationNeeds.map(need => (
-                            <span key={need} className="px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-[9px] font-bold border border-blue-100">{need}</span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                     {hasSpecialOffer(member.specialOffer) && (
                       <div className="bg-amber-50 rounded-lg px-3 py-2 border border-amber-100">
                         <p className="text-[9px] font-black text-amber-700 uppercase tracking-wider mb-0.5 flex items-center gap-1"><Gift size={9} /> Sister Deal</p>
@@ -1557,7 +1592,7 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onCon
               </div>
               <div className="flex flex-wrap gap-2">
                 {allCountries.filter(c => c !== 'All').map(c => {
-                  const count = MOCK_SISTER_CHAPTER_MEMBERS.filter(m => m.country === c).length;
+                  const count = views.filter(m => m.country === c).length;
                   const active = selectedCountry === c;
                   return (
                     <button key={c} onClick={() => setSelectedCountry(active ? 'All' : c)}
@@ -1580,7 +1615,7 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onCon
               </div>
               <div className="flex flex-wrap gap-2">
                 {allChapters.filter(c => c !== 'All').map(c => {
-                  const count = MOCK_SISTER_CHAPTER_MEMBERS.filter(m => m.jciChapter === c).length;
+                  const count = views.filter(m => m.jciChapter === c).length;
                   const active = selectedChapter === c;
                   return (
                     <button key={c} onClick={() => setSelectedChapter(active ? 'All' : c)}
@@ -1603,7 +1638,7 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onCon
               </div>
               <div className="flex flex-wrap gap-2">
                 {allIndustries.filter(i => i !== 'All').map(i => {
-                  const count = MOCK_SISTER_CHAPTER_MEMBERS.filter(m => m.industry === i).length;
+                  const count = views.filter(m => m.industry === i).length;
                   const active = selectedIndustry === i;
                   return (
                     <button key={i} onClick={() => setSelectedIndustry(active ? 'All' : i)}
@@ -1659,16 +1694,6 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onCon
               {hasSpecialOffer(detailMember.specialOffer) && <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 px-2 py-1 rounded-full flex items-center gap-0.5"><Gift size={9} /> Deal</span>}
             </div>
             {detailMember.description && <p className="text-sm text-slate-600 leading-relaxed">{detailMember.description}</p>}
-            {detailMember.collaborationNeeds.length > 0 && (
-              <div>
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1.5">Collaboration Needs</span>
-                <div className="flex flex-wrap gap-1">
-                  {detailMember.collaborationNeeds.map(need => (
-                    <span key={need} className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px] font-bold border border-blue-100">{need}</span>
-                  ))}
-                </div>
-              </div>
-            )}
             {hasSpecialOffer(detailMember.specialOffer) && (
               <div className="bg-amber-50 p-3 rounded-xl border border-amber-100">
                 <span className="text-[10px] font-black text-amber-700 uppercase tracking-wider flex items-center gap-1 mb-1"><Gift size={11} /> Sister Chapter Deal</span>
@@ -1691,7 +1716,7 @@ const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onCon
                   industry: `${detailMember.jciChapter} (${detailMember.country})`,
                   description: detailMember.description, website: detailMember.email,
                   offer: getSpecialOfferSummary(detailMember.specialOffer), logo: detailMember.avatarUrl,
-                  internationalPartnershipTypes: detailMember.collaborationNeeds,
+                  internationalPartnershipTypes: [],
                   businessCategory: detailMember.businessCategory, acceptsInternationalBusiness: 'Yes'
                 };
                 onContact(mappedBiz);

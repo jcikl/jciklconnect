@@ -28,6 +28,8 @@ interface MemberCreateModalProps {
   members: Member[];
   allProjects: Project[];
   onCreateMember: (data: MemberCreateInput & Record<string, any>) => Promise<void>;
+  /** When provided, a chapter selector is shown (SUPER_ADMIN only). First entry is the default. */
+  chapterOptions?: { value: string; label: string }[];
 }
 
 export const MemberCreateModal: React.FC<MemberCreateModalProps> = ({
@@ -36,6 +38,7 @@ export const MemberCreateModal: React.FC<MemberCreateModalProps> = ({
   members,
   allProjects,
   onCreateMember,
+  chapterOptions,
 }) => {
   const [hobbies, setHobbies] = useState<string[]>([]);
   const [interestedIndustries, setInterestedIndustries] = useState<string[]>([]);
@@ -43,12 +46,14 @@ export const MemberCreateModal: React.FC<MemberCreateModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   // FORM-009: per-field error state for custom validation (e.g. duplicate email)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [selectedLoId, setSelectedLoId] = useState<string>(chapterOptions?.[0]?.value ?? 'jcikl');
 
   const handleClose = () => {
     setHobbies([]);
     setInterestedIndustries([]);
     setIntroducer('');
     setFieldErrors({});
+    setSelectedLoId(chapterOptions?.[0]?.value ?? 'jcikl');
     onClose();
   };
 
@@ -97,6 +102,7 @@ export const MemberCreateModal: React.FC<MemberCreateModalProps> = ({
 
       whatsappGroup: false,
       tshirtStatus: 'NA',
+      ...(chapterOptions && { loId: selectedLoId }),
     };
 
     try {
@@ -144,6 +150,17 @@ export const MemberCreateModal: React.FC<MemberCreateModalProps> = ({
 
         <div className="max-h-[60vh] overflow-y-auto pr-2">
           <div className="space-y-6">
+            {chapterOptions && chapterOptions.length > 1 && (
+              <section>
+                <h3 className="text-sm font-bold text-slate-900 border-b pb-2 mb-4">Chapter</h3>
+                <Select
+                  label="Assign to Chapter"
+                  options={chapterOptions}
+                  value={selectedLoId}
+                  onChange={e => setSelectedLoId(e.target.value)}
+                />
+              </section>
+            )}
             <section>
               <h3 className="text-sm font-bold text-slate-900 border-b pb-2 mb-4">Identity & Account</h3>
               <div className="grid grid-cols-2 gap-4">

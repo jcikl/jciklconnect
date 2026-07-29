@@ -88,6 +88,8 @@ import { MyProfileSelfView } from './Members/MyProfileSelfView';
 import { MemberDetail } from './Members/MemberDetail';
 import { MentorMatchingModal } from './Members/MentorMatchingModal';
 import { MemberCreateModal } from './Members/MemberCreateModal';
+import { useSisterChapters } from '../../hooks/useSisterChapters';
+import { DEFAULT_LO_ID } from '../../config/constants';
 import { BatchFieldUpdateModal } from './Members/BatchFieldUpdateModal';
 import { useMemberSearch } from '../../hooks/useMemberSearch';
 const HOBBY_OPTIONS = [
@@ -163,7 +165,9 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
   const [isBatchDeleting, setIsBatchDeleting] = useState(false);
 
   const { member: currentMember } = useAuth();
-  const { isAdmin, isBoard, isDeveloper } = usePermissions();
+  const { isAdmin, isBoard, isDeveloper, effectiveRole } = usePermissions();
+  const isSuperAdmin = effectiveRole === UserRole.SUPER_ADMIN;
+  const { chapters: sisterChapters } = useSisterChapters();
   const { showToast } = useToast();
   const canManageMembers = isAdmin || isBoard || isDeveloper;
 
@@ -687,6 +691,10 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
         members={members}
         allProjects={allProjects}
         onCreateMember={handleAddMember}
+        chapterOptions={isSuperAdmin && sisterChapters.length > 0 ? [
+          { value: DEFAULT_LO_ID, label: 'JCI Kuala Lumpur' },
+          ...sisterChapters.map(ch => ({ value: ch.id, label: ch.name })),
+        ] : undefined}
       />
 
       {/* Batch Import Modal */}

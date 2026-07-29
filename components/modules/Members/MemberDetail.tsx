@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button, Card, Badge, Modal, useToast, Tabs } from '../../ui/Common';
+import { Select } from '../../ui/Form';
 import { IntroducerSelector } from '../../ui/IntroducerSelector';
 import { Combobox } from '../../ui/Combobox';
 import { MultiSelectDropdown } from '../../ui/MultiSelectDropdown';
@@ -30,7 +31,8 @@ import { MentorshipService, MentorMatchSuggestion } from '../../../services/ment
 import { ProjectsService } from '../../../services/projectsService';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../../config/firebase';
-import { JOIN_US_SURVEY_QUESTIONS, nationalityOptionsForValue, INDUSTRY_OPTIONS, IDEAL_REFERRAL_OPTIONS, BUSINESS_CATEGORIES_OPTIONS } from '../../../config/constants';
+import { JOIN_US_SURVEY_QUESTIONS, nationalityOptionsForValue, INDUSTRY_OPTIONS, IDEAL_REFERRAL_OPTIONS, BUSINESS_CATEGORIES_OPTIONS, DEFAULT_LO_ID } from '../../../config/constants';
+import { useSisterChapters } from '../../../hooks/useSisterChapters';
 import { getBirthPlaceFromIC, isMalaysianIC, getDateOfBirthFromIC, getGenderFromIC } from '../../../utils/malaysianIdUtils';
 import { formatDateToDDMMMYYYY } from '../../../utils/dateUtils';
 import { MembershipTypeDisplay } from '../../shared/MembershipTypeDisplay';
@@ -60,9 +62,14 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
     [members, memberProp]
   );
   const { isAdmin, isDeveloper, hasPermission, effectiveRole, isOrganizationSecretary, isPresident } = usePermissions();
+  const isSuperAdmin = effectiveRole === UserRole.SUPER_ADMIN;
   const canViewSensitiveFields = isSelfView || isAdmin || isDeveloper || isOrganizationSecretary || isPresident;
   const canEditMembers = hasPermission('canEditMembers');
   const { showToast } = useToast();
+  const { chapters: sisterChapters } = useSisterChapters();
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferLoId, setTransferLoId] = useState('');
+  const [isTransferring, setIsTransferring] = useState(false);
   const [showMentorMatchModal, setShowMentorMatchModal] = useState(false);
   const [potentialMentors, setPotentialMentors] = useState<MentorMatchSuggestion[]>([]);
   const [loadingMatches, setLoadingMatches] = useState(false);
@@ -270,6 +277,20 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
       return false;
     } finally {
       isInlineSavingRef.current = false;
+    }
+  };
+
+  const handleTransferChapter = async () => {
+    if (!transferLoId) return;
+    setIsTransferring(true);
+    try {
+      await updateMember(member.id, { loId: transferLoId });
+      showToast('Member transferred successfully', 'success');
+      setShowTransferModal(false);
+    } catch {
+      showToast('Failed to transfer member', 'error');
+    } finally {
+      setIsTransferring(false);
     }
   };
 
@@ -914,6 +935,9 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
                     <Button variant="outline" size="sm" className="h-9 px-3 text-sky-600 border-sky-200 hover:bg-sky-50 font-bold" onClick={handleSendInviteEmail}>Send Invite</Button>
                   )
                 )}
+                {isSuperAdmin && !isSelfView && sisterChapters.length > 0 && (
+                  <Button variant="outline" size="sm" className="h-9 px-3 text-purple-600 border-purple-200 hover:bg-purple-50 font-bold" onClick={() => { setTransferLoId(member.loId ?? DEFAULT_LO_ID); setShowTransferModal(true); }}>Transfer</Button>
+                )}
                 {(isDeveloper || (isAdmin && simulatedRole === null)) && !isSelfView && (
                   <Button variant="outline" size="sm" className="h-9 px-3 text-red-500 border-red-200 hover:bg-red-50 font-bold" onClick={() => setShowDeleteConfirm(true)}>Delete</Button>
                 )}
@@ -1033,6 +1057,9 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
                     ) : (
                       <Button variant="outline" size="sm" className="flex-none h-10 px-6 text-sky-600 border-sky-200 hover:bg-sky-50 font-bold" onClick={handleSendInviteEmail}>Send Invite</Button>
                     )
+                  )}
+                  {isSuperAdmin && !isSelfView && sisterChapters.length > 0 && (
+                    <Button variant="outline" size="sm" className="flex-none h-10 px-6 text-purple-600 border-purple-200 hover:bg-purple-50 font-bold" onClick={() => { setTransferLoId(member.loId ?? DEFAULT_LO_ID); setShowTransferModal(true); }}>Transfer Chapter</Button>
                   )}
                   {(isDeveloper || (isAdmin && simulatedRole === null)) && !isSelfView && (
                     <Button variant="outline" size="sm" className="flex-none h-10 px-6 text-red-600 border-red-200 hover:bg-red-50 font-bold" onClick={() => setShowDeleteConfirm(true)}>Delete</Button>
@@ -1436,6 +1463,39 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
           onSelect={handleAssignMentor}
           onClose={() => setShowMentorMatchModal(false)}
         />
+      )}
+
+      {showTransferModal && (
+        <Modal
+          isOpen={showTransferModal}
+          onClose={() => !isTransferring && setShowTransferModal(false)}
+          title="Transfer Chapter"
+          size="sm"
+          footer={
+            <div className="flex gap-3 justify-end w-full">
+              <Button variant="outline" onClick={() => setShowTransferModal(false)} disabled={isTransferring}>Cancel</Button>
+              <Button variant="primary" onClick={handleTransferChapter} disabled={isTransferring || transferLoId === (member.loId ?? DEFAULT_LO_ID)}>
+                {isTransferring ? 'Transferring…' : 'Confirm Transfer'}
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <p className="text-xs text-amber-700">Transferring a member changes which chapter they belong to. They will immediately appear in the new chapter's International Network and disappear from the current one.</p>
+            </div>
+            <Select
+              label="Transfer to"
+              value={transferLoId}
+              onChange={e => setTransferLoId(e.target.value)}
+              options={[
+                { value: DEFAULT_LO_ID, label: 'JCI Kuala Lumpur (Home)' },
+                ...sisterChapters.map(ch => ({ value: ch.id, label: `${ch.flagEmoji ?? ''} ${ch.name}`.trim() })),
+              ]}
+            />
+            <p className="text-xs text-slate-500">Current chapter: <span className="font-medium">{member.loId === DEFAULT_LO_ID || !member.loId ? 'JCI Kuala Lumpur' : sisterChapters.find(c => c.id === member.loId)?.name ?? member.loId}</span></p>
+          </div>
+        </Modal>
       )}
 
       {showDeleteConfirm && (
