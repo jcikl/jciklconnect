@@ -196,6 +196,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
       idealReferralIndustry: member.idealReferralIndustry || '',
       idealReferral: member.business?.idealReferrals || (Array.isArray(member.business?.idealReferrals) ? member.business?.idealReferrals.join(', ') : ''),
       specialOffer: member.business?.specialOffer ?? '',
+      specialOffers: member.business?.specialOffers ?? (member.business?.specialOffer ? [typeof member.business.specialOffer === 'string' ? { description: member.business.specialOffer, terms: '', expiryDate: '' } : member.business.specialOffer] : []),
 
       phone: member.contact?.phone || '',
       alternatePhone: member.contact?.alternatePhone || '',
@@ -281,45 +282,47 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (updateMember as (id: string, updates: any) => Promise<void>)(member.id, {
-        avatar: inlineValues.general?.avatarUrl || '', avatarUrl: inlineValues.general?.avatarUrl || '',
-        name: inlineValues.general?.name, fullName: inlineValues.general?.fullName, idNumber: inlineValues.general?.idNumber,
-        birthPlace: inlineValues.general?.birthPlace || undefined,
-        'general.birthPlace': inlineValues.general?.birthPlace || undefined,
-        dateOfBirth: inlineValues.general?.dob, gender: inlineValues.general?.gender, ethnicity: inlineValues.general?.ethnicity,
-        'general.ethnicity': inlineValues.general?.ethnicity || undefined,
-        dietaryPreference: (inlineValues.general?.dietaryPreference as any) || undefined,
-        'general.dietaryPreference': (inlineValues.general?.dietaryPreference as any) || undefined,
-        nationality: inlineValues.general?.nationality, introducer: inlineValues.jciCareer?.introducer, bio: inlineValues.others?.bio,
-        hobbies: inlineValues.others?.hobbies, skills: skillsArr,
-        companyName: inlineValues.companyName, companyWebsite: inlineValues.business?.companyWebsite,
-        companyDescription: inlineValues.business?.companyDescription,
-        'business.companyDescription': inlineValues.business?.companyDescription || undefined,
-        departmentAndPosition: inlineValues.business?.departmentAndPosition,
-        'business.departmentAndPosition': inlineValues.business?.departmentAndPosition || undefined,
-        acceptInternationalBusiness: inlineValues.business?.acceptInternationalBusiness, businessCategory: inlineValues.business?.businessCategory,
-        industry: inlineValues.industry, interestedIndustries: inlineValues.business?.interestedIndustries,
-        'business.interestedIndustries': inlineValues.business?.interestedIndustries,
-        levelOfManagement: inlineValues.business?.levelOfManagement,
-        'business.levelOfManagement': inlineValues.business?.levelOfManagement || undefined,
+        avatar: inlineValues.avatar || '', avatarUrl: inlineValues.avatar || '',
+        name: inlineValues.name, fullName: inlineValues.fullName, idNumber: inlineValues.idNumber,
+        birthPlace: inlineValues.birthPlace || undefined,
+        'general.birthPlace': inlineValues.birthPlace || undefined,
+        dateOfBirth: inlineValues.dateOfBirth, gender: inlineValues.gender, ethnicity: inlineValues.ethnicity,
+        'general.ethnicity': inlineValues.ethnicity || undefined,
+        dietaryPreference: (inlineValues.dietaryPreference as any) || undefined,
+        'general.dietaryPreference': (inlineValues.dietaryPreference as any) || undefined,
+        nationality: inlineValues.nationality, introducer: inlineValues.introducer, bio: inlineValues.bio,
+        hobbies: inlineValues.hobbies, skills: skillsArr,
+        companyName: inlineValues.companyName, companyWebsite: inlineValues.companyWebsite,
+        companyDescription: inlineValues.companyDescription,
+        'business.companyDescription': inlineValues.companyDescription || undefined,
+        departmentAndPosition: inlineValues.departmentAndPosition,
+        'business.departmentAndPosition': inlineValues.departmentAndPosition || undefined,
+        acceptInternationalBusiness: inlineValues.acceptInternationalBusiness, businessCategory: inlineValues.businessCategory,
+        industry: inlineValues.industry, interestedIndustries: inlineValues.interestedIndustries,
+        'business.interestedIndustries': inlineValues.interestedIndustries,
+        levelOfManagement: inlineValues.levelOfManagement,
+        'business.levelOfManagement': inlineValues.levelOfManagement || undefined,
         idealReferralIndustry: inlineValues.idealReferralIndustry,
-        idealReferral: inlineValues.business?.idealReferrals, specialOffer: inlineValues.business?.specialOffer,
-        phone: inlineValues.contact?.phone, alternatePhone: inlineValues.contact?.alternatePhone, email: inlineValues.contact?.email,
-        whatsappGroup: inlineValues.contact?.whatsappJoined, address: inlineValues.contact?.address,
-        emergencyContactName: inlineValues.contact?.emergency?.name, emergencyContactRelationship: inlineValues.contact?.emergency?.relationship,
-        emergencyContactPhone: inlineValues.contact?.emergency?.phone, linkedin: inlineValues.contact?.socials?.linkedin,
-        facebook: inlineValues.contact?.socials?.facebook, instagram: inlineValues.contact?.socials?.instagram, wechat: inlineValues.contact?.socials?.wechat,
-        cutStyle: inlineValues.others?.shirtStyle, tshirtSize: inlineValues.others?.tshirtSize, jacketSize: inlineValues.others?.jacketSize,
-        tshirtStatus: inlineValues.others?.tshirtStatus, embroideredName: inlineValues.others?.embroideredName,
-        senatorshipId: inlineValues.jciCareer?.senatorship?.senatorNumber?.trim(), senatorCertified: inlineValues.jciCareer?.senatorship?.certified,
-        senatorshipBoardValidated: inlineValues.jciCareer?.senatorship?.boardValidated,
-        senatorshipValidatedBy: inlineValues.jciCareer?.senatorshipValidatedBy?.trim(),
-        'jciCareer.senatorshipValidatedBy': inlineValues.jciCareer?.senatorshipValidatedBy?.trim(),
-        senatorshipValidatedAt: inlineValues.jciCareer?.senatorshipValidatedAt?.trim(),
-        'jciCareer.senatorshipValidatedAt': inlineValues.jciCareer?.senatorshipValidatedAt?.trim(),
+        idealReferral: inlineValues.idealReferral,
+        specialOffers: inlineValues.specialOffers ?? [],
+        specialOffer: (inlineValues.specialOffers ?? [])[0] ?? inlineValues.specialOffer,
+        phone: inlineValues.phone, alternatePhone: inlineValues.alternatePhone, email: inlineValues.email,
+        whatsappGroup: inlineValues.whatsappGroup, address: inlineValues.address,
+        emergencyContactName: inlineValues.emergencyContactName, emergencyContactRelationship: inlineValues.emergencyContactRelationship,
+        emergencyContactPhone: inlineValues.emergencyContactPhone, linkedin: inlineValues.linkedin,
+        facebook: inlineValues.facebook, instagram: inlineValues.instagram, wechat: inlineValues.wechat,
+        cutStyle: inlineValues.cutStyle, tshirtSize: inlineValues.tshirtSize, jacketSize: inlineValues.jacketSize,
+        tshirtStatus: inlineValues.tshirtStatus, embroideredName: inlineValues.embroideredName,
+        senatorshipId: inlineValues.senatorshipId?.trim(), senatorCertified: inlineValues.senatorCertified,
+        senatorshipBoardValidated: inlineValues.senatorshipBoardValidated,
+        senatorshipValidatedBy: inlineValues.senatorshipValidatedBy?.trim(),
+        'jciCareer.senatorshipValidatedBy': inlineValues.senatorshipValidatedBy?.trim(),
+        senatorshipValidatedAt: inlineValues.senatorshipValidatedAt?.trim(),
+        'jciCareer.senatorshipValidatedAt': inlineValues.senatorshipValidatedAt?.trim(),
         ...(inlineValues.role ? { role: inlineValues.role } : {}),
-        ...(inlineValues.jciCareer?.membershipType ? { membershipType: inlineValues.jciCareer?.membershipType } : {}),
+        ...(inlineValues.membershipType ? { membershipType: inlineValues.membershipType } : {}),
       });
-      const finalAvatar = inlineValues.general?.avatarUrl;
+      const finalAvatar = inlineValues.avatar;
       const originalAvatar = member.general?.avatarUrl || member.general?.avatarUrl || member.general?.avatarUrl || '';
       // Delete original saved avatar if replaced
       if (originalAvatar && originalAvatar !== finalAvatar) {
@@ -1162,7 +1165,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
             handleFindMentors={handleFindMentors}
             loadingMatches={loadingMatches}
             setShowPaymentHistoryModal={setShowPaymentHistoryModal}
-            canEditRoleType={isDeveloper || (isAdmin && simulatedRole === null)}
+            canEditRoleType={isDeveloper || effectiveRole === UserRole.SUPER_ADMIN}
           />
         </AsyncErrorBoundary>
       )}

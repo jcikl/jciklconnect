@@ -94,51 +94,56 @@ const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) 
                     placeholder="e.g. 12345"
                     value={inlineValues.jciCareer?.senatorship?.senatorNumber}
                     onChange={e => setInlineValues({ ...inlineValues, senatorshipId: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                    disabled={!!inlineValues.senatorshipBoardValidated}
+                    className={`w-full rounded-lg border px-3 py-1.5 text-sm ${inlineValues.senatorshipBoardValidated ? 'border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed' : 'border-slate-300 focus:border-jci-blue'}`}
                   />
                 </div>
-                <div className="flex items-center gap-4 py-1">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={inlineValues.jciCareer?.senatorship?.certified}
-                      onChange={e => setInlineValues({ ...inlineValues, senatorCertified: e.target.checked })}
-                      className="w-4 h-4 rounded border-slate-300 text-jci-blue focus:ring-jci-blue/20"
-                    />
-                    <span className="text-sm font-medium text-slate-700">Senator Certified</span>
-                  </label>
-                </div>
-                <div className="flex items-center gap-4 py-1">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={inlineValues.jciCareer?.senatorship?.boardValidated}
-                      onChange={e => setInlineValues({ ...inlineValues, senatorshipBoardValidated: e.target.checked })}
-                      className="w-4 h-4 rounded border-slate-300 text-jci-blue focus:ring-jci-blue/20"
-                    />
-                    <span className="text-sm font-medium text-slate-700">Board Validated</span>
-                  </label>
-                </div>
-                {inlineValues.jciCareer?.senatorship?.boardValidated && (
-                  <div className="grid grid-cols-2 gap-4 animate-in fade-in duration-200">
-                    <div>
-                      <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Validated By</label>
-                      <input
-                        type="text"
-                        value={inlineValues.jciCareer?.senatorshipValidatedBy}
-                        onChange={e => setInlineValues({ ...inlineValues, senatorshipValidatedBy: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
-                      />
+                {canEditRoleType && (
+                  <>
+                    <div className="flex items-center gap-4 py-1">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={inlineValues.jciCareer?.senatorship?.certified}
+                          onChange={e => setInlineValues({ ...inlineValues, senatorCertified: e.target.checked })}
+                          className="w-4 h-4 rounded border-slate-300 text-jci-blue focus:ring-jci-blue/20"
+                        />
+                        <span className="text-sm font-medium text-slate-700">Senator Certified</span>
+                      </label>
                     </div>
-                    <div>
-                      <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Validated At</label>
-                      <Input
-                        type="date"
-                        value={inlineValues.jciCareer?.senatorshipValidatedAt}
-                        onChange={e => setInlineValues({ ...inlineValues, senatorshipValidatedAt: e.target.value })}
-                      />
+                    <div className="flex items-center gap-4 py-1">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={inlineValues.jciCareer?.senatorship?.boardValidated}
+                          onChange={e => setInlineValues({ ...inlineValues, senatorshipBoardValidated: e.target.checked })}
+                          className="w-4 h-4 rounded border-slate-300 text-jci-blue focus:ring-jci-blue/20"
+                        />
+                        <span className="text-sm font-medium text-slate-700">Board Validated</span>
+                      </label>
                     </div>
-                  </div>
+                    {inlineValues.jciCareer?.senatorship?.boardValidated && (
+                      <div className="grid grid-cols-2 gap-4 animate-in fade-in duration-200">
+                        <div>
+                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Validated By</label>
+                          <input
+                            type="text"
+                            value={inlineValues.jciCareer?.senatorshipValidatedBy}
+                            onChange={e => setInlineValues({ ...inlineValues, senatorshipValidatedBy: e.target.value })}
+                            className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Validated At</label>
+                          <Input
+                            type="date"
+                            value={inlineValues.jciCareer?.senatorshipValidatedAt}
+                            onChange={e => setInlineValues({ ...inlineValues, senatorshipValidatedAt: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               {canEditRoleType && (
                 <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-200">

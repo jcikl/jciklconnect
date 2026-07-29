@@ -60,11 +60,11 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
             <div className="space-y-4 text-sm">
               <div className="flex flex-row items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-white bg-blue-50 shadow-sm shrink-0">
-                  {inlineValues.general?.avatarUrl ? (
-                    <img src={inlineValues._avatarTs ? `${inlineValues.general?.avatarUrl}?v=${inlineValues._avatarTs}` : inlineValues.general?.avatarUrl} alt={inlineValues.general?.name || member.general?.name} className="w-full h-full object-cover" />
+                  {inlineValues.avatar ? (
+                    <img src={inlineValues._avatarTs ? `${inlineValues.avatar}?v=${inlineValues._avatarTs}` : inlineValues.avatar} alt={inlineValues.name || member.general?.name} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-xl font-black text-jci-blue">
-                      {(inlineValues.general?.name || member.general?.name || 'M').charAt(0)}
+                      {(inlineValues.name || member.general?.name || 'M').charAt(0)}
                     </div>
                   )}
                 </div>
@@ -91,7 +91,7 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Name (Short)<span className="text-red-500 ml-1">*</span></label>
                   <input
                     type="text"
-                    value={inlineValues.general?.name}
+                    value={inlineValues.name ?? ''}
                     onChange={e => setInlineValues({ ...inlineValues, name: e.target.value })}
                     required
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
@@ -101,7 +101,7 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Full Name (ID)</label>
                   <input
                     type="text"
-                    value={inlineValues.general?.fullName}
+                    value={inlineValues.fullName ?? ''}
                     onChange={e => setInlineValues({ ...inlineValues, fullName: e.target.value })}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
                   />
@@ -111,7 +111,7 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                   {canViewSensitiveFields ? (
                     <input
                       type="text"
-                      value={inlineValues.general?.idNumber}
+                      value={inlineValues.idNumber ?? ''}
                       onChange={e => {
                         const ic = e.target.value;
                         const updates: any = { idNumber: ic };
@@ -132,15 +132,15 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Date of Birth</label>
                   <Input
                     type="date"
-                    value={inlineValues.general?.dob}
+                    value={inlineValues.dateOfBirth ?? ''}
                     onChange={e => setInlineValues({ ...inlineValues, dateOfBirth: e.target.value })}
                   />
                 </div>
                 <div>
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Nationality</label>
                   <Combobox
-                    options={nationalityOptionsForValue(inlineValues.general?.nationality)}
-                    value={inlineValues.general?.nationality}
+                    options={nationalityOptionsForValue(inlineValues.nationality)}
+                    value={inlineValues.nationality ?? ''}
                     onChange={val => setInlineValues({ ...inlineValues, nationality: val })}
                     placeholder="Select nationality..."
                   />
@@ -149,7 +149,7 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Birth Place</label>
                   <input
                     type="text"
-                    value={inlineValues.general?.birthPlace || ''}
+                    value={inlineValues.birthPlace ?? ''}
                     onChange={e => setInlineValues({ ...inlineValues, birthPlace: e.target.value })}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
                   />
@@ -157,7 +157,7 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                 <div>
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Gender</label>
                   <select
-                    value={inlineValues.general?.gender}
+                    value={inlineValues.gender ?? ''}
                     onChange={e => setInlineValues({ ...inlineValues, gender: e.target.value })}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white"
                   >
@@ -169,7 +169,7 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                 <div>
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Ethnicity</label>
                   <select
-                    value={inlineValues.general?.ethnicity}
+                    value={inlineValues.ethnicity ?? ''}
                     onChange={e => setInlineValues({ ...inlineValues, ethnicity: e.target.value })}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 bg-white"
                   >
@@ -185,8 +185,8 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                   <div className="flex w-full rounded-lg border border-slate-300 overflow-hidden divide-x divide-slate-200">
                     {(['Vegetarian', 'Halal', 'Normal'] as const).map((opt) => (
                       <label key={opt} className="cursor-pointer flex-1 flex">
-                        <input type="radio" name="inlineDietaryPreference" value={opt.toLowerCase()} checked={inlineValues.general?.dietaryPreference === opt.toLowerCase()} onChange={e => setInlineValues({ ...inlineValues, dietaryPreference: e.target.value })} className="hidden" />
-                        <span className={`flex-1 text-center px-1 md:px-4 py-2 text-[10px] md:text-sm font-medium transition-colors ${inlineValues.general?.dietaryPreference === opt.toLowerCase() ? 'bg-jci-blue text-white' : 'bg-white text-slate-700 hover:bg-slate-50'}`}>{opt}</span>
+                        <input type="radio" name="inlineDietaryPreference" value={opt.toLowerCase()} checked={inlineValues.dietaryPreference === opt.toLowerCase()} onChange={e => setInlineValues({ ...inlineValues, dietaryPreference: e.target.value })} className="hidden" />
+                        <span className={`flex-1 text-center px-1 md:px-4 py-2 text-[10px] md:text-sm font-medium transition-colors ${inlineValues.dietaryPreference === opt.toLowerCase() ? 'bg-jci-blue text-white' : 'bg-white text-slate-700 hover:bg-slate-50'}`}>{opt}</span>
                       </label>
                     ))}
                   </div>
@@ -194,7 +194,7 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                 <div>
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Introducer</label>
                   <IntroducerSelector
-                    value={inlineValues.jciCareer?.introducer || ''}
+                    value={inlineValues.introducer ?? ''}
                     onChange={val => setInlineValues({ ...inlineValues, introducer: val })}
                     members={members}
                     projects={allProjects}
@@ -205,7 +205,7 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
               <div className="border-t pt-3">
                 <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Personal Biography</label>
                 <textarea
-                  value={inlineValues.others?.bio}
+                  value={inlineValues.bio ?? ''}
                   onChange={e => setInlineValues({ ...inlineValues, bio: e.target.value })}
                   rows={2}
                   className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 resize-y"
@@ -216,7 +216,7 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                 <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Hobbies</label>
                 <div className="flex flex-wrap gap-1.5 p-2 border border-slate-200 rounded-lg bg-slate-50">
                   {HOBBY_OPTIONS.map(opt => {
-                    const isChecked = inlineValues.others?.hobbies.includes(opt);
+                    const isChecked = (inlineValues.hobbies ?? []).includes(opt);
                     return (
                       <label key={opt} className="cursor-pointer">
                         <input
@@ -224,8 +224,8 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                           checked={isChecked}
                           onChange={e => {
                             const newHobbies = e.target.checked
-                              ? [...inlineValues.others?.hobbies, opt]
-                              : inlineValues.others?.hobbies.filter((h: string) => h !== opt);
+                              ? [...(inlineValues.hobbies ?? []), opt]
+                              : (inlineValues.hobbies ?? []).filter((h: string) => h !== opt);
                             setInlineValues({ ...inlineValues, hobbies: newHobbies });
                           }}
                           className="hidden"
@@ -374,7 +374,7 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                 <div>
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Cut Style</label>
                   <select
-                    value={inlineValues.others?.shirtStyle}
+                    value={inlineValues.cutStyle ?? ''}
                     onChange={e => setInlineValues({ ...inlineValues, cutStyle: e.target.value })}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
                   >
@@ -386,7 +386,7 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                 <div>
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">T-Shirt Size</label>
                   <select
-                    value={inlineValues.others?.tshirtSize}
+                    value={inlineValues.tshirtSize ?? ''}
                     onChange={e => setInlineValues({ ...inlineValues, tshirtSize: e.target.value })}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
                   >
@@ -397,7 +397,7 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                 <div>
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Jacket Size</label>
                   <select
-                    value={inlineValues.others?.jacketSize}
+                    value={inlineValues.jacketSize ?? ''}
                     onChange={e => setInlineValues({ ...inlineValues, jacketSize: e.target.value })}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
                   >
@@ -408,7 +408,7 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                 <div>
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Logo Status</label>
                   <select
-                    value={inlineValues.others?.tshirtStatus}
+                    value={inlineValues.tshirtStatus ?? ''}
                     onChange={e => setInlineValues({ ...inlineValues, tshirtStatus: e.target.value })}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
                   >
@@ -424,7 +424,7 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                 <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Embroidered Name</label>
                 <input
                   type="text"
-                  value={inlineValues.others?.embroideredName}
+                  value={inlineValues.embroideredName ?? ''}
                   onChange={e => setInlineValues({ ...inlineValues, embroideredName: e.target.value })}
                   placeholder="Embroidered Name on Jacket"
                   className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"

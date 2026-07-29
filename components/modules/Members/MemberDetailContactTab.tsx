@@ -30,7 +30,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                 <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Primary Phone</label>
                 <input
                   type="text"
-                  value={inlineValues.contact?.phone}
+                  value={inlineValues.phone ?? ''}
                   onChange={e => setInlineValues({ ...inlineValues, phone: e.target.value })}
                   className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                 />
@@ -39,7 +39,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                 <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Alternate Phone</label>
                 <input
                   type="text"
-                  value={inlineValues.contact?.alternatePhone}
+                  value={inlineValues.alternatePhone ?? ''}
                   onChange={e => setInlineValues({ ...inlineValues, alternatePhone: e.target.value })}
                   className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                 />
@@ -48,7 +48,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                 <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Email</label>
                 <input
                   type="email"
-                  value={inlineValues.contact?.email}
+                  value={inlineValues.email ?? ''}
                   onChange={e => setInlineValues({ ...inlineValues, email: e.target.value })}
                   className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                 />
@@ -56,7 +56,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
               <div>
                 <label className="text-slate-500 block text-xs uppercase font-medium mb-1">WhatsApp Group Added</label>
                 <select
-                  value={inlineValues.contact?.whatsappJoined ? 'Yes' : 'No'}
+                  value={inlineValues.whatsappGroup ? 'Yes' : 'No'}
                   onChange={e => setInlineValues({ ...inlineValues, whatsappGroup: e.target.value === 'Yes' })}
                   className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
                 >
@@ -68,7 +68,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                 <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Address</label>
                 {canViewSensitiveFields ? (
                   <textarea
-                    value={inlineValues.contact?.address}
+                    value={inlineValues.address ?? ''}
                     onChange={e => setInlineValues({ ...inlineValues, address: e.target.value })}
                     rows={2}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue resize-y"
@@ -86,7 +86,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Name</label>
                   <input
                     type="text"
-                    value={inlineValues.contact?.emergency?.name}
+                    value={inlineValues.emergencyContactName ?? ''}
                     onChange={e => setInlineValues({ ...inlineValues, emergencyContactName: e.target.value })}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                   />
@@ -95,7 +95,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Relationship</label>
                   <input
                     type="text"
-                    value={inlineValues.contact?.emergency?.relationship}
+                    value={inlineValues.emergencyContactRelationship ?? ''}
                     onChange={e => setInlineValues({ ...inlineValues, emergencyContactRelationship: e.target.value })}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                   />
@@ -104,7 +104,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Phone</label>
                   <input
                     type="text"
-                    value={inlineValues.contact?.emergency?.phone}
+                    value={inlineValues.emergencyContactPhone ?? ''}
                     onChange={e => setInlineValues({ ...inlineValues, emergencyContactPhone: e.target.value })}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                   />
@@ -119,7 +119,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                   <label className="text-slate-500 block text-xs font-medium mb-1">LinkedIn</label>
                   <input
                     type="text"
-                    value={inlineValues.contact?.socials?.linkedin}
+                    value={inlineValues.linkedin ?? ''}
                     onChange={e => setInlineValues({ ...inlineValues, linkedin: e.target.value })}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                   />
@@ -128,7 +128,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                   <label className="text-slate-500 block text-xs font-medium mb-1">Facebook</label>
                   <input
                     type="text"
-                    value={inlineValues.contact?.socials?.facebook}
+                    value={inlineValues.facebook ?? ''}
                     onChange={e => setInlineValues({ ...inlineValues, facebook: e.target.value })}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                   />
@@ -137,7 +137,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                   <label className="text-slate-500 block text-xs font-medium mb-1">Instagram</label>
                   <input
                     type="text"
-                    value={inlineValues.contact?.socials?.instagram}
+                    value={inlineValues.instagram ?? ''}
                     onChange={e => setInlineValues({ ...inlineValues, instagram: e.target.value })}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                   />
@@ -146,7 +146,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                   <label className="text-slate-500 block text-xs font-medium mb-1">WeChat ID</label>
                   <input
                     type="text"
-                    value={inlineValues.contact?.socials?.wechat}
+                    value={inlineValues.wechat ?? ''}
                     onChange={e => setInlineValues({ ...inlineValues, wechat: e.target.value })}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                   />

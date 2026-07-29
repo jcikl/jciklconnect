@@ -650,13 +650,13 @@ export const JCIKLApp: React.FC = () => {
     const wrapEB = (component: React.ReactNode, moduleName: string) => (
       <ErrorBoundary fallback={
         <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 sm:p-10">
-          <img
-            src="/mascot/Error.png"
-            alt="Error mascot"
-            className="w-48 sm:w-60 object-contain select-none mb-2"
-            draggable={false}
-          />
           <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-xl border border-slate-100 dark:border-slate-700 p-6 sm:p-8 text-center w-full max-w-xs sm:max-w-sm">
+            <img
+              src="/mascot/Error.png"
+              alt="Error mascot"
+              className="w-36 sm:w-44 object-contain select-none mx-auto mb-3"
+              draggable={false}
+            />
             <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white mb-1.5 tracking-tight">
               {moduleName} 加载失败
             </h2>

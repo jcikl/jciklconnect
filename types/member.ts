@@ -223,6 +223,7 @@ export interface Member {
     industry: string;
     businessCategory: string[];
     specialOffer?: SpecialOffer | string;
+    specialOffers?: SpecialOffer[];
     acceptInternationalBusiness: 'Yes' | 'No' | 'Willing to Explore';
     idealReferrals?: string[];
     connections?: InternationalConnection[];

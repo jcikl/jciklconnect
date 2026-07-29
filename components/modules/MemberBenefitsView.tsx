@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Gift, Users, Calendar, CheckCircle, Clock, Sparkles, Star } from 'lucide-react';
-import { Button, Card, Badge, Modal, useToast, Tabs } from '../ui/Common';
+import { Button, Card, Badge, Modal, useToast } from '../ui/Common';
 import { MembersOnlyOverlay } from '../ui/MembersOnlyOverlay';
 import { LoadingState } from '../ui/Loading';
 import { useAdvertisements } from '../../hooks/useAdvertisements';
@@ -13,15 +13,6 @@ import { hasSpecialOffer, getSpecialOfferSummary, SpecialOffer } from '../../typ
 
 type BenefitItem = Advertisement & { _isMemberOffer?: boolean; _memberId?: string; _memberName?: string; _isSelf?: boolean };
 
-type FilterTab = 'all' | 'new' | 'expiring' | 'unclaimed' | 'claimed';
-
-const FILTER_TABS: { key: FilterTab; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'new', label: 'New' },
-  { key: 'expiring', label: 'Expiring Soon' },
-  { key: 'unclaimed', label: 'Not Claimed' },
-  { key: 'claimed', label: 'Claimed' },
-];
 
 function getDaysRemaining(endDate: Advertisement['endDate']): number | null {
   if (!endDate) return null;
@@ -42,7 +33,7 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
   const [selectedBenefitForDetail, setSelectedBenefitForDetail] = useState<BenefitItem | null>(null);
   const [selectedBenefitForUsage, setSelectedBenefitForUsage] = useState<BenefitItem | null>(null);
   const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
+
   const [recordedImpressions, setRecordedImpressions] = useState<Set<string>>(new Set());
   const { advertisements, loading, error, recordClick, recordImpression, getBenefitUsageHistory } = useAdvertisements();
   const { member } = useAuth();
@@ -51,33 +42,40 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
 
   const memberOffers = useMemo((): BenefitItem[] => {
     return members
-      .filter(m => hasSpecialOffer(m.business?.specialOffer || (m as any).specialOffer))
-      .map(m => {
+      .filter(m => {
+        const offersList = m.business?.specialOffers;
+        if (Array.isArray(offersList) && offersList.length > 0) return true;
+        return hasSpecialOffer(m.business?.specialOffer || (m as any).specialOffer);
+      })
+      .flatMap(m => {
         const isSelf = m.id === member?.id;
-        const offer = m.business?.specialOffer || (m as any).specialOffer as SpecialOffer | string;
-        const offerObj = typeof offer === 'object' ? offer as SpecialOffer : null;
-        const summary = getSpecialOfferSummary(offer);
+        const offersList: SpecialOffer[] = m.business?.specialOffers ??
+          (m.business?.specialOffer ? [typeof m.business.specialOffer === 'string' ? { description: m.business.specialOffer } : m.business.specialOffer] : []);
+        return offersList.map((offerObj, idx) => {
+        const offer = offerObj;
+        const summary = getSpecialOfferSummary(offerObj);
         return {
-          id: `member_offer_${m.id}`,
+          id: `member_offer_${m.id}_${idx}`,
           title: summary,
-          description: offerObj?.terms || offerObj?.description || (typeof offer === 'string' ? offer : ''),
+          description: offerObj.description || '',
           type: 'Banner' as const,
           placement: [],
-          imageUrl: offerObj?.imageUrl || m.general?.avatarUrl || (m as any).avatarUrl || '',
-          logoUrl: offerObj?.logoUrl || m.general?.avatarUrl || (m as any).avatarUrl || '',
+          imageUrl: offerObj.imageUrl || m.general?.avatarUrl || (m as any).avatarUrl || '',
+          logoUrl: offerObj.logoUrl || m.general?.avatarUrl || (m as any).avatarUrl || '',
           status: 'Active' as const,
           impressions: 0,
           clicks: 0,
           priority: 0,
           startDate: m.createdAt || new Date(),
           provider: m.companyName || '',
-          termsAndConditions: offerObj?.terms,
+          termsAndConditions: offerObj.terms,
           createdAt: m.createdAt || new Date(),
           updatedAt: m.updatedAt || new Date(),
           _isMemberOffer: true,
           _memberId: m.id,
           _memberName: isSelf ? 'Your Offer' : (m.general?.name || (m as any).name || ''),
         } as BenefitItem;
+        });
       });
   }, [members, member?.id]);
 
@@ -123,29 +121,16 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
   );
 
   const displayBenefits = useMemo(() => {
-    let list = allActive;
-    if (activeFilter === 'new') {
-      // member offers don't have a meaningful "new" window — exclude them
-      list = list.filter(b => !b._isMemberOffer && isNewBenefit(b.startDate));
-    } else if (activeFilter === 'expiring') {
-      // member offers don't expire — exclude them
-      list = list.filter(b => {
-        if (b._isMemberOffer) return false;
-        const days = getDaysRemaining(b.endDate);
-        return days !== null && days <= 30 && days > 0;
-      });
-    } else if (activeFilter === 'unclaimed') {
-      list = list.filter(b => !claimedBenefitIds.has(b.id!));
-    } else if (activeFilter === 'claimed') {
-      list = list.filter(b => claimedBenefitIds.has(b.id!));
-    }
-    // unclaimed first
-    return list.sort((a, b) => {
+    // own offer first, then unclaimed before claimed
+    return [...allActive].sort((a, b) => {
+      const aIsSelf = a._isMemberOffer && a._memberId === member?.id ? -1 : 0;
+      const bIsSelf = b._isMemberOffer && b._memberId === member?.id ? -1 : 0;
+      if (aIsSelf !== bIsSelf) return aIsSelf - bIsSelf;
       const aClaimed = claimedBenefitIds.has(a.id!) ? 1 : 0;
       const bClaimed = claimedBenefitIds.has(b.id!) ? 1 : 0;
       return aClaimed - bClaimed;
     });
-  }, [allActive, activeFilter, claimedBenefitIds]);
+  }, [allActive, claimedBenefitIds, member?.id]);
 
   const isGuest = (member?.role || '') === 'GUEST';
 
@@ -220,14 +205,6 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
         </div>
       )}
 
-      {/* Filter chips */}
-      <Tabs
-       
-        tabs={FILTER_TABS.map(t => ({ id: t.key, label: t.label }))}
-        activeTab={activeFilter}
-        onTabChange={(id) => setActiveFilter(id as FilterTab)}
-      />
-
       {/* Grid */}
       <LoadingState loading={loading} error={error} empty={displayBenefits.length === 0} emptyMessage="No benefits match this filter">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
@@ -290,13 +267,15 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
 
                 {/* Content */}
                 <div className="flex flex-col flex-1 p-3">
-                  {b._isMemberOffer ? (
-                    b.provider && <p className="text-[9px] text-slate-400 mb-0.5 truncate">{b.provider}</p>
-                  ) : (
-                    b.provider && <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5 truncate">{b.provider}</p>
+                  {!b._isMemberOffer && b.provider && (
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5 truncate">{b.provider}</p>
                   )}
-                  <h3 className="font-bold text-sm text-slate-900 leading-snug line-clamp-2 mb-1">{b.title}</h3>
-                  <p className="text-[11px] text-slate-500 line-clamp-2 flex-1">{b.description}</p>
+                  <h3 className="font-bold text-sm text-slate-900 leading-snug line-clamp-2 mb-1">
+                    {b._isMemberOffer ? (b.provider || b.title) : b.title}
+                  </h3>
+                  <p className="text-[11px] text-slate-500 line-clamp-2 flex-1">
+                    {b._isMemberOffer ? b.title : b.description}
+                  </p>
                   <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100">
                     {b._isMemberOffer ? (
                       <div className="flex items-center gap-1 text-[10px] text-violet-400">

@@ -127,7 +127,7 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
         logoUrl: logoUrl || undefined,
         linkUrl: formData.get('linkUrl') as string || undefined,
         startDate: selectedAd?.startDate || new Date().toISOString().split('T')[0],
-        endDate: selectedAd?.endDate,
+        endDate: (formData.get('endDate') as string) || undefined,
         status: (formData.get('status') as any) || 'Active',
         priority: parseInt(formData.get('priority') as string) || 0,
         budget: formData.get('budget') ? parseFloat(formData.get('budget') as string) : undefined,
@@ -542,6 +542,12 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
               placeholder="https://example.com"
               defaultValue={selectedAd?.linkUrl}
             />
+            <Input
+              name="endDate"
+              label="Expiry Date (Optional)"
+              type="date"
+              defaultValue={selectedAd?.endDate ? (typeof selectedAd.endDate === 'string' ? selectedAd.endDate.split('T')[0] : new Date(selectedAd.endDate as any).toISOString().split('T')[0]) : ''}
+            />
           </div>
 
           {/* Advanced (collapsed) */}
@@ -563,14 +569,6 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
                   min="0"
                   max="10"
                   defaultValue={selectedAd?.priority?.toString() || '5'}
-                />
-                <Input
-                  name="budget"
-                  label="Budget (RM)"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  defaultValue={selectedAd?.budget?.toString()}
                 />
               </div>
             )}

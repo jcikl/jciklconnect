@@ -132,18 +132,14 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex flex-col justify-center items-center p-5 sm:p-8">
           <div className="w-full max-w-sm sm:max-w-md">
-            {/* Mascot illustration */}
-            <div className="flex justify-center mb-2">
+            {/* Card */}
+            <div className="bg-white rounded-3xl shadow-xl border border-slate-100 p-6 sm:p-8 text-center">
               <img
                 src="/mascot/Error.png"
                 alt="Error mascot"
-                className="w-64 sm:w-72 object-contain select-none"
+                className="w-48 sm:w-56 object-contain select-none mx-auto mb-4"
                 draggable={false}
               />
-            </div>
-
-            {/* Card */}
-            <div className="bg-white rounded-3xl shadow-xl border border-slate-100 p-6 sm:p-8 text-center">
               <h2 className="text-xl sm:text-2xl font-black text-slate-900 mb-2 tracking-tight">
                 Oops! Something went wrong
               </h2>

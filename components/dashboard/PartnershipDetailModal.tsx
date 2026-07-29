@@ -106,16 +106,25 @@ export const PartnershipDetailModal: React.FC<PartnershipDetailModalProps> = ({ 
 
   if (!visible) return null;
 
+  const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768;
+
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
   const baseY = !isOpen ? vh : snap === 'half' ? vh * 0.5 : 0;
   const currentY = dragOffset !== 0 ? Math.max(0, baseY + dragOffset) : baseY;
   const isDragging = dragOffset !== 0 || slideX !== 0;
 
-  const sheetStyle: React.CSSProperties = {
-    height: '100vh',
-    transform: `translateY(${currentY}px)` + (slideX !== 0 ? ` translateX(${slideX * 0.15}px)` : ''),
-    transition: isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.32,0.72,0,1)',
-  };
+  const sheetStyle: React.CSSProperties = isDesktop
+    ? {
+        opacity: isOpen ? 1 : 0,
+        transform: `translate(-50%, -50%) scale(${isOpen ? 1 : 0.96})`,
+        transition: 'opacity 0.25s ease, transform 0.25s ease',
+        maxHeight: '85vh',
+      }
+    : {
+        height: '100vh',
+        transform: `translateY(${currentY}px)` + (slideX !== 0 ? ` translateX(${slideX * 0.15}px)` : ''),
+        transition: isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.32,0.72,0,1)',
+      };
 
   const backdropOpacity = isOpen
     ? dragOffset !== 0
@@ -132,13 +141,15 @@ export const PartnershipDetailModal: React.FC<PartnershipDetailModalProps> = ({ 
         onClick={handleClose}
       />
 
-      {/* Sheet */}
+      {/* Sheet — mobile: bottom drawer | desktop: centered dialog */}
       <div
-        className="fixed bottom-0 left-0 right-0 z-[55] flex flex-col rounded-t-[28px] bg-white shadow-2xl md:left-1/2 md:-translate-x-1/2 md:w-[560px] md:rounded-t-2xl"
+        className="fixed z-[55] flex flex-col bg-white shadow-2xl
+          bottom-0 left-0 right-0 rounded-t-[28px]
+          md:bottom-auto md:top-1/2 md:left-1/2 md:right-auto md:w-[560px] md:rounded-2xl"
         style={sheetStyle}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
+        onTouchStart={!isDesktop ? handleTouchStart : undefined}
+        onTouchMove={!isDesktop ? handleTouchMove : undefined}
+        onTouchEnd={!isDesktop ? handleTouchEnd : undefined}
       >
         {/* Hero image */}
         <div className="relative h-56 w-full overflow-hidden shrink-0 rounded-t-[28px] md:rounded-t-2xl">
