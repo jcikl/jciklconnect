@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SlidersHorizontal, CreditCard, MessageSquare, Activity, Wrench, Users, ShieldCheck } from 'lucide-react';
+import { SlidersHorizontal, CreditCard, MessageSquare, Activity, Wrench, Users, ShieldCheck, Network } from 'lucide-react';
 import { PageHeader, Tabs } from '../ui/Common';
 import { MembershipConfigView } from './MembershipConfigView';
 import { AccessConfigView } from './AccessConfigView';
@@ -7,10 +7,13 @@ import { ToyyibView } from './ToyyibView';
 import { WhapiConfigView } from './WhapiConfigView';
 import { SystemLogsView } from './SystemLogsView';
 import { DbMaintenanceView } from './DbMaintenanceView';
+import { SisterChaptersConfig } from './SisterChaptersConfig';
+import { usePermissions } from '../../hooks/usePermissions';
+import { UserRole } from '../../types';
 
-type ConfigTab = 'membership' | 'access' | 'toyyib' | 'whapi' | 'systemlogs' | 'maintenance';
+type ConfigTab = 'membership' | 'access' | 'toyyib' | 'whapi' | 'systemlogs' | 'maintenance' | 'sisters';
 
-const TABS: { id: ConfigTab; label: string; icon: React.ReactNode }[] = [
+const BASE_TABS: { id: ConfigTab; label: string; icon: React.ReactNode }[] = [
   { id: 'membership',  label: 'Membership',   icon: <Users size={14} /> },
   { id: 'access',      label: 'Access',        icon: <ShieldCheck size={14} /> },
   { id: 'toyyib',      label: 'ToyyibPay',     icon: <CreditCard size={14} /> },
@@ -19,11 +22,19 @@ const TABS: { id: ConfigTab; label: string; icon: React.ReactNode }[] = [
   { id: 'maintenance', label: 'Maintenance',   icon: <Wrench size={14} /> },
 ];
 
+const SUPER_ADMIN_TABS: { id: ConfigTab; label: string; icon: React.ReactNode }[] = [
+  { id: 'sisters', label: 'Global Relations', icon: <Network size={14} /> },
+];
+
 interface Props {
   initialTab?: ConfigTab;
 }
 
 export const SystemConfigView: React.FC<Props> = ({ initialTab }) => {
+  const { effectiveRole } = usePermissions();
+  const isSuperAdmin = effectiveRole === UserRole.SUPER_ADMIN;
+
+  const tabs = isSuperAdmin ? [...BASE_TABS, ...SUPER_ADMIN_TABS] : BASE_TABS;
   const [activeTab, setActiveTab] = useState<ConfigTab>(initialTab ?? 'membership');
 
   return (
@@ -34,7 +45,7 @@ export const SystemConfigView: React.FC<Props> = ({ initialTab }) => {
       />
 
       <Tabs
-        tabs={TABS.map(t => ({ id: t.id, label: t.label, icon: t.icon }))}
+        tabs={tabs.map(t => ({ id: t.id, label: t.label, icon: t.icon }))}
         activeTab={activeTab}
         onTabChange={(id) => setActiveTab(id as ConfigTab)}
         mobileFallback="select"
@@ -47,6 +58,7 @@ export const SystemConfigView: React.FC<Props> = ({ initialTab }) => {
         {activeTab === 'whapi'       && <WhapiConfigView embedded />}
         {activeTab === 'systemlogs'  && <SystemLogsView />}
         {activeTab === 'maintenance' && <DbMaintenanceView />}
+        {activeTab === 'sisters'     && isSuperAdmin && <SisterChaptersConfig />}
       </div>
     </div>
   );

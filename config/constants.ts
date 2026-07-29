@@ -4,6 +4,7 @@ export const DEFAULT_LO_ID = 'jcikl';
 
 export const COLLECTIONS = {
   MEMBERS: 'members',
+  ZOOM_BOOKINGS: 'zoomBookings',
   EVENTS: 'events',
   EVENT_BUDGETS: 'eventBudgets',
   PROJECTS: 'projects',
@@ -105,6 +106,8 @@ export const COLLECTIONS = {
   BIRTHDAY_NOTIFICATIONS_SENT: 'birthdayNotificationsSent',
   /** Nudge dismiss records written by behavioralNudgingService */
   NUDGES: 'nudges',
+  /** Sister / partner JCI chapters from other countries */
+  SISTER_CHAPTERS: 'sisterChapters',
   /** Atomic sequence counters (e.g. PR reference number generation) */
   COUNTERS: 'counters',
   /** System-wide configuration documents (e.g. radar_points_config, promotionSettings) */

@@ -191,7 +191,7 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                     ))}
                   </div>
                 </div>
-                <div>
+                <div className="col-span-2">
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Introducer</label>
                   <IntroducerSelector
                     value={inlineValues.introducer ?? ''}
