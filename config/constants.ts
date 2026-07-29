@@ -5,6 +5,7 @@ export const DEFAULT_LO_ID = 'jcikl';
 export const COLLECTIONS = {
   MEMBERS: 'members',
   ZOOM_BOOKINGS: 'zoomBookings',
+  SOCIAL_POSTS: 'socialPosts',
   EVENTS: 'events',
   EVENT_BUDGETS: 'eventBudgets',
   PROJECTS: 'projects',

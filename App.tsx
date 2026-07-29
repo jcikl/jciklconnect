@@ -66,6 +66,7 @@ const KnowledgeView = lazy(() => import('./components/modules/KnowledgeView').th
 const CommunicationView = lazy(() => import('./components/modules/CommunicationView').then(m => ({ default: m.CommunicationView })));
 const HobbyClubsView = lazy(() => import('./components/modules/HobbyClubsView').then(m => ({ default: m.HobbyClubsView })));
 const ZoomBookingView = lazy(() => import('./components/modules/ZoomBookingView').then(m => ({ default: m.ZoomBookingView })));
+const SocialMediaView = lazy(() => import('./components/modules/SocialMediaView').then(m => ({ default: m.SocialMediaView })));
 const SurveysView = lazy(() => import('./components/modules/SurveysView').then(m => ({ default: m.SurveysView })));
 const MemberBenefitsView = lazy(() => import('./components/modules/MemberBenefitsView').then(m => ({ default: m.MemberBenefitsView })));
 const DataImportExportView = lazy(() => import('./components/modules/DataImportExportView').then(m => ({ default: m.DataImportExportView })));
@@ -655,7 +656,7 @@ export const JCIKLApp: React.FC = () => {
             <img
               src="/mascot/Error.png"
               alt="Error mascot"
-              className="w-36 sm:w-44 object-contain select-none mx-auto mb-3"
+              className="w-52 sm:w-64 object-contain select-none block mx-auto"
               draggable={false}
             />
             <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white mb-1.5 tracking-tight">
@@ -736,6 +737,9 @@ export const JCIKLApp: React.FC = () => {
       case 'ZOOM_BOOKING':
         if (member?.role === UserRole.INACTIVE) return dashboardFallback;
         return wrapEB(<ZoomBookingView />, 'Zoom Booking');
+      case 'SOCIAL_MEDIA':
+        if (member?.role === UserRole.INACTIVE) return dashboardFallback;
+        return wrapEB(<SocialMediaView />, 'Social Media');
       case 'SURVEYS':
         if (member?.role === UserRole.INACTIVE) return dashboardFallback;
         return wrapEB(<SurveysView searchQuery={searchQuery} />, '问卷');
@@ -961,6 +965,13 @@ export const JCIKLApp: React.FC = () => {
                     onClick={() => { handleViewChange('ZOOM_BOOKING'); setIsSidebarOpen(false); }}
                     isCollapsed={isSidebarCollapsed}
                   />
+                  <SidebarItem
+                    icon={<Share2 size={18} />}
+                    label="Social Media"
+                    isActive={view === 'SOCIAL_MEDIA'}
+                    onClick={() => { handleViewChange('SOCIAL_MEDIA'); setIsSidebarOpen(false); }}
+                    isCollapsed={isSidebarCollapsed}
+                  />
                   {hasPermission('canViewFinance') && (
                     <>
                       <SidebarItem
@@ -1122,7 +1133,7 @@ export const JCIKLApp: React.FC = () => {
             </div>
           )}
           <h1 className="sr-only">
-            {view === 'DASHBOARD' ? 'Dashboard' : view === 'MEMBERS' ? 'Members' : view === 'EVENTS' ? 'Event List' : view === 'PROJECTS' ? 'Events Management' : view === 'FINANCE' ? 'Finance' : view === 'PAYMENT_REQUESTS' ? 'Payment Requests' : view === 'GAMIFICATION' ? 'Gamification' : view === 'INVENTORY' ? 'Inventory' : view === 'DIRECTORY' ? 'Business Directory' : view === 'AUTOMATION' ? 'Automation Studio' : view === 'KNOWLEDGE' ? 'Knowledge' : view === 'COMMUNICATION' ? 'Communication' : view === 'CLUBS' ? 'Hobby Clubs' : view === 'SURVEYS' ? 'Surveys' : view === 'ZOOM_BOOKING' ? 'Zoom Booking' : view === 'BENEFITS' ? 'Member Benefits' : view === 'DATA_IMPORT_EXPORT' ? 'Data Import/Export' : view === 'ADVERTISEMENTS' ? 'Partnership & Promotions' : view === 'AI_INSIGHTS' ? 'AI Insights' : view === 'TEMPLATES' ? 'Templates' : view === 'ACTIVITY_PLANS' ? 'Activity Plans' : view === 'REPORTS' ? 'Reports' : view === 'DEVELOPER' ? 'Developer Interface' : 'JCI LO Management'}
+            {view === 'DASHBOARD' ? 'Dashboard' : view === 'MEMBERS' ? 'Members' : view === 'EVENTS' ? 'Event List' : view === 'PROJECTS' ? 'Events Management' : view === 'FINANCE' ? 'Finance' : view === 'PAYMENT_REQUESTS' ? 'Payment Requests' : view === 'GAMIFICATION' ? 'Gamification' : view === 'INVENTORY' ? 'Inventory' : view === 'DIRECTORY' ? 'Business Directory' : view === 'AUTOMATION' ? 'Automation Studio' : view === 'KNOWLEDGE' ? 'Knowledge' : view === 'COMMUNICATION' ? 'Communication' : view === 'CLUBS' ? 'Hobby Clubs' : view === 'SURVEYS' ? 'Surveys' : view === 'ZOOM_BOOKING' ? 'Zoom Booking' : view === 'SOCIAL_MEDIA' ? 'Social Media' : view === 'BENEFITS' ? 'Member Benefits' : view === 'DATA_IMPORT_EXPORT' ? 'Data Import/Export' : view === 'ADVERTISEMENTS' ? 'Partnership & Promotions' : view === 'AI_INSIGHTS' ? 'AI Insights' : view === 'TEMPLATES' ? 'Templates' : view === 'ACTIVITY_PLANS' ? 'Activity Plans' : view === 'REPORTS' ? 'Reports' : view === 'DEVELOPER' ? 'Developer Interface' : 'JCI LO Management'}
           </h1>
           {/* Topbar removed for premium gradient header replacement */}
 
@@ -1512,6 +1523,10 @@ export const JCIKLApp: React.FC = () => {
                         <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('ZOOM_BOOKING'); setShowMobileMenu(false); }}>
                           <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-blue-950/30 text-blue-400 border-blue-900/50'}`}><Video size={22} /></div>
                           <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Zoom</span>
+                        </div>
+                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('SOCIAL_MEDIA'); setShowMobileMenu(false); }}>
+                          <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-sky-950/30 text-sky-400 border-sky-900/50'}`}><Share2 size={22} /></div>
+                          <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Social</span>
                         </div>
                         {canAccessEventsAndPayments && (
                           <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('PAYMENT_REQUESTS'); setShowMobileMenu(false); }}>

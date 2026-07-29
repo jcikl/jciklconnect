@@ -8,3 +8,4 @@ export * from './finance';
 export * from './automation';
 export * from './governance';
 export * from './misc';
+export * from './sisterChapter';

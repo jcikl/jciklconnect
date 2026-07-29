@@ -1327,6 +1327,26 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create, update, delete: if isAdmin();
     }
+    // Sister chapters — any authenticated member can read; only SUPER_ADMIN can write
+    match /sisterChapters/{chapterId} {
+      allow read: if isActiveMember();
+      allow create, update, delete: if getUserRole() == 'SUPER_ADMIN';
+    }
+
+    // Social posts — members can create and read their own; BOD/Admin can read and update all
+    match /socialPosts/{postId} {
+      allow get: if isActiveMember() && (resource.data.submittedBy == request.auth.uid || isBoard());
+      allow list: if isActiveMember();
+      allow create: if isActiveMember() && request.resource.data.submittedBy == request.auth.uid
+        && request.resource.data.status == 'draft'
+        && request.resource.data.keys().hasAll(['title', 'rawContent', 'platforms', 'status', 'submittedBy', 'submittedByName', 'createdAt', 'updatedAt']);
+      allow update: if isBoard()
+        || (isActiveMember() && resource.data.submittedBy == request.auth.uid
+            && resource.data.status in ['draft', 'rejected']
+            && request.resource.data.status in ['draft', 'pending_review']);
+      allow delete: if isAdmin();
+    }
+
     // Default: deny all other access
     match /{document=**} {
       allow read, write: if false;
