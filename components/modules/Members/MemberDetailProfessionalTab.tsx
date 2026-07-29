@@ -1,10 +1,11 @@
 import * as React from 'react';
-import { ArrowUpRight } from 'lucide-react';
-import { Card, Badge } from '../../ui/Common';
+import { ArrowUpRight, Upload } from 'lucide-react';
+import { Card, Badge, useToast } from '../../ui/Common';
 import { MultiSelectDropdown } from '../../ui/MultiSelectDropdown';
 import type { Member, SpecialOffer } from '../../../types';
 import { getSpecialOfferSummary, hasSpecialOffer } from '../../../types/member';
 import { INDUSTRY_OPTIONS, IDEAL_REFERRAL_OPTIONS, BUSINESS_CATEGORIES_OPTIONS } from '../../../config/constants';
+import { uploadMemberOfferLogoToCloudinary, uploadMemberOfferBannerToCloudinary } from '../../../services/cloudinaryService';
 
 interface MemberDetailProfessionalTabProps {
   member: Member;
@@ -16,6 +17,39 @@ interface MemberDetailProfessionalTabProps {
 
 const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps> = (props) => {
   const { member, isEditMode, inlineValues, setInlineValues, activeInlineEditCard } = props;
+  const { showToast } = useToast();
+  const [uploadingLogo, setUploadingLogo] = React.useState(false);
+  const [uploadingBanner, setUploadingBanner] = React.useState(false);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>, update: (p: Partial<SpecialOffer>) => void) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !member.id) return;
+    setUploadingLogo(true);
+    try {
+      const url = await uploadMemberOfferLogoToCloudinary(file, member.id);
+      update({ logoUrl: url });
+    } catch {
+      showToast('Failed to upload logo', 'error');
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>, update: (p: Partial<SpecialOffer>) => void) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !member.id) return;
+    setUploadingBanner(true);
+    try {
+      const url = await uploadMemberOfferBannerToCloudinary(file, member.id);
+      update({ imageUrl: url });
+    } catch {
+      showToast('Failed to upload banner', 'error');
+    } finally {
+      setUploadingBanner(false);
+    }
+  };
 
   return (
     <div className="grid lg:grid-cols-3 gap-6">
@@ -64,6 +98,15 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                   />
                 </div>
+                <div className="col-span-2">
+                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Company Description</label>
+                  <textarea
+                    value={inlineValues.business?.companyDescription}
+                    onChange={e => setInlineValues({ ...inlineValues, companyDescription: e.target.value })}
+                    rows={2}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue resize-y"
+                  />
+                </div>
                 <div>
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Position / Title</label>
                   <input
@@ -110,16 +153,6 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                     <option value="Willing to Explore">Willing to Explore</option>
                   </select>
                 </div>
-              </div>
-
-              <div className="border-t pt-3">
-                <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Company Description</label>
-                <textarea
-                  value={inlineValues.business?.companyDescription}
-                  onChange={e => setInlineValues({ ...inlineValues, companyDescription: e.target.value })}
-                  rows={2}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue resize-y"
-                />
               </div>
 
               <div className="grid grid-cols-2 gap-4 border-t pt-3">
@@ -177,20 +210,43 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                         onChange={e => update({ terms: e.target.value })}
                         className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue resize-none"
                       />
-                      <input
-                        type="url"
-                        placeholder="Logo URL (optional)"
-                        value={structured.logoUrl ?? ''}
-                        onChange={e => update({ logoUrl: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
-                      />
-                      <input
-                        type="url"
-                        placeholder="Ad Banner URL (optional)"
-                        value={structured.imageUrl ?? ''}
-                        onChange={e => update({ imageUrl: e.target.value })}
-                        className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
-                      />
+                      {/* Logo + Banner uploads — side by side */}
+                      <div className="grid grid-cols-2 gap-3">
+                        {/* Logo */}
+                        <div className="flex flex-col gap-1.5">
+                          <p className="text-xs text-slate-500 font-medium">Company Logo</p>
+                          <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 aspect-square flex items-center justify-center overflow-hidden">
+                            {structured.logoUrl
+                              ? <img src={structured.logoUrl} alt="Logo" className="w-full h-full object-contain p-1" />
+                              : <Upload size={18} className="text-slate-300" />
+                            }
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <label className={`flex-1 inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${uploadingLogo ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' : 'bg-white text-slate-700 border-slate-300 hover:border-jci-blue hover:text-jci-blue'}`}>
+                              <Upload size={11} />{uploadingLogo ? 'Uploading…' : 'Upload'}
+                              <input type="file" accept="image/*" className="hidden" disabled={uploadingLogo} onChange={e => handleLogoUpload(e, update)} />
+                            </label>
+                            {structured.logoUrl && <button type="button" onClick={() => update({ logoUrl: '' })} className="text-xs text-slate-400 hover:text-red-500">Remove</button>}
+                          </div>
+                        </div>
+                        {/* Ad Banner */}
+                        <div className="flex flex-col gap-1.5">
+                          <p className="text-xs text-slate-500 font-medium">Ad Banner</p>
+                          <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 aspect-square flex items-center justify-center overflow-hidden">
+                            {structured.imageUrl
+                              ? <img src={structured.imageUrl} alt="Banner" className="w-full h-full object-cover" />
+                              : <Upload size={18} className="text-slate-300" />
+                            }
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <label className={`flex-1 inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${uploadingBanner ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' : 'bg-white text-slate-700 border-slate-300 hover:border-jci-blue hover:text-jci-blue'}`}>
+                              <Upload size={11} />{uploadingBanner ? 'Uploading…' : 'Upload'}
+                              <input type="file" accept="image/*" className="hidden" disabled={uploadingBanner} onChange={e => handleBannerUpload(e, update)} />
+                            </label>
+                            {structured.imageUrl && <button type="button" onClick={() => update({ imageUrl: '' })} className="text-xs text-slate-400 hover:text-red-500">Remove</button>}
+                          </div>
+                        </div>
+                      </div>
                       <div className="flex items-center gap-3">
                         <label className="text-xs text-slate-500 whitespace-nowrap">Status</label>
                         <div className="flex gap-2">
@@ -227,6 +283,9 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                   <a href={member.business?.companyWebsite.startsWith('http') ? member.business?.companyWebsite : `https://${member.business?.companyWebsite}`} target="_blank" rel="noopener noreferrer" className="text-xs text-jci-blue hover:underline block mt-1">
                     {member.business?.companyWebsite}
                   </a>
+                )}
+                {member.business?.companyDescription && (
+                  <p className="text-xs text-slate-500 leading-relaxed mt-1.5">{member.business.companyDescription}</p>
                 )}
               </div>
 
@@ -292,13 +351,6 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                   </div>
                 </div>
 
-                {/* Company Description */}
-                {member.business?.companyDescription && (
-                  <div className="p-3 bg-slate-50 rounded-lg border-l-4 border-slate-300">
-                    <span className="text-slate-500 text-xs uppercase font-bold mb-1 block">Company Description</span>
-                    <p className="text-xs text-slate-600 leading-relaxed">{member.business.companyDescription}</p>
-                  </div>
-                )}
 
                 {/* Special Member Offer */}
                 <div className="p-3 bg-jci-blue/5 rounded-lg border-l-4 border-jci-blue">

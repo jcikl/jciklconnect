@@ -221,12 +221,22 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
     getMemberDisplayMembershipType,
   });
 
+  // Always pin current user to the top
+  const sortedMembers = useMemo(() => {
+    if (!currentMember?.id) return filteredMembers;
+    const idx = filteredMembers.findIndex(m => m.id === currentMember.id);
+    if (idx <= 0) return filteredMembers;
+    const result = [...filteredMembers];
+    result.unshift(result.splice(idx, 1)[0]);
+    return result;
+  }, [filteredMembers, currentMember?.id]);
+
   // Paginate filtered members
   const paginatedMembers = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
-    return filteredMembers.slice(startIndex, endIndex);
-  }, [filteredMembers, currentPage, itemsPerPage]);
+    return sortedMembers.slice(startIndex, endIndex);
+  }, [sortedMembers, currentPage, itemsPerPage]);
 
   const totalPages = Math.ceil(filteredMembers.length / itemsPerPage);
 

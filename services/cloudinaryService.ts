@@ -128,6 +128,36 @@ export const uploadMemberGroupPhotoToCloudinary = async (
   return uploadToCloudinary(compressedFile, folder, onProgress, { publicId });
 };
 
+export const uploadMemberOfferLogoToCloudinary = async (
+  file: File,
+  memberId: string,
+  onProgress?: (progress: number) => void
+): Promise<string> => {
+  const compressedFile = await imageCompression(file, {
+    maxSizeMB: 0.3,
+    maxWidthOrHeight: 512,
+    useWebWorker: false,
+  });
+  const folder = `${sanitizeFolderPath(MEMBER_AVATAR_ASSET_ROOT)}/member-offers/${sanitizePathSegment(memberId)}`;
+  const publicId = `logo-${Math.floor(Date.now() / 1000)}`;
+  return uploadToCloudinary(compressedFile, folder, onProgress, { publicId });
+};
+
+export const uploadMemberOfferBannerToCloudinary = async (
+  file: File,
+  memberId: string,
+  onProgress?: (progress: number) => void
+): Promise<string> => {
+  const compressedFile = await imageCompression(file, {
+    maxSizeMB: 0.8,
+    maxWidthOrHeight: 1200,
+    useWebWorker: false,
+  });
+  const folder = `${sanitizeFolderPath(MEMBER_AVATAR_ASSET_ROOT)}/member-offers/${sanitizePathSegment(memberId)}`;
+  const publicId = `banner-${Math.floor(Date.now() / 1000)}`;
+  return uploadToCloudinary(compressedFile, folder, onProgress, { publicId });
+};
+
 export const uploadBodGroupPhotoToCloudinary = async (
   file: File,
   term: string,
