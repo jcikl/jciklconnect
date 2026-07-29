@@ -1,16 +1,31 @@
 import { useState, useEffect, useCallback } from 'react';
 import { SocialPersonaService } from '../services/socialPersonaService';
+import { DEFAULT_PERSONAS } from '../types/socialPersona';
 import type { SocialPersona } from '../types/socialPersona';
 import type { SocialPostPlatform } from '../types/socialPost';
 
+const PLATFORMS: SocialPostPlatform[] = ['facebook', 'instagram', 'linkedin', 'xiaohongshu'];
+
+function buildDefaults(): SocialPersona[] {
+  return PLATFORMS.map(platform => ({
+    ...DEFAULT_PERSONAS[platform],
+    id: platform,
+    updatedAt: new Date().toISOString(),
+  }));
+}
+
 export function useSocialPersonas() {
-  const [personas, setPersonas] = useState<SocialPersona[]>([]);
+  const [personas, setPersonas] = useState<SocialPersona[]>(buildDefaults());
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       setPersonas(await SocialPersonaService.getAllPersonas());
+    } catch {
+      // Firestore rules may not be deployed yet — silently fall back to defaults.
+      // Personas are still functional; BOD can configure once rules are deployed.
+      setPersonas(buildDefaults());
     } finally {
       setLoading(false);
     }
