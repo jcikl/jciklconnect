@@ -130,7 +130,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
       // Default error UI
       return (
-        <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex flex-col justify-center items-center p-5 sm:p-8">
+        <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 flex flex-col justify-center items-center p-5 sm:p-8">
           <div className="w-full max-w-sm sm:max-w-md">
             {/* Card */}
             <div className="bg-white rounded-3xl shadow-xl border border-slate-100 p-6 sm:p-8 text-center">
