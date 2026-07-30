@@ -138,9 +138,10 @@ export const SocialMediaView: React.FC = () => {
         {isBod && (
           <button
             onClick={() => setPersonaDrawerOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors shrink-0"
+            aria-label="AI Personas"
+            className="p-2 rounded-xl text-slate-500 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors shrink-0"
           >
-            <Settings size={13} /> AI Personas
+            <Settings size={16} />
           </button>
         )}
       </div>
