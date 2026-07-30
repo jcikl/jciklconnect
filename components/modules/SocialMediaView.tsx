@@ -53,9 +53,9 @@ function formatDateTime(iso?: string) {
 
 // ── Tab definition ─────────────────────────────────────────────────────────────
 
-type TabKey = 'all' | SocialPostStatus | 'settings';
+type TabKey = 'all' | SocialPostStatus;
 
-const BOD_TABS: { key: TabKey; label: string; icon?: React.ReactNode }[] = [
+const BOD_TABS: { key: TabKey; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'pending_review', label: 'Pending Review' },
   { key: 'approved', label: 'Approved' },
@@ -63,7 +63,6 @@ const BOD_TABS: { key: TabKey; label: string; icon?: React.ReactNode }[] = [
   { key: 'published', label: 'Published' },
   { key: 'draft', label: 'Drafts' },
   { key: 'rejected', label: 'Rejected' },
-  { key: 'settings', label: 'AI Personas', icon: <Settings size={11} /> },
 ];
 
 const MEMBER_TABS: { key: TabKey; label: string }[] = [
@@ -87,6 +86,7 @@ export const SocialMediaView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabKey>('all');
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState<SocialPost | null>(null);
+  const [personaDrawerOpen, setPersonaDrawerOpen] = useState(false);
 
   const tabs = isBod ? BOD_TABS : MEMBER_TABS;
 
@@ -126,13 +126,23 @@ export const SocialMediaView: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div>
-        <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-          <Share2 size={20} className="text-jci-blue" /> Social Media
-        </h2>
-        <p className="text-xs text-slate-500 mt-0.5">
-          {isBod ? 'Review and publish member-submitted content.' : 'Submit content for the JCI KL official social media pages.'}
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <Share2 size={20} className="text-jci-blue" /> Social Media
+          </h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {isBod ? 'Review and publish member-submitted content.' : 'Submit content for the JCI KL official social media pages.'}
+          </p>
+        </div>
+        {isBod && (
+          <button
+            onClick={() => setPersonaDrawerOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors shrink-0"
+          >
+            <Settings size={13} /> AI Personas
+          </button>
+        )}
       </div>
 
       {/* Tabs */}
@@ -147,8 +157,8 @@ export const SocialMediaView: React.FC = () => {
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
-            {tab.icon}{tab.label}
-            {tab.key !== 'settings' && (counts[tab.key] ?? 0) > 0 && (
+            {tab.label}
+            {(counts[tab.key] ?? 0) > 0 && (
               <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${activeTab === tab.key ? 'bg-white/20' : 'bg-slate-200'}`}>
                 {counts[tab.key]}
               </span>
@@ -157,10 +167,8 @@ export const SocialMediaView: React.FC = () => {
         ))}
       </div>
 
-      {/* Post list / Settings panel */}
-      {activeTab === 'settings' ? (
-        <SocialPersonaConfig />
-      ) : loading ? (
+      {/* Post list */}
+      {loading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 size={24} className="animate-spin text-slate-400" />
         </div>
@@ -174,17 +182,15 @@ export const SocialMediaView: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-2">
-          {activeTab !== 'settings' && (
-            <button
-              onClick={() => setCreateOpen(true)}
-              className="w-full flex items-center gap-3 bg-white border border-dashed border-jci-blue/40 hover:border-jci-blue hover:bg-jci-blue/5 rounded-xl px-4 py-3 transition-colors group"
-            >
-              <div className="w-7 h-7 rounded-full bg-jci-blue/10 group-hover:bg-jci-blue/20 flex items-center justify-center flex-shrink-0 transition-colors">
-                <Plus size={15} className="text-jci-blue" />
-              </div>
-              <span className="text-sm font-semibold text-jci-blue">New Post</span>
-            </button>
-          )}
+          <button
+            onClick={() => setCreateOpen(true)}
+            className="w-full flex items-center gap-3 bg-white border border-dashed border-jci-blue/40 hover:border-jci-blue hover:bg-jci-blue/5 rounded-xl px-4 py-3 transition-colors group"
+          >
+            <div className="w-7 h-7 rounded-full bg-jci-blue/10 group-hover:bg-jci-blue/20 flex items-center justify-center flex-shrink-0 transition-colors">
+              <Plus size={15} className="text-jci-blue" />
+            </div>
+            <span className="text-sm font-semibold text-jci-blue">New Post</span>
+          </button>
           {filtered.map(post => (
             <PostCard
               key={post.id}
@@ -203,6 +209,18 @@ export const SocialMediaView: React.FC = () => {
         onClose={() => setCreateOpen(false)}
         onSubmit={handleCreate}
       />
+
+      {/* AI Personas drawer */}
+      {isBod && (
+        <Drawer isOpen={personaDrawerOpen} title="AI Personas" onClose={() => setPersonaDrawerOpen(false)} position="bottom" size="xl">
+          <div className="pb-6">
+            <p className="text-xs text-slate-500 mb-4">
+              Configure the AI writing style for each platform. These prompts are used when BOD clicks "AI Rewrite" in the review drawer.
+            </p>
+            <SocialPersonaConfig />
+          </div>
+        </Drawer>
+      )}
 
       {/* Review / Edit drawer */}
       {selectedPost && (
