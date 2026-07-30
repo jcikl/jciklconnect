@@ -126,7 +126,7 @@ export const SocialMediaView: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
             <Share2 size={20} className="text-jci-blue" /> Social Media
