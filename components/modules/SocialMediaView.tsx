@@ -593,6 +593,17 @@ const ReviewDrawer: React.FC<{
 
   const drawerFooter = (canEditDraft || isAdmin) ? (
     <div className="flex gap-2">
+      {isAdmin && (
+        <Button
+          variant="outline"
+          className="shrink-0 px-3 text-red-500 border-red-200 hover:bg-red-50"
+          onClick={onDelete}
+          disabled={saving}
+          aria-label="Delete post"
+        >
+          <X size={16} />
+        </Button>
+      )}
       {canEditDraft && (
         <Button variant="outline" className="flex-1" onClick={saveDraft} disabled={draftSaving}>
           {draftSaving ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : null}
@@ -616,16 +627,6 @@ const ReviewDrawer: React.FC<{
           }}
         >
           <Send size={14} className="mr-1.5" /> Submit for Review
-        </Button>
-      )}
-      {isAdmin && (
-        <Button
-          variant="outline"
-          className={`text-red-500 border-red-200 hover:bg-red-50 ${canEditDraft ? '' : 'flex-1'}`}
-          onClick={onDelete}
-          disabled={saving}
-        >
-          <X size={14} className="mr-1.5" /> Delete Post
         </Button>
       )}
     </div>
