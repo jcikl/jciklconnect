@@ -4,6 +4,7 @@ import {
   Clock, Eye, Send, RotateCcw, Calendar, Megaphone, Loader2, Settings, Zap,
 } from 'lucide-react';
 import { Button, Modal, Badge, Drawer, useToast } from '../ui/Common';
+import { AsyncErrorBoundary } from '../ui/ErrorBoundary';
 import { Input, Textarea, Select } from '../ui/Form';
 import { useAuth } from '../../hooks/useAuth';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -215,7 +216,9 @@ export const SocialMediaView: React.FC = () => {
       {isBod && (
         <Drawer isOpen={personaDrawerOpen} title="AI Personas" onClose={() => setPersonaDrawerOpen(false)} position="bottom" size="xl">
           <div className="pb-6">
-            <SocialPersonaConfig />
+            <AsyncErrorBoundary>
+              {personaDrawerOpen && <SocialPersonaConfig />}
+            </AsyncErrorBoundary>
           </div>
         </Drawer>
       )}
