@@ -592,43 +592,46 @@ const ReviewDrawer: React.FC<{
   };
 
   const drawerFooter = (canEditDraft || isAdmin) ? (
-    <div className="flex gap-2">
-      {isAdmin && (
-        <Button
-          variant="outline"
-          className="shrink-0 px-3 text-red-500 border-red-200 hover:bg-red-50"
-          onClick={onDelete}
-          disabled={saving}
-          aria-label="Delete post"
-        >
-          <X size={16} />
-        </Button>
-      )}
-      {canEditDraft && (
-        <Button variant="outline" className="flex-1" onClick={saveDraft} disabled={draftSaving}>
-          {draftSaving ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : null}
-          Save Draft
-        </Button>
-      )}
-      {canEditDraft && (
-        <Button
-          variant="primary"
-          className="flex-1"
-          disabled={draftSaving}
-          onClick={async () => {
-            await saveDraft();
-            onSubmitForReview({
-              ...post,
-              title: draftTitle.trim() || post.title,
-              rawContent: draftContent.trim() || post.rawContent,
-              platforms: draftPlatforms,
-              hashtags: draftHashtags.split(/[,\s#]+/).map(t => t.trim()).filter(Boolean),
-            });
-          }}
-        >
-          <Send size={14} className="mr-1.5" /> Submit for Review
-        </Button>
-      )}
+    <div className="flex items-center justify-between">
+      <div>
+        {isAdmin && (
+          <Button
+            variant="outline"
+            className="px-3 text-red-500 border-red-200 hover:bg-red-50"
+            onClick={onDelete}
+            disabled={saving}
+            aria-label="Delete post"
+          >
+            <X size={16} />
+          </Button>
+        )}
+      </div>
+      <div className="flex gap-2">
+        {canEditDraft && (
+          <Button variant="outline" onClick={saveDraft} disabled={draftSaving}>
+            {draftSaving ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : null}
+            Save Draft
+          </Button>
+        )}
+        {canEditDraft && (
+          <Button
+            variant="primary"
+            disabled={draftSaving}
+            onClick={async () => {
+              await saveDraft();
+              onSubmitForReview({
+                ...post,
+                title: draftTitle.trim() || post.title,
+                rawContent: draftContent.trim() || post.rawContent,
+                platforms: draftPlatforms,
+                hashtags: draftHashtags.split(/[,\s#]+/).map(t => t.trim()).filter(Boolean),
+              });
+            }}
+          >
+            <Send size={14} className="mr-1.5" /> Submit for Review
+          </Button>
+        )}
+      </div>
     </div>
   ) : undefined;
 
