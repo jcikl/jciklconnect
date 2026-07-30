@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Sparkles, Save, Facebook, Megaphone, Share2, RotateCcw } from 'lucide-react';
-import { Button, useToast } from '../ui/Common';
+import { Button, Tabs, useToast } from '../ui/Common';
+import type { TabItem } from '../ui/Tabs';
 import { useSocialPersonas } from '../../hooks/useSocialPersonas';
 import { DEFAULT_PERSONAS } from '../../types/socialPersona';
 import type { SocialPostPlatform } from '../../types/socialPost';
@@ -14,12 +15,6 @@ const PLATFORM_ICONS: Record<SocialPostPlatform, React.ReactNode> = {
   xiaohongshu: <span className="text-xs font-black">红</span>,
 };
 
-const PLATFORM_COLORS: Record<SocialPostPlatform, { tab: string; active: string }> = {
-  facebook:    { tab: 'text-blue-600',  active: 'border-b-2 border-blue-500 text-blue-700 bg-blue-50/60' },
-  instagram:   { tab: 'text-pink-600',  active: 'border-b-2 border-pink-500 text-pink-700 bg-pink-50/60' },
-  linkedin:    { tab: 'text-sky-600',   active: 'border-b-2 border-sky-500  text-sky-700  bg-sky-50/60'  },
-  xiaohongshu: { tab: 'text-red-600',   active: 'border-b-2 border-red-500  text-red-700  bg-red-50/60'  },
-};
 
 const TONE_OPTIONS = [
   { value: 'professional and engaging', label: 'Professional & Engaging' },
@@ -70,32 +65,18 @@ export const SocialPersonaConfig: React.FC = () => {
   const draft = getDraft(activeTab);
   const isDirty = !!drafts[activeTab] && Object.keys(drafts[activeTab]).length > 0;
 
+  const tabItems: TabItem[] = PLATFORMS.map(platform => ({
+    id: platform,
+    label: SOCIAL_POST_PLATFORM_LABELS[platform],
+    icon: PLATFORM_ICONS[platform],
+    badge: (!!drafts[platform] && Object.keys(drafts[platform]).length > 0)
+      ? <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+      : undefined,
+  }));
+
   return (
-    <div className="flex flex-col">
-      {/* Platform tabs */}
-      <div className="flex border-b border-slate-200 mb-4">
-        {PLATFORMS.map(platform => {
-          const isActive = activeTab === platform;
-          const hasDraft = !!drafts[platform] && Object.keys(drafts[platform]).length > 0;
-          return (
-            <button
-              key={platform}
-              onClick={() => setActiveTab(platform)}
-              className={`flex items-center gap-1.5 px-3 py-2.5 text-xs font-semibold transition-colors relative ${
-                isActive
-                  ? PLATFORM_COLORS[platform].active
-                  : `text-slate-500 hover:text-slate-700 hover:bg-slate-50 ${PLATFORM_COLORS[platform].tab}`
-              }`}
-            >
-              {PLATFORM_ICONS[platform]}
-              {SOCIAL_POST_PLATFORM_LABELS[platform]}
-              {hasDraft && (
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 absolute top-1.5 right-1" />
-              )}
-            </button>
-          );
-        })}
-      </div>
+    <div className="flex flex-col gap-4">
+      <Tabs tabs={tabItems} activeTab={activeTab} onTabChange={t => setActiveTab(t as SocialPostPlatform)} />
 
       {/* Active platform config */}
       <div className="space-y-3">
