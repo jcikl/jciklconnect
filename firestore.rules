@@ -1340,7 +1340,7 @@ service cloud.firestore {
       allow create: if isActiveMember() && request.resource.data.submittedBy == request.auth.uid
         && request.resource.data.status == 'draft'
         && request.resource.data.keys().hasAll(['title', 'rawContent', 'platforms', 'status', 'submittedBy', 'submittedByName', 'createdAt', 'updatedAt']);
-      allow update: if isBoard()
+      allow update: if isBoard() || isAdmin()
         || (isActiveMember() && resource.data.submittedBy == request.auth.uid
             && resource.data.status in ['draft', 'rejected']
             && request.resource.data.status in ['draft', 'pending_review']);
