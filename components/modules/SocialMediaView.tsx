@@ -215,9 +215,6 @@ export const SocialMediaView: React.FC = () => {
       {isBod && (
         <Drawer isOpen={personaDrawerOpen} title="AI Personas" onClose={() => setPersonaDrawerOpen(false)} position="bottom" size="xl">
           <div className="pb-6">
-            <p className="text-xs text-slate-500 mb-4">
-              Configure the AI writing style for each platform. These prompts are used when BOD clicks "AI Rewrite" in the review drawer.
-            </p>
             <SocialPersonaConfig />
           </div>
         </Drawer>
