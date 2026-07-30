@@ -33,12 +33,6 @@ const PLATFORM_ICONS: Record<SocialPostPlatform, React.ReactNode> = {
   xiaohongshu: <span className="text-[10px] font-black">红</span>,
 };
 
-const TONE_OPTIONS = [
-  { value: 'professional and engaging', label: 'Professional & Engaging' },
-  { value: 'fun and energetic', label: 'Fun & Energetic' },
-  { value: 'inspiring and motivational', label: 'Inspiring & Motivational' },
-  { value: 'informative and concise', label: 'Informative & Concise' },
-];
 
 const ALL_PLATFORMS: SocialPostPlatform[] = ['facebook', 'instagram', 'linkedin', 'xiaohongshu'];
 
@@ -464,7 +458,7 @@ const ReviewDrawer: React.FC<{
   const [activePlatform, setActivePlatform] = useState<SocialPostPlatform>(post.platforms[0]);
   const [editedContent, setEditedContent] = useState(post.editedContent ?? post.rawContent);
   const [platformContent, setPlatformContent] = useState<Partial<Record<SocialPostPlatform, string>>>(post.platformContent ?? {});
-  const [tone, setTone] = useState('professional and engaging');
+
   const [rewriting, setRewriting] = useState(false);
   const [generatingAll, setGeneratingAll] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
@@ -494,7 +488,7 @@ const ReviewDrawer: React.FC<{
       const result = await SocialPostService.aiRewrite(
         post.rawContent,
         SOCIAL_POST_PLATFORM_LABELS[activePlatform],
-        persona?.defaultTone ?? tone,
+        persona?.defaultTone ?? 'professional and engaging',
         persona?.systemPrompt,
       );
       if (isMultiPlatform) {
@@ -522,7 +516,7 @@ const ReviewDrawer: React.FC<{
           const result = await SocialPostService.aiRewrite(
             post.rawContent,
             SOCIAL_POST_PLATFORM_LABELS[platform],
-            persona?.defaultTone ?? tone,
+            persona?.defaultTone ?? 'professional and engaging',
             persona?.systemPrompt,
           );
           return { platform, result };
@@ -612,15 +606,6 @@ const ReviewDrawer: React.FC<{
             <div className="flex items-center justify-between mb-1.5">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Edited Caption</p>
               <div className="flex items-center gap-2">
-                {!isMultiPlatform && (
-                  <select
-                    value={tone}
-                    onChange={e => setTone(e.target.value)}
-                    className="text-xs border border-slate-300 rounded-lg px-2 py-1 text-slate-600 bg-white"
-                  >
-                    {TONE_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                  </select>
-                )}
                 {isMultiPlatform && (
                   <button
                     onClick={handleGenerateAll}
