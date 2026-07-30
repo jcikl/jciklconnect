@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import {
   Share2, Plus, X, Check, ChevronRight, Sparkles, Facebook,
   Clock, Eye, Send, RotateCcw, Calendar, Megaphone, Loader2, Settings, Zap,
+  LayoutList, Columns, CalendarDays, ChevronLeft,
 } from 'lucide-react';
 import { Button, Modal, Badge, Drawer, useToast } from '../ui/Common';
 import { AsyncErrorBoundary } from '../ui/ErrorBoundary';
@@ -79,6 +80,7 @@ export const SocialMediaView: React.FC = () => {
   const { showToast } = useToast();
 
   const [activeTab, setActiveTab] = useState<TabKey>('all');
+  const [viewMode, setViewMode] = useState<'list' | 'kanban' | 'calendar'>('list');
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState<SocialPost | null>(null);
   const [personaDrawerOpen, setPersonaDrawerOpen] = useState(false);
@@ -130,73 +132,109 @@ export const SocialMediaView: React.FC = () => {
             {isBod ? 'Review and publish member-submitted content.' : 'Submit content for the JCI KL official social media pages.'}
           </p>
         </div>
-        {isBod && (
-          <button
-            onClick={() => setPersonaDrawerOpen(true)}
-            aria-label="AI Personas"
-            className="p-2 rounded-xl text-slate-500 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors shrink-0"
-          >
-            <Settings size={16} />
-          </button>
-        )}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* View mode toggle */}
+          <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200">
+            {([
+              { mode: 'list' as const, icon: <LayoutList size={14} />, label: 'List' },
+              { mode: 'kanban' as const, icon: <Columns size={14} />, label: 'Kanban' },
+              { mode: 'calendar' as const, icon: <CalendarDays size={14} />, label: 'Calendar' },
+            ]).map(({ mode, icon, label }) => (
+              <button
+                key={mode}
+                onClick={() => setViewMode(mode)}
+                aria-label={label}
+                className={`p-1.5 rounded-md transition-colors ${viewMode === mode ? 'bg-white text-jci-blue shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                {icon}
+              </button>
+            ))}
+          </div>
+          {isBod && (
+            <button
+              onClick={() => setPersonaDrawerOpen(true)}
+              aria-label="AI Personas"
+              className="p-2 rounded-xl text-slate-500 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors"
+            >
+              <Settings size={16} />
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-none">
-        {tabs.map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
-              activeTab === tab.key
-                ? 'bg-jci-blue text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            {tab.label}
-            {(counts[tab.key] ?? 0) > 0 && (
-              <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${activeTab === tab.key ? 'bg-white/20' : 'bg-slate-200'}`}>
-                {counts[tab.key]}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
+      {/* Status tabs — hidden in kanban/calendar (kanban shows all columns, calendar is date-based) */}
+      {viewMode === 'list' && (
+        <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-none">
+          {tabs.map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
+                activeTab === tab.key
+                  ? 'bg-jci-blue text-white'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {tab.label}
+              {(counts[tab.key] ?? 0) > 0 && (
+                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${activeTab === tab.key ? 'bg-white/20' : 'bg-slate-200'}`}>
+                  {counts[tab.key]}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
 
-      {/* Post list */}
+      {/* Views */}
       {loading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 size={24} className="animate-spin text-slate-400" />
         </div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-14 border-2 border-dashed border-slate-200 rounded-xl">
-          <Share2 size={28} className="mx-auto text-slate-300 mb-2" />
-          <p className="text-sm text-slate-500">No posts here</p>
-          <button onClick={() => setCreateOpen(true)} className="mt-2 text-xs text-jci-blue hover:underline">
-            Create your first post →
-          </button>
-        </div>
+      ) : viewMode === 'list' ? (
+        filtered.length === 0 ? (
+          <div className="text-center py-14 border-2 border-dashed border-slate-200 rounded-xl">
+            <Share2 size={28} className="mx-auto text-slate-300 mb-2" />
+            <p className="text-sm text-slate-500">No posts here</p>
+            <button onClick={() => setCreateOpen(true)} className="mt-2 text-xs text-jci-blue hover:underline">
+              Create your first post →
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <button
+              onClick={() => setCreateOpen(true)}
+              className="w-full flex items-center gap-3 bg-white border border-dashed border-jci-blue/40 hover:border-jci-blue hover:bg-jci-blue/5 rounded-xl px-4 py-3 transition-colors group"
+            >
+              <div className="w-7 h-7 rounded-full bg-jci-blue/10 group-hover:bg-jci-blue/20 flex items-center justify-center flex-shrink-0 transition-colors">
+                <Plus size={15} className="text-jci-blue" />
+              </div>
+              <span className="text-sm font-semibold text-jci-blue">New Post</span>
+            </button>
+            {filtered.map(post => (
+              <PostCard
+                key={post.id}
+                post={post}
+                isBod={isBod}
+                onClick={() => setSelectedPost(post)}
+                onSubmit={handleSubmitForReview}
+              />
+            ))}
+          </div>
+        )
+      ) : viewMode === 'kanban' ? (
+        <KanbanView
+          posts={posts}
+          isBod={isBod}
+          onOpenCreate={() => setCreateOpen(true)}
+          onSelect={setSelectedPost}
+          onSubmit={handleSubmitForReview}
+        />
       ) : (
-        <div className="space-y-2">
-          <button
-            onClick={() => setCreateOpen(true)}
-            className="w-full flex items-center gap-3 bg-white border border-dashed border-jci-blue/40 hover:border-jci-blue hover:bg-jci-blue/5 rounded-xl px-4 py-3 transition-colors group"
-          >
-            <div className="w-7 h-7 rounded-full bg-jci-blue/10 group-hover:bg-jci-blue/20 flex items-center justify-center flex-shrink-0 transition-colors">
-              <Plus size={15} className="text-jci-blue" />
-            </div>
-            <span className="text-sm font-semibold text-jci-blue">New Post</span>
-          </button>
-          {filtered.map(post => (
-            <PostCard
-              key={post.id}
-              post={post}
-              isBod={isBod}
-              onClick={() => setSelectedPost(post)}
-              onSubmit={handleSubmitForReview}
-            />
-          ))}
-        </div>
+        <CalendarView
+          posts={posts}
+          onSelect={setSelectedPost}
+        />
       )}
 
       {/* Create modal */}
@@ -346,6 +384,170 @@ const PostCard: React.FC<{
     </div>
   </div>
 );
+
+// ── Kanban view ───────────────────────────────────────────────────────────────
+
+const KANBAN_STATUSES: SocialPostStatus[] = ['draft', 'pending_review', 'approved', 'scheduled', 'published', 'rejected'];
+
+const KanbanView: React.FC<{
+  posts: SocialPost[];
+  isBod: boolean;
+  onOpenCreate: () => void;
+  onSelect: (post: SocialPost) => void;
+  onSubmit: (post: SocialPost) => void;
+}> = ({ posts, isBod, onOpenCreate, onSelect, onSubmit }) => (
+  <div className="flex gap-3 overflow-x-auto pb-3 -mx-4 px-4">
+    {KANBAN_STATUSES.map(status => {
+      const col = posts.filter(p => p.status === status);
+      return (
+        <div key={status} className="flex-none w-60 flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${STATUS_COLORS[status]}`}>
+              {SOCIAL_POST_STATUS_LABELS[status]}
+            </span>
+            <span className="text-[10px] text-slate-400 font-semibold">{col.length}</span>
+          </div>
+          {status === 'draft' && (
+            <button
+              onClick={onOpenCreate}
+              className="flex items-center gap-2 border border-dashed border-jci-blue/40 hover:border-jci-blue hover:bg-jci-blue/5 rounded-xl px-3 py-2 transition-colors group"
+            >
+              <Plus size={13} className="text-jci-blue" />
+              <span className="text-xs font-semibold text-jci-blue">New Post</span>
+            </button>
+          )}
+          {col.map(post => (
+            <div
+              key={post.id}
+              onClick={() => onSelect(post)}
+              className="bg-white border border-slate-200 rounded-xl p-3 cursor-pointer hover:border-slate-300 hover:shadow-sm transition-all"
+            >
+              <p className="text-xs font-semibold text-slate-900 line-clamp-2 mb-1">{post.title}</p>
+              <p className="text-[11px] text-slate-500 line-clamp-2">{post.rawContent}</p>
+              <div className="flex items-center justify-between mt-2">
+                <div className="flex gap-0.5">
+                  {post.platforms.map(p => (
+                    <span key={p} className="text-slate-400">{PLATFORM_ICONS[p]}</span>
+                  ))}
+                </div>
+                {post.aiGenerated && <Sparkles size={10} className="text-purple-400" />}
+              </div>
+              <div className="flex items-center justify-between mt-1.5">
+                <span className="text-[10px] text-slate-400">{formatDate(post.createdAt)}</span>
+                {!isBod && status === 'draft' && (
+                  <button
+                    onClick={e => { e.stopPropagation(); onSubmit(post); }}
+                    className="text-[10px] font-semibold text-jci-blue hover:underline"
+                  >
+                    Submit →
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+          {col.length === 0 && status !== 'draft' && (
+            <div className="border border-dashed border-slate-200 rounded-xl py-6 flex items-center justify-center">
+              <span className="text-[11px] text-slate-300">Empty</span>
+            </div>
+          )}
+        </div>
+      );
+    })}
+  </div>
+);
+
+// ── Calendar view ─────────────────────────────────────────────────────────────
+
+const CalendarView: React.FC<{
+  posts: SocialPost[];
+  onSelect: (post: SocialPost) => void;
+}> = ({ posts, onSelect }) => {
+  const today = new Date();
+  const [year, setYear] = useState(today.getFullYear());
+  const [month, setMonth] = useState(today.getMonth());
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  // Map posts to day numbers (prefer scheduledAt, fall back to createdAt)
+  const postsByDay = useMemo(() => {
+    const map: Record<number, SocialPost[]> = {};
+    posts.forEach(post => {
+      const dateStr = post.scheduledAt ?? post.createdAt;
+      if (!dateStr) return;
+      const d = new Date(dateStr);
+      if (d.getFullYear() === year && d.getMonth() === month) {
+        const day = d.getDate();
+        map[day] = [...(map[day] ?? []), post];
+      }
+    });
+    return map;
+  }, [posts, year, month]);
+
+  const prevMonth = () => { if (month === 0) { setYear(y => y - 1); setMonth(11); } else setMonth(m => m - 1); };
+  const nextMonth = () => { if (month === 11) { setYear(y => y + 1); setMonth(0); } else setMonth(m => m + 1); };
+
+  const monthLabel = new Date(year, month, 1).toLocaleDateString('en-MY', { month: 'long', year: 'numeric' });
+  const dayHeaders = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  const cells: (number | null)[] = [...Array(firstDay).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+  // pad to complete last row
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  return (
+    <div className="space-y-3">
+      {/* Month navigation */}
+      <div className="flex items-center justify-between">
+        <button onClick={prevMonth} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">
+          <ChevronLeft size={16} />
+        </button>
+        <span className="text-sm font-semibold text-slate-800">{monthLabel}</span>
+        <button onClick={nextMonth} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">
+          <ChevronRight size={16} />
+        </button>
+      </div>
+
+      {/* Day headers */}
+      <div className="grid grid-cols-7 gap-px">
+        {dayHeaders.map(d => (
+          <div key={d} className="text-center text-[10px] font-semibold text-slate-400 py-1">{d}</div>
+        ))}
+      </div>
+
+      {/* Calendar grid */}
+      <div className="grid grid-cols-7 gap-px bg-slate-200 rounded-xl overflow-hidden">
+        {cells.map((day, i) => {
+          const isToday = day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
+          const dayPosts = day ? (postsByDay[day] ?? []) : [];
+          return (
+            <div
+              key={i}
+              className={`bg-white min-h-[56px] p-1.5 flex flex-col gap-0.5 ${!day ? 'opacity-0 pointer-events-none' : ''}`}
+            >
+              <span className={`text-[11px] font-semibold self-start leading-none px-1 py-0.5 rounded-full ${
+                isToday ? 'bg-jci-blue text-white' : 'text-slate-600'
+              }`}>
+                {day}
+              </span>
+              {dayPosts.slice(0, 2).map(post => (
+                <button
+                  key={post.id}
+                  onClick={() => onSelect(post)}
+                  className={`w-full text-left text-[9px] font-semibold px-1 py-0.5 rounded truncate leading-tight ${STATUS_COLORS[post.status]}`}
+                >
+                  {post.title}
+                </button>
+              ))}
+              {dayPosts.length > 2 && (
+                <span className="text-[9px] text-slate-400 font-semibold px-1">+{dayPosts.length - 2} more</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 // ── Create modal ──────────────────────────────────────────────────────────────
 
