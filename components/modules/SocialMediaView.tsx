@@ -266,6 +266,12 @@ export const SocialMediaView: React.FC = () => {
               setSelectedPost(p => p ? { ...p, platformContent, aiGenerated: true } : p);
             } catch { showToast('Failed to save', 'error'); }
           }}
+          onUpdateDraft={async (updates) => {
+            try {
+              await updatePost(selectedPost.id, updates);
+              setSelectedPost(p => p ? { ...p, ...updates } : p);
+            } catch { showToast('Failed to save draft', 'error'); }
+          }}
           onDelete={async () => {
             try {
               await deletePost(selectedPost.id);
@@ -452,12 +458,40 @@ const ReviewDrawer: React.FC<{
   onMarkPublished: () => Promise<void>;
   onUpdateContent: (content: string) => Promise<void>;
   onUpdatePlatformContent: (platformContent: Partial<Record<SocialPostPlatform, string>>) => Promise<void>;
+  onUpdateDraft: (updates: { title: string; rawContent: string; platforms: SocialPostPlatform[]; hashtags: string[] }) => Promise<void>;
   onDelete: () => Promise<void>;
-}> = ({ post, isBod, isAdmin, memberId, onClose, onSubmitForReview, onApprove, onReject, onSchedule, onMarkPublished, onUpdateContent, onUpdatePlatformContent, onDelete }) => {
+}> = ({ post, isBod, isAdmin, memberId, onClose, onSubmitForReview, onApprove, onReject, onSchedule, onMarkPublished, onUpdateContent, onUpdatePlatformContent, onUpdateDraft, onDelete }) => {
+  const isOwner = post.submittedBy === memberId;
+  const isDraftOwner = !isBod && isOwner && post.status === 'draft';
+
   const isMultiPlatform = post.platforms.length > 1;
   const [activePlatform, setActivePlatform] = useState<SocialPostPlatform>(post.platforms[0]);
   const [editedContent, setEditedContent] = useState(post.editedContent ?? post.rawContent);
   const [platformContent, setPlatformContent] = useState<Partial<Record<SocialPostPlatform, string>>>(post.platformContent ?? {});
+
+  // Draft editing state (member only)
+  const [draftTitle, setDraftTitle] = useState(post.title);
+  const [draftContent, setDraftContent] = useState(post.rawContent);
+  const [draftPlatforms, setDraftPlatforms] = useState<SocialPostPlatform[]>(post.platforms);
+  const [draftHashtags, setDraftHashtags] = useState(post.hashtags?.join(', ') ?? '');
+  const [draftSaving, setDraftSaving] = useState(false);
+
+  const saveDraft = async () => {
+    setDraftSaving(true);
+    try {
+      await onUpdateDraft({
+        title: draftTitle.trim() || post.title,
+        rawContent: draftContent.trim() || post.rawContent,
+        platforms: draftPlatforms,
+        hashtags: draftHashtags.split(/[,\s#]+/).map(t => t.trim()).filter(Boolean),
+      });
+    } finally {
+      setDraftSaving(false);
+    }
+  };
+
+  const toggleDraftPlatform = (p: SocialPostPlatform) =>
+    setDraftPlatforms(prev => prev.includes(p) ? (prev.length > 1 ? prev.filter(x => x !== p) : prev) : [...prev, p]);
 
   const [rewriting, setRewriting] = useState(false);
   const [generatingAll, setGeneratingAll] = useState(false);
@@ -557,8 +591,6 @@ const ReviewDrawer: React.FC<{
     finally { setSaving(false); }
   };
 
-  const isOwner = post.submittedBy === memberId;
-
   return (
     <Drawer isOpen title={post.title} onClose={onClose} position="bottom" size="xl">
       <div className="space-y-5 pb-6">
@@ -592,13 +624,76 @@ const ReviewDrawer: React.FC<{
           </div>
         )}
 
-        {/* Original content */}
-        <div>
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Original Content</p>
-          <div className="bg-slate-50 rounded-xl px-4 py-3 text-sm text-slate-700 whitespace-pre-wrap border border-slate-200">
-            {post.rawContent}
+        {/* Draft editing (member owner) or read-only content */}
+        {isDraftOwner ? (
+          <div className="space-y-3">
+            {/* Title */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Title</label>
+              <input
+                type="text"
+                value={draftTitle}
+                onChange={e => setDraftTitle(e.target.value)}
+                onBlur={saveDraft}
+                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-800 focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 outline-none"
+                placeholder="Post title…"
+              />
+            </div>
+            {/* Platforms */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Platforms</label>
+              <div className="flex flex-wrap gap-2">
+                {(['facebook', 'instagram', 'linkedin', 'xiaohongshu'] as SocialPostPlatform[]).map(p => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => { toggleDraftPlatform(p); }}
+                    onBlur={saveDraft}
+                    className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
+                      draftPlatforms.includes(p)
+                        ? 'border-jci-blue bg-blue-50 text-jci-blue'
+                        : 'border-slate-200 text-slate-400 hover:border-slate-300'
+                    }`}
+                  >
+                    {PLATFORM_ICONS[p]} {SOCIAL_POST_PLATFORM_LABELS[p]}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Content */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Content</label>
+              <textarea
+                value={draftContent}
+                onChange={e => setDraftContent(e.target.value)}
+                onBlur={saveDraft}
+                rows={6}
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800 focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 outline-none resize-none"
+                placeholder="Write your post content…"
+              />
+            </div>
+            {/* Hashtags */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Hashtags</label>
+              <input
+                type="text"
+                value={draftHashtags}
+                onChange={e => setDraftHashtags(e.target.value)}
+                onBlur={saveDraft}
+                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-800 focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 outline-none"
+                placeholder="#jcikl, #leadership, #community"
+              />
+              <p className="text-[10px] text-slate-400 mt-1">Separate with commas or spaces</p>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Original Content</p>
+            <div className="bg-slate-50 rounded-xl px-4 py-3 text-sm text-slate-700 whitespace-pre-wrap border border-slate-200">
+              {post.rawContent}
+            </div>
+          </div>
+        )}
 
         {/* Edited / AI content (BOD editable) */}
         {isBod && (
@@ -770,9 +865,32 @@ const ReviewDrawer: React.FC<{
         )}
 
         {/* Member actions */}
-        {!isBod && isOwner && post.status === 'draft' && (
-          <div className="border-t border-slate-100 pt-4">
-            <Button variant="primary" className="w-full" onClick={() => onSubmitForReview(post)}>
+        {isDraftOwner && (
+          <div className="border-t border-slate-100 pt-4 flex gap-3">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={saveDraft}
+              disabled={draftSaving}
+            >
+              {draftSaving ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : null}
+              Save Draft
+            </Button>
+            <Button
+              variant="primary"
+              className="flex-1"
+              disabled={draftSaving}
+              onClick={async () => {
+                await saveDraft();
+                onSubmitForReview({
+                  ...post,
+                  title: draftTitle.trim() || post.title,
+                  rawContent: draftContent.trim() || post.rawContent,
+                  platforms: draftPlatforms,
+                  hashtags: draftHashtags.split(/[,\s#]+/).map(t => t.trim()).filter(Boolean),
+                });
+              }}
+            >
               <Send size={14} className="mr-1.5" /> Submit for Review
             </Button>
           </div>
