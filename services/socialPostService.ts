@@ -1,9 +1,10 @@
 import {
   collection, addDoc, updateDoc, deleteDoc, doc, query, where, getDocs, orderBy, getDoc,
 } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { db, auth } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { isDevMode } from '../utils/devMode';
+import { AuditLogService } from './auditLogService';
 import type { SocialPost, SocialPostCreateInput, SocialPostStatus } from '../types/socialPost';
 
 const COL = COLLECTIONS.SOCIAL_POSTS;
@@ -75,6 +76,7 @@ export class SocialPostService {
       updatedAt: new Date().toISOString(),
     };
     const ref = await addDoc(collection(db, COL), data);
+    AuditLogService.writeAuditEntry({ action: 'social_post_created', performedBy: member.id, targetCollection: COL, targetId: ref.id, after: { title: input.title, platforms: input.platforms } });
     return { id: ref.id, ...data };
   }
 
@@ -86,6 +88,7 @@ export class SocialPostService {
   static async submitForReview(id: string): Promise<void> {
     if (isDevMode()) return;
     await updateDoc(doc(db, COL, id), { status: 'pending_review', updatedAt: new Date().toISOString() });
+    AuditLogService.writeAuditEntry({ action: 'social_post_submitted_for_review', performedBy: auth?.currentUser?.uid ?? '', targetCollection: COL, targetId: id });
   }
 
   static async approvePost(id: string, reviewerId: string, editedContent?: string): Promise<void> {
@@ -96,6 +99,7 @@ export class SocialPostService {
       ...(editedContent !== undefined && { editedContent }),
       updatedAt: new Date().toISOString(),
     });
+    AuditLogService.writeAuditEntry({ action: 'social_post_approved', performedBy: reviewerId, targetCollection: COL, targetId: id });
   }
 
   static async rejectPost(id: string, reviewerId: string, reason: string): Promise<void> {
@@ -106,11 +110,13 @@ export class SocialPostService {
       rejectionReason: reason,
       updatedAt: new Date().toISOString(),
     });
+    AuditLogService.writeAuditEntry({ action: 'social_post_rejected', performedBy: reviewerId, targetCollection: COL, targetId: id, metadata: { reason } });
   }
 
   static async schedulePost(id: string, scheduledAt: string): Promise<void> {
     if (isDevMode()) return;
     await updateDoc(doc(db, COL, id), { status: 'scheduled', scheduledAt, updatedAt: new Date().toISOString() });
+    AuditLogService.writeAuditEntry({ action: 'social_post_scheduled', performedBy: auth?.currentUser?.uid ?? '', targetCollection: COL, targetId: id, metadata: { scheduledAt } });
   }
 
   static async markPublished(id: string): Promise<void> {
@@ -120,6 +126,7 @@ export class SocialPostService {
       publishedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
+    AuditLogService.writeAuditEntry({ action: 'social_post_published', performedBy: auth?.currentUser?.uid ?? '', targetCollection: COL, targetId: id });
   }
 
   static async getMyPosts(memberId: string): Promise<SocialPost[]> {
@@ -146,6 +153,7 @@ export class SocialPostService {
   static async deletePost(id: string): Promise<void> {
     if (isDevMode()) return;
     await deleteDoc(doc(db, COL, id));
+    AuditLogService.writeAuditEntry({ action: 'social_post_deleted', performedBy: auth?.currentUser?.uid ?? '', targetCollection: COL, targetId: id });
   }
 
   static async aiRewrite(content: string, platform: string, tone: string, customSystemPrompt?: string): Promise<string> {
