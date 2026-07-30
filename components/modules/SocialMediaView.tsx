@@ -591,8 +591,48 @@ const ReviewDrawer: React.FC<{
     finally { setSaving(false); }
   };
 
+  const drawerFooter = (canEditDraft || isAdmin) ? (
+    <div className="flex gap-2">
+      {canEditDraft && (
+        <Button variant="outline" className="flex-1" onClick={saveDraft} disabled={draftSaving}>
+          {draftSaving ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : null}
+          Save Draft
+        </Button>
+      )}
+      {canEditDraft && (
+        <Button
+          variant="primary"
+          className="flex-1"
+          disabled={draftSaving}
+          onClick={async () => {
+            await saveDraft();
+            onSubmitForReview({
+              ...post,
+              title: draftTitle.trim() || post.title,
+              rawContent: draftContent.trim() || post.rawContent,
+              platforms: draftPlatforms,
+              hashtags: draftHashtags.split(/[,\s#]+/).map(t => t.trim()).filter(Boolean),
+            });
+          }}
+        >
+          <Send size={14} className="mr-1.5" /> Submit for Review
+        </Button>
+      )}
+      {isAdmin && (
+        <Button
+          variant="outline"
+          className={`text-red-500 border-red-200 hover:bg-red-50 ${canEditDraft ? '' : 'flex-1'}`}
+          onClick={onDelete}
+          disabled={saving}
+        >
+          <X size={14} className="mr-1.5" /> Delete Post
+        </Button>
+      )}
+    </div>
+  ) : undefined;
+
   return (
-    <Drawer isOpen title={post.title} onClose={onClose} position="bottom" size="xl">
+    <Drawer isOpen title={post.title} onClose={onClose} position="bottom" size="xl" footer={drawerFooter}>
       <div className="space-y-5 pb-6">
         {/* Meta */}
         <div className="flex flex-wrap items-center gap-2">
@@ -859,46 +899,6 @@ const ReviewDrawer: React.FC<{
           </div>
         )}
 
-        {/* Draft actions — save + submit (member owner or BOD) */}
-        {canEditDraft && (
-          <div className="border-t border-slate-100 pt-4 flex gap-3">
-            <Button variant="outline" className="flex-1" onClick={saveDraft} disabled={draftSaving}>
-              {draftSaving ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : null}
-              Save Draft
-            </Button>
-            <Button
-              variant="primary"
-              className="flex-1"
-              disabled={draftSaving}
-              onClick={async () => {
-                await saveDraft();
-                onSubmitForReview({
-                  ...post,
-                  title: draftTitle.trim() || post.title,
-                  rawContent: draftContent.trim() || post.rawContent,
-                  platforms: draftPlatforms,
-                  hashtags: draftHashtags.split(/[,\s#]+/).map(t => t.trim()).filter(Boolean),
-                });
-              }}
-            >
-              <Send size={14} className="mr-1.5" /> Submit for Review
-            </Button>
-          </div>
-        )}
-
-        {/* Admin delete */}
-        {isAdmin && (
-          <div className="border-t border-slate-100 pt-4">
-            <Button
-              variant="outline"
-              className="w-full text-red-500 border-red-200 hover:bg-red-50"
-              onClick={onDelete}
-              disabled={saving}
-            >
-              <X size={14} className="mr-1.5" /> Delete Post
-            </Button>
-          </div>
-        )}
       </div>
     </Drawer>
   );
