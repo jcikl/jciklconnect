@@ -44,9 +44,9 @@ export default async (req, context) => {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  let topic, startTime, duration, alternativeHostEmail;
+  let topic, startTime, duration;
   try {
-    ({ topic, startTime, duration, alternativeHostEmail } = await req.json().catch(() => ({})));
+    ({ topic, startTime, duration } = await req.json().catch(() => ({})));
   } catch {
     return Response.json({ error: 'Invalid request body' }, { status: 400 });
   }
@@ -69,7 +69,6 @@ export default async (req, context) => {
         participant_video: true,
         join_before_host: true,
         waiting_room: false,
-        ...(alternativeHostEmail ? { alternative_hosts: alternativeHostEmail } : {}),
       },
     };
 
@@ -85,24 +84,6 @@ export default async (req, context) => {
     const data = await res.json();
 
     if (!res.ok) {
-      // If alternative host caused the error, retry without it
-      if (alternativeHostEmail && (data.code === 1010 || data.code === 1114)) {
-        const retryBody = { ...body, settings: { ...body.settings, alternative_hosts: undefined } };
-        const retry = await fetch(`https://api.zoom.us/v2/users/${hostUserId}/meetings`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify(retryBody),
-        });
-        const retryData = await retry.json();
-        if (!retry.ok) throw new Error(retryData.message || 'Zoom API error');
-        return Response.json({
-          meetingId: retryData.id,
-          joinUrl: retryData.join_url,
-          hostUrl: retryData.start_url,
-          password: retryData.password,
-          alternativeHostSet: false,
-        });
-      }
       throw new Error(data.message || 'Zoom API error');
     }
 
@@ -111,7 +92,6 @@ export default async (req, context) => {
       joinUrl: data.join_url,
       hostUrl: data.start_url,
       password: data.password,
-      alternativeHostSet: !!alternativeHostEmail,
     });
   } catch (err) {
     console.error('[zoom-create-meeting]', err);
