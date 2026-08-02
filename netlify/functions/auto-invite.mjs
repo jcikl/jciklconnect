@@ -1,6 +1,6 @@
-const { initializeApp, getApps, cert } = require('firebase-admin/app');
-const { getAuth } = require('firebase-admin/auth');
-const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
 const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID;
 const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
@@ -22,8 +22,8 @@ const NEUTRAL_RESPONSE = {
   message: 'If an account exists for this email, a password setup email has been sent.',
 };
 
-exports.handler = async (event) => {
-  const requestOrigin = event.headers.origin || event.headers.Origin || '';
+export default async (req, context) => {
+  const requestOrigin = req.headers.get('origin') ?? '';
   const allowedOrigin = ALLOWED_ORIGINS.includes(requestOrigin) ? requestOrigin : ALLOWED_ORIGINS[0];
   const cors = {
     'Access-Control-Allow-Origin': allowedOrigin,
@@ -32,18 +32,18 @@ exports.handler = async (event) => {
     'Vary': 'Origin',
   };
 
-  if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: cors, body: '' };
-  if (event.httpMethod !== 'POST') return { statusCode: 405, headers: cors, body: 'Method Not Allowed' };
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+  if (req.method !== 'POST') return new Response('Method Not Allowed', { status: 405, headers: cors });
 
   let email;
   try {
-    ({ email } = JSON.parse(event.body));
+    ({ email } = await req.json().catch(() => ({})));
   } catch {
-    return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'Invalid request body' }) };
+    return Response.json({ error: 'Invalid request body' }, { status: 400, headers: cors });
   }
 
   if (typeof email !== 'string' || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return { statusCode: 200, headers: cors, body: JSON.stringify(NEUTRAL_RESPONSE) };
+    return Response.json(NEUTRAL_RESPONSE, { headers: cors });
   }
 
   const emailKey = email.toLowerCase();
@@ -52,7 +52,7 @@ exports.handler = async (event) => {
   if (now > entry.resetAt) { entry.count = 0; entry.resetAt = now + RATE_WINDOW_MS; }
   if (entry.count >= RATE_LIMIT) {
     // Return neutral — don't reveal rate limiting to probers
-    return { statusCode: 200, headers: cors, body: JSON.stringify(NEUTRAL_RESPONSE) };
+    return Response.json(NEUTRAL_RESPONSE, { headers: cors });
   }
   entry.count++;
   rateLimitMap.set(emailKey, entry);
@@ -79,7 +79,7 @@ exports.handler = async (event) => {
 
     if (!found) {
       // Not a member — return neutral, don't create account
-      return { statusCode: 200, headers: cors, body: JSON.stringify(NEUTRAL_RESPONSE) };
+      return Response.json(NEUTRAL_RESPONSE, { headers: cors });
     }
 
     // Create Firebase Auth account if it doesn't exist yet
@@ -142,9 +142,9 @@ exports.handler = async (event) => {
       }
     }
 
-    return { statusCode: 200, headers: cors, body: JSON.stringify(NEUTRAL_RESPONSE) };
+    return Response.json(NEUTRAL_RESPONSE, { headers: cors });
   } catch (err) {
     console.error('[auto-invite] error:', err);
-    return { statusCode: 200, headers: cors, body: JSON.stringify(NEUTRAL_RESPONSE) };
+    return Response.json(NEUTRAL_RESPONSE, { headers: cors });
   }
 };

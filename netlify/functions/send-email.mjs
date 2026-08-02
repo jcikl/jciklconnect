@@ -1,6 +1,6 @@
-const { initializeApp, getApps, cert } = require('firebase-admin/app');
-const { getAuth } = require('firebase-admin/auth');
-const { getFirestore } = require('firebase-admin/firestore');
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
 // SEC: server-side env vars only — no VITE_ prefix so Vite never bundles these into the browser.
 const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID;
 const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
@@ -18,8 +18,8 @@ const ALLOWED_ORIGINS = ['https://app.jcikl.cc', 'http://localhost:3000', 'http:
 // could use the org's DKIM-signed domain to send phishing to arbitrary recipients.
 const ALLOWED_ROLES = ['BOARD', 'ADMIN', 'SUPER_ADMIN'];
 
-exports.handler = async (event) => {
-  const requestOrigin = event.headers.origin || event.headers.Origin || '';
+export default async (req, context) => {
+  const requestOrigin = req.headers.get('origin') ?? '';
   const allowedOrigin = ALLOWED_ORIGINS.includes(requestOrigin) ? requestOrigin : ALLOWED_ORIGINS[0];
   const cors = {
     'Access-Control-Allow-Origin': allowedOrigin,
@@ -28,17 +28,17 @@ exports.handler = async (event) => {
     'Vary': 'Origin',
   };
 
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 204, headers: cors, body: '' };
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: cors });
   }
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, headers: cors, body: 'Method Not Allowed' };
+  if (req.method !== 'POST') {
+    return new Response('Method Not Allowed', { status: 405, headers: cors });
   }
 
   // --- Auth: verify Firebase ID Token ---
-  const authHeader = event.headers.authorization || event.headers.Authorization;
+  const authHeader = req.headers.get('authorization') ?? '';
   if (!authHeader?.startsWith('Bearer ')) {
-    return { statusCode: 401, headers: cors, body: JSON.stringify({ success: false, error: 'Unauthorized' }) };
+    return Response.json({ success: false, error: 'Unauthorized' }, { status: 401, headers: cors });
   }
   const idToken = authHeader.split('Bearer ')[1];
 
@@ -47,26 +47,26 @@ exports.handler = async (event) => {
     const callerDoc = await getFirestore().collection('members').doc(decoded.uid).get();
     const role = callerDoc.data()?.role;
     if (!ALLOWED_ROLES.includes(role)) {
-      return { statusCode: 403, headers: cors, body: JSON.stringify({ success: false, error: 'Forbidden' }) };
+      return Response.json({ success: false, error: 'Forbidden' }, { status: 403, headers: cors });
     }
   } catch {
-    return { statusCode: 401, headers: cors, body: JSON.stringify({ success: false, error: 'Unauthorized' }) };
+    return Response.json({ success: false, error: 'Unauthorized' }, { status: 401, headers: cors });
   }
 
   // --- Parse body ---
   let to, subject, html, provider, from;
   try {
-    ({ to, subject, html, provider, from } = JSON.parse(event.body));
+    ({ to, subject, html, provider, from } = await req.json().catch(() => ({})));
   } catch {
-    return { statusCode: 400, headers: cors, body: JSON.stringify({ success: false, error: 'Invalid request body' }) };
+    return Response.json({ success: false, error: 'Invalid request body' }, { status: 400, headers: cors });
   }
 
   // --- Input validation ---
   if (!to || !subject || !html || !provider) {
-    return { statusCode: 400, headers: cors, body: JSON.stringify({ success: false, error: 'Missing required fields: to, subject, html, provider' }) };
+    return Response.json({ success: false, error: 'Missing required fields: to, subject, html, provider' }, { status: 400, headers: cors });
   }
   if (!['sendgrid', 'resend', 'mailgun'].includes(provider)) {
-    return { statusCode: 400, headers: cors, body: JSON.stringify({ success: false, error: 'Invalid provider. Must be sendgrid, resend, or mailgun.' }) };
+    return Response.json({ success: false, error: 'Invalid provider. Must be sendgrid, resend, or mailgun.' }, { status: 400, headers: cors });
   }
 
   // P1: Validate and allowlist the from address to prevent header injection.
@@ -76,10 +76,10 @@ exports.handler = async (event) => {
   // P1: Guard against recipient flooding and oversized HTML payloads.
   const toArr = Array.isArray(to) ? to : [to];
   if (toArr.length > 50) {
-    return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'Too many recipients' }) };
+    return Response.json({ error: 'Too many recipients' }, { status: 400, headers: cors });
   }
   if (html && html.length > 100000) {
-    return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'HTML body too large' }) };
+    return Response.json({ error: 'HTML body too large' }, { status: 400, headers: cors });
   }
 
   // Normalise `to` to a string (single address) or comma-joined string
@@ -170,17 +170,9 @@ exports.handler = async (event) => {
     }
 
     console.log('[send-email] Sent via', provider, '| recipients:', toArr.length, '| messageId:', messageId);
-    return {
-      statusCode: 200,
-      headers: cors,
-      body: JSON.stringify({ success: true, messageId }),
-    };
+    return Response.json({ success: true, messageId }, { headers: cors });
   } catch (err) {
     console.error('[send-email] error:', err);
-    return {
-      statusCode: 500,
-      headers: cors,
-      body: JSON.stringify({ success: false, error: 'Internal server error' }),
-    };
+    return Response.json({ success: false, error: 'Internal server error' }, { status: 500, headers: cors });
   }
 };

@@ -16,14 +16,14 @@ if (!getApps().length) {
 const db = getFirestore();
 const messaging = getMessaging();
 
-export const handler = async (event) => {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+export default async (req, context) => {
+  if (req.method !== 'POST') {
+    return new Response('Method Not Allowed', { status: 405 });
   }
 
-  const authHeader = event.headers.authorization || event.headers.Authorization;
+  const authHeader = req.headers.get('authorization') ?? '';
   if (!authHeader?.startsWith('Bearer ')) {
-    return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const idToken = authHeader.split('Bearer ')[1];
   try {
@@ -31,22 +31,22 @@ export const handler = async (event) => {
     const callerDoc = await db.collection('members').doc(decoded.uid).get();
     const role = callerDoc.data()?.role;
     if (!['ADMIN', 'SUPER_ADMIN'].includes(role)) {
-      return { statusCode: 403, body: JSON.stringify({ error: 'Forbidden' }) };
+      return Response.json({ error: 'Forbidden' }, { status: 403 });
     }
   } catch {
-    return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   let body;
   try {
-    body = JSON.parse(event.body || '{}');
+    body = await req.json().catch(() => ({}));
   } catch {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) };
+    return Response.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
   const { memberId, title, message } = body;
   if (!memberId || !title || !message) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'memberId, title, and message are required' }) };
+    return Response.json({ error: 'memberId, title, and message are required' }, { status: 400 });
   }
 
   try {
@@ -66,10 +66,7 @@ export const handler = async (event) => {
     const fcmToken = userDoc.data()?.fcmToken;
 
     if (!fcmToken) {
-      return {
-        statusCode: 200,
-        body: JSON.stringify({ success: true, pushed: false, reason: 'No FCM token registered for this member' }),
-      };
+      return Response.json({ success: true, pushed: false, reason: 'No FCM token registered for this member' });
     }
 
     await messaging.send({
@@ -84,15 +81,9 @@ export const handler = async (event) => {
       data: { type: 'test' },
     });
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ success: true, pushed: true }),
-    };
+    return Response.json({ success: true, pushed: true });
   } catch (err) {
     console.error('send-push-test error:', err);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: err.message || 'Internal server error' }),
-    };
+    return Response.json({ error: err.message || 'Internal server error' }, { status: 500 });
   }
 };

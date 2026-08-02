@@ -12,9 +12,10 @@
  *   npm install cloudinary --prefix netlify/functions
  */
 
-const { initializeApp, getApps, cert } = require('firebase-admin/app');
-const { getAuth } = require('firebase-admin/auth');
-const { getFirestore } = require('firebase-admin/firestore');
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
+import { v2 as cloudinary } from 'cloudinary';
 
 if (!getApps().length) {
   initializeApp({
@@ -29,8 +30,8 @@ if (!getApps().length) {
 
 const ALLOWED_ORIGINS = ['https://app.jcikl.cc', 'http://localhost:3000', 'http://localhost:3001'];
 
-exports.handler = async (event) => {
-  const requestOrigin = event.headers.origin || event.headers.Origin || '';
+export default async (req, context) => {
+  const requestOrigin = req.headers.get('origin') ?? '';
   const allowedOrigin = ALLOWED_ORIGINS.includes(requestOrigin) ? requestOrigin : ALLOWED_ORIGINS[0];
   const cors = {
     'Access-Control-Allow-Origin': allowedOrigin,
@@ -39,17 +40,17 @@ exports.handler = async (event) => {
     'Vary': 'Origin',
   };
 
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 204, headers: cors, body: '' };
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: cors });
   }
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, headers: cors, body: 'Method Not Allowed' };
+  if (req.method !== 'POST') {
+    return new Response('Method Not Allowed', { status: 405, headers: cors });
   }
 
   // Require a valid Firebase ID token
-  const authHeader = event.headers.authorization || event.headers.Authorization;
+  const authHeader = req.headers.get('authorization') ?? '';
   if (!authHeader?.startsWith('Bearer ')) {
-    return { statusCode: 401, headers: cors, body: JSON.stringify({ error: 'Unauthorized' }) };
+    return Response.json({ error: 'Unauthorized' }, { status: 401, headers: cors });
   }
   const idToken = authHeader.split('Bearer ')[1];
   try {
@@ -58,22 +59,22 @@ exports.handler = async (event) => {
     const role = memberDoc.data()?.role;
     const ALLOWED_ROLES = ['BOARD', 'ADMIN', 'SUPER_ADMIN'];
     if (!memberDoc.exists || !ALLOWED_ROLES.includes(role)) {
-      return { statusCode: 403, headers: cors, body: JSON.stringify({ error: 'Insufficient permissions' }) };
+      return Response.json({ error: 'Insufficient permissions' }, { status: 403, headers: cors });
     }
   } catch {
-    return { statusCode: 401, headers: cors, body: JSON.stringify({ error: 'Unauthorized' }) };
+    return Response.json({ error: 'Unauthorized' }, { status: 401, headers: cors });
   }
 
   let body = {};
   try {
-    body = JSON.parse(event.body || '{}');
+    body = await req.json().catch(() => ({}));
   } catch {
-    return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'Invalid JSON' }) };
+    return Response.json({ error: 'Invalid JSON' }, { status: 400, headers: cors });
   }
 
   const { publicId } = body;
   if (!publicId || typeof publicId !== 'string' || publicId.trim() === '') {
-    return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'publicId is required' }) };
+    return Response.json({ error: 'publicId is required' }, { status: 400, headers: cors });
   }
 
   const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
@@ -82,23 +83,20 @@ exports.handler = async (event) => {
 
   if (!cloudName || !apiKey || !apiSecret) {
     console.error('[cloudinary-delete] Missing Cloudinary env vars (CLOUDINARY_CLOUD_NAME / CLOUDINARY_API_KEY / CLOUDINARY_API_SECRET)');
-    return { statusCode: 500, headers: cors, body: JSON.stringify({ error: 'Server misconfiguration' }) };
+    return Response.json({ error: 'Server misconfiguration' }, { status: 500, headers: cors });
   }
 
   try {
-    // Use the cloudinary SDK for signed deletion
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const cloudinary = require('cloudinary').v2;
     cloudinary.config({ cloud_name: cloudName, api_key: apiKey, api_secret: apiSecret });
 
     const result = await cloudinary.uploader.destroy(publicId.trim());
 
     if (result.result === 'ok' || result.result === 'not found') {
-      return { statusCode: 200, headers: cors, body: JSON.stringify({ success: true, result: result.result }) };
+      return Response.json({ success: true, result: result.result }, { headers: cors });
     }
-    return { statusCode: 400, headers: cors, body: JSON.stringify({ error: `Cloudinary returned: ${result.result}` }) };
+    return Response.json({ error: `Cloudinary returned: ${result.result}` }, { status: 400, headers: cors });
   } catch (err) {
     console.error('[cloudinary-delete] Error:', err);
-    return { statusCode: 500, headers: cors, body: JSON.stringify({ error: 'Failed to delete asset' }) };
+    return Response.json({ error: 'Failed to delete asset' }, { status: 500, headers: cors });
   }
 };

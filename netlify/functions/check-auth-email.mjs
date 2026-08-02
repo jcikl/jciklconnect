@@ -12,15 +12,15 @@ if (!getApps().length) {
   });
 }
 
-export const handler = async (event) => {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+export default async (req, context) => {
+  if (req.method !== 'POST') {
+    return new Response('Method Not Allowed', { status: 405 });
   }
 
   // Verify caller identity — only BOARD+ may check Firebase Auth account status
-  const authHeader = event.headers.authorization || event.headers.Authorization;
+  const authHeader = req.headers.get('authorization') ?? '';
   if (!authHeader?.startsWith('Bearer ')) {
-    return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const idToken = authHeader.split('Bearer ')[1];
   try {
@@ -28,36 +28,33 @@ export const handler = async (event) => {
     const callerDoc = await getFirestore().collection('members').doc(decoded.uid).get();
     const callerRole = callerDoc.data()?.role;
     if (!['BOARD', 'ADMIN', 'SUPER_ADMIN'].includes(callerRole)) {
-      return { statusCode: 403, body: JSON.stringify({ error: 'Forbidden' }) };
+      return Response.json({ error: 'Forbidden' }, { status: 403 });
     }
   } catch {
-    return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   let email;
   try {
-    ({ email } = JSON.parse(event.body));
+    ({ email } = await req.json().catch(() => ({})));
   } catch {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Invalid request body' }) };
+    return Response.json({ error: 'Invalid request body' }, { status: 400 });
   }
   if (!email) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'email is required' }) };
+    return Response.json({ error: 'email is required' }, { status: 400 });
   }
 
   try {
     const user = await getAuth().getUserByEmail(email);
-    return {
-      statusCode: 200,
-      body: JSON.stringify({
-        exists: true,
-        providers: user.providerData.map(p => p.providerId),
-      }),
-    };
+    return Response.json({
+      exists: true,
+      providers: user.providerData.map(p => p.providerId),
+    });
   } catch (err) {
     if (err.code === 'auth/user-not-found') {
-      return { statusCode: 200, body: JSON.stringify({ exists: false, providers: [] }) };
+      return Response.json({ exists: false, providers: [] });
     }
     console.error('[check-auth-email] error:', err);
-    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
+    return Response.json({ error: err.message }, { status: 500 });
   }
 };

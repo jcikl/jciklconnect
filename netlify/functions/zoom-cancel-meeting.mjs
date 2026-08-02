@@ -24,29 +24,29 @@ async function getZoomToken() {
   return data.access_token;
 }
 
-export const handler = async (event) => {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+export default async (req, context) => {
+  if (req.method !== 'POST') {
+    return new Response('Method Not Allowed', { status: 405 });
   }
 
-  const authHeader = event.headers.authorization || event.headers.Authorization;
+  const authHeader = req.headers.get('authorization') ?? '';
   if (!authHeader?.startsWith('Bearer ')) {
-    return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
   try {
     await getAuth().verifyIdToken(authHeader.split('Bearer ')[1]);
   } catch {
-    return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   let meetingId;
   try {
-    ({ meetingId } = JSON.parse(event.body));
+    ({ meetingId } = await req.json().catch(() => ({})));
   } catch {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Invalid request body' }) };
+    return Response.json({ error: 'Invalid request body' }, { status: 400 });
   }
   if (!meetingId) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'meetingId is required' }) };
+    return Response.json({ error: 'meetingId is required' }, { status: 400 });
   }
 
   try {
@@ -62,9 +62,9 @@ export const handler = async (event) => {
       throw new Error(data.message || `Zoom delete failed: ${res.status}`);
     }
 
-    return { statusCode: 200, body: JSON.stringify({ cancelled: true }) };
+    return Response.json({ cancelled: true });
   } catch (err) {
     console.error('[zoom-cancel-meeting]', err);
-    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
+    return Response.json({ error: err.message }, { status: 500 });
   }
 };

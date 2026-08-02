@@ -19,15 +19,15 @@ if (!getApps().length) {
 // - Member, no auth     → creates Auth account → { isMember: true, created: true }
 //   (caller should then call sendPasswordResetEmail client-side)
 // Requires a valid Firebase ID token from a BOARD, ADMIN, or SUPER_ADMIN caller.
-export const handler = async (event) => {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+export default async (req, context) => {
+  if (req.method !== 'POST') {
+    return new Response('Method Not Allowed', { status: 405 });
   }
 
   // Verify caller identity — only privileged roles may check/create auth accounts
-  const authHeader = event.headers.authorization || event.headers.Authorization;
+  const authHeader = req.headers.get('authorization') ?? '';
   if (!authHeader?.startsWith('Bearer ')) {
-    return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const idToken = authHeader.split('Bearer ')[1];
   try {
@@ -37,21 +37,21 @@ export const handler = async (event) => {
     const callerDoc = await db.collection('members').doc(decoded.uid).get();
     const callerRole = callerDoc.data()?.role;
     if (!['ADMIN', 'SUPER_ADMIN', 'BOARD'].includes(callerRole)) {
-      return { statusCode: 403, body: JSON.stringify({ error: 'Forbidden' }) };
+      return Response.json({ error: 'Forbidden' }, { status: 403 });
     }
   } catch {
-    return { statusCode: 401, body: JSON.stringify({ error: 'Invalid or expired token' }) };
+    return Response.json({ error: 'Invalid or expired token' }, { status: 401 });
   }
 
   let email;
   try {
-    ({ email } = JSON.parse(event.body));
+    ({ email } = await req.json().catch(() => ({})));
   } catch {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Invalid request body' }) };
+    return Response.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
   if (!email) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'email is required' }) };
+    return Response.json({ error: 'email is required' }, { status: 400 });
   }
 
   try {
@@ -59,21 +59,13 @@ export const handler = async (event) => {
     const snap = await db.collection('members').where('email', '==', email).limit(1).get();
 
     if (snap.empty) {
-      return {
-        statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isMember: false }),
-      };
+      return Response.json({ isMember: false });
     }
 
     // Check if Auth account already exists
     try {
       await getAuth().getUserByEmail(email);
-      return {
-        statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isMember: true, authExists: true }),
-      };
+      return Response.json({ isMember: true, authExists: true });
     } catch (authErr) {
       if (authErr.code !== 'auth/user-not-found') throw authErr;
     }
@@ -82,13 +74,9 @@ export const handler = async (event) => {
     const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8).toUpperCase() + '1!';
     await getAuth().createUser({ email, password: tempPassword });
 
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ isMember: true, created: true }),
-    };
+    return Response.json({ isMember: true, created: true });
   } catch (err) {
     console.error('[check-and-create-auth] error:', err);
-    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
+    return Response.json({ error: err.message }, { status: 500 });
   }
 };

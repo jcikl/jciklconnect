@@ -19,25 +19,25 @@ if (!getApps().length) {
  *  → 200 { updated: false, reason: 'no-auth-account' }  member has no Auth account yet (nothing to sync)
  *  → 409 { error }                                newEmail already used by a different Auth account
  */
-export const handler = async (event) => {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+export default async (req, context) => {
+  if (req.method !== 'POST') {
+    return new Response('Method Not Allowed', { status: 405 });
   }
 
-  const authHeader = event.headers.authorization || event.headers.Authorization;
+  const authHeader = req.headers.get('authorization') ?? '';
   if (!authHeader?.startsWith('Bearer ')) {
-    return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const idToken = authHeader.split('Bearer ')[1];
 
   let uid, newEmail;
   try {
-    ({ uid, newEmail } = JSON.parse(event.body));
+    ({ uid, newEmail } = await req.json().catch(() => ({})));
   } catch {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Invalid request body' }) };
+    return Response.json({ error: 'Invalid request body' }, { status: 400 });
   }
   if (!uid || !newEmail) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'uid and newEmail are required' }) };
+    return Response.json({ error: 'uid and newEmail are required' }, { status: 400 });
   }
 
   try {
@@ -48,15 +48,15 @@ export const handler = async (event) => {
 
     // INACTIVE accounts may not update any email, even their own
     if (role === 'INACTIVE') {
-      return { statusCode: 403, body: JSON.stringify({ error: 'Forbidden' }) };
+      return Response.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // Non-admins may only update their own email
     if (!isAdmin && decoded.uid !== uid) {
-      return { statusCode: 403, body: JSON.stringify({ error: 'Forbidden' }) };
+      return Response.json({ error: 'Forbidden' }, { status: 403 });
     }
   } catch {
-    return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const auth = getAuth();
@@ -66,11 +66,11 @@ export const handler = async (event) => {
     try {
       const user = await auth.getUser(uid);
       if (user.email?.toLowerCase() === newEmail.toLowerCase()) {
-        return { statusCode: 200, body: JSON.stringify({ updated: false, reason: 'unchanged' }) };
+        return Response.json({ updated: false, reason: 'unchanged' });
       }
     } catch (err) {
       if (err.code === 'auth/user-not-found') {
-        return { statusCode: 200, body: JSON.stringify({ updated: false, reason: 'no-auth-account' }) };
+        return Response.json({ updated: false, reason: 'no-auth-account' });
       }
       throw err;
     }
@@ -79,10 +79,10 @@ export const handler = async (event) => {
     try {
       const existing = await auth.getUserByEmail(newEmail);
       if (existing.uid !== uid) {
-        return {
-          statusCode: 409,
-          body: JSON.stringify({ error: 'This email is already used by another account' }),
-        };
+        return Response.json(
+          { error: 'This email is already used by another account' },
+          { status: 409 },
+        );
       }
     } catch (err) {
       if (err.code !== 'auth/user-not-found') throw err;
@@ -90,9 +90,9 @@ export const handler = async (event) => {
     }
 
     await auth.updateUser(uid, { email: newEmail, emailVerified: false });
-    return { statusCode: 200, body: JSON.stringify({ updated: true }) };
+    return Response.json({ updated: true });
   } catch (err) {
     console.error('[update-auth-email] error:', err);
-    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
+    return Response.json({ error: err.message }, { status: 500 });
   }
 };

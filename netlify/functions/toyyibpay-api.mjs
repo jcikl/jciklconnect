@@ -4,9 +4,9 @@
  * Supported actions: getCategories, getCategoryDetails, createCategory, createBill, getBills, getSettlements
  */
 
-const { initializeApp, getApps, cert } = require('firebase-admin/app');
-const { getAuth } = require('firebase-admin/auth');
-const { getFirestore } = require('firebase-admin/firestore');
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
 
 const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID;
 const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
@@ -86,9 +86,9 @@ async function callToyyibOrEmpty(endpoint, extraParams = {}, isSandbox, fallback
   }
 }
 
-exports.handler = async (event) => {
+export default async (req, context) => {
   // FIX 2: Only reflect origin back if it is in the allowlist
-  const requestOrigin = event.headers.origin || event.headers.Origin || '';
+  const requestOrigin = req.headers.get('origin') ?? '';
   const allowedOrigin = ALLOWED_ORIGINS.includes(requestOrigin) ? requestOrigin : ALLOWED_ORIGINS[0];
   const cors = {
     'Access-Control-Allow-Origin': allowedOrigin,
@@ -97,17 +97,17 @@ exports.handler = async (event) => {
     'Vary': 'Origin',
   };
 
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 204, headers: cors, body: '' };
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: cors });
   }
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, headers: cors, body: 'Method Not Allowed' };
+  if (req.method !== 'POST') {
+    return new Response('Method Not Allowed', { status: 405, headers: cors });
   }
 
   // Require Firebase ID token for all requests
-  const authHeader = event.headers.authorization || event.headers.Authorization;
+  const authHeader = req.headers.get('authorization') ?? '';
   if (!authHeader?.startsWith('Bearer ')) {
-    return { statusCode: 401, headers: cors, body: JSON.stringify({ error: 'Unauthorized' }) };
+    return Response.json({ error: 'Unauthorized' }, { status: 401, headers: cors });
   }
   const idToken = authHeader.split('Bearer ')[1];
   let decodedUid, callerRole;
@@ -117,14 +117,14 @@ exports.handler = async (event) => {
     const callerDoc = await getFirestore().collection('members').doc(decoded.uid).get();
     callerRole = callerDoc.data()?.role;
   } catch {
-    return { statusCode: 401, headers: cors, body: JSON.stringify({ error: 'Unauthorized' }) };
+    return Response.json({ error: 'Unauthorized' }, { status: 401, headers: cors });
   }
 
   let body = {};
   try {
-    body = JSON.parse(event.body || '{}');
+    body = await req.json().catch(() => ({}));
   } catch {
-    return { statusCode: 400, headers: cors, body: 'Invalid JSON' };
+    return new Response('Invalid JSON', { status: 400, headers: cors });
   }
 
   const { action, ...params } = body;
@@ -134,7 +134,7 @@ exports.handler = async (event) => {
     (action === 'createCategory' || action === 'createBill' || action === 'setMode') &&
     !['BOARD', 'ADMIN', 'SUPER_ADMIN'].includes(callerRole)
   ) {
-    return { statusCode: 403, headers: cors, body: JSON.stringify({ error: 'Forbidden' }) };
+    return Response.json({ error: 'Forbidden' }, { status: 403, headers: cors });
   }
 
   // Resolve sandbox/production mode once per request from Firestore (with env fallback)
@@ -150,7 +150,7 @@ exports.handler = async (event) => {
       case 'setMode': {
         // BOARD+ can toggle sandbox/production mode — persisted to Firestore
         if (typeof params.isSandbox !== 'boolean') {
-          return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'isSandbox (boolean) required' }) };
+          return Response.json({ error: 'isSandbox (boolean) required' }, { status: 400, headers: cors });
         }
         await getFirestore().doc('systemConfig/toyyibpay').set(
           { isSandbox: params.isSandbox, updatedAt: new Date().toISOString(), updatedBy: decodedUid },
@@ -165,27 +165,27 @@ exports.handler = async (event) => {
         result = [];
         break;
       case 'getCategoryDetails':
-        if (!params.categoryCode) return { statusCode: 400, headers: cors, body: 'categoryCode required' };
+        if (!params.categoryCode) return new Response('categoryCode required', { status: 400, headers: cors });
         result = await callToyyib('getCategoryDetails', { categoryCode: params.categoryCode }, isSandbox);
         break;
       case 'createCategory':
-        if (!params.catname || !params.catdescription) return { statusCode: 400, headers: cors, body: 'catname and catdescription required' };
+        if (!params.catname || !params.catdescription) return new Response('catname and catdescription required', { status: 400, headers: cors });
         result = await callToyyib('createCategory', { catname: params.catname, catdescription: params.catdescription }, isSandbox);
         break;
       case 'createBill': {
         // NET-008: Input validation before forwarding to ToyyibPay
         const rawAmount = Number(params.billAmount);
         if (!params.billAmount || isNaN(rawAmount) || rawAmount <= 0) {
-          return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'Invalid input: billAmount must be a positive number' }) };
+          return Response.json({ error: 'Invalid input: billAmount must be a positive number' }, { status: 400, headers: cors });
         }
         if (!params.billName || String(params.billName).length > 255) {
-          return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'Invalid input: billName is required and must be ≤255 characters' }) };
+          return Response.json({ error: 'Invalid input: billName is required and must be ≤255 characters' }, { status: 400, headers: cors });
         }
         if (!params.billDescription || String(params.billDescription).length > 255) {
-          return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'Invalid input: billDescription is required and must be ≤255 characters' }) };
+          return Response.json({ error: 'Invalid input: billDescription is required and must be ≤255 characters' }, { status: 400, headers: cors });
         }
         if (params.billEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(params.billEmail)) {
-          return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'Invalid input: billEmail has an invalid format' }) };
+          return Response.json({ error: 'Invalid input: billEmail has an invalid format' }, { status: 400, headers: cors });
         }
 
         // FIX 3: Only forward explicitly allowlisted params; lock callback/return URLs
@@ -232,27 +232,19 @@ exports.handler = async (event) => {
         break;
       case 'getBillTransactions':
         // Check transactions for a specific bill
-        if (!params.billCode) return { statusCode: 400, headers: cors, body: 'billCode required' };
+        if (!params.billCode) return new Response('billCode required', { status: 400, headers: cors });
         result = await callToyyib('getBillTransactions', {
           billCode: params.billCode,
           ...(params.billpaymentStatus ? { billpaymentStatus: params.billpaymentStatus } : {}),
         }, isSandbox);
         break;
       default:
-        return { statusCode: 400, headers: cors, body: `Unknown action: ${action}` };
+        return new Response(`Unknown action: ${action}`, { status: 400, headers: cors });
     }
-    return {
-      statusCode: 200,
-      headers: { ...cors, 'Content-Type': 'application/json' },
-      body: JSON.stringify(result),
-    };
+    return Response.json(result, { headers: cors });
   } catch (err) {
     console.error(`[toyyibpay-api] action=${action} error:`, err);
-    return {
-      statusCode: 502,
-      headers: { ...cors, 'Content-Type': 'application/json' },
-      // NET-003: never expose internal error details to the caller
-      body: JSON.stringify({ error: 'Upstream payment service error' }),
-    };
+    // NET-003: never expose internal error details to the caller
+    return Response.json({ error: 'Upstream payment service error' }, { status: 502, headers: cors });
   }
 };

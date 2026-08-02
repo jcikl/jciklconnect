@@ -1,23 +1,23 @@
-export const handler = async (event) => {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
+export default async (req, context) => {
+  if (req.method !== 'POST') {
+    return Response.json({ error: 'Method not allowed' }, { status: 405 });
   }
 
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    return { statusCode: 500, body: JSON.stringify({ error: 'OpenAI API key not configured' }) };
+    return Response.json({ error: 'OpenAI API key not configured' }, { status: 500 });
   }
 
   let body;
   try {
-    body = JSON.parse(event.body || '{}');
+    body = await req.json().catch(() => ({}));
   } catch {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) };
+    return Response.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
   const { content, platform = 'Facebook', tone = 'professional and engaging', customSystemPrompt } = body;
   if (!content) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'content is required' }) };
+    return Response.json({ error: 'content is required' }, { status: 400 });
   }
 
   const systemPrompt = customSystemPrompt
@@ -46,18 +46,14 @@ export const handler = async (event) => {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      return { statusCode: 502, body: JSON.stringify({ error: err.error?.message ?? 'OpenAI request failed' }) };
+      return Response.json({ error: err.error?.message ?? 'OpenAI request failed' }, { status: 502 });
     }
 
     const data = await res.json();
     const rewritten = data.choices?.[0]?.message?.content?.trim() ?? '';
 
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rewritten }),
-    };
+    return Response.json({ rewritten });
   } catch (err) {
-    return { statusCode: 500, body: JSON.stringify({ error: 'Internal server error' }) };
+    return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
 };

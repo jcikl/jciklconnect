@@ -14,14 +14,14 @@ if (!getApps().length) {
 
 // POST { uid } OR { email }
 // Deletes a Firebase Auth account for an orphaned user (no members record).
-export const handler = async (event) => {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+export default async (req, context) => {
+  if (req.method !== 'POST') {
+    return new Response('Method Not Allowed', { status: 405 });
   }
 
-  const authHeader = event.headers.authorization || event.headers.Authorization;
+  const authHeader = req.headers.get('authorization') ?? '';
   if (!authHeader?.startsWith('Bearer ')) {
-    return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const idToken = authHeader.split('Bearer ')[1];
   try {
@@ -29,21 +29,21 @@ export const handler = async (event) => {
     const callerDoc = await getFirestore().collection('members').doc(decoded.uid).get();
     const role = callerDoc.data()?.role;
     if (!['ADMIN', 'SUPER_ADMIN'].includes(role)) {
-      return { statusCode: 403, body: JSON.stringify({ error: 'Forbidden' }) };
+      return Response.json({ error: 'Forbidden' }, { status: 403 });
     }
   } catch {
-    return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   let uid, email;
   try {
-    ({ uid, email } = JSON.parse(event.body));
+    ({ uid, email } = await req.json().catch(() => ({})));
   } catch {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Invalid request body' }) };
+    return Response.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
   if (!uid && !email) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'uid or email is required' }) };
+    return Response.json({ error: 'uid or email is required' }, { status: 400 });
   }
 
   try {
@@ -56,20 +56,12 @@ export const handler = async (event) => {
 
     await auth.deleteUser(uid);
 
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ deleted: true }),
-    };
+    return Response.json({ deleted: true });
   } catch (err) {
     if (err.code === 'auth/user-not-found') {
-      return {
-        statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deleted: false, reason: 'not_found' }),
-      };
+      return Response.json({ deleted: false, reason: 'not_found' });
     }
     console.error('[delete-auth-user] error:', err);
-    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
+    return Response.json({ error: err.message }, { status: 500 });
   }
 };

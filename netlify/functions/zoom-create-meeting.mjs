@@ -28,30 +28,30 @@ async function getZoomToken() {
   return data.access_token;
 }
 
-export const handler = async (event) => {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+export default async (req, context) => {
+  if (req.method !== 'POST') {
+    return new Response('Method Not Allowed', { status: 405 });
   }
 
   // Verify caller is an authenticated member
-  const authHeader = event.headers.authorization || event.headers.Authorization;
+  const authHeader = req.headers.get('authorization') ?? '';
   if (!authHeader?.startsWith('Bearer ')) {
-    return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
   try {
     await getAuth().verifyIdToken(authHeader.split('Bearer ')[1]);
   } catch {
-    return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   let topic, startTime, duration, alternativeHostEmail;
   try {
-    ({ topic, startTime, duration, alternativeHostEmail } = JSON.parse(event.body));
+    ({ topic, startTime, duration, alternativeHostEmail } = await req.json().catch(() => ({})));
   } catch {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Invalid request body' }) };
+    return Response.json({ error: 'Invalid request body' }, { status: 400 });
   }
   if (!topic || !startTime || !duration) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'topic, startTime and duration are required' }) };
+    return Response.json({ error: 'topic, startTime and duration are required' }, { status: 400 });
   }
 
   try {
@@ -95,32 +95,26 @@ export const handler = async (event) => {
         });
         const retryData = await retry.json();
         if (!retry.ok) throw new Error(retryData.message || 'Zoom API error');
-        return {
-          statusCode: 200,
-          body: JSON.stringify({
-            meetingId: retryData.id,
-            joinUrl: retryData.join_url,
-            hostUrl: retryData.start_url,
-            password: retryData.password,
-            alternativeHostSet: false,
-          }),
-        };
+        return Response.json({
+          meetingId: retryData.id,
+          joinUrl: retryData.join_url,
+          hostUrl: retryData.start_url,
+          password: retryData.password,
+          alternativeHostSet: false,
+        });
       }
       throw new Error(data.message || 'Zoom API error');
     }
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({
-        meetingId: data.id,
-        joinUrl: data.join_url,
-        hostUrl: data.start_url,
-        password: data.password,
-        alternativeHostSet: !!alternativeHostEmail,
-      }),
-    };
+    return Response.json({
+      meetingId: data.id,
+      joinUrl: data.join_url,
+      hostUrl: data.start_url,
+      password: data.password,
+      alternativeHostSet: !!alternativeHostEmail,
+    });
   } catch (err) {
     console.error('[zoom-create-meeting]', err);
-    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
+    return Response.json({ error: err.message }, { status: 500 });
   }
 };

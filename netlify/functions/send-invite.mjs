@@ -1,6 +1,6 @@
-const { initializeApp, getApps, cert } = require('firebase-admin/app');
-const { getAuth } = require('firebase-admin/auth');
-const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
 const rateLimitMap = new Map() // callerUid -> { count, resetAt }
 const RATE_LIMIT = 10 // max invites per window
@@ -22,8 +22,8 @@ if (!getApps().length) {
 // NET-011: Restrict CORS to known origins only (mirrors toyyibpay-api.js pattern)
 const ALLOWED_ORIGINS = ['https://app.jcikl.cc', 'http://localhost:3000', 'http://localhost:3001'];
 
-exports.handler = async (event) => {
-  const requestOrigin = event.headers.origin || event.headers.Origin || '';
+export default async (req, context) => {
+  const requestOrigin = req.headers.get('origin') ?? '';
   const allowedOrigin = ALLOWED_ORIGINS.includes(requestOrigin) ? requestOrigin : ALLOWED_ORIGINS[0];
   const cors = {
     'Access-Control-Allow-Origin': allowedOrigin,
@@ -32,16 +32,16 @@ exports.handler = async (event) => {
     'Vary': 'Origin',
   };
 
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 204, headers: cors, body: '' };
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: cors });
   }
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, headers: cors, body: 'Method Not Allowed' };
+  if (req.method !== 'POST') {
+    return new Response('Method Not Allowed', { status: 405, headers: cors });
   }
 
-  const authHeader = event.headers.authorization || event.headers.Authorization;
+  const authHeader = req.headers.get('authorization') ?? '';
   if (!authHeader?.startsWith('Bearer ')) {
-    return { statusCode: 401, headers: cors, body: JSON.stringify({ error: 'Unauthorized' }) };
+    return Response.json({ error: 'Unauthorized' }, { status: 401, headers: cors });
   }
   const idToken = authHeader.split('Bearer ')[1];
   let callerUid;
@@ -51,10 +51,10 @@ exports.handler = async (event) => {
     const callerDoc = await getFirestore().collection('members').doc(callerUid).get();
     const role = callerDoc.data()?.role;
     if (!['ADMIN', 'SUPER_ADMIN'].includes(role)) {
-      return { statusCode: 403, headers: cors, body: JSON.stringify({ error: 'Forbidden' }) };
+      return Response.json({ error: 'Forbidden' }, { status: 403, headers: cors });
     }
   } catch {
-    return { statusCode: 401, headers: cors, body: JSON.stringify({ error: 'Unauthorized' }) };
+    return Response.json({ error: 'Unauthorized' }, { status: 401, headers: cors });
   }
 
   // NET-007: rate limit per caller (resets on cold start)
@@ -62,21 +62,21 @@ exports.handler = async (event) => {
   const entry = rateLimitMap.get(callerUid) || { count: 0, resetAt: now + RATE_WINDOW_MS }
   if (now > entry.resetAt) { entry.count = 0; entry.resetAt = now + RATE_WINDOW_MS }
   if (entry.count >= RATE_LIMIT) {
-    return { statusCode: 429, headers: cors, body: JSON.stringify({ error: 'Rate limit exceeded. Try again later.' }) }
+    return Response.json({ error: 'Rate limit exceeded. Try again later.' }, { status: 429, headers: cors });
   }
   entry.count++
   rateLimitMap.set(callerUid, entry)
 
   let email;
   try {
-    ({ email } = JSON.parse(event.body));
+    ({ email } = await req.json().catch(() => ({})));
   } catch {
-    return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'Invalid request body' }) };
+    return Response.json({ error: 'Invalid request body' }, { status: 400, headers: cors });
   }
 
   // NET-006: validate email format, type, and length
   if (typeof email !== 'string' || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'Invalid email address' }) }
+    return Response.json({ error: 'Invalid email address' }, { status: 400, headers: cors });
   }
 
   const auth = getAuth();
@@ -151,21 +151,16 @@ exports.handler = async (event) => {
       // Don't throw — logging failure should not break email delivery
     }
 
-    return {
-      statusCode: 200,
-      headers: cors,
-      body: JSON.stringify({
+    return Response.json(
+      {
         success: true,
         message: 'Invite sent. The member will receive a password-setup email shortly.',
-      }),
-    };
+      },
+      { headers: cors }
+    );
   } catch (err) {
     console.error('[send-invite] error:', err);
     // NET-002: never expose internal error details to the caller
-    return {
-      statusCode: 500,
-      headers: cors,
-      body: JSON.stringify({ error: 'Internal server error' }),
-    };
+    return Response.json({ error: 'Internal server error' }, { status: 500, headers: cors });
   }
 };

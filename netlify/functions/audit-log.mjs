@@ -28,33 +28,33 @@ const ALLOWED_ORIGINS = ['https://app.jcikl.cc', 'http://localhost:3000', 'http:
 const ALLOWED_ROLES = ['BOARD', 'ADMIN', 'SUPER_ADMIN'];
 const AUDIT_LOG_COLLECTION = 'auditLog';
 
-export const handler = async (event) => {
-  const origin = event.headers?.origin ?? '';
+export default async (req, context) => {
+  const origin = req.headers.get('origin') ?? '';
   const corsHeaders = {
     'Access-Control-Allow-Origin': ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0],
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
   };
 
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 204, headers: corsHeaders, body: '' };
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ error: 'Method not allowed' }) };
+  if (req.method !== 'POST') {
+    return Response.json({ error: 'Method not allowed' }, { status: 405, headers: corsHeaders });
   }
 
   // Verify Firebase ID token
-  const authHeader = event.headers?.authorization ?? '';
+  const authHeader = req.headers.get('authorization') ?? '';
   const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
   if (!idToken) {
-    return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ error: 'Missing authorization token' }) };
+    return Response.json({ error: 'Missing authorization token' }, { status: 401, headers: corsHeaders });
   }
 
   let decodedToken;
   try {
     decodedToken = await getAuth().verifyIdToken(idToken);
   } catch {
-    return { statusCode: 401, headers: corsHeaders, body: JSON.stringify({ error: 'Invalid or expired token' }) };
+    return Response.json({ error: 'Invalid or expired token' }, { status: 401, headers: corsHeaders });
   }
 
   // Verify the caller has an auditable role
@@ -62,19 +62,19 @@ export const handler = async (event) => {
   const callerSnap = await db.collection('members').doc(decodedToken.uid).get();
   const callerRole = callerSnap.exists ? (callerSnap.data()?.role ?? callerSnap.data()?.jciCareer?.role) : null;
   if (!ALLOWED_ROLES.includes(callerRole)) {
-    return { statusCode: 403, headers: corsHeaders, body: JSON.stringify({ error: 'Insufficient role to write audit log' }) };
+    return Response.json({ error: 'Insufficient role to write audit log' }, { status: 403, headers: corsHeaders });
   }
 
   let body;
   try {
-    body = JSON.parse(event.body ?? '{}');
+    body = await req.json().catch(() => ({}));
   } catch {
-    return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'Invalid JSON body' }) };
+    return Response.json({ error: 'Invalid JSON body' }, { status: 400, headers: corsHeaders });
   }
 
   const { action, targetCollection, targetId, before, after, metadata } = body;
   if (!action || !targetCollection || !targetId) {
-    return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: 'action, targetCollection, and targetId are required' }) };
+    return Response.json({ error: 'action, targetCollection, and targetId are required' }, { status: 400, headers: corsHeaders });
   }
 
   try {
@@ -89,9 +89,9 @@ export const handler = async (event) => {
       timestamp: Timestamp.now(),
       _source: 'netlify-function',
     });
-    return { statusCode: 200, headers: corsHeaders, body: JSON.stringify({ ok: true }) };
+    return Response.json({ ok: true }, { headers: corsHeaders });
   } catch (error) {
     console.error('[audit-log] Firestore write failed:', error);
-    return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: 'Failed to write audit log' }) };
+    return Response.json({ error: 'Failed to write audit log' }, { status: 500, headers: corsHeaders });
   }
 };

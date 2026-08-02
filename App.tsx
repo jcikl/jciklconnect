@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, lazy, Suspense, useCallback } from 'react';
+﻿import React, { useState, useEffect, useMemo, useRef, lazy, Suspense, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom';
 import {
@@ -670,14 +670,14 @@ export const JCIKLApp: React.FC = () => {
                 onClick={() => window.location.reload()}
                 className="h-10 bg-jci-blue text-white rounded-xl font-bold text-xs shadow hover:bg-blue-600 transition-all active:scale-[0.98] flex items-center justify-center gap-1.5"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /><path d="M8 16H3v5" /></svg>
                 刷新页面
               </button>
               <button
                 onClick={() => window.location.href = '/'}
                 className="h-10 bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 rounded-xl font-bold text-xs hover:bg-slate-100 dark:hover:bg-slate-600 transition-all flex items-center justify-center gap-1.5"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>
                 返回首页
               </button>
             </div>
@@ -1509,7 +1509,7 @@ export const JCIKLApp: React.FC = () => {
                         <span className={`text-[10px] font-bold uppercase tracking-widest shrink-0 ${'text-slate-500'}`}>Workspace</span>
                         <div className={`flex-1 h-px ${'bg-slate-700/60'}`} />
                       </div>
-                      <div className="grid grid-cols-4 gap-y-4 gap-x-1">
+                      <div className="grid grid-cols-5 gap-y-4 gap-x-1">
                         {canViewEventsManagement && (
                           <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('PROJECTS'); setShowMobileMenu(false); }}>
                             <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-blue-950/30 text-blue-400 border-blue-900/50'}`}><FolderKanban size={22} /></div>
@@ -1571,7 +1571,7 @@ export const JCIKLApp: React.FC = () => {
                         <span className="text-[10px] font-bold uppercase tracking-widest shrink-0 text-slate-500">Portal</span>
                         <div className="flex-1 h-px bg-slate-700/60" />
                       </div>
-                      <div className="grid grid-cols-4 gap-y-4 gap-x-1">
+                      <div className="grid grid-cols-5 gap-y-4 gap-x-1">
                         {canViewEventsManagement && !isPlainMember && (
                           <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('FLAGSHIP_PROJECTS_MGT'); setShowMobileMenu(false); }}>
                             <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-sky-950/30 text-sky-400 border-sky-900/50"><Briefcase size={22} /></div>

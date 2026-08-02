@@ -20,8 +20,8 @@ const ALLOWED_ORIGINS = ['https://app.jcikl.cc', 'http://localhost:3000', 'http:
 const ADMIN_ROLES = new Set(['BOARD', 'ADMIN', 'SUPER_ADMIN']);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-function corsHeaders(event) {
-  const origin = event.headers?.origin ?? '';
+function corsHeaders(req) {
+  const origin = req.headers.get('origin') ?? '';
   return {
     'Access-Control-Allow-Origin': ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0],
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -162,37 +162,37 @@ async function upsertRecord(token, tableId, firebaseId, fields) {
   return { mode: 'created', recordId: data.record?.record_id || data.record_id || data.id };
 }
 
-export const handler = async (event) => {
-  const headers = corsHeaders(event);
-  if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers, body: '' };
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
+export default async (req, context) => {
+  const cors = corsHeaders(req);
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+  if (req.method !== 'POST') {
+    return Response.json({ error: 'Method not allowed' }, { status: 405, headers: cors });
   }
 
-  const authHeader = event.headers?.authorization ?? '';
+  const authHeader = req.headers.get('authorization') ?? '';
   const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-  if (!idToken) return { statusCode: 401, headers, body: JSON.stringify({ error: 'Missing authorization token' }) };
+  if (!idToken) return Response.json({ error: 'Missing authorization token' }, { status: 401, headers: cors });
 
   let decoded;
   try {
     decoded = await getAuth().verifyIdToken(idToken);
   } catch {
-    return { statusCode: 401, headers, body: JSON.stringify({ error: 'Invalid or expired token' }) };
+    return Response.json({ error: 'Invalid or expired token' }, { status: 401, headers: cors });
   }
 
   let body;
   try {
-    body = JSON.parse(event.body ?? '{}');
+    body = await req.json().catch(() => ({}));
   } catch {
-    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invalid JSON body' }) };
+    return Response.json({ error: 'Invalid JSON body' }, { status: 400, headers: cors });
   }
 
   const { collection, id, action = 'upsert' } = body;
   if (collection !== 'members' || typeof id !== 'string' || !id) {
-    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Only members/{id} sync is supported for now' }) };
+    return Response.json({ error: 'Only members/{id} sync is supported for now' }, { status: 400, headers: cors });
   }
   if (!['upsert', 'delete'].includes(action)) {
-    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Unsupported sync action' }) };
+    return Response.json({ error: 'Unsupported sync action' }, { status: 400, headers: cors });
   }
 
   try {
@@ -205,25 +205,21 @@ export const handler = async (event) => {
     const callerData = callerSnap.exists ? callerSnap.data() : {};
     const callerRole = callerData?.role ?? callerData?.jciCareer?.role;
     if (decoded.uid !== id && !ADMIN_ROLES.has(callerRole)) {
-      return { statusCode: 403, headers, body: JSON.stringify({ error: 'Insufficient permission to sync this member' }) };
+      return Response.json({ error: 'Insufficient permission to sync this member' }, { status: 403, headers: cors });
     }
 
     const memberSnap = await db.collection('members').doc(id).get();
     if (!memberSnap.exists) {
-      return { statusCode: 404, headers, body: JSON.stringify({ error: 'Member not found' }) };
+      return Response.json({ error: 'Member not found' }, { status: 404, headers: cors });
     }
 
     const token = await tenantToken();
     const fields = memberFields(id, memberSnap.data());
     const result = await upsertRecord(token, MEMBERS_TABLE_ID, id, fields);
 
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({ ok: true, collection, id, action, ...result }),
-    };
+    return Response.json({ ok: true, collection, id, action, ...result }, { headers: cors });
   } catch (error) {
     console.error('[lark-sync] failed:', error);
-    return { statusCode: 500, headers, body: JSON.stringify({ error: error.message || 'Lark sync failed' }) };
+    return Response.json({ error: error.message || 'Lark sync failed' }, { status: 500, headers: cors });
   }
 };

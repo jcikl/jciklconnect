@@ -16,15 +16,15 @@ if (!getApps().length) {
 // members collection is the sole source of truth for registration eligibility.
 // Supports: field=email, field=phone
 // Requires a valid Firebase ID token from a BOARD, ADMIN, or SUPER_ADMIN caller.
-export const handler = async (event) => {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+export default async (req, context) => {
+  if (req.method !== 'POST') {
+    return new Response('Method Not Allowed', { status: 405 });
   }
 
   // Verify caller identity — only BOARD+ may enumerate PII fields
-  const authHeader = event.headers.authorization || event.headers.Authorization;
+  const authHeader = req.headers.get('authorization') ?? '';
   if (!authHeader?.startsWith('Bearer ')) {
-    return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const idToken = authHeader.split('Bearer ')[1];
   try {
@@ -32,33 +32,29 @@ export const handler = async (event) => {
     const callerDoc = await getFirestore().collection('members').doc(decoded.uid).get();
     const callerRole = callerDoc.data()?.role;
     if (!['BOARD', 'ADMIN', 'SUPER_ADMIN'].includes(callerRole)) {
-      return { statusCode: 403, body: JSON.stringify({ error: 'Forbidden' }) };
+      return Response.json({ error: 'Forbidden' }, { status: 403 });
     }
   } catch {
-    return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) };
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   let field, value;
   try {
-    ({ field, value } = JSON.parse(event.body));
+    ({ field, value } = await req.json().catch(() => ({})));
   } catch {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Invalid request body' }) };
+    return Response.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
   if (!field || !value || !['email', 'phone'].includes(field)) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'field (email|phone) and value are required' }) };
+    return Response.json({ error: 'field (email|phone) and value are required' }, { status: 400 });
   }
 
   try {
     const db = getFirestore();
     const snap = await db.collection('members').where(field, '==', value).limit(1).get();
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ exists: !snap.empty }),
-    };
+    return Response.json({ exists: !snap.empty });
   } catch (err) {
     console.error('[check-member-field] error:', err);
-    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
+    return Response.json({ error: err.message }, { status: 500 });
   }
 };

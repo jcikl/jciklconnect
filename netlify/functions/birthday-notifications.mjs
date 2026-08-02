@@ -1,6 +1,6 @@
-const { initializeApp, getApps, cert } = require('firebase-admin/app');
-const { getFirestore } = require('firebase-admin/firestore');
-const { getMessaging } = require('firebase-admin/messaging');
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getMessaging } from 'firebase-admin/messaging';
 
 // SEC-CF05: Use FIREBASE_ADMIN_* names (no VITE_ prefix) so Vite never injects
 // the private key into the browser bundle. Align Netlify dashboard env var names.
@@ -49,9 +49,9 @@ async function sendFcmPush(memberId, title, body, type, extraData = {}) {
   });
 }
 
-exports.handler = async (_event) => {
+export default async (req, context) => {
   if (!_fbProjectId || !_fbClientEmail || !_fbPrivateKey) {
-    return { statusCode: 500, body: JSON.stringify({ error: 'Missing Firebase Admin credentials' }) };
+    return Response.json({ error: 'Missing Firebase Admin credentials' }, { status: 500 });
   }
 
   try {
@@ -66,7 +66,7 @@ exports.handler = async (_event) => {
 
     if (birthdaySnap.empty) {
       console.log('No birthdays today.');
-      return { statusCode: 200, body: 'No birthdays today.' };
+      return Response.json('No birthdays today.');
     }
 
     const birthdayMembers = birthdaySnap.docs.map(doc => {
@@ -112,12 +112,12 @@ exports.handler = async (_event) => {
 
     const msg = `Done: ${birthdayMembers.length} personal, ${otherMemberIds.length} announcements.`;
     console.log(msg);
-    return { statusCode: 200, body: msg };
+    return Response.json(msg);
   } catch (err) {
     console.error('Birthday function error:', err);
-    return { statusCode: 500, body: JSON.stringify({ error: 'Internal server error' }) };
+    return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
 };
 
 // Runs daily at midnight Malaysia time (UTC+8 = 16:00 UTC)
-exports.config = { schedule: '0 16 * * *' };
+export const config = { schedule: '0 16 * * *' };

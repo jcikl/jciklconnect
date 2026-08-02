@@ -11,10 +11,12 @@
  * Mapped URL: /api/webhooks/toyyibpay  (via netlify.toml redirect)
  */
 
-const { initializeApp, getApps, cert } = require('firebase-admin/app');
-const { getFirestore, Timestamp } = require('firebase-admin/firestore');
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { COLLECTIONS } = require('../../config/constants');
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getFirestore, Timestamp } from 'firebase-admin/firestore';
+
+// Inline the collection name constant to avoid a CJS cross-import at runtime.
+// Keep in sync with config/constants.ts COLLECTIONS.TOYYIBPAY_WEBHOOKS.
+const TOYYIBPAY_WEBHOOKS_COLLECTION = 'toyyibpay_webhooks';
 
 const TOYYIB_SECRET_KEY = process.env.TOYYIBPAY_SECRET_KEY;
 if (!TOYYIB_SECRET_KEY) throw new Error('TOYYIBPAY_SECRET_KEY env var not set');
@@ -66,9 +68,9 @@ async function verifyBillWithToyyib(billCode, transactionId) {
   return exactMatch || records[0];
 }
 
-exports.handler = async (event) => {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+export default async (req, context) => {
+  if (req.method !== 'POST') {
+    return new Response('Method Not Allowed', { status: 405 });
   }
 
   // NET-005: Shared-secret webhook verification.
@@ -76,24 +78,26 @@ exports.handler = async (event) => {
   // callback URL at bill creation time (toyyibpay-api.js createBill case) so
   // only our own webhook endpoint receives calls with the correct secret.
   const webhookSecret = process.env.TOYYIBPAY_WEBHOOK_SECRET;
-  const receivedSecret = event.queryStringParameters?.secret;
+  const url = new URL(req.url);
+  const receivedSecret = url.searchParams.get('secret');
   if (receivedSecret !== webhookSecret) {
     console.warn('[toyyibpay-callback] Webhook secret mismatch — rejecting callback');
-    return { statusCode: 401, body: 'Unauthorized' };
+    return new Response('Unauthorized', { status: 401 });
   }
 
   let data = {};
-  const ct = event.headers['content-type'] || '';
+  const ct = req.headers.get('content-type') || '';
   try {
     if (ct.includes('application/json')) {
-      data = JSON.parse(event.body || '{}');
+      data = await req.json().catch(() => ({}));
     } else {
       // form-encoded (ToyyibPay default)
-      const params = new URLSearchParams(event.body || '');
+      const bodyText = await req.text();
+      const params = new URLSearchParams(bodyText || '');
       for (const [k, v] of params.entries()) data[k] = v;
     }
   } catch {
-    return { statusCode: 400, body: 'Bad Request' };
+    return new Response('Bad Request', { status: 400 });
   }
 
   const transactionId = data.transaction_id;
@@ -101,7 +105,7 @@ exports.handler = async (event) => {
   const orderId = data.order_id;
 
   if (!transactionId || !billCode) {
-    return { statusCode: 400, body: 'Missing required fields' };
+    return new Response('Missing required fields', { status: 400 });
   }
 
   const db = getDb();
@@ -112,7 +116,7 @@ exports.handler = async (event) => {
   // attempt errored out and must be retried, not silently swallowed.
   // Wrapped in a Firestore transaction so concurrent webhooks cannot both
   // read processed:false and both proceed — only one wins the write.
-  const idempotencyRef = db.collection(COLLECTIONS.TOYYIBPAY_WEBHOOKS).doc(transactionId);
+  const idempotencyRef = db.collection(TOYYIBPAY_WEBHOOKS_COLLECTION).doc(transactionId);
   const alreadyProcessed = await db.runTransaction(async (t) => {
     const doc = await t.get(idempotencyRef);
     if (doc.exists && doc.data().processed === true) return true;
@@ -127,7 +131,7 @@ exports.handler = async (event) => {
   });
   if (alreadyProcessed) {
     console.log(`[toyyibpay-callback] Already processed txn ${transactionId}, skipping`);
-    return { statusCode: 200, body: 'Already processed' };
+    return new Response('Already processed');
   }
 
   // ── Verify against ToyyibPay's own record before trusting anything ──────────
@@ -137,12 +141,12 @@ exports.handler = async (event) => {
   } catch (err) {
     console.error('[toyyibpay-callback] Verification call failed:', err);
     await idempotencyRef.set({ processed: false, error: `verify failed: ${err}`, failedAt: Timestamp.now() }, { merge: true });
-    return { statusCode: 502, body: 'Verification failed' };
+    return new Response('Verification failed', { status: 502 });
   }
   if (!verified) {
     console.warn(`[toyyibpay-callback] ToyyibPay has no transaction record for billCode=${billCode}; ignoring unverifiable callback`);
     await idempotencyRef.set({ processed: false, error: 'no matching ToyyibPay record', failedAt: Timestamp.now() }, { merge: true });
-    return { statusCode: 400, body: 'Unverifiable callback' };
+    return new Response('Unverifiable callback', { status: 400 });
   }
 
   // billpaymentStatus: 1=paid, 2=pending, 3=failed, 4=settling — from ToyyibPay's own API, not the POST body.
@@ -280,7 +284,7 @@ exports.handler = async (event) => {
         if (!existingMembershipTxSnap.empty) {
           console.log('[toyyibpay-callback] Duplicate webhook: membership tx already exists for billCode:', billCode);
           await idempotencyRef.set({ processed: true, processedAt: Timestamp.now() }, { merge: true });
-          return { statusCode: 200, body: 'Already processed' };
+          return new Response('Already processed');
         }
 
         const txDescription = `Membership dues ${billYear} — ${billData?.billName || billCode}`;
@@ -609,11 +613,11 @@ exports.handler = async (event) => {
     // Mark idempotency record as processed only after every write above succeeded.
     await idempotencyRef.set({ processed: true, processedAt: Timestamp.now() }, { merge: true });
 
-    return { statusCode: 200, body: 'OK' };
+    return new Response('OK');
   } catch (err) {
     console.error('[toyyibpay-callback] Error processing webhook:', err);
     // Leave processed:false so the next retry from ToyyibPay reprocesses this transaction.
     await idempotencyRef.set({ processed: false, error: String(err), failedAt: Timestamp.now() }, { merge: true });
-    return { statusCode: 500, body: 'Internal Server Error' };
+    return new Response('Internal Server Error', { status: 500 });
   }
 };
