@@ -86,7 +86,7 @@ export default async (req, context) => {
 
     if (!res.ok) {
       // If alternative host caused the error, retry without it
-      if (alternativeHostEmail && data.code === 1010) {
+      if (alternativeHostEmail && (data.code === 1010 || data.code === 1114)) {
         const retryBody = { ...body, settings: { ...body.settings, alternative_hosts: undefined } };
         const retry = await fetch(`https://api.zoom.us/v2/users/${hostUserId}/meetings`, {
           method: 'POST',
