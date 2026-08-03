@@ -907,7 +907,7 @@ service cloud.firestore {
       allow list: if isMember();
       allow get: if isMember() && (resource.data.memberId == request.auth.uid || isBoard());
       allow create: if isMember() && request.resource.data.memberId == request.auth.uid;
-      allow update: if isBoard();
+      allow update: if isBoard() || (isMember() && resource.data.memberId == request.auth.uid);
       allow delete: if false;
     }
 
