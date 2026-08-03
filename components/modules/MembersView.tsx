@@ -630,7 +630,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
           </div>
         </>
       ) : (
-        <MemberDetail member={selectedMember} onBack={() => setSelectedMemberId(null)} />
+        <MemberDetail member={selectedMember} onBack={() => setSelectedMemberId(null)} isSelfView={selectedMember?.id === currentMember?.id} />
       )}
 
       {selectedIds.size > 1 && isAdmin && (
