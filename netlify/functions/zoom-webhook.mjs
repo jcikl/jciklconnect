@@ -52,20 +52,25 @@ export default async (req, context) => {
 
   const { event, payload: eventPayload } = payload;
 
-  if (event === 'meeting.deleted' || event === 'meeting.ended') {
-    const meetingId = eventPayload?.object?.id;
-    if (!meetingId) return new Response('OK');
+  const meetingId = eventPayload?.object?.id;
+  if (!meetingId) return new Response('OK');
 
-    // Find the booking by zoomMeetingId and mark cancelled
+  if (event === 'meeting.deleted' || event === 'meeting.ended') {
     const snap = await db.collection(ZOOM_BOOKINGS)
       .where('zoomMeetingId', '==', meetingId)
       .where('status', '==', 'confirmed')
       .limit(1)
       .get();
+    if (!snap.empty) await snap.docs[0].ref.update({ status: 'cancelled' });
+  }
 
-    if (!snap.empty) {
-      await snap.docs[0].ref.update({ status: 'cancelled' });
-    }
+  if (event === 'meeting.recovered') {
+    const snap = await db.collection(ZOOM_BOOKINGS)
+      .where('zoomMeetingId', '==', meetingId)
+      .where('status', '==', 'cancelled')
+      .limit(1)
+      .get();
+    if (!snap.empty) await snap.docs[0].ref.update({ status: 'confirmed' });
   }
 
   return new Response('OK');
