@@ -1,12 +1,58 @@
 import React, { useState, useMemo } from 'react';
 import { Video, Plus, X, ExternalLink, Clock, Calendar, Copy, Check, List, ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
-import { Button, Modal, useToast } from '../ui/Common';
+import { Button, Modal, Tabs, useToast } from '../ui/Common';
 import { Input } from '../ui/Form';
 import { useAuth } from '../../hooks/useAuth';
 import { useZoomBookings } from '../../hooks/useZoomBookings';
 import type { ZoomBooking } from '../../types/zoomBooking';
 
-const DURATION_OPTIONS = [30, 45, 60, 90, 120];
+function minutesToTimeStr(m: number) {
+  return `${Math.floor(m / 60).toString().padStart(2, '0')}:${(m % 60).toString().padStart(2, '0')}`;
+}
+function formatDuration(m: number) {
+  const h = Math.floor(m / 60), min = m % 60;
+  return h > 0 && min > 0 ? `${h}h ${min}m` : h > 0 ? `${h}h` : `${min}m`;
+}
+function fmtTime(m: number) {
+  return new Date(`2000-01-01T${minutesToTimeStr(m)}:00`).toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
+const THUMB = [
+  'absolute w-full h-full appearance-none bg-transparent pointer-events-none',
+  '[&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none',
+  '[&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full',
+  '[&::-webkit-slider-thumb]:bg-[#1C3F94] [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer',
+  '[&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4',
+  '[&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-[#1C3F94]',
+  '[&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:shadow-md [&::-moz-range-thumb]:cursor-pointer',
+].join(' ');
+
+const TimeRangeSlider: React.FC<{
+  start: number; end: number;
+  onStartChange: (v: number) => void; onEndChange: (v: number) => void;
+  occupied?: { start: number; end: number; label?: string }[];
+}> = ({ start, end, onStartChange, onEndChange, occupied = [] }) => {
+  const MAX = 1410, STEP = 30;
+  const sp = (start / MAX) * 100, ep = (end / MAX) * 100;
+  return (
+    <div className="relative h-6 flex items-center">
+      <div className="absolute w-full h-2 bg-slate-200 rounded-full" />
+      {/* Occupied slots — shown as red segments beneath the active range */}
+      {occupied.map((slot, i) => (
+        <div key={i} title={slot.label}
+          className="absolute h-2 bg-red-400 rounded-full opacity-70"
+          style={{ left: `${(slot.start / MAX) * 100}%`, width: `${((slot.end - slot.start) / MAX) * 100}%` }} />
+      ))}
+      {/* Active selection */}
+      <div className="absolute h-2 bg-jci-blue rounded-full"
+        style={{ left: `${sp}%`, width: `${ep - sp}%` }} />
+      <input type="range" min={0} max={MAX} step={STEP} value={start} className={THUMB}
+        onChange={e => onStartChange(Math.min(Number(e.target.value), end - STEP))} />
+      <input type="range" min={0} max={MAX} step={STEP} value={end} className={THUMB}
+        onChange={e => onEndChange(Math.max(Number(e.target.value), start + STEP))} />
+    </div>
+  );
+};
 const MONTH_ABBR = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 const WEEK_DAY_LABELS = ['M','T','W','T','F','S','S'];
 
@@ -63,11 +109,12 @@ export const ZoomBookingView: React.FC = () => {
   const { showToast } = useToast();
 
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+  const [listTab, setListTab] = useState<'upcoming' | 'past'>('upcoming');
   const [modalOpen, setModalOpen] = useState(false);
   const [topic, setTopic] = useState('');
   const [date, setDate] = useState('');
-  const [time, setTime] = useState('');
-  const [duration, setDuration] = useState(60);
+  const [timeMinutes, setTimeMinutes] = useState(540); // 09:00 default
+  const [endMinutes, setEndMinutes] = useState(600);   // 10:00 default
   const [saving, setSaving] = useState(false);
   const [newBooking, setNewBooking] = useState<ZoomBooking | null>(null);
   const [editingBooking, setEditingBooking] = useState<ZoomBooking | null>(null);
@@ -77,8 +124,8 @@ export const ZoomBookingView: React.FC = () => {
   const openModal = (prefilledDate?: string) => {
     setTopic('');
     setDate(prefilledDate ?? '');
-    setTime('');
-    setDuration(60);
+    setTimeMinutes(540);
+    setEndMinutes(600);
     setNewBooking(null);
     setEditingBooking(null);
     setModalOpen(true);
@@ -87,24 +134,38 @@ export const ZoomBookingView: React.FC = () => {
   const openEditModal = (booking: ZoomBooking) => {
     const dt = new Date(booking.startTime);
     const localDate = dt.toLocaleDateString('en-CA', { timeZone: 'Asia/Kuala_Lumpur' }); // YYYY-MM-DD
-    const localTime = dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kuala_Lumpur' }); // HH:MM
+    const localH = parseInt(dt.toLocaleString('en-MY', { hour: '2-digit', hour12: false, timeZone: 'Asia/Kuala_Lumpur' }));
+    const localM = dt.getMinutes();
     setTopic(booking.topic);
     setDate(localDate);
-    setTime(localTime);
-    setDuration(booking.duration);
+    const startM = Math.round((localH * 60 + localM) / 30) * 30;
+    setTimeMinutes(startM);
+    setEndMinutes(Math.min(1410, startM + booking.duration));
     setNewBooking(null);
     setEditingBooking(booking);
     setModalOpen(true);
   };
 
   const handleCreate = async () => {
-    if (!topic.trim() || !date || !time) {
+    if (!topic.trim() || !date) {
       showToast('Please fill in all required fields', 'error');
       return;
     }
-    const startTime = new Date(`${date}T${time}:00+08:00`).toISOString();
+    const duration = endMinutes - timeMinutes;
+    const startTime = new Date(`${date}T${minutesToTimeStr(timeMinutes)}:00+08:00`).toISOString();
     if (new Date(startTime) <= new Date()) {
       showToast('Start time must be in the future', 'error');
+      return;
+    }
+    const newStart = new Date(startTime).getTime();
+    const newEnd = newStart + duration * 60000;
+    const conflict = bookings.find(b =>
+      b.status === 'confirmed' && b.id !== editingBooking?.id &&
+      newStart < new Date(b.startTime).getTime() + b.duration * 60000 &&
+      newEnd > new Date(b.startTime).getTime()
+    );
+    if (conflict) {
+      showToast(`Time conflicts with "${conflict.topic}" (${formatDateTime(conflict.startTime)})`, 'error');
       return;
     }
     if (!member || !user?.email) {
@@ -146,6 +207,19 @@ export const ZoomBookingView: React.FC = () => {
     }
   };
 
+  const occupiedSlots = useMemo(() => {
+    if (!date) return [];
+    return bookings
+      .filter(b => b.status === 'confirmed' && b.id !== editingBooking?.id)
+      .filter(b => new Date(b.startTime).toLocaleDateString('en-CA', { timeZone: 'Asia/Kuala_Lumpur' }) === date)
+      .map(b => {
+        const d = new Date(b.startTime);
+        const h = parseInt(d.toLocaleString('en-MY', { hour: '2-digit', hour12: false, timeZone: 'Asia/Kuala_Lumpur' }));
+        const startM = h * 60 + d.getMinutes();
+        return { start: startM, end: Math.min(1410, startM + b.duration), label: b.topic };
+      });
+  }, [date, bookings, editingBooking]);
+
   const confirmed = bookings.filter(b => b.status === 'confirmed');
   const past = bookings.filter(b => b.status === 'cancelled' || !isFuture(b.startTime));
 
@@ -157,12 +231,8 @@ export const ZoomBookingView: React.FC = () => {
           <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
             <Video size={20} className="text-jci-blue" /> Zoom Booking
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">Schedule a Zoom meeting — you'll be set as alternative host.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="primary" size="sm" onClick={() => openModal()} className="flex items-center gap-1.5">
-            <Plus size={14} /> New Booking
-          </Button>
           {/* View toggle */}
           <div className="flex rounded-lg border border-slate-200 overflow-hidden">
             <button
@@ -185,7 +255,7 @@ export const ZoomBookingView: React.FC = () => {
       {viewMode === 'calendar' && (
         <ZoomBookingCalendar
           bookings={bookings}
-          onDateClick={(d) => openModal(d.toISOString().split('T')[0])}
+          onDateClick={(d) => openModal(d.toLocaleDateString('en-CA', { timeZone: 'Asia/Kuala_Lumpur' }))}
           onBookingClick={(b) => { /* scroll to list or show detail */ }}
         />
       )}
@@ -193,32 +263,55 @@ export const ZoomBookingView: React.FC = () => {
       {/* List view */}
       {viewMode === 'list' && (
         <>
-          {/* Upcoming */}
+          {/* New Booking Row */}
+          <button
+            onClick={() => openModal()}
+            className="w-full flex items-center gap-3 rounded-xl border-2 border-dashed border-slate-200 px-4 py-3 text-slate-400 hover:border-jci-blue hover:text-jci-blue transition-colors group"
+          >
+            <div className="w-8 h-8 rounded-full border-2 border-dashed border-current flex items-center justify-center group-hover:bg-jci-blue/5 transition-colors">
+              <Plus size={14} />
+            </div>
+            <span className="text-sm font-medium">New Booking</span>
+          </button>
+
+          <Tabs
+            tabs={[
+              { id: 'upcoming', label: 'Upcoming', badge: confirmed.filter(b => isFuture(b.startTime)).length > 0 ? <span className="bg-white/30 text-xs rounded-full px-1.5 py-0.5 font-bold">{confirmed.filter(b => isFuture(b.startTime)).length}</span> : undefined },
+              { id: 'past', label: 'Past & Cancelled', badge: past.length > 0 ? <span className="bg-white/30 text-xs rounded-full px-1.5 py-0.5 font-bold">{past.length}</span> : undefined },
+            ]}
+            activeTab={listTab}
+            onTabChange={t => setListTab(t as 'upcoming' | 'past')}
+            fullWidth
+          />
+
           {loading ? (
             <p className="text-sm text-slate-400 text-center py-8">Loading…</p>
-          ) : confirmed.filter(b => isFuture(b.startTime)).length === 0 ? (
-            <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-xl">
-              <Video size={32} className="mx-auto text-slate-300 mb-2" />
-              <p className="text-sm text-slate-500">No upcoming bookings</p>
-              <button onClick={() => openModal()} className="mt-3 text-xs text-jci-blue hover:underline">Create your first booking →</button>
-            </div>
+          ) : listTab === 'upcoming' ? (
+            confirmed.filter(b => isFuture(b.startTime)).length === 0 ? (
+              <div className="text-center py-10 text-slate-400">
+                <Video size={28} className="mx-auto text-slate-300 mb-2" />
+                <p className="text-sm">No upcoming bookings</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {confirmed.filter(b => isFuture(b.startTime)).map(b => (
+                  <BookingCard key={b.id} booking={b} onCancel={b.memberId === member?.id ? () => handleCancel(b) : undefined} onEdit={b.memberId === member?.id ? () => openEditModal(b) : undefined} />
+                ))}
+              </div>
+            )
           ) : (
-            <div className="space-y-3">
-              <p className="text-xs uppercase font-semibold text-slate-400 tracking-wider">Upcoming</p>
-              {confirmed.filter(b => isFuture(b.startTime)).map(b => (
-                <BookingCard key={b.id} booking={b} onCancel={() => handleCancel(b)} onEdit={() => openEditModal(b)} />
-              ))}
-            </div>
-          )}
-
-          {/* Past / cancelled */}
-          {past.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs uppercase font-semibold text-slate-400 tracking-wider">Past &amp; Cancelled</p>
-              {past.map(b => (
-                <BookingCard key={b.id} booking={b} past />
-              ))}
-            </div>
+            past.length === 0 ? (
+              <div className="text-center py-10 text-slate-400">
+                <Clock size={28} className="mx-auto text-slate-300 mb-2" />
+                <p className="text-sm">No past or cancelled bookings</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {past.map(b => (
+                  <BookingCard key={b.id} booking={b} past />
+                ))}
+              </div>
+            )
           )}
         </>
       )}
@@ -274,40 +367,31 @@ export const ZoomBookingView: React.FC = () => {
               onChange={e => setTopic(e.target.value)}
               placeholder="e.g. Mentor Session with John"
             />
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1">Date *</label>
-                <input
-                  type="date"
-                  min={minDate}
-                  value={date}
-                  onChange={e => setDate(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1">Time *</label>
-                <input
-                  type="time"
-                  value={time}
-                  onChange={e => setTime(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
-                />
-              </div>
+            <div>
+              <label className="text-xs font-medium text-slate-600 block mb-1">Date *</label>
+              <input
+                type="date"
+                min={minDate}
+                value={date}
+                onChange={e => setDate(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
+              />
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-600 block mb-1">Duration</label>
-              <div className="flex gap-2">
-                {DURATION_OPTIONS.map(d => (
-                  <button
-                    key={d}
-                    type="button"
-                    onClick={() => setDuration(d)}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-medium border-2 transition-colors ${duration === d ? 'border-jci-blue bg-jci-blue/5 text-jci-blue' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}
-                  >
-                    {d < 60 ? `${d}m` : `${d / 60}h`}
-                  </button>
-                ))}
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-medium text-slate-600">Time *</label>
+                <span className="text-sm font-semibold text-jci-blue tabular-nums">
+                  {fmtTime(timeMinutes)} – {fmtTime(endMinutes)}
+                  <span className="ml-1.5 text-xs font-normal text-slate-400">({formatDuration(endMinutes - timeMinutes)})</span>
+                </span>
+              </div>
+              <TimeRangeSlider
+                start={timeMinutes} end={endMinutes}
+                onStartChange={setTimeMinutes} onEndChange={setEndMinutes}
+                occupied={occupiedSlots}
+              />
+              <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+                <span>12 AM</span><span>6 AM</span><span>12 PM</span><span>6 PM</span><span>11:30 PM</span>
               </div>
             </div>
           </div>
@@ -349,7 +433,13 @@ const BookingCard: React.FC<{ booking: ZoomBooking; onCancel?: () => void; onEdi
     {booking.status === 'confirmed' && (
       <div className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2">
         <span className="text-xs text-slate-500 flex-1 truncate">{booking.zoomJoinUrl}</span>
-        <CopyButton text={booking.zoomJoinUrl} />
+        <CopyButton text={(() => {
+          const start = new Date(booking.startTime);
+          const end = new Date(start.getTime() + booking.duration * 60000);
+          const dateFmt = start.toLocaleDateString('en-MY', { dateStyle: 'long', timeZone: 'Asia/Kuala_Lumpur' });
+          const timeFmt = (d: Date) => d.toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kuala_Lumpur' });
+          return `${booking.topic}\nDate: ${dateFmt}\nTime: ${timeFmt(start)} - ${timeFmt(end)}\n${booking.zoomJoinUrl}`;
+        })()} />
         <a href={booking.zoomJoinUrl} target="_blank" rel="noopener noreferrer" className="p-1 rounded hover:bg-slate-200 text-slate-400">
           <ExternalLink size={13} />
         </a>
@@ -482,7 +572,7 @@ const ZoomBookingCalendar: React.FC<{
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-slate-900 truncate">{b.topic}</p>
                     <p className="text-xs text-slate-400">
-                      {new Date(b.startTime).toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kuala_Lumpur' })} · {b.duration} min
+                      {new Date(b.startTime).toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kuala_Lumpur' })} – {new Date(new Date(b.startTime).getTime() + b.duration * 60000).toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kuala_Lumpur' })} · {formatDuration(b.duration)}
                       {b.status === 'cancelled' && <span className="ml-2 text-red-400">Cancelled</span>}
                     </p>
                   </div>

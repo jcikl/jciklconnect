@@ -10,16 +10,16 @@ export function useZoomBookings(memberId: string) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setBookings(await ZoomBookingService.getMyBookings(memberId));
+      setBookings(await ZoomBookingService.getAllBookings());
       setError(null);
     } catch {
       setError('Failed to load bookings');
     } finally {
       setLoading(false);
     }
-  }, [memberId]);
+  }, []);
 
-  useEffect(() => { if (memberId) load(); }, [memberId, load]);
+  useEffect(() => { load(); }, [load]);
 
   const createBooking = async (
     input: ZoomBookingCreateInput,
