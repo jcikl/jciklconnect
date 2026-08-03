@@ -1322,6 +1322,14 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    // Malaysian postcode → area/state lookup table
+    // Readable by all authenticated users (needed for resolveArea on member save);
+    // only admins may seed or edit entries.
+    match /postcodes/{postcodeId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
     match /userRolePermissions/{ruleId} {
       allow read: if isAuthenticated();
       allow create, update, delete: if isAdmin();

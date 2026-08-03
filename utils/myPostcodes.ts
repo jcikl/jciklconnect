@@ -834,3 +834,36 @@ export function resolveAreaFromAddress(address: string | undefined | null): Area
 
   return null;
 }
+
+// ---------------------------------------------------------------------------
+// Seed export — converts static tables into PostcodeEntry-shaped objects
+// for PostcodeService.seed()
+// ---------------------------------------------------------------------------
+export interface SeedEntry {
+  id: string;
+  postcode?: string;
+  minPrefix?: number;
+  maxPrefix?: number;
+  pattern?: string;
+  area: string;
+  state: string;
+  type: 'exact' | 'range' | 'keyword';
+}
+
+export function getSeedEntries(): SeedEntry[] {
+  const entries: SeedEntry[] = [];
+
+  Object.entries(EXACT).forEach(([postcode, info]) => {
+    entries.push({ id: postcode, postcode, area: info.area, state: info.state, type: 'exact' });
+  });
+
+  RANGES.forEach(([min, max, info]) => {
+    entries.push({ id: `range_${min}_${max}`, minPrefix: min, maxPrefix: max, area: info.area, state: info.state, type: 'range' });
+  });
+
+  KEYWORDS.forEach(([pattern, info], i) => {
+    entries.push({ id: `kw_${i}`, pattern: pattern.source, area: info.area, state: info.state, type: 'keyword' });
+  });
+
+  return entries;
+}

@@ -40,7 +40,7 @@ import {
 } from '../types';
 import { isDevMode } from '../utils/devMode';
 import { getMYTYear } from '../utils/dateUtils';
-import { resolveAreaFromAddress } from '../utils/myPostcodes';
+import { PostcodeService } from './postcodeService';
 import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 import { MOCK_MEMBERS } from './mockData';
 import { AuditLogService } from './auditLogService';
@@ -572,7 +572,7 @@ export class MembersService {
 
       // Auto-resolve area from address when address is being updated
       if (updates.contact?.address !== undefined) {
-        const resolved = resolveAreaFromAddress(updates.contact.address);
+        const resolved = await PostcodeService.resolveArea(updates.contact.address);
         if (resolved) {
           updates = {
             ...updates,

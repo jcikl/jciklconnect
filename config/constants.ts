@@ -122,6 +122,8 @@ export const COLLECTIONS = {
   RADAR_CONTRIBUTIONS: 'RadarContributions',
   /** Configurable role-permission catalog (permissionCatalog/{id}) */
   PERMISSION_CATALOG: 'permissionCatalog',
+  /** Malaysian postcode → area/state lookup table (postcodes/{postcode}) */
+  POSTCODES: 'postcodes',
 } as const;
 
 /** 付款申请参考编号前缀：PR-{loId}-{YYYYMMDD}-{序号}，与银行备注约定一致（Story 2.1） */
