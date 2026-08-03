@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { Users, CheckCircle, UserPlus, Star, X } from 'lucide-react';
+import { resolveAreaFromAddress } from '../../../utils/myPostcodes';
 import { Card } from '../../ui/Common';
 import type { Member } from '../../../types';
 import { MemberStatistics } from '../../../services/memberStatsService';
@@ -73,10 +74,21 @@ export const MemberStatisticsView: React.FC<{
     return data.filter(item => item.value > 0);
   }, [members]);
 
+  const resolveGeo = (m: Member) => {
+    if (m.contact?.area && m.contact?.state) return { area: m.contact.area, state: m.contact.state };
+    const addr = m.contact?.address;
+    if (addr) {
+      const r = resolveAreaFromAddress(addr);
+      if (r) return r;
+    }
+    return null;
+  };
+
   const stateData = React.useMemo(() => {
     const counts: Record<string, number> = {};
     members.forEach(m => {
-      const state = m.contact?.state?.trim() || 'Unknown';
+      const geo = resolveGeo(m);
+      const state = geo?.state?.trim() || 'Unknown';
       counts[state] = (counts[state] || 0) + 1;
     });
     return Object.entries(counts)
@@ -87,7 +99,8 @@ export const MemberStatisticsView: React.FC<{
   const areaData = React.useMemo(() => {
     const counts: Record<string, number> = {};
     members.forEach(m => {
-      const area = m.contact?.area?.trim();
+      const geo = resolveGeo(m);
+      const area = geo?.area?.trim();
       if (area) counts[area] = (counts[area] || 0) + 1;
     });
     return Object.entries(counts)
@@ -322,7 +335,7 @@ export const MemberStatisticsView: React.FC<{
             data={stateData}
             colorOffset={2}
             onSegmentClick={name => {
-              const filtered = members.filter(m => (m.contact?.state?.trim() || 'Unknown') === name);
+              const filtered = members.filter(m => (resolveGeo(m)?.state?.trim() || 'Unknown') === name);
               setDrawerSegment({ label: `State: ${name}`, members: filtered });
             }}
           />
@@ -339,7 +352,7 @@ export const MemberStatisticsView: React.FC<{
                     key={item.name}
                     className="w-full text-left group"
                     onClick={() => {
-                      const filtered = members.filter(m => m.contact?.area?.trim() === item.name);
+                      const filtered = members.filter(m => resolveGeo(m)?.area?.trim() === item.name);
                       setDrawerSegment({ label: `Area: ${item.name}`, members: filtered });
                     }}
                   >
