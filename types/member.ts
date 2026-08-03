@@ -189,6 +189,8 @@ export interface Member {
     phone: string;
     alternatePhone?: string;
     address: string;
+    area?: string;
+    state?: string;
     whatsappJoined: boolean;
     socials: {
       linkedin?: string;

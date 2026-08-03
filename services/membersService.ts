@@ -40,6 +40,7 @@ import {
 } from '../types';
 import { isDevMode } from '../utils/devMode';
 import { getMYTYear } from '../utils/dateUtils';
+import { resolveAreaFromAddress } from '../utils/myPostcodes';
 import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 import { MOCK_MEMBERS } from './mockData';
 import { AuditLogService } from './auditLogService';
@@ -568,6 +569,17 @@ export class MembersService {
 
       // Shallow-copy to avoid mutating the caller's object (E11)
       updates = { ...updates };
+
+      // Auto-resolve area from address when address is being updated
+      if (updates.contact?.address !== undefined) {
+        const resolved = resolveAreaFromAddress(updates.contact.address);
+        if (resolved) {
+          updates = {
+            ...updates,
+            contact: { ...updates.contact, area: resolved.area, state: resolved.state } as any,
+          };
+        }
+      }
 
       if (updates.contact?.email != null) {
         const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
