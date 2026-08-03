@@ -58,10 +58,16 @@ export default async (req, context) => {
     const token = await getZoomToken();
     const hostUserId = process.env.ZOOM_HOST_USER_ID; // JCI KL's Zoom user ID or email
 
+    // Convert UTC ISO to KL local datetime string (no offset) so Zoom
+    // displays the time in Asia/Kuala_Lumpur rather than UTC.
+    const startLocal = new Date(startTime)
+      .toLocaleString('sv-SE', { timeZone: 'Asia/Kuala_Lumpur' })
+      .replace(' ', 'T'); // "2026-08-03T11:11:00"
+
     const body = {
       topic,
       type: 2, // scheduled meeting
-      start_time: startTime, // ISO 8601
+      start_time: startLocal, // local KL time, interpreted via timezone field below
       duration,             // minutes
       timezone: 'Asia/Kuala_Lumpur',
       settings: {
