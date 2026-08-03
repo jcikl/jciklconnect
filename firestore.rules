@@ -902,6 +902,15 @@ service cloud.firestore {
       allow create, update, delete: if isBoard();
     }
     
+    // Zoom Bookings
+    match /zoomBookings/{docId} {
+      allow list: if isMember();
+      allow get: if isMember() && (resource.data.memberId == request.auth.uid || isBoard());
+      allow create: if isMember() && request.resource.data.memberId == request.auth.uid;
+      allow update: if isBoard();
+      allow delete: if false;
+    }
+
     // Mentorship: mentorMatches, mentorshipFeedback (Mentor Matching / stats)
     match /mentorMatches/{docId} {
       // FIX 10: restrict read to isMember() — GUEST/INACTIVE should not see mentorship matches.
