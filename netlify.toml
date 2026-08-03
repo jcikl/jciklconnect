@@ -35,6 +35,12 @@
   package = "@netlify/plugin-functions-install-core"
 
 [[redirects]]
+  from = "/api/webhooks/zoom"
+  to = "/.netlify/functions/zoom-webhook"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/api/webhooks/toyyibpay"
   to = "/.netlify/functions/toyyibpay-callback"
   status = 200
