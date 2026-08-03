@@ -135,6 +135,9 @@ export const ZoomBookingView: React.FC = () => {
           <p className="text-xs text-slate-500 mt-0.5">Schedule a Zoom meeting — you'll be set as alternative host.</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="primary" size="sm" onClick={() => openModal()} className="flex items-center gap-1.5">
+            <Plus size={14} /> New Booking
+          </Button>
           {/* View toggle */}
           <div className="flex rounded-lg border border-slate-200 overflow-hidden">
             <button

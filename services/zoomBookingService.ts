@@ -1,4 +1,4 @@
-import { collection, addDoc, updateDoc, doc, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, query, where, getDocs } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
@@ -62,7 +62,6 @@ export class ZoomBookingService {
         topic: input.topic,
         startTime: input.startTime,
         duration: input.duration,
-        alternativeHostEmail: member.email,
       }),
     });
 
@@ -109,13 +108,11 @@ export class ZoomBookingService {
   static async getMyBookings(memberId: string): Promise<ZoomBooking[]> {
     if (isDevMode()) return MOCK_BOOKINGS;
 
-    const q = query(
-      collection(db, COL),
-      where('memberId', '==', memberId),
-      orderBy('startTime', 'desc')
-    );
+    const q = query(collection(db, COL), where('memberId', '==', memberId));
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as ZoomBooking));
+    return snap.docs
+      .map(d => ({ id: d.id, ...d.data() } as ZoomBooking))
+      .sort((a, b) => b.startTime.localeCompare(a.startTime));
   }
 
   static async getAllBookings(): Promise<ZoomBooking[]> {
