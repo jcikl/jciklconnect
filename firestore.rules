@@ -142,9 +142,9 @@ service cloud.firestore {
       // Board/Admin-created members: isBoard() bypass allows all fields (including bulk import).
       // Bulk import (ADMIN+ in UI) is additionally restricted at the service/function layer since
       // Firestore rules cannot distinguish a single write from a batch loop.
+      // name/email may live at top-level (legacy) OR inside general.name/contact.email (current nested format).
+      // isBoard() bypasses field-shape checks; self-registration still validates both layouts.
       allow create: if isAuthenticated() &&
-                       request.resource.data.name is string &&
-                       request.resource.data.email is string &&
                        request.resource.data.role is string &&
                        (isBoard() ||
                         (request.auth.uid == memberId &&
@@ -154,7 +154,11 @@ service cloud.firestore {
                            'email', 'name', 'displayName', 'photoURL', 'photoUrl',
                            'createdAt', 'role', 'status', 'loId',
                            'general', 'contact', 'membership'
-                         ])));
+                         ]) &&
+                         (request.resource.data.name is string ||
+                          request.resource.data.get('general', {}).get('name', null) is string) &&
+                         (request.resource.data.email is string ||
+                          request.resource.data.get('contact', {}).get('email', null) is string)));
 
       // Self-write: members may update any profile field EXCEPT the locked list below.
       // INACTIVE users are blocked from self-write at the rules layer (not just service layer).
