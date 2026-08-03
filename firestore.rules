@@ -51,7 +51,7 @@ service cloud.firestore {
       return isAuthenticated() &&
              exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
              (
-               (getUserRole() != null && getUserRole() in ['BOARD', 'ADMIN']) ||
+               (getUserRole() != null && getUserRole() in ['BOARD', 'ADMIN', 'SUPER_ADMIN']) ||
                isCurrentBoardMember()
              );
     }
@@ -92,7 +92,7 @@ service cloud.firestore {
              exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
              (
                (getUserRole() != null &&
-                getUserRole() in ['ADMIN', 'BOARD']) ||
+                getUserRole() in ['ADMIN', 'BOARD', 'SUPER_ADMIN']) ||
                isCurrentBoardMember()
              );
     }
@@ -186,7 +186,7 @@ service cloud.firestore {
            request.resource.data.get('general', {}).get('idNumber', null)    == resource.data.get('general', {}).get('idNumber', null) &&
            request.resource.data.get('general', {}).get('idType', null)      == resource.data.get('general', {}).get('idType', null)))
         ) ||
-        (canEditMembers() && (resource == null || resourceInMyLo(resource.data)) &&
+        (canEditMembers() && (resource == null || isAdmin() || resourceInMyLo(resource.data)) &&
          // BOARD members cannot elevate anyone to ADMIN / SUPER_ADMIN (E13 fix)
          (isAdmin() ||
           !(request.resource.data.get('role', resource.data.get('role', '')) in ['ADMIN', 'SUPER_ADMIN'])) &&
