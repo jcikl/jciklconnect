@@ -91,6 +91,52 @@ export class ZoomBookingService {
     return { id: ref.id, ...docData };
   }
 
+  static async updateBooking(
+    existing: ZoomBooking,
+    input: ZoomBookingCreateInput,
+    member: { id: string; name: string; email: string }
+  ): Promise<ZoomBooking> {
+    if (isDevMode()) {
+      return { ...existing, ...input };
+    }
+
+    const token = await getIdToken();
+
+    // Cancel old Zoom meeting (best-effort, don't block on failure)
+    await fetch('/.netlify/functions/zoom-cancel-meeting', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ meetingId: existing.zoomMeetingId }),
+    }).catch(() => {});
+
+    // Create new Zoom meeting
+    const res = await fetch('/.netlify/functions/zoom-create-meeting', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ topic: input.topic, startTime: input.startTime, duration: input.duration }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to reschedule Zoom meeting');
+    }
+
+    const zoom = await res.json();
+
+    const updates = {
+      topic: input.topic,
+      startTime: input.startTime,
+      duration: input.duration,
+      zoomMeetingId: zoom.meetingId,
+      zoomJoinUrl: zoom.joinUrl,
+      zoomHostUrl: zoom.hostUrl,
+      zoomPassword: zoom.password,
+    };
+
+    await updateDoc(doc(db, COL, existing.id), updates);
+    return { ...existing, ...updates };
+  }
+
   static async cancelBooking(booking: ZoomBooking): Promise<void> {
     if (isDevMode()) return;
 

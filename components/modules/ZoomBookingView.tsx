@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Video, Plus, X, ExternalLink, Clock, Calendar, Copy, Check, List, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Video, Plus, X, ExternalLink, Clock, Calendar, Copy, Check, List, ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
 import { Button, Modal, useToast } from '../ui/Common';
 import { Input } from '../ui/Form';
 import { useAuth } from '../../hooks/useAuth';
@@ -59,7 +59,7 @@ const CopyButton: React.FC<{ text: string }> = ({ text }) => {
 
 export const ZoomBookingView: React.FC = () => {
   const { member, user } = useAuth();
-  const { bookings, loading, createBooking, cancelBooking } = useZoomBookings(member?.id ?? '');
+  const { bookings, loading, createBooking, cancelBooking, updateBooking } = useZoomBookings(member?.id ?? '');
   const { showToast } = useToast();
 
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
@@ -70,6 +70,7 @@ export const ZoomBookingView: React.FC = () => {
   const [duration, setDuration] = useState(60);
   const [saving, setSaving] = useState(false);
   const [newBooking, setNewBooking] = useState<ZoomBooking | null>(null);
+  const [editingBooking, setEditingBooking] = useState<ZoomBooking | null>(null);
 
   const minDate = new Date().toISOString().split('T')[0];
 
@@ -79,6 +80,20 @@ export const ZoomBookingView: React.FC = () => {
     setTime('');
     setDuration(60);
     setNewBooking(null);
+    setEditingBooking(null);
+    setModalOpen(true);
+  };
+
+  const openEditModal = (booking: ZoomBooking) => {
+    const dt = new Date(booking.startTime);
+    const localDate = dt.toLocaleDateString('en-CA', { timeZone: 'Asia/Kuala_Lumpur' }); // YYYY-MM-DD
+    const localTime = dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kuala_Lumpur' }); // HH:MM
+    setTopic(booking.topic);
+    setDate(localDate);
+    setTime(localTime);
+    setDuration(booking.duration);
+    setNewBooking(null);
+    setEditingBooking(booking);
     setModalOpen(true);
   };
 
@@ -98,14 +113,24 @@ export const ZoomBookingView: React.FC = () => {
     }
     setSaving(true);
     try {
-      const booking = await createBooking(
-        { topic: topic.trim(), startTime, duration },
-        { id: member.id, name: member.general?.name ?? member.id, email: user.email }
-      );
-      setNewBooking(booking);
-      showToast('Zoom meeting created!', 'success');
+      if (editingBooking) {
+        await updateBooking(
+          editingBooking,
+          { topic: topic.trim(), startTime, duration },
+          { id: member.id, name: member.general?.name ?? member.id, email: user.email }
+        );
+        showToast('Zoom meeting updated!', 'success');
+        setModalOpen(false);
+      } else {
+        const booking = await createBooking(
+          { topic: topic.trim(), startTime, duration },
+          { id: member.id, name: member.general?.name ?? member.id, email: user.email }
+        );
+        setNewBooking(booking);
+        showToast('Zoom meeting created!', 'success');
+      }
     } catch (err: any) {
-      showToast(err?.message ?? 'Failed to create meeting', 'error');
+      showToast(err?.message ?? 'Failed to save meeting', 'error');
     } finally {
       setSaving(false);
     }
@@ -181,7 +206,7 @@ export const ZoomBookingView: React.FC = () => {
             <div className="space-y-3">
               <p className="text-xs uppercase font-semibold text-slate-400 tracking-wider">Upcoming</p>
               {confirmed.filter(b => isFuture(b.startTime)).map(b => (
-                <BookingCard key={b.id} booking={b} onCancel={() => handleCancel(b)} />
+                <BookingCard key={b.id} booking={b} onCancel={() => handleCancel(b)} onEdit={() => openEditModal(b)} />
               ))}
             </div>
           )}
@@ -202,7 +227,7 @@ export const ZoomBookingView: React.FC = () => {
       <Modal
         isOpen={modalOpen}
         onClose={() => !saving && setModalOpen(false)}
-        title="New Zoom Booking"
+        title={editingBooking ? 'Edit Zoom Booking' : 'New Zoom Booking'}
         size="sm"
         footer={
           newBooking ? (
@@ -211,7 +236,7 @@ export const ZoomBookingView: React.FC = () => {
             <div className="flex gap-3 w-full">
               <Button variant="outline" className="flex-1" onClick={() => setModalOpen(false)} disabled={saving}>Cancel</Button>
               <Button variant="primary" className="flex-1" onClick={handleCreate} disabled={saving}>
-                {saving ? 'Creating…' : 'Create Meeting'}
+                {saving ? (editingBooking ? 'Updating…' : 'Creating…') : (editingBooking ? 'Update Meeting' : 'Create Meeting')}
               </Button>
             </div>
           )
@@ -292,7 +317,7 @@ export const ZoomBookingView: React.FC = () => {
   );
 };
 
-const BookingCard: React.FC<{ booking: ZoomBooking; onCancel?: () => void; past?: boolean }> = ({ booking, onCancel, past }) => (
+const BookingCard: React.FC<{ booking: ZoomBooking; onCancel?: () => void; onEdit?: () => void; past?: boolean }> = ({ booking, onCancel, onEdit, past }) => (
   <div className={`rounded-xl border p-4 space-y-3 ${past ? 'bg-slate-50 border-slate-100 opacity-60' : 'bg-white border-slate-200'}`}>
     <div className="flex items-start justify-between gap-2">
       <div>
@@ -303,10 +328,19 @@ const BookingCard: React.FC<{ booking: ZoomBooking; onCancel?: () => void; past?
           <Clock size={11} /> {booking.duration} min
         </p>
       </div>
-      {!past && onCancel && (
-        <button onClick={onCancel} className="p-1.5 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-400 transition-colors shrink-0">
-          <X size={14} />
-        </button>
+      {!past && (
+        <div className="flex items-center gap-1 shrink-0">
+          {onEdit && (
+            <button onClick={onEdit} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-300 hover:text-slate-600 transition-colors">
+              <Pencil size={13} />
+            </button>
+          )}
+          {onCancel && (
+            <button onClick={onCancel} className="p-1.5 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-400 transition-colors">
+              <X size={14} />
+            </button>
+          )}
+        </div>
       )}
       {booking.status === 'cancelled' && (
         <span className="text-[10px] font-semibold text-red-400 bg-red-50 px-2 py-0.5 rounded-full shrink-0">Cancelled</span>

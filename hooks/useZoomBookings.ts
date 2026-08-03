@@ -30,6 +30,16 @@ export function useZoomBookings(memberId: string) {
     return booking;
   };
 
+  const updateBooking = async (
+    existing: ZoomBooking,
+    input: import('../types/zoomBooking').ZoomBookingCreateInput,
+    member: { id: string; name: string; email: string }
+  ): Promise<ZoomBooking> => {
+    const updated = await ZoomBookingService.updateBooking(existing, input, member);
+    setBookings(prev => prev.map(b => b.id === existing.id ? updated : b));
+    return updated;
+  };
+
   const cancelBooking = async (booking: ZoomBooking) => {
     await ZoomBookingService.cancelBooking(booking);
     setBookings(prev =>
@@ -37,5 +47,5 @@ export function useZoomBookings(memberId: string) {
     );
   };
 
-  return { bookings, loading, error, createBooking, cancelBooking, reload: load };
+  return { bookings, loading, error, createBooking, updateBooking, cancelBooking, reload: load };
 }
