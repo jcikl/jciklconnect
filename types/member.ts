@@ -299,6 +299,11 @@ export interface Member {
   tendencyTags?: string[];
   internationalConnections?: InternationalConnection[];
   internationalPartnershipTypes?: string[];
+  privacy?: {
+    showPhone?: boolean;
+    showAlternatePhone?: boolean;
+    showSocials?: boolean;
+  };
 }
 
 /** Returns a short display string for any specialOffer value (structured or legacy string). */

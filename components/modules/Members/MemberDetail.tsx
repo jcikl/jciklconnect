@@ -205,6 +205,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
       specialOffer: member.business?.specialOffer ?? '',
       specialOffers: member.business?.specialOffers ?? (member.business?.specialOffer ? [typeof member.business.specialOffer === 'string' ? { description: member.business.specialOffer, terms: '', expiryDate: '' } : member.business.specialOffer] : []),
 
+      privacy: member.privacy ?? { showPhone: true, showAlternatePhone: true, showSocials: true },
       phone: member.contact?.phone || '',
       alternatePhone: member.contact?.alternatePhone || '',
       whatsappGroup: !!member.contact?.whatsappJoined,
@@ -327,6 +328,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
         idealReferral: inlineValues.idealReferral,
         specialOffers: inlineValues.specialOffers ?? [],
         specialOffer: (inlineValues.specialOffers ?? [])[0] ?? inlineValues.specialOffer,
+        privacy: inlineValues.privacy,
         phone: inlineValues.phone, alternatePhone: inlineValues.alternatePhone, email: inlineValues.email,
         whatsappGroup: inlineValues.whatsappGroup, address: inlineValues.address,
         emergencyContactName: inlineValues.emergencyContactName, emergencyContactRelationship: inlineValues.emergencyContactRelationship,
@@ -1164,6 +1166,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
             inlineValues={inlineValues}
             setInlineValues={setInlineValues}
             canViewSensitiveFields={canViewSensitiveFields}
+            isSelfView={isSelfView}
           />
         </AsyncErrorBoundary>
       )}

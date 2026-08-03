@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { CalendarCheck, UserCog, Bell } from 'lucide-react';
+import { CalendarCheck, UserCog, Bell, Eye, EyeOff } from 'lucide-react';
 import { Button, Card, Badge, useToast } from '../../ui/Common';
 import { usePushNotifications } from '../../../hooks/usePushNotifications';
 import { Input, Textarea } from '../../ui/Form';
@@ -24,6 +24,12 @@ export const MyProfileSelfView: React.FC<{ member: Member; onSave: (updates: Par
   const [organizerEvents, setOrganizerEvents] = useState<Event[]>([]);
   const [eventsById, setEventsById] = useState<Record<string, Event>>({});
   const [loadingExtra, setLoadingExtra] = useState(true);
+  const [privacy, setPrivacy] = useState({
+    showPhone: member.privacy?.showPhone ?? true,
+    showAlternatePhone: member.privacy?.showAlternatePhone ?? true,
+    showSocials: member.privacy?.showSocials ?? true,
+  });
+
   const [form, setForm] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {};
     MEMBER_SELF_EDITABLE_FIELDS.forEach((key) => {
@@ -64,7 +70,7 @@ export const MyProfileSelfView: React.FC<{ member: Member; onSave: (updates: Par
     e.preventDefault();
     setSaving(true);
     try {
-      const updates: Partial<Member> = {};
+      const updates: Partial<Member> = { privacy };
       MEMBER_SELF_EDITABLE_FIELDS.forEach((key) => {
         (updates as Record<string, unknown>)[key] = form[key]?.trim() || null;
       });
@@ -107,6 +113,35 @@ export const MyProfileSelfView: React.FC<{ member: Member; onSave: (updates: Par
           ))}
           <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
         </form>
+      </Card>
+
+      {/* Privacy Settings */}
+      <Card className="p-4">
+        <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2"><Eye size={16} /> Privacy Settings</h3>
+        <p className="text-xs text-slate-400 mb-4">控制哪些信息对其他会员可见</p>
+        <div className="space-y-3">
+          {([
+            { key: 'showPhone', label: 'Primary Phone', desc: 'Show your primary phone number to other members' },
+            { key: 'showAlternatePhone', label: 'Alternative Phone', desc: 'Show your alternative phone number to other members' },
+            { key: 'showSocials', label: 'Social Media', desc: 'Show your LinkedIn, Facebook, Instagram and WeChat to other members' },
+          ] as { key: keyof typeof privacy; label: string; desc: string }[]).map(({ key, label, desc }) => (
+            <div key={key} className="flex items-center justify-between gap-3">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-slate-700">{label}</p>
+                <p className="text-xs text-slate-400">{desc}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPrivacy(p => ({ ...p, [key]: !p[key] }))}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${privacy[key] ? 'bg-jci-blue' : 'bg-slate-200'}`}
+                aria-checked={privacy[key]}
+                role="switch"
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${privacy[key] ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
+            </div>
+          ))}
+        </div>
       </Card>
 
       {/* Push Notifications */}

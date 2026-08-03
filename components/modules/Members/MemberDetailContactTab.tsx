@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Phone, MessageCircle, MapPin, Linkedin, Facebook, Instagram, Lock } from 'lucide-react';
+import { Phone, MessageCircle, MapPin, Linkedin, Facebook, Instagram, Lock, Eye } from 'lucide-react';
 import { Card } from '../../ui/Common';
 import type { Member } from '../../../types';
 
@@ -15,11 +15,15 @@ interface MemberDetailContactTabProps {
   inlineValues: any;
   setInlineValues: React.Dispatch<React.SetStateAction<any>>;
   canViewSensitiveFields: boolean;
+  isSelfView?: boolean;
 }
 
 const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
-  member, isEditMode, inlineValues, setInlineValues, canViewSensitiveFields,
+  member, isEditMode, inlineValues, setInlineValues, canViewSensitiveFields, isSelfView = false,
 }) => {
+  const privacy = inlineValues?.privacy ?? member.privacy ?? {};
+  const togglePrivacy = (key: 'showPhone' | 'showAlternatePhone' | 'showSocials') =>
+    setInlineValues((prev: any) => ({ ...prev, privacy: { ...privacy, [key]: !(privacy[key] ?? true) } }));
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <Card title="Contact Information">
@@ -153,6 +157,27 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                 </div>
               </div>
             </div>
+            {isSelfView && (
+              <div className="border-t pt-4">
+                <h4 className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-1.5"><Eye size={13} /> Privacy Settings</h4>
+                <div className="space-y-3">
+                  {([
+                    { key: 'showPhone' as const, label: 'Primary Phone' },
+                    { key: 'showAlternatePhone' as const, label: 'Alternative Phone' },
+                    { key: 'showSocials' as const, label: 'Social Media' },
+                  ]).map(({ key, label }) => (
+                    <div key={key} className="flex items-center justify-between">
+                      <span className="text-sm text-slate-600">{label} visible to other members</span>
+                      <button type="button" onClick={() => togglePrivacy(key)}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${(privacy[key] ?? true) ? 'bg-jci-blue' : 'bg-slate-200'}`}
+                        role="switch" aria-checked={privacy[key] ?? true}>
+                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${(privacy[key] ?? true) ? 'translate-x-[18px]' : 'translate-x-[2px]'}`} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="grid md:grid-cols-2 gap-6">
@@ -163,7 +188,9 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                 </div>
                 <div>
                   <p className="text-xs text-slate-500 uppercase font-medium">Primary Phone</p>
-                  <p className="text-sm font-bold">{member.contact?.phone || 'N/A'}</p>
+                  {(isSelfView || canViewSensitiveFields || (member.privacy?.showPhone ?? true))
+                    ? <p className="text-sm font-bold">{member.contact?.phone || 'N/A'}</p>
+                    : <RestrictedField />}
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -172,7 +199,9 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                 </div>
                 <div>
                   <p className="text-xs text-slate-500 uppercase font-medium">Alternate Phone</p>
-                  <p className="text-sm font-bold">{member.contact?.alternatePhone || 'N/A'}</p>
+                  {(isSelfView || canViewSensitiveFields || (member.privacy?.showAlternatePhone ?? true))
+                    ? <p className="text-sm font-bold">{member.contact?.alternatePhone || 'N/A'}</p>
+                    : <RestrictedField />}
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -205,20 +234,22 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
               </div>
 
               <h4 className="text-xs font-bold text-slate-400 uppercase border-b pb-1 mt-4">Social Media</h4>
-              <div className="flex gap-4 items-center">
-                {member.contact?.socials?.linkedin
-                  ? <a href={member.contact?.socials?.linkedin} target="_blank" rel="noreferrer" className="text-[#0077B5]"><Linkedin size={20} /></a>
-                  : <Linkedin size={20} className="text-slate-300" />}
-                {member.contact?.socials?.facebook
-                  ? <a href={member.contact?.socials?.facebook} target="_blank" rel="noreferrer" className="text-[#1877F2]"><Facebook size={20} /></a>
-                  : <Facebook size={20} className="text-slate-300" />}
-                {member.contact?.socials?.instagram
-                  ? <a href={member.contact?.socials?.instagram} target="_blank" rel="noreferrer" className="text-[#E1306C]"><Instagram size={20} /></a>
-                  : <Instagram size={20} className="text-slate-300" />}
-                {member.contact?.socials?.wechat
-                  ? <div className="text-[#07C160] flex items-center gap-1"><MessageCircle size={20} /></div>
-                  : <MessageCircle size={20} className="text-slate-300" />}
-              </div>
+              {(isSelfView || canViewSensitiveFields || (member.privacy?.showSocials ?? true)) ? (
+                <div className="flex gap-4 items-center">
+                  {member.contact?.socials?.linkedin
+                    ? <a href={member.contact?.socials?.linkedin} target="_blank" rel="noreferrer" className="text-[#0077B5]"><Linkedin size={20} /></a>
+                    : <Linkedin size={20} className="text-slate-300" />}
+                  {member.contact?.socials?.facebook
+                    ? <a href={member.contact?.socials?.facebook} target="_blank" rel="noreferrer" className="text-[#1877F2]"><Facebook size={20} /></a>
+                    : <Facebook size={20} className="text-slate-300" />}
+                  {member.contact?.socials?.instagram
+                    ? <a href={member.contact?.socials?.instagram} target="_blank" rel="noreferrer" className="text-[#E1306C]"><Instagram size={20} /></a>
+                    : <Instagram size={20} className="text-slate-300" />}
+                  {member.contact?.socials?.wechat
+                    ? <div className="text-[#07C160] flex items-center gap-1"><MessageCircle size={20} /></div>
+                    : <MessageCircle size={20} className="text-slate-300" />}
+                </div>
+              ) : <RestrictedField />}
             </div>
           </div>
         )}

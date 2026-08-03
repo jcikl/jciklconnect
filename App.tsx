@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom';
 import {
   Users, Calendar, LayoutDashboard, Briefcase, FolderKanban,
-  LogOut, Award, Sparkles, TrendingUp,
+  LogOut, Award, Sparkles, TrendingUp, Banknote,
   Menu, Bell, Search, AlertTriangle, Package, Building2, Workflow,
   MessageSquare, BookOpen, Heart, CheckSquare, Check, X, CheckCircle,
   Gift, Database, Megaphone, BarChart3, FileText, Code, Mail, Phone, Facebook, Instagram, Youtube, Clock, UserCircle,
@@ -975,7 +975,7 @@ export const JCIKLApp: React.FC = () => {
                   {hasPermission('canViewFinance') && (
                     <>
                       <SidebarItem
-                        icon={<TrendingUp size={18} />}
+                        icon={<Banknote size={18} />}
                         label="Finances"
                         isActive={view === 'FINANCE'}
                         onClick={() => { handleViewChange('FINANCE'); setIsSidebarOpen(false); }}
@@ -1537,7 +1537,7 @@ export const JCIKLApp: React.FC = () => {
                         {hasPermission('canViewFinance') && (
                           <>
                             <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('FINANCE'); setShowMobileMenu(false); }}>
-                              <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-emerald-950/30 text-emerald-400 border-emerald-900/50'}`}><TrendingUp size={22} /></div>
+                              <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-emerald-950/30 text-emerald-400 border-emerald-900/50'}`}><Banknote size={22} /></div>
                               <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Finances</span>
                             </div>
                             <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('INVENTORY'); setShowMobileMenu(false); }}>
