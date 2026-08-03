@@ -3,9 +3,9 @@ export default async (req, context) => {
     return Response.json({ error: 'Method not allowed' }, { status: 405 });
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
-    return Response.json({ error: 'OpenAI API key not configured' }, { status: 500 });
+    return Response.json({ error: 'Groq API key not configured' }, { status: 500 });
   }
 
   let body;
@@ -27,14 +27,14 @@ export default async (req, context) => {
   const userPrompt = `Rewrite the following content as an engaging ${platform} post for JCI Kuala Lumpur:\n\n${content}`;
 
   try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'llama-3.3-70b-versatile',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
@@ -46,7 +46,7 @@ export default async (req, context) => {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      return Response.json({ error: err.error?.message ?? 'OpenAI request failed' }, { status: 502 });
+      return Response.json({ error: err.error?.message ?? 'Groq request failed' }, { status: 502 });
     }
 
     const data = await res.json();
