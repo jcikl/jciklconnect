@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Phone, MessageCircle, MapPin, Linkedin, Facebook, Instagram, Lock, Eye } from 'lucide-react';
+import { Phone, MessageCircle, MapPin, Linkedin, Facebook, Instagram, Lock, Eye, EyeOff } from 'lucide-react';
 import { Card } from '../../ui/Common';
 import type { Member } from '../../../types';
 
@@ -31,7 +31,14 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
           <div className="space-y-4 text-sm">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Primary Phone</label>
+                <label className="text-slate-500 flex items-center gap-1.5 text-xs uppercase font-medium mb-1">
+                  Primary Phone
+                  {isSelfView && (
+                    <button type="button" onClick={() => togglePrivacy('showPhone')} className="text-slate-400 hover:text-jci-blue transition-colors" title={(privacy.showPhone ?? true) ? 'Visible to members' : 'Hidden from members'}>
+                      {(privacy.showPhone ?? true) ? <Eye size={12} /> : <EyeOff size={12} />}
+                    </button>
+                  )}
+                </label>
                 <input
                   type="text"
                   value={inlineValues.phone ?? ''}
@@ -40,7 +47,14 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                 />
               </div>
               <div>
-                <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Alternate Phone</label>
+                <label className="text-slate-500 flex items-center gap-1.5 text-xs uppercase font-medium mb-1">
+                  Alternate Phone
+                  {isSelfView && (
+                    <button type="button" onClick={() => togglePrivacy('showAlternatePhone')} className="text-slate-400 hover:text-jci-blue transition-colors" title={(privacy.showAlternatePhone ?? true) ? 'Visible to members' : 'Hidden from members'}>
+                      {(privacy.showAlternatePhone ?? true) ? <Eye size={12} /> : <EyeOff size={12} />}
+                    </button>
+                  )}
+                </label>
                 <input
                   type="text"
                   value={inlineValues.alternatePhone ?? ''}
@@ -117,7 +131,14 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
             </div>
 
             <div className="border-t pt-3">
-              <h4 className="text-xs font-bold text-slate-400 uppercase border-b pb-1 mb-3">Social Media Links</h4>
+              <h4 className="text-xs font-bold text-slate-400 uppercase border-b pb-1 mb-3 flex items-center gap-1.5">
+                Social Media Links
+                {isSelfView && (
+                  <button type="button" onClick={() => togglePrivacy('showSocials')} className="text-slate-400 hover:text-jci-blue transition-colors font-normal" title={(privacy.showSocials ?? true) ? 'Visible to members' : 'Hidden from members'}>
+                    {(privacy.showSocials ?? true) ? <Eye size={12} /> : <EyeOff size={12} />}
+                  </button>
+                )}
+              </h4>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-slate-500 block text-xs font-medium mb-1">LinkedIn</label>
@@ -157,27 +178,6 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                 </div>
               </div>
             </div>
-            {isSelfView && (
-              <div className="border-t pt-4">
-                <h4 className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-1.5"><Eye size={13} /> Privacy Settings</h4>
-                <div className="space-y-3">
-                  {([
-                    { key: 'showPhone' as const, label: 'Primary Phone' },
-                    { key: 'showAlternatePhone' as const, label: 'Alternative Phone' },
-                    { key: 'showSocials' as const, label: 'Social Media' },
-                  ]).map(({ key, label }) => (
-                    <div key={key} className="flex items-center justify-between">
-                      <span className="text-sm text-slate-600">{label} visible to other members</span>
-                      <button type="button" onClick={() => togglePrivacy(key)}
-                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${(privacy[key] ?? true) ? 'bg-jci-blue' : 'bg-slate-200'}`}
-                        role="switch" aria-checked={privacy[key] ?? true}>
-                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${(privacy[key] ?? true) ? 'translate-x-[18px]' : 'translate-x-[2px]'}`} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         ) : (
           <div className="grid md:grid-cols-2 gap-6">
