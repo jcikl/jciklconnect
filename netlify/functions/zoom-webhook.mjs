@@ -35,6 +35,7 @@ export default async (req, context) => {
   if (payload.event === 'endpoint.url_validation') {
     const { plainToken } = payload.payload;
     const secret = process.env.ZOOM_WEBHOOK_SECRET_TOKEN;
+    if (!secret) return new Response('ZOOM_WEBHOOK_SECRET_TOKEN not configured', { status: 500 });
     const encryptedToken = createHmac('sha256', secret).update(plainToken).digest('hex');
     return Response.json({ plainToken, encryptedToken });
   }
