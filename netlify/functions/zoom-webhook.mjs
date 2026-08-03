@@ -64,15 +64,15 @@ export default async (req, context) => {
 
   const { event, payload: eventPayload } = payload;
 
-  const meetingId = eventPayload?.object?.id;
+  const obj = eventPayload?.object;
+  const meetingId = obj?.id;
   if (!meetingId) return new Response('OK');
 
   if (event === 'meeting.deleted' || event === 'meeting.ended') {
     const snap = await db.collection(ZOOM_BOOKINGS)
       .where('zoomMeetingId', '==', meetingId)
       .where('status', '==', 'confirmed')
-      .limit(1)
-      .get();
+      .limit(1).get();
     if (!snap.empty) await snap.docs[0].ref.update({ status: 'cancelled' });
   }
 
@@ -80,9 +80,21 @@ export default async (req, context) => {
     const snap = await db.collection(ZOOM_BOOKINGS)
       .where('zoomMeetingId', '==', meetingId)
       .where('status', '==', 'cancelled')
-      .limit(1)
-      .get();
+      .limit(1).get();
     if (!snap.empty) await snap.docs[0].ref.update({ status: 'confirmed' });
+  }
+
+  if (event === 'meeting.updated') {
+    const snap = await db.collection(ZOOM_BOOKINGS)
+      .where('zoomMeetingId', '==', meetingId)
+      .limit(1).get();
+    if (!snap.empty) {
+      const updates = {};
+      if (obj.topic) updates.topic = obj.topic;
+      if (obj.start_time) updates.startTime = new Date(obj.start_time).toISOString();
+      if (obj.duration) updates.duration = obj.duration;
+      if (Object.keys(updates).length) await snap.docs[0].ref.update(updates);
+    }
   }
 
   return new Response('OK');
