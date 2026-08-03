@@ -212,7 +212,7 @@ export class PromotionService {
         senatorCertified: member.jciCareer?.senatorship?.certified,
         senatorshipId: member.jciCareer?.senatorship?.senatorNumber,
         role: member.role,
-        membershipType: member.jciCareer?.membershipType,
+        membershipType: (member.membershipType ?? member.jciCareer?.membershipType) as any,
       },
       rules
     );
@@ -510,7 +510,7 @@ export class PromotionService {
 
     // batch: member role + membershipType
     const memberRef = doc(db, COLLECTIONS.MEMBERS ?? 'members', memberId);
-    batch.update(memberRef, { membershipType: 'Official', role: UserRole.MEMBER });
+    batch.update(memberRef, { membershipType: 'Official', 'jciCareer.membershipType': 'Official', role: UserRole.MEMBER });
 
     // batch: dues update
     const currentYear = new Date().getFullYear().toString();
@@ -537,7 +537,7 @@ export class PromotionService {
       oldDuesAmount: this.PROBATION_DUES,
       newDuesAmount: this.FULL_MEMBER_DUES,
       notificationSent: false,
-      notes: reason
+      ...(reason !== undefined ? { notes: reason } : {})
     };
     if (!isDevMode()) {
       batch.set(promotionRef, { ...promotion, promotionDate: serverTimestamp() });
@@ -972,6 +972,36 @@ export class PromotionService {
       errorLoggingService.logError(error as Error, { component: 'getManualPromotionRequests', additionalData: { status } });
       return [];
     }
+  }
+
+  /**
+   * Backfill: sync jciCareer.membershipType for all members where root membershipType === 'Official'
+   * but jciCareer.membershipType is missing or stale. Runs in batches of 500.
+   */
+  static async backfillOfficialMembershipType(): Promise<{ updated: number; skipped: number }> {
+    if (isDevMode()) {
+      console.log('Dev: backfillOfficialMembershipType skipped');
+      return { updated: 0, skipped: 0 };
+    }
+    const all = await MembersService.getAllMembers();
+    const toFix = all.filter(
+      (m: Member) => m.membershipType === 'Official' && m.jciCareer?.membershipType !== 'Official'
+    );
+    if (toFix.length === 0) return { updated: 0, skipped: all.length };
+
+    const CHUNK = 450;
+    for (let i = 0; i < toFix.length; i += CHUNK) {
+      const chunk = toFix.slice(i, i + CHUNK);
+      const b = writeBatch(db);
+      for (const m of chunk) {
+        const ref = doc(db, COLLECTIONS.MEMBERS ?? 'members', m.id);
+        b.update(ref, { 'jciCareer.membershipType': 'Official' });
+      }
+      await b.commit();
+    }
+
+    MembersService.invalidateMembersCache();
+    return { updated: toFix.length, skipped: all.length - toFix.length };
   }
 
   /**

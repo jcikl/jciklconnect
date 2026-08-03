@@ -20,7 +20,8 @@ import {
   PromotionHistory,
   ManualPromotionRequest,
   Member,
-  MemberPromotionProgress
+  MemberPromotionProgress,
+  UserRole
 } from '../../../types';
 
 // Map requirement type to promotionProgress field key
@@ -81,7 +82,7 @@ const splitEventParticipation = (value?: string): [{ date: string; detail: strin
 
 const displayValue = (value?: string | null) => value?.trim() || '-';
 
-type TrackingView = 'promotion' | EngagementYear;
+type TrackingView = 'promotion' | EngagementYear | 'requests';
 
 const ENGAGEMENT_VIEW_LABELS: Record<EngagementYear, string> = {
   firstYear: '1st Year Member Engagement',
@@ -182,6 +183,17 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
   const [promotingConfirmId, setPromotingConfirmId] = useState<string | null>(null);
   const [quickPromotingId, setQuickPromotingId] = useState<string | null>(null);
   const [isPromoting, setIsPromoting] = useState(false);
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [approvingRequestId, setApprovingRequestId] = useState<string | null>(null);
+  const [rejectingRequestId, setRejectingRequestId] = useState<string | null>(null);
+  const [rejectReasonMap, setRejectReasonMap] = useState<Record<string, string>>({});
+  const [rejectSubmittingId, setRejectSubmittingId] = useState<string | null>(null);
+  const [isBackfilling, setIsBackfilling] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [bulkReason, setBulkReason] = useState('');
+  const [isBulkPromoting, setIsBulkPromoting] = useState(false);
+  const [bulkPromoteProgress, setBulkPromoteProgress] = useState<{ done: number; total: number } | null>(null);
   const { member: currentUser } = useAuth();
   const { showToast } = useToast();
 
@@ -189,16 +201,30 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
     loadData();
   }, []);
 
+  const isAdmin = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUPER_ADMIN;
+
   const loadData = async () => {
     setLoading(true);
     try {
-      const [{ statistics: stats, members }, allMembers] = await Promise.all([
+      const [{ statistics: stats, members }, allMembers, requests] = await Promise.all([
         PromotionService.getPromotionTrackingOverview(),
-        MembersService.getAllMembers()
+        MembersService.getAllMembers(),
+        PromotionService.getManualPromotionRequests('pending'),
       ]);
       setStatistics(stats);
       setProbationMembers(members);
       setEngagementMembers(allMembers);
+      // Deduplicate by memberId — keep the most recent pending request per member
+      const deduped = Object.values(
+        requests.reduce((acc: Record<string, any>, r: any) => {
+          const existing = acc[r.memberId];
+          const rDate = r.requestedAt?.toDate?.() ?? new Date(r.requestedAt ?? 0);
+          const eDate = existing?.requestedAt?.toDate?.() ?? new Date(existing?.requestedAt ?? 0);
+          if (!existing || rDate > eDate) acc[r.memberId] = r;
+          return acc;
+        }, {})
+      );
+      setPendingRequests(deduped);
     } catch (err) {
       showToast('Failed to load promotion data', 'error');
     } finally {
@@ -609,14 +635,16 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
 
     setIsSubmittingManual(true);
     try {
+      const isAdmin = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUPER_ADMIN;
       await PromotionService.createManualPromotionRequest(
         selectedMemberId,
         currentUser?.id || '',
         manualPromotionReason,
-        false // Do not override requirements by default
+        isAdmin,
+        isAdmin ? currentUser?.role : undefined
       );
 
-      showToast('Manual promotion request submitted', 'success');
+      showToast(isAdmin ? 'Member promoted successfully' : 'Manual promotion request submitted', 'success');
       setShowManualPromotionModal(false);
       setManualPromotionReason('');
       setPromotionProgress(null);
@@ -629,6 +657,86 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
       showToast(err.message || 'Failed to submit promotion request', 'error');
     } finally {
       setIsSubmittingManual(false);
+    }
+  };
+
+  const handleBulkManualPromote = async () => {
+    if (!bulkReason.trim()) { showToast('Please enter a reason', 'warning'); return; }
+    if (!currentUser?.id) return;
+    const ids = Array.from(selectedIds);
+    setIsBulkPromoting(true);
+    setBulkPromoteProgress({ done: 0, total: ids.length });
+    let succeeded = 0;
+    let failed = 0;
+    for (let i = 0; i < ids.length; i++) {
+      try {
+        await PromotionService.createManualPromotionRequest(
+          ids[i],
+          currentUser.id,
+          bulkReason,
+          isAdmin,
+          isAdmin ? currentUser.role : undefined
+        );
+        succeeded++;
+      } catch {
+        failed++;
+      }
+      setBulkPromoteProgress({ done: i + 1, total: ids.length });
+    }
+    setIsBulkPromoting(false);
+    setBulkPromoteProgress(null);
+    setShowBulkModal(false);
+    setBulkReason('');
+    setSelectedIds(new Set());
+    showToast(
+      `${succeeded} member${succeeded !== 1 ? 's' : ''} ${isAdmin ? 'promoted' : 'requested'}${failed ? `, ${failed} failed` : ''}`,
+      failed ? 'warning' : 'success'
+    );
+    await loadData();
+  };
+
+  const handleBackfill = async () => {
+    setIsBackfilling(true);
+    try {
+      const { updated, skipped } = await PromotionService.backfillOfficialMembershipType();
+      showToast(`Backfill complete — ${updated} updated, ${skipped} already correct`, 'success');
+      await loadData();
+    } catch (err: any) {
+      showToast(err.message || 'Backfill failed', 'error');
+    } finally {
+      setIsBackfilling(false);
+    }
+  };
+
+  const handleApproveRequest = async (requestId: string) => {
+    if (!currentUser?.id) return;
+    setApprovingRequestId(requestId);
+    try {
+      await PromotionService.approveManualPromotionRequest(requestId, currentUser.id);
+      showToast('Member promoted successfully', 'success');
+      await loadData();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to approve request', 'error');
+    } finally {
+      setApprovingRequestId(null);
+    }
+  };
+
+  const handleRejectRequest = async (requestId: string) => {
+    const reason = rejectReasonMap[requestId]?.trim();
+    if (!reason) { showToast('Please enter a rejection reason', 'warning'); return; }
+    if (!currentUser?.id) return;
+    setRejectSubmittingId(requestId);
+    try {
+      await PromotionService.rejectManualPromotionRequest(requestId, reason, currentUser.id);
+      showToast('Request rejected', 'success');
+      setRejectingRequestId(null);
+      setRejectReasonMap(prev => { const next = { ...prev }; delete next[requestId]; return next; });
+      await loadData();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to reject request', 'error');
+    } finally {
+      setRejectSubmittingId(null);
     }
   };
 
@@ -745,6 +853,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
           { key: 'promotion' as TrackingView, label: 'Probation', short: 'Probation', badge: 0 },
           { key: 'firstYear' as TrackingView, label: '1st Year', short: '1st Yr', badge: pendingCounts.firstYear },
           { key: 'secondYear' as TrackingView, label: '2nd Year', short: '2nd Yr', badge: pendingCounts.secondYear },
+          ...(isAdmin ? [{ key: 'requests' as TrackingView, label: 'Requests', short: 'Req', badge: pendingRequests.length }] : []),
         ] as const).map(view => (
           <button
             key={view.key}
@@ -776,7 +885,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                 {[
                   { label: 'Probation', value: statistics.totalProbationMembers, color: 'text-slate-900' },
                   { label: 'Eligible', value: statistics.eligibleForPromotion, color: 'text-green-600' },
-                  { label: 'Official', value: statistics.promotedThisYear, color: 'text-purple-600' },
+                  { label: 'Official', value: engagementMembers.filter((m: any) => m.membershipType === 'Official').length, color: 'text-purple-600' },
                 ].map(s => (
                   <div key={s.label} className="text-center p-2 rounded-xl bg-slate-50 border border-slate-100">
                     <div className={`text-xl font-black ${s.color}`}>{s.value}</div>
@@ -806,17 +915,33 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                   );
                 })}
               </div>
+
             </Card>
           )}
 
           {/* Probation Members List */}
           <Card>
-            <div className="flex items-center justify-between mb-4">
-              <span className="font-bold text-slate-900">Probation Members{filteredProbationMembers.length ? ` · ${filteredProbationMembers.length}` : ''}</span>
+            <div className="flex items-center justify-between mb-4 gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 rounded border-slate-300 accent-jci-blue shrink-0"
+                  checked={filteredProbationMembers.length > 0 && filteredProbationMembers.every(m => selectedIds.has(m.id))}
+                  onChange={e => {
+                    if (e.target.checked) setSelectedIds(new Set(filteredProbationMembers.map(m => m.id)));
+                    else setSelectedIds(new Set());
+                  }}
+                  title="Select all"
+                />
+                <span className="font-bold text-slate-900 truncate">
+                  Probation Members{filteredProbationMembers.length ? ` · ${filteredProbationMembers.length}` : ''}
+                  {selectedIds.size > 0 && <span className="ml-1.5 text-jci-blue font-semibold">({selectedIds.size} selected)</span>}
+                </span>
+              </div>
               <button
                 onClick={handleBulkPromoAutoSuggest}
                 disabled={bulkAutoSuggesting}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-50 transition-colors shadow-sm"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-50 transition-colors shadow-sm shrink-0"
               >
                 {bulkAutoSuggesting ? <RefreshCw size={12} className="animate-spin" /> : <Sparkles size={12} className="text-amber-500" />}
                 {bulkAutoSuggesting && bulkProgress ? `${bulkProgress.current}/${bulkProgress.total}…` : 'Auto-Suggest All'}
@@ -843,6 +968,19 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                     }`}
                   >
                     <div className="flex items-center gap-3 p-3">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 rounded border-slate-300 accent-jci-blue shrink-0"
+                        checked={selectedIds.has(member.id)}
+                        onChange={e => {
+                          setSelectedIds(prev => {
+                            const next = new Set(prev);
+                            e.target.checked ? next.add(member.id) : next.delete(member.id);
+                            return next;
+                          });
+                        }}
+                        onClick={e => e.stopPropagation()}
+                      />
                       {/* Avatar */}
                       <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs shrink-0 ${isEligible ? 'bg-green-500' : 'bg-jci-blue'}`}>
                         {(member.fullName || member.name || '?').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
@@ -931,6 +1069,20 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                 <div className="py-8 text-center text-sm text-slate-400">No probation members found.</div>
               )}
             </div>
+
+            {/* Bulk action bar */}
+            {selectedIds.size > 0 && (
+              <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
+                <span className="text-sm text-slate-600 font-medium">{selectedIds.size} member{selectedIds.size !== 1 ? 's' : ''} selected</span>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setSelectedIds(new Set())}>Clear</Button>
+                  <Button size="sm" onClick={() => setShowBulkModal(true)}>
+                    <TrendingUp size={13} className="mr-1.5" />
+                    {isAdmin ? 'Promote All' : 'Request Promotion'}
+                  </Button>
+                </div>
+              </div>
+            )}
           </Card>
         </>
       )}
@@ -1245,17 +1397,21 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                         <input type="text" className={`${inputClassName} flex-1`} placeholder="Event 1"
                           value={editValues.event_participation_1 || ''}
                           onChange={(e) => setEditValues(prev => ({ ...prev, event_participation_1: e.target.value }))} />
-                        <Input type="date" className="sm:w-36"
-                          value={editValues.event_participation_1_date || ''}
-                          onChange={(e) => setEditValues(prev => ({ ...prev, event_participation_1_date: e.target.value }))} />
+                        <div className="w-full sm:w-36 flex-shrink-0">
+                          <Input type="date"
+                            value={editValues.event_participation_1_date || ''}
+                            onChange={(e) => setEditValues(prev => ({ ...prev, event_participation_1_date: e.target.value }))} />
+                        </div>
                       </div>
                       <div className="flex flex-col sm:flex-row gap-2">
                         <input type="text" className={`${inputClassName} flex-1`} placeholder="Event 2"
                           value={editValues.event_participation_2 || ''}
                           onChange={(e) => setEditValues(prev => ({ ...prev, event_participation_2: e.target.value }))} />
-                        <Input type="date" className="sm:w-36"
-                          value={editValues.event_participation_2_date || ''}
-                          onChange={(e) => setEditValues(prev => ({ ...prev, event_participation_2_date: e.target.value }))} />
+                        <div className="w-full sm:w-36 flex-shrink-0">
+                          <Input type="date"
+                            value={editValues.event_participation_2_date || ''}
+                            onChange={(e) => setEditValues(prev => ({ ...prev, event_participation_2_date: e.target.value }))} />
+                        </div>
                       </div>
                       <Button size="sm" variant={
                         editValues.event_participation_1?.trim() && editValues.event_participation_1_date?.trim() &&
@@ -1522,6 +1678,133 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
       </Modal>
 
       {/* Manual Promotion Request Modal */}
+      {/* Requests approval panel */}
+      {activeView === 'requests' && (
+        <div className="space-y-3">
+          {pendingRequests.length === 0 ? (
+            <Card>
+              <div className="py-8 text-center text-slate-400 text-sm">No pending promotion requests</div>
+            </Card>
+          ) : pendingRequests.map((req: any) => {
+            const isApprovingThis = approvingRequestId === req.id;
+            const isRejectingThis = rejectingRequestId === req.id;
+            const isSubmittingThis = rejectSubmittingId === req.id;
+            const requestedAt = req.requestedAt?.toDate?.() ?? (req.requestedAt ? new Date(req.requestedAt) : null);
+            return (
+              <Card key={req.id}>
+                <div className="space-y-3">
+                  {/* Header */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-semibold text-slate-900">{req.memberName || req.memberId}</div>
+                      <div className="text-xs text-slate-500 mt-0.5">
+                        Requested by <span className="font-medium text-slate-700">{(() => { const m = engagementMembers.find((x: any) => x.id === req.requestedBy); return m ? (m.general?.fullName || m.general?.name || req.requestedBy) : req.requestedBy; })()}</span>
+                        {requestedAt && <span className="ml-1">· {requestedAt.toLocaleDateString()}</span>}
+                      </div>
+                    </div>
+                    <Badge variant="warning">Pending</Badge>
+                  </div>
+
+                  {/* Reason */}
+                  {req.reason && (
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-sm text-slate-700">
+                      <span className="font-medium text-slate-500 text-xs block mb-1">Reason</span>
+                      {req.reason}
+                    </div>
+                  )}
+
+                  {/* Missing requirements */}
+                  {req.missingRequirements?.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {req.missingRequirements.map((r: string) => (
+                        <span key={r} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">{r}</span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Reject reason input */}
+                  {isRejectingThis && (
+                    <div className="space-y-2">
+                      <textarea
+                        rows={2}
+                        placeholder="Reason for rejection…"
+                        value={rejectReasonMap[req.id] || ''}
+                        onChange={e => setRejectReasonMap(prev => ({ ...prev, [req.id]: e.target.value }))}
+                        className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-jci-blue/30"
+                      />
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" onClick={() => setRejectingRequestId(null)}>Cancel</Button>
+                        <Button size="sm" variant="danger" onClick={() => handleRejectRequest(req.id)} disabled={isSubmittingThis}>
+                          {isSubmittingThis ? <RefreshCw size={13} className="animate-spin mr-1" /> : null}
+                          Confirm Reject
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Action buttons */}
+                  {!isRejectingThis && (
+                    <div className="flex gap-2 pt-1">
+                      <Button size="sm" variant="outline" className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
+                        onClick={() => setRejectingRequestId(req.id)}>
+                        <X size={14} className="mr-1" /> Reject
+                      </Button>
+                      <Button size="sm" className="flex-1" onClick={() => handleApproveRequest(req.id)} disabled={isApprovingThis}>
+                        {isApprovingThis ? <RefreshCw size={13} className="animate-spin mr-1" /> : <Check size={14} className="mr-1" />}
+                        Approve & Promote
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Bulk promotion modal */}
+      <Modal isOpen={showBulkModal} onClose={() => { if (!isBulkPromoting) { setShowBulkModal(false); setBulkReason(''); } }} title={isAdmin ? `Promote ${selectedIds.size} Members` : `Request Promotion for ${selectedIds.size} Members`}>
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            {isAdmin
+              ? `This will immediately promote ${selectedIds.size} member${selectedIds.size !== 1 ? 's' : ''} to Official, bypassing requirements.`
+              : `This will submit a pending promotion request for ${selectedIds.size} member${selectedIds.size !== 1 ? 's' : ''} for BOD review.`}
+          </p>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">Reason <span className="text-red-500">*</span></label>
+            <textarea
+              rows={3}
+              placeholder="e.g. Completed requirements offline / Backlog clearance…"
+              value={bulkReason}
+              onChange={e => setBulkReason(e.target.value)}
+              disabled={isBulkPromoting}
+              className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-jci-blue/30 disabled:opacity-50"
+            />
+          </div>
+          {bulkPromoteProgress && (
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs text-slate-500">
+                <span>Processing…</span>
+                <span>{bulkPromoteProgress.done}/{bulkPromoteProgress.total}</span>
+              </div>
+              <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-jci-blue rounded-full transition-all duration-300"
+                  style={{ width: `${(bulkPromoteProgress.done / bulkPromoteProgress.total) * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
+          <div className="flex gap-2 pt-1">
+            <Button variant="outline" className="flex-1" onClick={() => { setShowBulkModal(false); setBulkReason(''); }} disabled={isBulkPromoting}>Cancel</Button>
+            <Button className="flex-1" onClick={handleBulkManualPromote} disabled={isBulkPromoting || !bulkReason.trim()}>
+              {isBulkPromoting ? <RefreshCw size={14} className="animate-spin mr-1.5" /> : <Check size={14} className="mr-1.5" />}
+              {isAdmin ? 'Promote All' : 'Submit Requests'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
       <Modal
         isOpen={showManualPromotionModal}
         onClose={() => {

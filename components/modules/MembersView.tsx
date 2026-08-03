@@ -315,7 +315,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
 
       const fields = ['id', 'name', 'email', 'phone', 'membershipType', 'status', 'joinDate'];
       const filters: any[] = [];
-      const userId = 'current_user_id'; // Would come from auth context
+      const userId = currentMember?.id || '';
 
       let exportData: string | ArrayBuffer;
       let mimeType: string;

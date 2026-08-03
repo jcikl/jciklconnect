@@ -199,24 +199,14 @@ export function computeMembershipTypeFromMember(
   }
 
   if (member.membershipType === 'Official') {
-    const officialCheck = validateMembershipTypeEligibility(
-      {
-        membershipType: 'Official',
-        nationality: member.nationality,
-        dateOfBirth: member.dateOfBirth,
-        senatorCertified: member.senatorCertified,
-        senatorshipId: member.senatorshipId,
-        role: member.role,
-      },
-      rules,
-      referenceDate
-    );
-    if (officialCheck.valid) return 'Official';
+    // Admin explicitly promoted this member — always honor it, even if age/dob validation
+    // would fail (e.g. missing dateOfBirth). Never downgrade an official member back to Probation.
+    return 'Official';
   }
 
   const suggested = suggestMembershipTypeForMember(member, rules, referenceDate);
 
-  if (suggested === 'Probation' && member.membershipType !== 'Official') {
+  if (suggested === 'Probation') {
     return 'Probation';
   }
 
