@@ -1,4 +1,4 @@
-import { createHmac } from 'crypto';
+import { createHmac } from 'node:crypto';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
@@ -22,7 +22,12 @@ function verifySignature(secret, timestamp, body, signature) {
 }
 
 export default async (req, context) => {
-  const bodyText = await req.text();
+  let bodyText;
+  try {
+    bodyText = await req.text();
+  } catch {
+    return new Response('Failed to read body', { status: 400 });
+  }
 
   // Zoom URL validation challenge (sent when registering the webhook endpoint)
   let payload;
@@ -33,11 +38,18 @@ export default async (req, context) => {
   }
 
   if (payload.event === 'endpoint.url_validation') {
-    const { plainToken } = payload.payload;
-    const secret = process.env.ZOOM_WEBHOOK_SECRET_TOKEN;
-    if (!secret) return new Response('ZOOM_WEBHOOK_SECRET_TOKEN not configured', { status: 500 });
-    const encryptedToken = createHmac('sha256', secret).update(plainToken).digest('hex');
-    return Response.json({ plainToken, encryptedToken });
+    try {
+      const { plainToken } = payload.payload;
+      const secret = process.env.ZOOM_WEBHOOK_SECRET_TOKEN;
+      if (!secret) return new Response('ZOOM_WEBHOOK_SECRET_TOKEN not configured', { status: 500 });
+      const encryptedToken = createHmac('sha256', secret).update(plainToken).digest('hex');
+      return new Response(JSON.stringify({ plainToken, encryptedToken }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } catch (err) {
+      return new Response(`Validation error: ${err.message}`, { status: 500 });
+    }
   }
 
   // Verify signature for all other events
