@@ -3,7 +3,9 @@ import { Users, CheckCircle, UserPlus, Star, X } from 'lucide-react';
 import { resolveAreaFromAddress } from '../../../utils/myPostcodes';
 import { Card } from '../../ui/Common';
 import type { Member } from '../../../types';
+import { UserRole } from '../../../types';
 import { MemberStatistics } from '../../../services/memberStatsService';
+import { usePermissions } from '../../../hooks/usePermissions';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 // Member Statistics View Component
@@ -12,6 +14,9 @@ export const MemberStatisticsView: React.FC<{
   loading: boolean;
   members: Member[];
 }> = ({ statistics, loading, members = [] }) => {
+  const { effectiveRole } = usePermissions();
+  const canSeeAddress = effectiveRole === UserRole.ADMIN || effectiveRole === UserRole.SUPER_ADMIN;
+
   const [isMobile, setIsMobile] = React.useState(false);
   const [drawerSegment, setDrawerSegment] = React.useState<{ label: string; members: Member[] } | null>(null);
 
@@ -408,7 +413,10 @@ export const MemberStatisticsView: React.FC<{
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-slate-800 text-sm truncate">{m.general?.name || m.general?.fullName}</p>
-                        <p className="text-xs text-slate-400 truncate">{m.contact?.email || m.contact?.email || m.contact?.phone || m.contact?.phone || ''}</p>
+                        <p className="text-xs text-slate-400 truncate">{m.contact?.email || m.contact?.phone || ''}</p>
+                        {canSeeAddress && m.contact?.address && (
+                          <p className="text-xs text-slate-400 truncate mt-0.5">{m.contact.address}</p>
+                        )}
                       </div>
                       <span className="text-xs text-slate-400 shrink-0">{m.jciCareer?.membershipType || m.role || ''}</span>
                     </div>
