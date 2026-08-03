@@ -12,7 +12,6 @@ export interface ZoomBooking {
   zoomJoinUrl: string;
   zoomHostUrl: string;
   zoomPassword: string;
-  alternativeHostSet: boolean;
   status: ZoomBookingStatus;
   createdAt: string;
 }

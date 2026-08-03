@@ -20,7 +20,6 @@ const MOCK_BOOKINGS: ZoomBooking[] = [
     zoomJoinUrl: 'https://zoom.us/j/123456789',
     zoomHostUrl: 'https://zoom.us/s/123456789',
     zoomPassword: 'abc123',
-    alternativeHostSet: true,
     status: 'confirmed',
     createdAt: new Date().toISOString(),
   },
@@ -48,7 +47,6 @@ export class ZoomBookingService {
         zoomJoinUrl: 'https://zoom.us/j/mock',
         zoomHostUrl: 'https://zoom.us/s/mock',
         zoomPassword: 'devmode',
-        alternativeHostSet: false,
         status: 'confirmed',
         createdAt: new Date().toISOString(),
       };
@@ -86,7 +84,6 @@ export class ZoomBookingService {
       zoomJoinUrl: zoom.joinUrl,
       zoomHostUrl: zoom.hostUrl,
       zoomPassword: zoom.password,
-      alternativeHostSet: zoom.alternativeHostSet,
       status: 'confirmed' as const,
       createdAt: new Date().toISOString(),
     };

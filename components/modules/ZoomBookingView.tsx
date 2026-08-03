@@ -236,11 +236,6 @@ export const ZoomBookingView: React.FC = () => {
                   <CopyButton text={newBooking.zoomPassword} />
                 </div>
               )}
-              {!newBooking.alternativeHostSet && (
-                <p className="text-[10px] text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
-                  Your email is not on the JCI KL Zoom account, so you were not set as alternative host. Contact an admin to be added.
-                </p>
-              )}
             </div>
           </div>
         ) : (
