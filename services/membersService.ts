@@ -248,11 +248,12 @@ export class MembersService {
       ...(existing?.general || {}),
     };
     if (data.general?.name !== undefined) general.name = data.general?.name;
+    else if (data.name !== undefined) general.name = data.name;
     if (data.general?.fullName !== undefined) general.fullName = data.general?.fullName;
+    else if (data.fullName !== undefined) general.fullName = data.fullName;
     if (data.general?.chineseName !== undefined) general.chineseName = data.general?.chineseName;
-    else if (data.general?.chineseName !== undefined) general.chineseName = data.general?.chineseName;
     if (data.general?.idNumber !== undefined) general.idNumber = data.general?.idNumber;
-    else if (data.general?.idNumber !== undefined) general.idNumber = data.general?.idNumber;
+    else if (data.idNumber !== undefined) general.idNumber = data.idNumber;
     if (data.general?.dob !== undefined) {
       general.dob = data.general?.dob;
       // Index field for birthday queries: "MMDD" e.g. "0706" for July 6
@@ -260,22 +261,33 @@ export class MembersService {
       if (dobStr && dobStr.length >= 10) {
         result.birthdayMMDD = dobStr.slice(5, 7) + dobStr.slice(8, 10);
       }
-    } else if (data.general?.dob !== undefined) {
-      general.dob = data.general?.dob;
-      const dobStr: string = data.general?.dob;
+    } else if (data.dob !== undefined) {
+      general.dob = data.dob;
+      const dobStr: string = data.dob;
+      if (dobStr && dobStr.length >= 10) {
+        result.birthdayMMDD = dobStr.slice(5, 7) + dobStr.slice(8, 10);
+      }
+    } else if (data.dateOfBirth !== undefined) {
+      general.dob = data.dateOfBirth;
+      const dobStr: string = data.dateOfBirth;
       if (dobStr && dobStr.length >= 10) {
         result.birthdayMMDD = dobStr.slice(5, 7) + dobStr.slice(8, 10);
       }
     }
     if (data.general?.gender !== undefined) general.gender = data.general?.gender;
+    else if (data.gender !== undefined) general.gender = data.gender;
     if (data.general?.race !== undefined) general.race = data.general?.race;
     else if (data.general?.ethnicity !== undefined) general.race = data.general?.ethnicity;
+    else if (data.ethnicity !== undefined) general.race = data.ethnicity;
     if (data.general?.ethnicity !== undefined) general.ethnicity = data.general?.ethnicity;
+    else if (data.ethnicity !== undefined) general.ethnicity = data.ethnicity;
     if (data.general?.dietaryPreference !== undefined) general.dietaryPreference = data.general?.dietaryPreference;
     if (data.general?.nationality !== undefined) general.nationality = data.general?.nationality;
+    else if (data.nationality !== undefined) general.nationality = data.nationality;
     if (data.general?.birthPlace !== undefined) general.birthPlace = data.general?.birthPlace;
     if (data.general?.avatarUrl !== undefined) general.avatarUrl = data.general?.avatarUrl;
-    else if (data.general?.avatarUrl !== undefined) general.avatarUrl = data.general?.avatarUrl;
+    else if (data.avatarUrl !== undefined) general.avatarUrl = data.avatarUrl;
+    else if (data.avatar !== undefined) general.avatarUrl = data.avatar;
 
     if (Object.keys(general).length > 0 || existing?.general) {
       result.general = general;
@@ -292,22 +304,34 @@ export class MembersService {
       emergency: { ...(existing?.contact?.emergency || {}) }
     };
     if (data.contact?.email !== undefined) contact.email = data.contact?.email;
+    else if (data.email !== undefined) contact.email = data.email;
     if (data.contact?.phone !== undefined) contact.phone = data.contact?.phone;
+    else if (data.phone !== undefined) contact.phone = data.phone;
     if (data.contact?.alternatePhone !== undefined) contact.alternatePhone = data.contact?.alternatePhone;
+    else if (data.alternatePhone !== undefined) contact.alternatePhone = data.alternatePhone;
     if (data.contact?.address !== undefined) contact.address = data.contact?.address;
-    
+    else if (data.address !== undefined) contact.address = data.address;
+
     if (data.contact?.whatsappJoined !== undefined) contact.whatsappJoined = !!data.contact?.whatsappJoined;
-    else if (data.contact?.whatsappJoined !== undefined) contact.whatsappJoined = !!data.contact?.whatsappJoined;
-    else if (data.contact?.whatsappJoined !== undefined) contact.whatsappJoined = !!data.contact?.whatsappJoined;
+    else if (data.whatsappJoined !== undefined) contact.whatsappJoined = !!data.whatsappJoined;
 
     if (data.contact?.socials?.linkedin !== undefined) contact.socials.linkedin = data.contact?.socials?.linkedin;
+    else if (data.linkedin !== undefined) contact.socials.linkedin = data.linkedin;
+    else if (data.linkedIn !== undefined) contact.socials.linkedin = data.linkedIn;
     if (data.contact?.socials?.facebook !== undefined) contact.socials.facebook = data.contact?.socials?.facebook;
+    else if (data.facebook !== undefined) contact.socials.facebook = data.facebook;
     if (data.contact?.socials?.instagram !== undefined) contact.socials.instagram = data.contact?.socials?.instagram;
+    else if (data.instagram !== undefined) contact.socials.instagram = data.instagram;
     if (data.contact?.socials?.wechat !== undefined) contact.socials.wechat = data.contact?.socials?.wechat;
+    else if (data.wechat !== undefined) contact.socials.wechat = data.wechat;
+    else if (data.weChat !== undefined) contact.socials.wechat = data.weChat;
 
     if (data.contact?.emergency?.name !== undefined) contact.emergency.name = data.contact?.emergency?.name;
+    else if (data.emergencyContactName !== undefined) contact.emergency.name = data.emergencyContactName;
     if (data.contact?.emergency?.phone !== undefined) contact.emergency.phone = data.contact?.emergency?.phone;
+    else if (data.emergencyContactPhone !== undefined) contact.emergency.phone = data.emergencyContactPhone;
     if (data.contact?.emergency?.relationship !== undefined) contact.emergency.relationship = data.contact?.emergency?.relationship;
+    else if (data.emergencyContactRelationship !== undefined) contact.emergency.relationship = data.emergencyContactRelationship;
 
     if (Object.keys(contact.socials).length === 0 && !existing?.contact?.socials) delete contact.socials;
     if (Object.keys(contact.emergency).length === 0 && !existing?.contact?.emergency) delete contact.emergency;
@@ -321,13 +345,20 @@ export class MembersService {
       ...(existing?.others || {}),
     };
     if (data.others?.bio !== undefined) others.bio = data.others?.bio;
+    else if (data.bio !== undefined) others.bio = data.bio;
     if (data.others?.shirtStyle !== undefined) others.shirtStyle = data.others?.shirtStyle;
-    else if (data.others?.shirtStyle !== undefined) others.shirtStyle = data.others?.shirtStyle;
+    else if (data.shirtStyle !== undefined) others.shirtStyle = data.shirtStyle;
+    else if (data.cutStyle !== undefined) others.shirtStyle = data.cutStyle;
     if (data.others?.tshirtSize !== undefined) others.tshirtSize = data.others?.tshirtSize;
+    else if (data.tshirtSize !== undefined) others.tshirtSize = data.tshirtSize;
     if (data.others?.jacketSize !== undefined) others.jacketSize = data.others?.jacketSize;
+    else if (data.jacketSize !== undefined) others.jacketSize = data.jacketSize;
     if (data.others?.embroideredName !== undefined) others.embroideredName = data.others?.embroideredName;
+    else if (data.embroideredName !== undefined) others.embroideredName = data.embroideredName;
     if (data.others?.tshirtStatus !== undefined) others.tshirtStatus = data.others?.tshirtStatus;
+    else if (data.tshirtStatus !== undefined) others.tshirtStatus = data.tshirtStatus;
     if (data.others?.hobbies !== undefined) others.hobbies = data.others?.hobbies;
+    else if (data.hobbies !== undefined) others.hobbies = data.hobbies;
 
     if (Object.keys(others).length > 0 || existing?.others) {
       result.others = others;
@@ -339,21 +370,24 @@ export class MembersService {
     };
     if (data.companyName !== undefined) business.companyName = data.companyName;
     if (data.business?.companyWebsite !== undefined) business.companyWebsite = data.business?.companyWebsite;
+    else if (data.companyWebsite !== undefined) business.companyWebsite = data.companyWebsite;
     if (data.business?.companyLogoUrl !== undefined) business.companyLogoUrl = data.business?.companyLogoUrl;
     if (data.business?.introduction !== undefined) business.introduction = data.business?.introduction;
     else if (data.business?.companyDescription !== undefined) business.introduction = data.business?.companyDescription;
     if (data.business?.companyDescription !== undefined) business.companyDescription = data.business?.companyDescription;
+    else if (data.companyDescription !== undefined) { business.introduction = data.companyDescription; business.companyDescription = data.companyDescription; }
     if (data.business?.position !== undefined) business.position = data.business?.position;
-    else if (data.business?.position !== undefined) business.position = data.business?.position;
-    else if (data.business?.position !== undefined) business.position = data.business?.position;
     else if (data.business?.departmentAndPosition !== undefined) business.position = data.business?.departmentAndPosition;
+    else if (data.departmentAndPosition !== undefined) business.position = data.departmentAndPosition;
     if (data.business?.departmentAndPosition !== undefined) business.departmentAndPosition = data.business?.departmentAndPosition;
+    else if (data.departmentAndPosition !== undefined) business.departmentAndPosition = data.departmentAndPosition;
     if (data.industry !== undefined) business.industry = data.industry;
     if (data.business?.businessCategory !== undefined) business.businessCategory = data.business?.businessCategory;
-    else if (data.business?.businessCategory !== undefined) business.businessCategory = data.business?.businessCategory;
+    else if (data.businessCategory !== undefined) business.businessCategory = data.businessCategory;
     if (data.business?.specialOffer !== undefined) business.specialOffer = data.business?.specialOffer;
     else if (data.specialOffer !== undefined) business.specialOffer = data.specialOffer;
     if (data.business?.acceptInternationalBusiness !== undefined) business.acceptInternationalBusiness = data.business?.acceptInternationalBusiness;
+    else if (data.acceptInternationalBusiness !== undefined) business.acceptInternationalBusiness = data.acceptInternationalBusiness;
     
     if (data.business?.idealReferrals !== undefined) {
       business.idealReferrals = data.business?.idealReferrals;
@@ -386,10 +420,13 @@ export class MembersService {
       senatorship: { ...(existing?.jciCareer?.senatorship || {}) }
     };
     if (data.jciCareer?.membershipType !== undefined) jciCareer.membershipType = data.jciCareer?.membershipType;
+    else if (data.membershipType !== undefined) jciCareer.membershipType = data.membershipType;
     // membershipStatus legacy field removed (E5) — use membership[year].status instead
     if (data.jciCareer?.joinDate !== undefined) jciCareer.joinDate = data.jciCareer?.joinDate;
-    else if (data.jciCareer?.joinDate !== undefined) jciCareer.joinDate = data.jciCareer?.joinDate;
+    else if (data.joinDate !== undefined) jciCareer.joinDate = data.joinDate;
+    else if (data.joinedDate !== undefined) jciCareer.joinDate = data.joinedDate;
     if (data.jciCareer?.introducer !== undefined) jciCareer.introducer = data.jciCareer?.introducer;
+    else if (data.introducer !== undefined) jciCareer.introducer = data.introducer;
 
     if (data.jciCareer?.senatorship?.senatorNumber !== undefined) jciCareer.senatorship.senatorNumber = data.jciCareer?.senatorship?.senatorNumber;
     if (data.jciCareer?.senatorship?.certified !== undefined) jciCareer.senatorship.certified = data.jciCareer?.senatorship?.certified;
