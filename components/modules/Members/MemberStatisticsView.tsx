@@ -73,6 +73,29 @@ export const MemberStatisticsView: React.FC<{
     return data.filter(item => item.value > 0);
   }, [members]);
 
+  const stateData = React.useMemo(() => {
+    const counts: Record<string, number> = {};
+    members.forEach(m => {
+      const state = m.contact?.state?.trim() || 'Unknown';
+      counts[state] = (counts[state] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [members]);
+
+  const areaData = React.useMemo(() => {
+    const counts: Record<string, number> = {};
+    members.forEach(m => {
+      const area = m.contact?.area?.trim();
+      if (area) counts[area] = (counts[area] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 12);
+  }, [members]);
+
   const genderData = React.useMemo(() => {
     let male = 0;
     let female = 0;
@@ -287,6 +310,52 @@ export const MemberStatisticsView: React.FC<{
                   setDrawerSegment({ label: `Management: ${name}`, members: filtered });
                 }}
               />
+            );
+          })()}
+        </Card>
+      </div>
+
+      {/* Area statistics row */}
+      <div className="grid md:grid-cols-3 gap-4">
+        <Card title="State Distribution">
+          <DonutChart
+            data={stateData}
+            colorOffset={2}
+            onSegmentClick={name => {
+              const filtered = members.filter(m => (m.contact?.state?.trim() || 'Unknown') === name);
+              setDrawerSegment({ label: `State: ${name}`, members: filtered });
+            }}
+          />
+        </Card>
+        <Card title="Top Areas">
+          {areaData.length === 0 ? (
+            <p className="text-slate-400 text-sm text-center py-8">No area data yet — update member addresses to populate.</p>
+          ) : (() => {
+            const max = areaData[0]?.value || 1;
+            return (
+              <div className="space-y-2 py-1">
+                {areaData.map((item, i) => (
+                  <button
+                    key={item.name}
+                    className="w-full text-left group"
+                    onClick={() => {
+                      const filtered = members.filter(m => m.contact?.area?.trim() === item.name);
+                      setDrawerSegment({ label: `Area: ${item.name}`, members: filtered });
+                    }}
+                  >
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate max-w-[70%]">{item.name}</span>
+                      <span className="text-xs font-bold text-slate-500 ml-2 shrink-0">{item.value}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all group-hover:brightness-110"
+                        style={{ width: `${(item.value / max) * 100}%`, backgroundColor: COLORS[i % COLORS.length] }}
+                      />
+                    </div>
+                  </button>
+                ))}
+              </div>
             );
           })()}
         </Card>
