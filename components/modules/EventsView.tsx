@@ -99,13 +99,13 @@ export const EventsView: React.FC<{ searchQuery?: string; initialSelectedEventId
               variant={viewMode === 'list' ? 'primary' : 'outline'}
               onClick={() => setViewMode('list')}
             >
-              <List size={16} className="mr-2" /> List View
+              <List size={16} className="sm:mr-2" /><span className="hidden sm:inline">List View</span>
             </Button>
             <Button
               variant={viewMode === 'calendar' ? 'primary' : 'outline'}
               onClick={() => setViewMode('calendar')}
             >
-              <Calendar size={16} className="mr-2" /> Calendar View
+              <Calendar size={16} className="sm:mr-2" /><span className="hidden sm:inline">Calendar View</span>
             </Button>
           </div>
         }
@@ -122,7 +122,6 @@ export const EventsView: React.FC<{ searchQuery?: string; initialSelectedEventId
           {/* Mobile: segmented control in white bordered container */}
           <div className="md:hidden p-1.5 bg-white rounded-xl border border-slate-200 shadow-sm">
             <Tabs
-             
               fullWidth
               tabs={['Upcoming', 'Completed']}
               activeTab={activeTab}
