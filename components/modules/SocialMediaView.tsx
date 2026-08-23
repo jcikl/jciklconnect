@@ -4,7 +4,7 @@ import {
   Clock, Eye, Send, RotateCcw, Calendar, Megaphone, Loader2, Settings, Zap,
   LayoutList, Columns, CalendarDays, ChevronLeft,
 } from 'lucide-react';
-import { Button, Modal, Badge, Drawer, useToast } from '../ui/Common';
+import { Button, Modal, Badge, Drawer, Tabs, useToast } from '../ui/Common';
 import { AsyncErrorBoundary } from '../ui/ErrorBoundary';
 import { Input, Textarea, Select } from '../ui/Form';
 import { useAuth } from '../../hooks/useAuth';
@@ -14,7 +14,7 @@ import { useSocialPersonas } from '../../hooks/useSocialPersonas';
 import { SocialPostService } from '../../services/socialPostService';
 import { SocialPersonaConfig } from './SocialPersonaConfig';
 import type { SocialPost, SocialPostStatus, SocialPostPlatform, SocialPostCreateInput, SocialPostContentType } from '../../types/socialPost';
-import { SOCIAL_POST_STATUS_LABELS, SOCIAL_POST_PLATFORM_LABELS, SOCIAL_POST_CONTENT_TYPE_LABELS } from '../../types/socialPost';
+import { SOCIAL_POST_STATUS_LABELS, SOCIAL_POST_PLATFORM_LABELS, SOCIAL_POST_CONTENT_TYPE_LABELS, SOCIAL_POST_CONTENT_TYPE_KEY_FIELDS } from '../../types/socialPost';
 
 // ── Status helpers ─────────────────────────────────────────────────────────────
 
@@ -37,6 +37,136 @@ const PLATFORM_ICONS: Record<SocialPostPlatform, React.ReactNode> = {
 
 const ALL_PLATFORMS: SocialPostPlatform[] = ['facebook', 'instagram', 'linkedin', 'xiaohongshu'];
 const ALL_CONTENT_TYPES = Object.keys(SOCIAL_POST_CONTENT_TYPE_LABELS) as SocialPostContentType[];
+
+const KEY_INFORMATION_HEADING = 'Key Information';
+const REFERENCE_CONTENT_HEADING = 'Reference Content';
+
+type KeyInfoValues = Record<string, string>;
+
+function parseReferenceMaterial(content: string, contentType: SocialPostContentType): { keyInfo: KeyInfoValues; referenceContent: string } {
+  const fields = SOCIAL_POST_CONTENT_TYPE_KEY_FIELDS[contentType];
+  const keyInfo = Object.fromEntries(fields.map(field => [field, ''])) as KeyInfoValues;
+  const lines = content.split(/\r?\n/);
+  const referenceStart = lines.findIndex(line => line.trim().toLowerCase() === `${REFERENCE_CONTENT_HEADING}:`.toLowerCase());
+
+  fields.forEach(field => {
+    const line = lines.find(candidate => candidate.toLowerCase().startsWith(`${field.toLowerCase()}:`));
+    if (line) keyInfo[field] = line.slice(field.length + 1).trim();
+  });
+
+  const hasStructuredKeyInfo = Object.values(keyInfo).some(Boolean);
+  if (referenceStart >= 0) {
+    return { keyInfo, referenceContent: lines.slice(referenceStart + 1).join('\n').trim() };
+  }
+
+  return { keyInfo, referenceContent: hasStructuredKeyInfo ? '' : content };
+}
+
+function buildReferenceMaterial(contentType: SocialPostContentType, keyInfo: KeyInfoValues, referenceContent: string) {
+  const keyInfoLines = SOCIAL_POST_CONTENT_TYPE_KEY_FIELDS[contentType]
+    .map(field => `${field}: ${(keyInfo[field] ?? '').trim()}`)
+    .filter(line => !line.endsWith(':'));
+  const sections = [
+    keyInfoLines.length ? `${KEY_INFORMATION_HEADING}:\n${keyInfoLines.join('\n')}` : '',
+    referenceContent.trim() ? `${REFERENCE_CONTENT_HEADING}:\n${referenceContent.trim()}` : '',
+  ].filter(Boolean);
+  return sections.join('\n\n');
+}
+
+const KeyInformationFields: React.FC<{
+  contentType: SocialPostContentType;
+  values: KeyInfoValues;
+  onChange: (field: string, value: string) => void;
+  onBlur?: () => void;
+}> = ({ contentType, values, onChange, onBlur }) => (
+  <div>
+    <label className="block text-sm font-medium text-slate-700 mb-2">Key Information *</label>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      {SOCIAL_POST_CONTENT_TYPE_KEY_FIELDS[contentType].map(field => (
+        <input
+          key={field}
+          type="text"
+          value={values[field] ?? ''}
+          onChange={e => onChange(field, e.target.value)}
+          onBlur={onBlur}
+          placeholder={field}
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 outline-none"
+        />
+      ))}
+    </div>
+  </div>
+);
+
+const ReadonlyField: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+  <div>
+    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">{label}</p>
+    <div className="bg-slate-50 rounded-xl px-4 py-3 text-sm text-slate-700 whitespace-pre-wrap border border-slate-200">
+      {children}
+    </div>
+  </div>
+);
+
+const ReadonlyKeyInformation: React.FC<{ contentType: SocialPostContentType; values: KeyInfoValues }> = ({ contentType, values }) => (
+  <div>
+    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Key Information</p>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      {SOCIAL_POST_CONTENT_TYPE_KEY_FIELDS[contentType].map(field => (
+        <div key={field} className="bg-slate-50 rounded-lg border border-slate-200 px-3 py-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{field}</p>
+          <p className="text-sm text-slate-700 mt-0.5">{values[field] || '-'}</p>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+const MockupPreview: React.FC<{
+  title: string;
+  platforms: SocialPostPlatform[];
+  activePlatform: SocialPostPlatform;
+  contentType: SocialPostContentType;
+  caption: string;
+  hashtags?: string[];
+}> = ({ title, platforms, activePlatform, contentType, caption, hashtags = [] }) => (
+  <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+    <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
+      <div className="flex items-center gap-2 min-w-0">
+        <div className="w-8 h-8 rounded-full bg-jci-blue text-white flex items-center justify-center text-xs font-black">
+          JC
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-slate-900 truncate">JCI Kuala Lumpur</p>
+          <p className="text-[11px] text-slate-400 truncate">
+            {SOCIAL_POST_PLATFORM_LABELS[activePlatform]} · {SOCIAL_POST_CONTENT_TYPE_LABELS[contentType]}
+          </p>
+        </div>
+      </div>
+      <div className="flex gap-1">
+        {platforms.map(platform => (
+          <span key={platform} className={`w-6 h-6 rounded-full flex items-center justify-center border ${platform === activePlatform ? 'border-jci-blue text-jci-blue bg-blue-50' : 'border-slate-200 text-slate-400 bg-white'}`}>
+            {PLATFORM_ICONS[platform]}
+          </span>
+        ))}
+      </div>
+    </div>
+    <div className="aspect-[16/9] bg-slate-100 border-b border-slate-100 flex items-center justify-center text-xs font-semibold text-slate-400">
+      Visual / poster area
+    </div>
+    <div className="p-4 space-y-2">
+      <p className="text-sm font-bold text-slate-900">{title || 'Post title'}</p>
+      <p className="text-sm text-slate-700 whitespace-pre-wrap min-h-[120px]">
+        {caption || 'Caption preview will appear here.'}
+      </p>
+      {hashtags.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {hashtags.map(tag => (
+            <span key={tag} className="text-[11px] text-jci-blue bg-jci-blue/8 px-2 py-0.5 rounded-full">#{tag}</span>
+          ))}
+        </div>
+      )}
+    </div>
+  </div>
+);
 
 function formatDate(iso?: string) {
   if (!iso) return '—';
@@ -700,8 +830,10 @@ const CreatePostModal: React.FC<{
   onClose: () => void;
   onSubmit: (input: SocialPostCreateInput) => Promise<void>;
 }> = ({ isOpen, onClose, onSubmit }) => {
+  const [activeFormTab, setActiveFormTab] = useState<'event_details' | 'socmed_setting' | 'mock_up'>('event_details');
   const [title, setTitle] = useState('');
-  const [rawContent, setRawContent] = useState('');
+  const [keyInfoValues, setKeyInfoValues] = useState<KeyInfoValues>({});
+  const [referenceContent, setReferenceContent] = useState('');
   const [contentType, setContentType] = useState<SocialPostContentType>('event_highlight');
   const [platforms, setPlatforms] = useState<SocialPostPlatform[]>(['facebook']);
   const [hashtags, setHashtags] = useState('');
@@ -711,20 +843,23 @@ const CreatePostModal: React.FC<{
   const togglePlatform = (p: SocialPostPlatform) =>
     setPlatforms(prev => prev.includes(p) ? (prev.length > 1 ? prev.filter(x => x !== p) : prev) : [...prev, p]);
 
-  const reset = () => { setTitle(''); setRawContent(''); setContentType('event_highlight'); setPlatforms(['facebook']); setHashtags(''); };
+  const sourceMaterial = buildReferenceMaterial(contentType, keyInfoValues, referenceContent);
+  const hashtagList = hashtags.split(/[,\s#]+/).map(t => t.trim()).filter(Boolean);
+
+  const reset = () => { setActiveFormTab('event_details'); setTitle(''); setKeyInfoValues({}); setReferenceContent(''); setContentType('event_highlight'); setPlatforms(['facebook']); setHashtags(''); };
 
   const handleClose = () => { reset(); onClose(); };
 
   const handleSubmit = async () => {
-    if (!title.trim() || !rawContent.trim()) { showToast('Title and content are required', 'error'); return; }
+    if (!title.trim() || !sourceMaterial.trim()) { showToast('Title and key information are required', 'error'); return; }
     setSaving(true);
     try {
       await onSubmit({
         title: title.trim(),
-        rawContent: rawContent.trim(),
+        rawContent: sourceMaterial,
         contentType,
         platforms,
-        hashtags: hashtags.split(/[,\s#]+/).map(t => t.trim()).filter(Boolean),
+        hashtags: hashtagList,
       });
       reset();
     } finally {
@@ -737,7 +872,7 @@ const CreatePostModal: React.FC<{
       isOpen={isOpen}
       onClose={handleClose}
       title="New Post"
-      size="md"
+      size="lg"
       footer={
         <div className="flex gap-3 w-full">
           <Button variant="outline" className="flex-1" onClick={handleClose} disabled={saving}>Cancel</Button>
@@ -748,49 +883,100 @@ const CreatePostModal: React.FC<{
       }
     >
       <div className="space-y-4">
-        <Input label="Title *" value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. JCI KL Business Mixer Recap" />
-        <Select
-          label="Content Type"
-          value={contentType}
-          onChange={e => setContentType(e.target.value as SocialPostContentType)}
-          options={ALL_CONTENT_TYPES.map(type => ({ value: type, label: SOCIAL_POST_CONTENT_TYPE_LABELS[type] }))}
+        <Tabs
+          tabs={[
+            { id: 'event_details', label: 'Event details' },
+            { id: 'socmed_setting', label: 'Socmed Setting' },
+            { id: 'mock_up', label: 'Mock up' },
+          ]}
+          activeTab={activeFormTab}
+          onTabChange={tab => setActiveFormTab(tab as typeof activeFormTab)}
+          fullWidth
+          mobileFallback="pill"
         />
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Content *</label>
-          <Textarea
-            value={rawContent}
-            onChange={e => setRawContent(e.target.value)}
-            placeholder="Write your post content here. Our team will review and optionally polish it with AI before publishing."
-            rows={5}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">Target Platforms</label>
-          <div className="flex gap-2 flex-wrap">
-            {ALL_PLATFORMS.map(p => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => togglePlatform(p)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border-2 transition-colors ${
-                  platforms.includes(p)
-                    ? 'border-jci-blue bg-jci-blue/5 text-jci-blue'
-                    : 'border-slate-200 text-slate-500 hover:border-slate-300'
-                }`}
-              >
-                {PLATFORM_ICONS[p]} {SOCIAL_POST_PLATFORM_LABELS[p]}
-              </button>
-            ))}
+
+        {activeFormTab === 'event_details' && (
+          <div className="space-y-4">
+            <Input label="Title *" value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. JCI KL Business Mixer Recap" />
+            <Select
+              label="Content Type"
+              value={contentType}
+              onChange={e => { setContentType(e.target.value as SocialPostContentType); setKeyInfoValues({}); }}
+              options={ALL_CONTENT_TYPES.map(type => ({ value: type, label: SOCIAL_POST_CONTENT_TYPE_LABELS[type] }))}
+            />
+            <KeyInformationFields
+              contentType={contentType}
+              values={keyInfoValues}
+              onChange={(field, value) => setKeyInfoValues(prev => ({ ...prev, [field]: value }))}
+            />
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Reference Content</label>
+              <Textarea
+                value={referenceContent}
+                onChange={e => setReferenceContent(e.target.value)}
+                placeholder="Paste poster copy, draft notes, links, photo/video context, or any extra details here."
+                rows={4}
+              />
+              <p className="text-[11px] text-slate-400 mt-1">
+                Optional supporting material. AI will use key information and reference content as source material.
+              </p>
+            </div>
+            <Input
+              label="Hashtags (optional)"
+              value={hashtags}
+              onChange={e => setHashtags(e.target.value)}
+              placeholder="#JCIKL #Leadership (comma or space separated)"
+            />
           </div>
-        </div>
-        <Input
-          label="Hashtags (optional)"
-          value={hashtags}
-          onChange={e => setHashtags(e.target.value)}
-          placeholder="#JCIKL #Leadership (comma or space separated)"
-        />
+        )}
+
+        {activeFormTab === 'socmed_setting' && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Platform</label>
+              <div className="flex gap-2 flex-wrap">
+                {ALL_PLATFORMS.map(p => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => togglePlatform(p)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border-2 transition-colors ${
+                      platforms.includes(p)
+                        ? 'border-jci-blue bg-jci-blue/5 text-jci-blue'
+                        : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                    }`}
+                  >
+                    {PLATFORM_ICONS[p]} {SOCIAL_POST_PLATFORM_LABELS[p]}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Edited Caption</label>
+              <Textarea
+                value=""
+                onChange={() => undefined}
+                placeholder="Edited caption will be generated or edited during review."
+                rows={6}
+                disabled
+              />
+            </div>
+          </div>
+        )}
+
+        {activeFormTab === 'mock_up' && (
+          <MockupPreview
+            title={title}
+            platforms={platforms}
+            activePlatform={platforms[0]}
+            contentType={contentType}
+            caption={sourceMaterial}
+            hashtags={hashtagList}
+          />
+        )}
+
         <p className="text-[11px] text-slate-400 bg-slate-50 rounded-lg px-3 py-2">
-          Your draft will be reviewed by our BOD team. They may edit or AI-rewrite the content before scheduling.
+          Your reference content will be reviewed by our BOD team. They may edit it or generate platform-specific AI captions before scheduling.
         </p>
       </div>
     </Modal>
@@ -817,6 +1003,7 @@ const ReviewDrawer: React.FC<{
 }> = ({ post, isBod, isAdmin, memberId, onClose, onSubmitForReview, onApprove, onReject, onSchedule, onMarkPublished, onUpdateContent, onUpdatePlatformContent, onUpdateDraft, onDelete }) => {
   const isOwner = post.submittedBy === memberId;
   const canEditDraft = post.status === 'draft' && (isBod || isOwner);
+  const [activeReviewTab, setActiveReviewTab] = useState<'event_details' | 'socmed_setting' | 'mock_up'>('event_details');
 
   const isMultiPlatform = post.platforms.length > 1;
   const [activePlatform, setActivePlatform] = useState<SocialPostPlatform>(post.platforms[0]);
@@ -824,19 +1011,23 @@ const ReviewDrawer: React.FC<{
   const [platformContent, setPlatformContent] = useState<Partial<Record<SocialPostPlatform, string>>>(post.platformContent ?? {});
 
   // Draft editing state
+  const initialDraftContentType = post.contentType ?? 'event_highlight';
+  const parsedReference = parseReferenceMaterial(post.rawContent, initialDraftContentType);
   const [draftTitle, setDraftTitle] = useState(post.title);
-  const [draftContent, setDraftContent] = useState(post.rawContent);
-  const [draftContentType, setDraftContentType] = useState<SocialPostContentType>(post.contentType ?? 'event_highlight');
+  const [keyInfoValues, setKeyInfoValues] = useState<KeyInfoValues>(parsedReference.keyInfo);
+  const [referenceContent, setReferenceContent] = useState(parsedReference.referenceContent);
+  const [draftContentType, setDraftContentType] = useState<SocialPostContentType>(initialDraftContentType);
   const [draftPlatforms, setDraftPlatforms] = useState<SocialPostPlatform[]>(post.platforms);
   const [draftHashtags, setDraftHashtags] = useState(post.hashtags?.join(', ') ?? '');
   const [draftSaving, setDraftSaving] = useState(false);
+  const draftSourceMaterial = buildReferenceMaterial(draftContentType, keyInfoValues, referenceContent);
 
   const saveDraft = async () => {
     setDraftSaving(true);
     try {
       await onUpdateDraft({
         title: draftTitle.trim() || post.title,
-        rawContent: draftContent.trim() || post.rawContent,
+        rawContent: draftSourceMaterial.trim() || post.rawContent,
         contentType: draftContentType,
         platforms: draftPlatforms,
         hashtags: draftHashtags.split(/[,\s#]+/).map(t => t.trim()).filter(Boolean),
@@ -850,11 +1041,13 @@ const ReviewDrawer: React.FC<{
     setDraftPlatforms(prev => prev.includes(p) ? (prev.length > 1 ? prev.filter(x => x !== p) : prev) : [...prev, p]);
 
   const handleContentTypeChange = async (value: SocialPostContentType) => {
+    const nextKeyInfoValues = {};
     setDraftContentType(value);
+    setKeyInfoValues(nextKeyInfoValues);
     if (!isBod || canEditDraft) return;
     await onUpdateDraft({
       title: draftTitle.trim() || post.title,
-      rawContent: draftContent.trim() || post.rawContent,
+      rawContent: buildReferenceMaterial(value, nextKeyInfoValues, referenceContent).trim() || post.rawContent,
       contentType: value,
       platforms: draftPlatforms,
       hashtags: draftHashtags.split(/[,\s#]+/).map(t => t.trim()).filter(Boolean),
@@ -888,7 +1081,7 @@ const ReviewDrawer: React.FC<{
     try {
       const persona = getPersona(activePlatform);
       const result = await SocialPostService.aiRewrite(
-        post.rawContent,
+        draftSourceMaterial.trim() || post.rawContent,
         SOCIAL_POST_PLATFORM_LABELS[activePlatform],
         persona?.defaultTone ?? 'professional and engaging',
         persona?.systemPrompt,
@@ -917,7 +1110,7 @@ const ReviewDrawer: React.FC<{
         post.platforms.map(async (platform) => {
           const persona = getPersona(platform);
           const result = await SocialPostService.aiRewrite(
-            post.rawContent,
+            draftSourceMaterial.trim() || post.rawContent,
             SOCIAL_POST_PLATFORM_LABELS[platform],
             persona?.defaultTone ?? 'professional and engaging',
             persona?.systemPrompt,
@@ -992,7 +1185,7 @@ const ReviewDrawer: React.FC<{
               onSubmitForReview({
                 ...post,
                 title: draftTitle.trim() || post.title,
-                rawContent: draftContent.trim() || post.rawContent,
+                rawContent: draftSourceMaterial.trim() || post.rawContent,
                 contentType: draftContentType,
                 platforms: draftPlatforms,
                 hashtags: draftHashtags.split(/[,\s#]+/).map(t => t.trim()).filter(Boolean),
@@ -1042,9 +1235,23 @@ const ReviewDrawer: React.FC<{
           </div>
         )}
 
-        {/* Draft editing form (member owner or BOD) / read-only original content */}
-        {canEditDraft ? (
+        <Tabs
+          tabs={[
+            { id: 'event_details', label: 'Event details' },
+            { id: 'socmed_setting', label: 'Socmed Setting' },
+            { id: 'mock_up', label: 'Mock up' },
+          ]}
+          activeTab={activeReviewTab}
+          onTabChange={tab => setActiveReviewTab(tab as typeof activeReviewTab)}
+          fullWidth
+          mobileFallback="pill"
+        />
+
+        {/* Event details */}
+        {activeReviewTab === 'event_details' && (
           <div className="space-y-3">
+            {canEditDraft ? (
+              <>
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Title</label>
               <input
@@ -1064,35 +1271,23 @@ const ReviewDrawer: React.FC<{
                 options={ALL_CONTENT_TYPES.map(type => ({ value: type, label: SOCIAL_POST_CONTENT_TYPE_LABELS[type] }))}
               />
             </div>
+            <KeyInformationFields
+              contentType={draftContentType}
+              values={keyInfoValues}
+              onChange={(field, value) => setKeyInfoValues(prev => ({ ...prev, [field]: value }))}
+              onBlur={saveDraft}
+            />
             <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Platforms</label>
-              <div className="flex flex-wrap gap-2">
-                {(ALL_PLATFORMS).map(p => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => toggleDraftPlatform(p)}
-                    className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
-                      draftPlatforms.includes(p)
-                        ? 'border-jci-blue bg-blue-50 text-jci-blue'
-                        : 'border-slate-200 text-slate-400 hover:border-slate-300'
-                    }`}
-                  >
-                    {PLATFORM_ICONS[p]} {SOCIAL_POST_PLATFORM_LABELS[p]}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Content</label>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Reference Content</label>
               <textarea
-                value={draftContent}
-                onChange={e => setDraftContent(e.target.value)}
+                value={referenceContent}
+                onChange={e => setReferenceContent(e.target.value)}
                 onBlur={saveDraft}
-                rows={6}
+                rows={4}
                 className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800 focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 outline-none resize-none"
-                placeholder="Write your post content…"
+                placeholder="Paste poster copy, draft notes, links, photo/video context, or any extra details here."
               />
+              <p className="text-[10px] text-slate-400 mt-1">Optional supporting material. AI treats this as source material, not as the final caption.</p>
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Hashtags</label>
@@ -1106,29 +1301,66 @@ const ReviewDrawer: React.FC<{
               />
               <p className="text-[10px] text-slate-400 mt-1">Separate with commas or spaces</p>
             </div>
-          </div>
-        ) : (
-          <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Original Content</p>
-            <div className="bg-slate-50 rounded-xl px-4 py-3 text-sm text-slate-700 whitespace-pre-wrap border border-slate-200">
-              {post.rawContent}
-            </div>
+              </>
+            ) : (
+              <>
+                <ReadonlyField label="Title">{draftTitle || post.title}</ReadonlyField>
+                {isBod ? (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Content Type</label>
+                    <Select
+                      value={draftContentType}
+                      onChange={e => handleContentTypeChange(e.target.value as SocialPostContentType)}
+                      options={ALL_CONTENT_TYPES.map(type => ({ value: type, label: SOCIAL_POST_CONTENT_TYPE_LABELS[type] }))}
+                    />
+                  </div>
+                ) : (
+                  <ReadonlyField label="Content Type">{SOCIAL_POST_CONTENT_TYPE_LABELS[draftContentType]}</ReadonlyField>
+                )}
+                <ReadonlyKeyInformation contentType={draftContentType} values={keyInfoValues} />
+                <ReadonlyField label="Reference Content">{referenceContent || post.rawContent || '-'}</ReadonlyField>
+                <ReadonlyField label="Hashtags">
+                  {draftHashtags
+                    ? draftHashtags.split(/[,\s#]+/).map(tag => `#${tag}`).join(' ')
+                    : '-'}
+                </ReadonlyField>
+              </>
+            )}
           </div>
         )}
 
-        {/* Edited / AI content (BOD editable) */}
-        {isBod && (
-          <div>
-            {!canEditDraft && (
-              <div className="mb-3">
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">AI Content Type</label>
-                <Select
-                  value={draftContentType}
-                  onChange={e => handleContentTypeChange(e.target.value as SocialPostContentType)}
-                  options={ALL_CONTENT_TYPES.map(type => ({ value: type, label: SOCIAL_POST_CONTENT_TYPE_LABELS[type] }))}
-                />
+        {activeReviewTab === 'socmed_setting' && (
+          <div className="space-y-4">
+            {canEditDraft && (
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Platform</label>
+                <div className="flex flex-wrap gap-2">
+                  {(ALL_PLATFORMS).map(p => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => toggleDraftPlatform(p)}
+                      className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
+                        draftPlatforms.includes(p)
+                          ? 'border-jci-blue bg-blue-50 text-jci-blue'
+                          : 'border-slate-200 text-slate-400 hover:border-slate-300'
+                      }`}
+                    >
+                      {PLATFORM_ICONS[p]} {SOCIAL_POST_PLATFORM_LABELS[p]}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
+            {!canEditDraft && (
+              <ReadonlyField label="Platform">
+                {post.platforms.map(platform => SOCIAL_POST_PLATFORM_LABELS[platform]).join(', ')}
+              </ReadonlyField>
+            )}
+
+            {/* Edited / AI content (BOD editable) */}
+            {isBod && (
+              <div>
             <div className="flex items-center justify-between mb-1.5">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Edited Caption</p>
               <div className="flex items-center gap-2">
@@ -1193,17 +1425,39 @@ const ReviewDrawer: React.FC<{
                 ))}
               </div>
             )}
+              </div>
+            )}
+
+            {/* Member: non-editable view of edited content */}
+            {!isBod && post.editedContent && (
+              <div>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Edited Caption</p>
+                <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-slate-800 whitespace-pre-wrap">
+                  {post.editedContent}
+                </div>
+              </div>
+            )}
+
+            {!isBod && !post.editedContent && (
+              <div>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Edited Caption</p>
+                <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-400">
+                  No edited caption yet.
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Member: non-editable view of edited content */}
-        {!isBod && post.editedContent && (
-          <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">BOD Edited Version</p>
-            <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-slate-800 whitespace-pre-wrap">
-              {post.editedContent}
-            </div>
-          </div>
+        {activeReviewTab === 'mock_up' && (
+          <MockupPreview
+            title={draftTitle}
+            platforms={draftPlatforms}
+            activePlatform={activePlatform}
+            contentType={draftContentType}
+            caption={activePlatformContent || draftSourceMaterial}
+            hashtags={draftHashtags.split(/[,\s#]+/).map(t => t.trim()).filter(Boolean)}
+          />
         )}
 
         {/* Schedule info */}
