@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Calendar, FolderKanban, Users, FileText, Briefcase, Gift, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Calendar, FolderKanban, Users, FileText, Gift, Menu, X } from 'lucide-react';
 import { Button } from '../ui/Common';
 
-type GuestPage = 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'directory' | 'partnerships';
+type GuestPage = 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'partnerships';
 
 export const GuestHeader: React.FC<{
   currentPage: GuestPage;
@@ -21,7 +21,6 @@ export const GuestHeader: React.FC<{
     if (path === '/events') return 'events';
     if (path === '/projects') return 'projects';
     if (path === '/enewsletters') return 'enewsletters';
-    if (path === '/directory') return 'directory';
     if (path === '/partnerships') return 'partnerships';
     return 'home';
   };
@@ -40,7 +39,6 @@ export const GuestHeader: React.FC<{
     { page: 'projects', label: 'Flagship Projects', icon: <FolderKanban size={18} /> },
     { page: 'about', label: 'About', icon: <Users size={18} /> },
     { page: 'enewsletters', label: 'E-Newsletters', icon: <FileText size={18} /> },
-    { page: 'directory', label: 'Directory', icon: <Briefcase size={18} /> },
     { page: 'partnerships', label: 'Partnerships', icon: <Gift size={18} /> },
   ];
 

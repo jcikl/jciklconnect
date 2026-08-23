@@ -9,7 +9,7 @@ import { GuestFooter } from '@/components/layout/GuestFooter';
 export const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
   onLogin: () => void;
   onRegister: () => void;
-  onPageChange: (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'directory' | 'partnerships') => void;
+  onPageChange: (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'partnerships') => void;
 }) => {
   const timelineEvents = [
     { year: '1953', title: 'JCI Kuala Lumpur was Initiated', description: 'Initiated by JC Frank Wakerman in 1953 followed up by President JC Wong Peng Tuck.' },

@@ -145,11 +145,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           icon={<Lock size={18} />}
         />
 
-        <div className="flex items-center justify-between text-sm">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" className="rounded border-slate-300" />
-            <span className="text-slate-600">Remember me</span>
-          </label>
+        <div className="flex justify-end text-sm">
           <button
             type="button"
             className="text-jci-blue hover:underline"

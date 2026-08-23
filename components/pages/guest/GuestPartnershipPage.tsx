@@ -13,7 +13,7 @@ import { Partnership } from '@/types';
 export const GuestPartnershipPage = ({ onLogin, onRegister, onPageChange }: {
   onLogin: () => void;
   onRegister: () => void;
-  onPageChange: (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'directory' | 'partnerships') => void;
+  onPageChange: (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'partnerships') => void;
 }) => {
   const [partnerships, setPartnerships] = useState<Partnership[]>([]);
   const [loading, setLoading] = useState(true);

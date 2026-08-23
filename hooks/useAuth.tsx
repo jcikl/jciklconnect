@@ -11,6 +11,8 @@ import {
   signInWithCredential,
   sendPasswordResetEmail,
   updateProfile,
+  setPersistence,
+  browserLocalPersistence,
 } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
@@ -274,6 +276,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return () => { clearTimeout(idleTimer); window.removeEventListener('mousemove', reset); window.removeEventListener('keydown', reset); };
   }, [user]);
 
+  const applyAuthPersistence = useCallback(async () => {
+    if (checkDevMode()) return;
+    await setPersistence(auth, browserLocalPersistence);
+  }, []);
+
   const signIn = useCallback(async (email: string, password: string) => {
     // AUTH-006: Dev mock login is compiled OUT of production builds via the import.meta.env.DEV
     // guard. VITE_DEV_EMAIL / VITE_DEV_PASSWORD are still VITE_-prefixed (bundled), but because
@@ -325,6 +332,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     // Regular Firebase authentication
+    await applyAuthPersistence();
+
     let userCred;
     try {
       userCred = await signInWithEmailAndPassword(auth, email, password);
@@ -374,7 +383,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
       // Note: Linking is handled by onAuthStateChanged listener
     }
-  }, [isDevMode]);
+  }, [applyAuthPersistence, isDevMode]);
 
   const signUp = useCallback(async (email: string, password: string, name: string, additionalData?: Record<string, any>) => {
     // Check if in developer mode
@@ -435,6 +444,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     // 1. Check if an imported profile already exists with this email
+    await applyAuthPersistence();
+
     let existingProfile: Member | null = null;
     try {
       const { MembersService } = await import('../services/membersService');
@@ -531,9 +542,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setUser(userCredential!.user);
     setMember({ id: userCredential!.user.uid, ...newMember } as Member);
     isSigningUpRef.current = false;
-  }, [isDevMode]);
+  }, [applyAuthPersistence, isDevMode]);
 
   const signInWithGoogle = useCallback(async () => {
+    await applyAuthPersistence();
+
     let userCredential;
     if (Capacitor.isNativePlatform()) {
       // WebView 内 Google 禁止 OAuth 弹窗（disallowed_useragent），改走原生登录换取 idToken
@@ -573,7 +586,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
       // Note: Linking to UID is handled automatically by the onAuthStateChanged listener above
     }
-  }, []);
+  }, [applyAuthPersistence]);
 
   const signOut = useCallback(async () => {
     setSimulatedRole(null);

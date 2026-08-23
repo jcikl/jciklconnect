@@ -10,7 +10,7 @@ import { FlagshipProject } from '@/types';
 export const FlagshipProjectsPage = ({ onLogin, onRegister, onPageChange }: {
   onLogin: () => void;
   onRegister: () => void;
-  onPageChange: (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'directory' | 'partnerships') => void;
+  onPageChange: (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'partnerships') => void;
 }) => {
   const [projects, setProjects] = useState<FlagshipProject[]>([]);
   const [loading, setLoading] = useState(true);

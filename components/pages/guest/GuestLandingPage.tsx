@@ -11,7 +11,7 @@ import { GuestFooter } from '@/components/layout/GuestFooter';
 export const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
   onLogin: () => void;
   onRegister: () => void;
-  onPageChange: (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'directory' | 'partnerships') => void;
+  onPageChange: (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'partnerships') => void;
 }) => {
   const currentYear = String(new Date().getFullYear());
   const [president, setPresident] = useState<{ name: string; avatar: string; company: string } | null>(null);

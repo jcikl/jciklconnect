@@ -5,9 +5,9 @@ import { COLLECTIONS } from '../config/constants';
 import { apiCache, CACHE_TTL_5MIN } from './cacheService';
 import { errorLoggingService } from './errorLoggingService';
 
-export type GuestPage = 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'directory' | 'partnerships';
+export type GuestPage = 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'partnerships';
 
-export const GUEST_PAGES: GuestPage[] = ['home', 'events', 'projects', 'about', 'enewsletters', 'directory', 'partnerships'];
+export const GUEST_PAGES: GuestPage[] = ['home', 'events', 'projects', 'about', 'enewsletters', 'partnerships'];
 
 export const GUEST_PAGE_LABELS: Record<GuestPage, string> = {
   home: 'Home',
@@ -15,7 +15,6 @@ export const GUEST_PAGE_LABELS: Record<GuestPage, string> = {
   projects: 'Flagship Projects',
   about: 'About Us',
   enewsletters: 'E-Newsletters',
-  directory: 'Directory',
   partnerships: 'Partnerships',
 };
 
@@ -27,7 +26,6 @@ export const pathToGuestPage = (pathname: string): GuestPage | null => {
     '/projects': 'projects',
     '/about': 'about',
     '/enewsletters': 'enewsletters',
-    '/directory': 'directory',
     '/partnerships': 'partnerships',
   };
   return map[pathname] ?? null;

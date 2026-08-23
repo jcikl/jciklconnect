@@ -13,8 +13,8 @@ import { useSocialPosts } from '../../hooks/useSocialPosts';
 import { useSocialPersonas } from '../../hooks/useSocialPersonas';
 import { SocialPostService } from '../../services/socialPostService';
 import { SocialPersonaConfig } from './SocialPersonaConfig';
-import type { SocialPost, SocialPostStatus, SocialPostPlatform, SocialPostCreateInput } from '../../types/socialPost';
-import { SOCIAL_POST_STATUS_LABELS, SOCIAL_POST_PLATFORM_LABELS } from '../../types/socialPost';
+import type { SocialPost, SocialPostStatus, SocialPostPlatform, SocialPostCreateInput, SocialPostContentType } from '../../types/socialPost';
+import { SOCIAL_POST_STATUS_LABELS, SOCIAL_POST_PLATFORM_LABELS, SOCIAL_POST_CONTENT_TYPE_LABELS } from '../../types/socialPost';
 
 // ── Status helpers ─────────────────────────────────────────────────────────────
 
@@ -36,6 +36,7 @@ const PLATFORM_ICONS: Record<SocialPostPlatform, React.ReactNode> = {
 
 
 const ALL_PLATFORMS: SocialPostPlatform[] = ['facebook', 'instagram', 'linkedin', 'xiaohongshu'];
+const ALL_CONTENT_TYPES = Object.keys(SOCIAL_POST_CONTENT_TYPE_LABELS) as SocialPostContentType[];
 
 function formatDate(iso?: string) {
   if (!iso) return '—';
@@ -701,6 +702,7 @@ const CreatePostModal: React.FC<{
 }> = ({ isOpen, onClose, onSubmit }) => {
   const [title, setTitle] = useState('');
   const [rawContent, setRawContent] = useState('');
+  const [contentType, setContentType] = useState<SocialPostContentType>('event_highlight');
   const [platforms, setPlatforms] = useState<SocialPostPlatform[]>(['facebook']);
   const [hashtags, setHashtags] = useState('');
   const [saving, setSaving] = useState(false);
@@ -709,7 +711,7 @@ const CreatePostModal: React.FC<{
   const togglePlatform = (p: SocialPostPlatform) =>
     setPlatforms(prev => prev.includes(p) ? (prev.length > 1 ? prev.filter(x => x !== p) : prev) : [...prev, p]);
 
-  const reset = () => { setTitle(''); setRawContent(''); setPlatforms(['facebook']); setHashtags(''); };
+  const reset = () => { setTitle(''); setRawContent(''); setContentType('event_highlight'); setPlatforms(['facebook']); setHashtags(''); };
 
   const handleClose = () => { reset(); onClose(); };
 
@@ -720,6 +722,7 @@ const CreatePostModal: React.FC<{
       await onSubmit({
         title: title.trim(),
         rawContent: rawContent.trim(),
+        contentType,
         platforms,
         hashtags: hashtags.split(/[,\s#]+/).map(t => t.trim()).filter(Boolean),
       });
@@ -746,6 +749,12 @@ const CreatePostModal: React.FC<{
     >
       <div className="space-y-4">
         <Input label="Title *" value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. JCI KL Business Mixer Recap" />
+        <Select
+          label="Content Type"
+          value={contentType}
+          onChange={e => setContentType(e.target.value as SocialPostContentType)}
+          options={ALL_CONTENT_TYPES.map(type => ({ value: type, label: SOCIAL_POST_CONTENT_TYPE_LABELS[type] }))}
+        />
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Content *</label>
           <Textarea
@@ -803,7 +812,7 @@ const ReviewDrawer: React.FC<{
   onMarkPublished: () => Promise<void>;
   onUpdateContent: (content: string) => Promise<void>;
   onUpdatePlatformContent: (platformContent: Partial<Record<SocialPostPlatform, string>>) => Promise<void>;
-  onUpdateDraft: (updates: { title: string; rawContent: string; platforms: SocialPostPlatform[]; hashtags: string[] }) => Promise<void>;
+  onUpdateDraft: (updates: { title: string; rawContent: string; contentType: SocialPostContentType; platforms: SocialPostPlatform[]; hashtags: string[] }) => Promise<void>;
   onDelete: () => Promise<void>;
 }> = ({ post, isBod, isAdmin, memberId, onClose, onSubmitForReview, onApprove, onReject, onSchedule, onMarkPublished, onUpdateContent, onUpdatePlatformContent, onUpdateDraft, onDelete }) => {
   const isOwner = post.submittedBy === memberId;
@@ -817,6 +826,7 @@ const ReviewDrawer: React.FC<{
   // Draft editing state
   const [draftTitle, setDraftTitle] = useState(post.title);
   const [draftContent, setDraftContent] = useState(post.rawContent);
+  const [draftContentType, setDraftContentType] = useState<SocialPostContentType>(post.contentType ?? 'event_highlight');
   const [draftPlatforms, setDraftPlatforms] = useState<SocialPostPlatform[]>(post.platforms);
   const [draftHashtags, setDraftHashtags] = useState(post.hashtags?.join(', ') ?? '');
   const [draftSaving, setDraftSaving] = useState(false);
@@ -827,6 +837,7 @@ const ReviewDrawer: React.FC<{
       await onUpdateDraft({
         title: draftTitle.trim() || post.title,
         rawContent: draftContent.trim() || post.rawContent,
+        contentType: draftContentType,
         platforms: draftPlatforms,
         hashtags: draftHashtags.split(/[,\s#]+/).map(t => t.trim()).filter(Boolean),
       });
@@ -837,6 +848,18 @@ const ReviewDrawer: React.FC<{
 
   const toggleDraftPlatform = (p: SocialPostPlatform) =>
     setDraftPlatforms(prev => prev.includes(p) ? (prev.length > 1 ? prev.filter(x => x !== p) : prev) : [...prev, p]);
+
+  const handleContentTypeChange = async (value: SocialPostContentType) => {
+    setDraftContentType(value);
+    if (!isBod || canEditDraft) return;
+    await onUpdateDraft({
+      title: draftTitle.trim() || post.title,
+      rawContent: draftContent.trim() || post.rawContent,
+      contentType: value,
+      platforms: draftPlatforms,
+      hashtags: draftHashtags.split(/[,\s#]+/).map(t => t.trim()).filter(Boolean),
+    });
+  };
 
   const [rewriting, setRewriting] = useState(false);
   const [generatingAll, setGeneratingAll] = useState(false);
@@ -869,6 +892,7 @@ const ReviewDrawer: React.FC<{
         SOCIAL_POST_PLATFORM_LABELS[activePlatform],
         persona?.defaultTone ?? 'professional and engaging',
         persona?.systemPrompt,
+        draftContentType,
       );
       if (isMultiPlatform) {
         const updated = { ...platformContent, [activePlatform]: result };
@@ -897,6 +921,7 @@ const ReviewDrawer: React.FC<{
             SOCIAL_POST_PLATFORM_LABELS[platform],
             persona?.defaultTone ?? 'professional and engaging',
             persona?.systemPrompt,
+            draftContentType,
           );
           return { platform, result };
         })
@@ -968,6 +993,7 @@ const ReviewDrawer: React.FC<{
                 ...post,
                 title: draftTitle.trim() || post.title,
                 rawContent: draftContent.trim() || post.rawContent,
+                contentType: draftContentType,
                 platforms: draftPlatforms,
                 hashtags: draftHashtags.split(/[,\s#]+/).map(t => t.trim()).filter(Boolean),
               });
@@ -998,6 +1024,9 @@ const ReviewDrawer: React.FC<{
               <Sparkles size={9} /> AI Enhanced
             </span>
           )}
+          <span className="text-[10px] text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
+            {SOCIAL_POST_CONTENT_TYPE_LABELS[draftContentType]}
+          </span>
         </div>
 
         <div className="text-xs text-slate-500 flex gap-4">
@@ -1025,6 +1054,14 @@ const ReviewDrawer: React.FC<{
                 onBlur={saveDraft}
                 className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-800 focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 outline-none"
                 placeholder="Post title…"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Content Type</label>
+              <Select
+                value={draftContentType}
+                onChange={e => handleContentTypeChange(e.target.value as SocialPostContentType)}
+                options={ALL_CONTENT_TYPES.map(type => ({ value: type, label: SOCIAL_POST_CONTENT_TYPE_LABELS[type] }))}
               />
             </div>
             <div>
@@ -1082,6 +1119,16 @@ const ReviewDrawer: React.FC<{
         {/* Edited / AI content (BOD editable) */}
         {isBod && (
           <div>
+            {!canEditDraft && (
+              <div className="mb-3">
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">AI Content Type</label>
+                <Select
+                  value={draftContentType}
+                  onChange={e => handleContentTypeChange(e.target.value as SocialPostContentType)}
+                  options={ALL_CONTENT_TYPES.map(type => ({ value: type, label: SOCIAL_POST_CONTENT_TYPE_LABELS[type] }))}
+                />
+              </div>
+            )}
             <div className="flex items-center justify-between mb-1.5">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Edited Caption</p>
               <div className="flex items-center gap-2">

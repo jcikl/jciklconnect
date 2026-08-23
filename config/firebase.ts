@@ -1,9 +1,8 @@
 // Firebase Configuration
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getAuth, Auth, setPersistence, browserSessionPersistence } from 'firebase/auth';
+import { getAuth, Auth, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
-import { isDevMode } from '../utils/devMode';
 
 // No hardcoded fallbacks — if env var is missing, Firebase init will fail loudly (intentional).
 // SEC-009: Hardcoded Firebase config fallbacks removed. All values must come from environment variables.
@@ -55,16 +54,9 @@ let storage: FirebaseStorage;
 if (typeof window !== 'undefined') {
   app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
   auth = getAuth(app);
-
-  // AUTH-002: Use browserSessionPersistence so sessions are cleared on browser close.
-  // This prevents unattended/shared devices from granting instant access to the next user.
-  // If a "Remember me" feature is added in the future, switch to browserLocalPersistence
-  // only when the user explicitly opts in on the login form.
-  if (!isDevMode()) {
-    setPersistence(auth, browserSessionPersistence).catch((error) => {
-      console.error('Error setting auth persistence:', error);
-    });
-  }
+  setPersistence(auth, browserLocalPersistence).catch((error) => {
+    console.error('Error setting auth persistence:', error);
+  });
 
   // persistentLocalCache only in production — HMR in dev causes re-init errors
   if (import.meta.env.PROD) {
@@ -86,4 +78,3 @@ if (typeof window !== 'undefined') {
 
 export { app, auth, db, storage };
 export default app;
-

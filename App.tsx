@@ -86,7 +86,7 @@ const SponsorshipView = lazy(() => import('./components/modules/SponsorshipView'
 import { PublicationService, toGoogleDrivePreviewUrl, extractGoogleDriveFileId } from './services/publicationService';
 import { BatchModeProvider, useBatchMode } from './contexts/BatchModeContext';
 import { PartnershipsService } from './services/partnershipsService';
-import { GuestAnalyticsService, pathToGuestPage, GuestPage } from './services/guestAnalyticsService';
+import { GuestAnalyticsService, pathToGuestPage } from './services/guestAnalyticsService';
 import { Partnership, FlagshipProject } from './types';
 import { AdvertisementService } from './services/advertisementService';
 
@@ -117,7 +117,6 @@ const GuestEventsPage = lazy(() => import('./components/pages/guest/GuestEventsP
 const FlagshipProjectsPage = lazy(() => import('./components/pages/guest/FlagshipProjectsPage').then(m => ({ default: m.FlagshipProjectsPage })));
 const GuestAboutPage = lazy(() => import('./components/pages/guest/GuestAboutPage').then(m => ({ default: m.GuestAboutPage })));
 const GuestEnewslettersPage = lazy(() => import('./components/pages/guest/GuestEnewslettersPage').then(m => ({ default: m.GuestEnewslettersPage })));
-const GuestDirectoryPage = lazy(() => import('./components/pages/guest/GuestDirectoryPage').then(m => ({ default: m.GuestDirectoryPage })));
 const GuestPartnershipPage = lazy(() => import('./components/pages/guest/GuestPartnershipPage').then(m => ({ default: m.GuestPartnershipPage })));
 const NotFoundPage = lazy(() => import('./components/pages/NotFoundPage').then(m => ({ default: m.NotFoundPage })));
 
@@ -126,7 +125,6 @@ const NotFoundPage = lazy(() => import('./components/pages/NotFoundPage').then(m
 // REMOVED: inline FlagshipProjectsPage definition (moved to components/pages/guest/FlagshipProjectsPage.tsx)
 // REMOVED: inline GuestAboutPage definition (moved to components/pages/guest/GuestAboutPage.tsx)
 // REMOVED: inline NewsletterThumbnail + GuestEnewslettersPage definition (moved to components/pages/guest/GuestEnewslettersPage.tsx)
-// REMOVED: inline GuestDirectoryPage definition (moved to components/pages/guest/GuestDirectoryPage.tsx)
 // REMOVED: inline GuestPartnershipPage definition (moved to components/pages/guest/GuestPartnershipPage.tsx)
 
 // --- Main App Shell ---
@@ -352,7 +350,6 @@ export const JCIKLApp: React.FC = () => {
       FLAGSHIP_PROJECTS: 'Flagship Projects',
       GUEST_ABOUT: 'About',
       GUEST_ENEWSLETTERS: 'E-Newsletters',
-      GUEST_DIRECTORY: 'Business Directory',
       DASHBOARD: 'Dashboard',
       MEMBERS: 'Members',
       EVENTS: 'Events',
@@ -438,8 +435,6 @@ export const JCIKLApp: React.FC = () => {
         setView('FLAGSHIP_PROJECTS');
       } else if (path === '/enewsletters') {
         setView('GUEST_ENEWSLETTERS');
-      } else if (path === '/directory') {
-        setView('GUEST_DIRECTORY');
       } else if (path === '/partnerships') {
         setView('GUEST_PARTNERSHIPS');
       } else if (path === '/') {
@@ -448,7 +443,7 @@ export const JCIKLApp: React.FC = () => {
     } else {
       // Authenticated pages - redirect if accessing guest pages
       const path = location.pathname;
-      const guestPaths = ['/', '/about', '/events', '/projects', '/enewsletters', '/directory', '/partnerships'];
+      const guestPaths = ['/', '/about', '/events', '/projects', '/enewsletters', '/partnerships'];
 
       if (guestPaths.includes(path)) {
         // Redirect authenticated users away from guest pages
@@ -573,7 +568,7 @@ export const JCIKLApp: React.FC = () => {
     openRegistration();
   };
 
-  const handleGuestPageChange = (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'directory' | 'partnerships') => {
+  const handleGuestPageChange = (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'partnerships') => {
     window.scrollTo({ top: 0, behavior: 'instant' });
     setSearchQuery('');
     if (page === 'home') {
@@ -591,9 +586,6 @@ export const JCIKLApp: React.FC = () => {
     } else if (page === 'enewsletters') {
       setView('GUEST_ENEWSLETTERS');
       navigate('/enewsletters');
-    } else if (page === 'directory') {
-      setView('GUEST_DIRECTORY');
-      navigate('/directory');
     } else if (page === 'partnerships') {
       setView('GUEST_PARTNERSHIPS');
       navigate('/partnerships');
@@ -601,7 +593,7 @@ export const JCIKLApp: React.FC = () => {
   };
 
   // Conditional Rendering Helper for Guest Pages
-  if (view === 'GUEST' || view === 'GUEST_EVENTS' || view === 'FLAGSHIP_PROJECTS' || view === 'GUEST_ABOUT' || view === 'GUEST_ENEWSLETTERS' || view === 'GUEST_DIRECTORY' || view === 'GUEST_PARTNERSHIPS') {
+  if (view === 'GUEST' || view === 'GUEST_EVENTS' || view === 'FLAGSHIP_PROJECTS' || view === 'GUEST_ABOUT' || view === 'GUEST_ENEWSLETTERS' || view === 'GUEST_PARTNERSHIPS') {
     const guestPageProps = {
       onLogin: handleLogin,
       onRegister: handleGuestRegister,
@@ -618,7 +610,6 @@ export const JCIKLApp: React.FC = () => {
             <Route path="/projects" element={<FlagshipProjectsPage {...guestPageProps} />} />
             <Route path="/about" element={<GuestAboutPage {...guestPageProps} />} />
             <Route path="/enewsletters" element={<GuestEnewslettersPage {...guestPageProps} />} />
-            <Route path="/directory" element={<GuestDirectoryPage {...guestPageProps} />} />
             <Route path="/partnerships" element={<GuestPartnershipPage {...guestPageProps} />} />
             <Route path="/roadmap" element={<div />} />
             <Route path="*" element={<NotFoundPage />} />

@@ -5,7 +5,7 @@ import { db, auth } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { isDevMode } from '../utils/devMode';
 import { AuditLogService } from './auditLogService';
-import type { SocialPost, SocialPostCreateInput, SocialPostStatus } from '../types/socialPost';
+import type { SocialPost, SocialPostCreateInput, SocialPostContentType, SocialPostStatus } from '../types/socialPost';
 
 const COL = COLLECTIONS.SOCIAL_POSTS;
 
@@ -14,6 +14,7 @@ const MOCK_POSTS: SocialPost[] = [
     id: 'mock-1',
     title: 'JCI KL Business Development Mixer',
     rawContent: 'Join us for an exciting business networking event this Friday! Connect with like-minded professionals and grow your network.',
+    contentType: 'promotion_recruitment',
     editedContent: '🤝 Expand your circle at the JCI KL Business Development Mixer this Friday! An evening of meaningful connections, opportunities, and growth awaits. Seats are limited — register now! #JCIKL #BusinessDevelopment #Networking',
     platforms: ['facebook'],
     status: 'pending_review',
@@ -28,6 +29,7 @@ const MOCK_POSTS: SocialPost[] = [
     id: 'mock-2',
     title: 'Community Clean-Up Drive',
     rawContent: 'We are organizing a community clean-up drive at Taman Jaya this Saturday morning from 8am to 12pm.',
+    contentType: 'impact_community',
     platforms: ['facebook'],
     status: 'draft',
     submittedBy: 'mock-member-2',
@@ -39,6 +41,7 @@ const MOCK_POSTS: SocialPost[] = [
     id: 'mock-3',
     title: 'JCI KL Annual Gala Night',
     rawContent: 'Celebrating another year of excellence and impact. Join us for the JCI KL Annual Gala Night.',
+    contentType: 'event_highlight',
     editedContent: '✨ A night to remember! The JCI KL Annual Gala Night celebrates a year of impact, leadership, and community. Dress to impress and celebrate with us! 🎉 #JCIGala #Leadership #Community',
     platforms: ['facebook'],
     status: 'scheduled',
@@ -156,14 +159,14 @@ export class SocialPostService {
     AuditLogService.writeAuditEntry({ action: 'social_post_deleted', performedBy: auth?.currentUser?.uid ?? '', targetCollection: COL, targetId: id });
   }
 
-  static async aiRewrite(content: string, platform: string, tone: string, customSystemPrompt?: string): Promise<string> {
+  static async aiRewrite(content: string, platform: string, tone: string, customSystemPrompt?: string, contentType?: SocialPostContentType): Promise<string> {
     if (isDevMode()) {
-      return `✨ [AI Rewritten for ${platform}]\n\n${content}\n\n#JCIKL #Leadership #Community`;
+      return `✨ [AI Rewritten for ${platform}${contentType ? ` / ${contentType}` : ''}]\n\n${content}\n\n#JCIKL #Leadership #Community`;
     }
     const res = await fetch('/.netlify/functions/social-ai-rewrite', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content, platform, tone, customSystemPrompt }),
+      body: JSON.stringify({ content, platform, tone, customSystemPrompt, contentType }),
     });
     if (!res.ok) throw new Error('AI rewrite failed');
     const data = await res.json();

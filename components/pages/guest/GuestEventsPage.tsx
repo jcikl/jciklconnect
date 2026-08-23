@@ -15,7 +15,7 @@ const EventCalendarView = lazy(() =>
 export const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
   onLogin: () => void;
   onRegister: () => void;
-  onPageChange: (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'directory' | 'partnerships') => void;
+  onPageChange: (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'partnerships') => void;
 }) => {
   const { events, loading } = useEvents({ publicMode: true });
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
