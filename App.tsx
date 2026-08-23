@@ -683,7 +683,7 @@ export const JCIKLApp: React.FC = () => {
 
     switch (view) {
       case 'MEMBERS':
-        if (!canAccessWorkspaceModules) return dashboardFallback;
+        if (!canAccessWorkspaceModules && !member) return dashboardFallback;
         return wrapEB(<MembersView searchQuery={searchQuery} initialSelectedMemberId={initialSelectedMemberId} onClearSelection={() => setInitialSelectedMemberId(null)} />, '会员');
       case 'PROJECTS':
         if (!canViewEventsManagement) return dashboardFallback;
