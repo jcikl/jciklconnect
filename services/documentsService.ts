@@ -47,11 +47,22 @@ export interface DocumentWithVersions extends Document {
 const MOCK_DOCUMENT: DocumentWithVersions = {
   id: 'd1',
   name: 'JCI Constitution 2024',
-  type: 'PDF',
-  category: 'Policy',
+  purpose: 'Board Reference',
   uploadedDate: '2024-01-15',
-  size: '2.5 MB',
+  isPublic: true,
   versions: [],
+  currentVersion: {
+    id: 'v1',
+    documentId: 'd1',
+    version: 1,
+    fileName: 'jci-constitution-2024.pdf',
+    fileUrl: 'https://example.com/mock.pdf',
+    fileSize: 2621440,
+    mimeType: 'application/pdf',
+    uploadedBy: 'mock-user',
+    uploadedAt: new Date(),
+    isCurrent: true,
+  },
   versionCount: 1,
 };
 
@@ -274,6 +285,22 @@ export class DocumentsService {
           return versionRef.id;
         } catch (error) {
           errorLoggingService.logError(error as Error, { component: 'DocumentsService', action: 'createDocumentVersion' });
+          throw error;
+        }
+      }
+    );
+  }
+
+  // Update a specific version's fileUrl (e.g. inline edit from UI)
+  static async updateVersionUrl(versionId: string, documentId: string, fileUrl: string): Promise<void> {
+    return withDevMode<void>(
+      () => Promise.resolve(),
+      async () => {
+        try {
+          await updateDoc(doc(db, COLLECTIONS.DOCUMENT_VERSIONS, versionId), { fileUrl, updatedAt: Timestamp.now() });
+          this.invalidateDocumentsCache(documentId);
+        } catch (error) {
+          errorLoggingService.logError(error as Error, { component: 'DocumentsService', action: 'updateVersionUrl' });
           throw error;
         }
       }

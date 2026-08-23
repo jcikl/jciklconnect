@@ -31,12 +31,14 @@ export const Drawer: React.FC<DrawerProps> = ({
 }) => {
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!isOpen) return;
     const previousFocus = document.activeElement as HTMLElement | null;
 
-    // Move focus into the panel
+    // Move focus into the panel only on open, not on every re-render
     const panel = panelRef.current;
     if (panel) {
       const focusable = getFocusable(panel);
@@ -45,7 +47,7 @@ export const Drawer: React.FC<DrawerProps> = ({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key === 'Tab' && panel) {
@@ -66,7 +68,8 @@ export const Drawer: React.FC<DrawerProps> = ({
       document.removeEventListener('keydown', handleKeyDown);
       previousFocus?.focus();
     };
-  }, [isOpen, onClose]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

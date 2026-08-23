@@ -128,12 +128,16 @@ export interface TrainingModule {
 export interface Document {
   id: string;
   name: string;
-  description?: string;
-  type: 'PDF' | 'DOC' | 'XLS' | 'IMG';
-  category: 'Policy' | 'Meeting Minutes' | 'Project Report' | 'Template';
   purpose?: string;
-  uploadedDate: string;
-  size: string;
+  description?: string;
+  tags?: string[];
+  isPublic?: boolean;
+  loId?: string;
+  uploadedBy?: string;
+  uploadedDate: string | Date;
+  createdAt?: Date;
+  updatedAt?: Date;
+  latestVersionNumber?: number;
 }
 
 export interface NewsPost {

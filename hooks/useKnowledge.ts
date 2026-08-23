@@ -60,6 +60,7 @@ export const useKnowledge = () => {
     loading,
     error,
     loadData,
+    reloadDocs,
     createDocument,
     deleteDocument,
   };

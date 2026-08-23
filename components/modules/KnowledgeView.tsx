@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { BookOpen, FileText, Download, Award, PlayCircle, Plus, Edit, Trash2, GraduationCap, CheckCircle, Clock, GitBranch, Eye, Search, Filter, X } from 'lucide-react';
+import { BookOpen, FileText, Download, Award, PlayCircle, Plus, Edit, Trash2, GraduationCap, CheckCircle, Clock, GitBranch, Eye, Search, Filter, X, Share2 } from 'lucide-react';
 import { Card, Button, ProgressBar, Badge, Tabs, Modal, Drawer, useToast, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
 import type { ConfirmState } from '../ui/Common';
 import { Input, Select, Textarea } from '../ui/Form';
@@ -15,7 +15,7 @@ import { formatFileSize } from '../../utils/formatUtils';
 
 export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
     const [activeTab, setActiveTab] = useState<'learning' | 'documents'>('learning');
-    const [selectedDocument, setSelectedDocument] = useState<DocumentWithVersions | null>(null);
+
     const [isPathModalOpen, setIsPathModalOpen] = useState(false);
     const [editingPathId, setEditingPathId] = useState<string | null>(null);
     const [pathForm, setPathForm] = useState({
@@ -29,27 +29,19 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
     });
     const [isSubmittingPath, setIsSubmittingPath] = useState(false);
     const [isDocUploadOpen, setIsDocUploadOpen] = useState(false);
-    const [docForm, setDocForm] = useState({ name: '', category: 'General', purpose: '', fileUrl: '' });
+    const [editingDoc, setEditingDoc] = useState<DocumentWithVersions | null>(null);
+    const [docForm, setDocForm] = useState({ name: '', purpose: '', fileUrl: '' });
     const [isSubmittingDoc, setIsSubmittingDoc] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [selectedCategory, setSelectedCategory] = useState<string>('all');
-    const [categories, setCategories] = useState<string[]>([]);
-    const { trainingModules, documents, loading, error } = useKnowledge();
+
+    const { trainingModules, documents, loading, error, reloadDocs } = useKnowledge();
     // Note: documents from useKnowledge may not have version info, we'll handle that in the component
     const { paths, loading: pathsLoading, error: pathsError, createPath, updatePath, deletePath } = useLearningPaths();
     const { member } = useAuth();
     const { isBoard, isAdmin } = usePermissions();
     const { showToast } = useToast();
 
-    // Extract categories from documents
-    useEffect(() => {
-        if (documents && documents.length > 0) {
-            const uniqueCategories = [...new Set(documents.map(doc => doc.category).filter(Boolean))];
-            setCategories(uniqueCategories);
-        }
-    }, [documents]);
-
-    // Filter documents based on search term and category
+    // Filter documents based on search term
     const filteredDocuments = useMemo(() => {
         let filtered = documents || [];
         const term = (searchQuery || searchTerm).toLowerCase();
@@ -58,18 +50,12 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
         if (term.trim()) {
             filtered = filtered.filter(doc =>
                 doc.name.toLowerCase().includes(term) ||
-                doc.description?.toLowerCase().includes(term) ||
-                doc.category.toLowerCase().includes(term)
+                doc.description?.toLowerCase().includes(term)
             );
         }
 
-        // Filter by category
-        if (selectedCategory !== 'all') {
-            filtered = filtered.filter(doc => doc.category === selectedCategory);
-        }
-
         return filtered;
-    }, [documents, searchTerm, selectedCategory, searchQuery]);
+    }, [documents, searchTerm, searchQuery]);
 
     const filteredPaths = useMemo(() => {
         let filtered = paths || [];
@@ -87,6 +73,7 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
     }, [paths, searchTerm, searchQuery]);
 
     return (
+        <>
         <div className="space-y-6">
             <div>
                 <h2 className="text-xl md:text-2xl font-bold text-slate-900">Knowledge & Learning</h2>
@@ -122,22 +109,13 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                             documents={filteredDocuments}
                             loading={loading}
                             error={error}
-                            onSelectDocument={setSelectedDocument}
                             canManage={isBoard || isAdmin}
                             onAdd={isBoard || isAdmin ? () => setIsDocUploadOpen(true) : undefined}
+                            onRefresh={reloadDocs}
                         />
                     )}
                 </div>
             </div>
-
-            {/* Document Detail Modal with Versions */}
-            {selectedDocument && (
-                <DocumentDetailModal
-                    document={selectedDocument}
-                    onClose={() => setSelectedDocument(null)}
-                    canManage={isBoard || isAdmin}
-                />
-            )}
 
             {/* New Learning Path Modal */}
             <Modal
@@ -262,11 +240,11 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                 </div>
             </Modal>
 
-            {/* Upload Document Modal */}
+            {/* Upload / Edit Document Modal */}
             <Modal
                 isOpen={isDocUploadOpen}
-                onClose={() => { setIsDocUploadOpen(false); setDocForm({ name: '', category: 'General', purpose: '', fileUrl: '' }); }}
-                title="Upload Document"
+                onClose={() => { setIsDocUploadOpen(false); setEditingDoc(null); setDocForm({ name: '', purpose: '', fileUrl: '' }); }}
+                title={editingDoc ? 'Edit Document' : 'Upload Document'}
                 size="md"
             >
                 <div className="space-y-4">
@@ -275,45 +253,49 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                         <Input value={docForm.name} onChange={e => setDocForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Meeting Minutes – Aug 2026" />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Purpose *</label>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Purpose</label>
                         <Input value={docForm.purpose} onChange={e => setDocForm(f => ({ ...f, purpose: e.target.value }))} placeholder="e.g. New Member Onboarding, Board Reference, Event Planning" />
                         <p className="text-xs text-slate-400 mt-1">Members will use this to find the right document quickly.</p>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
-                        <Select value={docForm.category} onChange={e => setDocForm(f => ({ ...f, category: e.target.value }))}
-                            options={['General', 'Meeting Minutes', 'Guidelines', 'Reports', 'Finance', 'HR', 'Legal'].map(c => ({ label: c, value: c }))} />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">File URL *</label>
                         <Input value={docForm.fileUrl} onChange={e => setDocForm(f => ({ ...f, fileUrl: e.target.value }))} placeholder="https://drive.google.com/..." />
                     </div>
                     <div className="flex justify-end gap-3 pt-2">
-                        <Button variant="outline" onClick={() => { setIsDocUploadOpen(false); setDocForm({ name: '', category: 'General', purpose: '', fileUrl: '' }); }}>Cancel</Button>
+                        <Button variant="outline" onClick={() => { setIsDocUploadOpen(false); setEditingDoc(null); setDocForm({ name: '', purpose: '', fileUrl: '' }); }}>Cancel</Button>
                         <Button variant="primary" disabled={!docForm.name.trim() || !docForm.fileUrl.trim() || isSubmittingDoc}
                             onClick={async () => {
                                 setIsSubmittingDoc(true);
                                 try {
-                                    await DocumentsService.createDocument(
-                                        { name: docForm.name.trim(), category: docForm.category, purpose: docForm.purpose.trim() || undefined, loId: (member as any)?.loId ?? 'default', uploadedBy: member?.id ?? '', uploadedDate: new Date(), description: '', tags: [], isPublic: true } as any,
-                                        docForm.fileUrl.trim()
-                                    );
-                                    showToast('Document uploaded successfully', 'success');
+                                    if (editingDoc) {
+                                        await DocumentsService.updateDocument(editingDoc.id, { name: docForm.name.trim(), purpose: docForm.purpose.trim() || undefined });
+                                        showToast('Document updated successfully', 'success');
+                                    } else {
+                                        const url = docForm.fileUrl.trim();
+                                        const guessedName = url.split('/').pop()?.split('?')[0] || docForm.name.trim();
+                                        await DocumentsService.createDocument(
+                                            { name: docForm.name.trim(), purpose: docForm.purpose.trim() || undefined, loId: (member as any)?.loId ?? 'default', uploadedBy: member?.id ?? '', uploadedDate: new Date(), description: '', tags: [], isPublic: true },
+                                            url, guessedName, 0, 'application/octet-stream', member?.id ?? ''
+                                        );
+                                        showToast('Document uploaded successfully', 'success');
+                                    }
                                     setIsDocUploadOpen(false);
-                                    setDocForm({ name: '', category: 'General', purpose: '', fileUrl: '' });
+                                    setEditingDoc(null);
+                                    setDocForm({ name: '', purpose: '', fileUrl: '' });
                                 } catch {
-                                    showToast('Failed to upload document', 'error');
+                                    showToast(editingDoc ? 'Failed to update document' : 'Failed to upload document', 'error');
                                 } finally {
                                     setIsSubmittingDoc(false);
                                 }
                             }}
                         >
-                            {isSubmittingDoc ? 'Uploading...' : 'Upload'}
+                            {isSubmittingDoc ? (editingDoc ? 'Saving...' : 'Uploading...') : (editingDoc ? 'Save' : 'Upload')}
                         </Button>
                     </div>
                 </div>
             </Modal>
         </div>
+        </>
     );
 };
 
@@ -453,7 +435,7 @@ const LearningPathsTab: React.FC<LearningPathsTabProps> = ({
                                         <Edit size={14} className="mr-1.5" />Edit
                                     </Button>
                                 )}
-                                <Button variant="danger" size="sm" className="flex-1" onClick={() => { setSelectedPath(null); setConfirmState({ open: true, title: 'Delete Learning Path', message: 'Are you sure you want to delete this learning path?', variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await onDelete(p.id!); } }); }}>
+                                <Button variant="danger" size="sm" className="flex-1" onClick={() => { setConfirmState({ open: true, title: 'Delete Learning Path', message: 'Are you sure you want to delete this learning path?', variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); setSelectedPath(null); await onDelete(p.id!); } }); }}>
                                     <Trash2 size={14} className="mr-1.5" />Delete
                                 </Button>
                             </div>
@@ -470,44 +452,44 @@ interface DocumentsTabProps {
     documents: any[];
     loading: boolean;
     error?: string | null;
-    onSelectDocument: (doc: DocumentWithVersions) => void;
     canManage: boolean;
     onAdd?: () => void;
+    onRefresh?: () => Promise<void>;
 }
 
-const DOC_CATEGORY_GRADIENT: Record<string, string> = {
-    'Meeting Minutes': 'from-violet-400 to-violet-600',
-    'Guidelines': 'from-emerald-400 to-emerald-600',
-    'Reports': 'from-amber-400 to-amber-500',
-    'Finance': 'from-rose-400 to-rose-600',
-    'HR': 'from-pink-400 to-pink-600',
-    'Legal': 'from-slate-500 to-slate-700',
+const PURPOSE_GRADIENT: Record<string, string> = {
+    'General': 'from-slate-400 to-slate-600',
 };
+const PURPOSE_GRADIENTS = [
+    'from-blue-400 to-blue-600',
+    'from-violet-400 to-violet-600',
+    'from-emerald-400 to-emerald-600',
+    'from-amber-400 to-amber-500',
+    'from-rose-400 to-rose-600',
+    'from-pink-400 to-pink-600',
+    'from-cyan-400 to-cyan-600',
+    'from-indigo-400 to-indigo-600',
+];
 
-const DocumentsTab: React.FC<DocumentsTabProps> = ({
-    documents,
-    loading,
-    error,
-    onSelectDocument,
-    canManage,
-    onAdd,
-}) => {
-    const addCard = onAdd ? (
-        <div
-            onClick={onAdd}
-            className="border-2 border-dashed border-slate-200 rounded-xl p-3 flex items-center gap-3 text-slate-400 hover:border-jci-blue hover:text-jci-blue hover:bg-sky-50 transition-colors cursor-pointer"
-        >
-            <div className="w-9 h-9 rounded-lg border-2 border-dashed border-current flex items-center justify-center shrink-0">
-                <Plus size={16} />
-            </div>
-            <div>
-                <p className="text-sm font-semibold">Upload Document</p>
-                <p className="text-xs">share a file with the team</p>
-            </div>
-        </div>
-    ) : null;
+const DocumentsTab: React.FC<DocumentsTabProps> = ({ documents, loading, error, canManage, onAdd, onRefresh }) => {
+    const { member } = useAuth();
+    const { showToast } = useToast();
+    const [selectedPurpose, setSelectedPurpose] = useState<string | null>(null);
+    // inline add within drawer
+    const [inlineAdd, setInlineAdd] = useState({ name: '', fileUrl: '' });
+    const [isAddingDoc, setIsAddingDoc] = useState(false);
+    // inline row edit
+    const [editingDocId, setEditingDocId] = useState<string | null>(null);
+    const [editStep, setEditStep] = useState<1 | 2>(1);
+    const [editForm, setEditForm] = useState({ name: '', purpose: '', fileUrl: '' });
+    const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
+    // edit purpose name (rename)
+    const [isEditingPurpose, setIsEditingPurpose] = useState(false);
+    const [newPurposeName, setNewPurposeName] = useState('');
+    const [isSavingPurpose, setIsSavingPurpose] = useState(false);
+    // confirm dialog
+    const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
 
-    // Group documents by purpose; documents without purpose go under 'General'
     const grouped = useMemo(() => {
         const map = new Map<string, typeof documents>();
         documents.forEach(doc => {
@@ -515,7 +497,6 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({
             if (!map.has(key)) map.set(key, []);
             map.get(key)!.push(doc);
         });
-        // Sort: named purposes first (alphabetical), 'General' last
         return Array.from(map.entries()).sort(([a], [b]) => {
             if (a === 'General') return 1;
             if (b === 'General') return -1;
@@ -523,53 +504,273 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({
         });
     }, [documents]);
 
-    const DocCard: React.FC<{ doc: any }> = ({ doc }) => {
-        const gradient = DOC_CATEGORY_GRADIENT[doc.category] ?? 'from-blue-400 to-blue-600';
-        return (
-            <div
-                className="bg-white border rounded-2xl overflow-hidden transition-all border-slate-100 hover:border-slate-200 hover:shadow-sm cursor-pointer"
-                onClick={() => onSelectDocument(doc)}
-            >
-                {/* Row 1: category + date */}
-                <div className="flex items-center gap-1 px-3 pt-3 pb-1.5 flex-wrap">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-600">{doc.category || 'General'}</span>
-                    {doc.versionCount && doc.versionCount > 1 && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-500">
-                            <GitBranch size={9} />{doc.versionCount}v
-                        </span>
-                    )}
-                    {doc.uploadedDate && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-50 text-slate-400">{formatDate(doc.uploadedDate)}</span>
-                    )}
-                </div>
-                {/* Row 2: icon + name */}
-                <div className="flex items-center gap-3 px-3 pb-3 pt-0">
-                    <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center shrink-0`}>
-                        <FileText size={16} className="text-white" strokeWidth={2} />
-                    </div>
-                    <p className="flex-1 min-w-0 font-semibold text-slate-900 text-sm leading-tight line-clamp-1">{doc.name}</p>
-                </div>
-            </div>
-        );
+    const getGradient = (purpose: string, idx: number) =>
+        PURPOSE_GRADIENT[purpose] ?? PURPOSE_GRADIENTS[idx % PURPOSE_GRADIENTS.length];
+
+    const drawerDocs = selectedPurpose ? (grouped.find(([p]) => p === selectedPurpose)?.[1] ?? []) : [];
+
+    const openEdit = (doc: any) => {
+        setEditingDocId(doc.id);
+        setEditStep(1);
+        setEditForm({ name: doc.name ?? '', purpose: doc.purpose ?? '', fileUrl: doc.currentVersion?.fileUrl ?? '' });
+    };
+
+    const handleSaveEdit = async (doc: any) => {
+        setIsSubmittingEdit(true);
+        try {
+            await DocumentsService.updateDocument(doc.id, {
+                name: editForm.name.trim(),
+                purpose: editForm.purpose.trim() || undefined,
+            });
+            const newUrl = editForm.fileUrl.trim();
+            if (doc.currentVersion?.id && newUrl && newUrl !== doc.currentVersion.fileUrl) {
+                await DocumentsService.updateVersionUrl(doc.currentVersion.id, doc.id, newUrl);
+            }
+            showToast('Document updated', 'success');
+            setEditingDocId(null);
+            onRefresh?.();
+        } catch {
+            showToast('Failed to update document', 'error');
+        } finally {
+            setIsSubmittingEdit(false);
+        }
+    };
+
+    const handleDeleteDoc = (doc: any) => {
+        setConfirmState({
+            open: true,
+            title: 'Delete Document',
+            message: `Delete "${doc.name}"? This cannot be undone.`,
+            variant: 'danger',
+            onConfirm: async () => {
+                setConfirmState(CONFIRM_CLOSED);
+                try {
+                    await DocumentsService.deleteDocument(doc.id);
+                    showToast('Document deleted', 'success');
+                    onRefresh?.();
+                } catch {
+                    showToast('Failed to delete document', 'error');
+                }
+            },
+        });
+    };
+
+    const handleAddToDrawer = async () => {
+        if (!inlineAdd.name.trim() || !inlineAdd.fileUrl.trim()) return;
+        setIsAddingDoc(true);
+        try {
+            const url = inlineAdd.fileUrl.trim();
+            const guessedName = url.split('/').pop()?.split('?')[0] || inlineAdd.name.trim();
+            await DocumentsService.createDocument(
+                { name: inlineAdd.name.trim(), purpose: selectedPurpose ?? undefined, loId: (member as any)?.loId ?? 'default', uploadedBy: member?.id ?? '', uploadedDate: new Date(), description: '', tags: [], isPublic: true },
+                url, guessedName, 0, 'application/octet-stream', member?.id ?? ''
+            );
+            showToast('Document added', 'success');
+            setInlineAdd({ name: '', fileUrl: '' });
+            onRefresh?.();
+        } catch {
+            showToast('Failed to add document', 'error');
+        } finally {
+            setIsAddingDoc(false);
+        }
+    };
+
+    const handleDownloadAll = () => {
+        drawerDocs.forEach((doc: any) => {
+            const url = doc.currentVersion?.fileUrl;
+            if (url) window.open(url, '_blank', 'noopener,noreferrer');
+        });
+    };
+
+    const handleSavePurpose = async () => {
+        if (!newPurposeName.trim() || !selectedPurpose) return;
+        setIsSavingPurpose(true);
+        try {
+            await Promise.all(
+                drawerDocs.map((doc: any) =>
+                    DocumentsService.updateDocument(doc.id, { purpose: newPurposeName.trim() } as any)
+                )
+            );
+            showToast('Purpose renamed', 'success');
+            setSelectedPurpose(newPurposeName.trim());
+            setIsEditingPurpose(false);
+            onRefresh?.();
+        } catch {
+            showToast('Failed to rename purpose', 'error');
+        } finally {
+            setIsSavingPurpose(false);
+        }
+    };
+
+    const handleDeletePurpose = () => {
+        setConfirmState({
+            open: true,
+            title: 'Delete Purpose Group',
+            message: `Delete all ${drawerDocs.length} document(s) in "${selectedPurpose}"? This cannot be undone.`,
+            variant: 'danger',
+            onConfirm: async () => {
+                setConfirmState(CONFIRM_CLOSED);
+                try {
+                    await Promise.all(drawerDocs.map((doc: any) => DocumentsService.deleteDocument(doc.id)));
+                    showToast('Purpose group deleted', 'success');
+                    setSelectedPurpose(null);
+                    onRefresh?.();
+                } catch {
+                    showToast('Failed to delete group', 'error');
+                }
+            },
+        });
     };
 
     return (
+        <>
         <LoadingState loading={loading} error={error ?? null} empty={false} emptyMessage="No documents found">
-            <div className="space-y-5">
-                {addCard}
-                {documents.length === 0 && !loading && (
-                    <p className="text-sm text-slate-400 text-center py-8">No documents available</p>
-                )}
-                {grouped.map(([purpose, docs]) => (
-                    <div key={purpose}>
-                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-1">{purpose}</p>
-                        <div className="space-y-2">
-                            {docs.map(doc => <DocCard key={doc.id} doc={doc} />)}
+            {/* Purpose cards grid — 1 col mobile, 2 col sm+, 3 col lg+ */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {onAdd && (
+                    <div onClick={onAdd} className="border-2 border-dashed border-slate-200 rounded-2xl p-4 flex items-center gap-3 text-slate-400 hover:border-jci-blue hover:text-jci-blue hover:bg-sky-50 transition-colors cursor-pointer min-h-[72px]">
+                        <div className="w-10 h-10 rounded-lg border-2 border-dashed border-current flex items-center justify-center shrink-0"><Plus size={16} /></div>
+                        <div>
+                            <p className="text-sm font-semibold">Upload Document</p>
+                            <p className="text-xs opacity-70">share a file with the team</p>
                         </div>
                     </div>
-                ))}
+                )}
+                {documents.length === 0 && !loading && (
+                    <p className="col-span-full text-sm text-slate-400 text-center py-10">No documents available</p>
+                )}
+                {grouped.map(([purpose, docs], idx) => {
+                    const gradient = getGradient(purpose, idx);
+                    return (
+                        <div key={purpose}
+                            className="bg-white border border-slate-100 rounded-2xl overflow-hidden hover:border-slate-200 hover:shadow-sm transition-all cursor-pointer active:scale-[0.98]"
+                            onClick={() => { setSelectedPurpose(purpose); setIsEditingPurpose(false); setInlineAdd({ name: '', fileUrl: '' }); }}>
+                            {/* Single row: icon + purpose name + doc count */}
+                            <div className="flex items-center gap-3 px-3 py-3">
+                                <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center shrink-0`}>
+                                    <FileText size={16} className="text-white" strokeWidth={2} />
+                                </div>
+                                <p className="flex-1 min-w-0 font-semibold text-slate-900 text-sm leading-tight line-clamp-1">{purpose}</p>
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-600 shrink-0">{docs.length} doc{docs.length !== 1 ? 's' : ''}</span>
+                            </div>
+                        </div>
+                    );
+                })}
             </div>
+
+            {/* Document list drawer */}
+            <Drawer isOpen={!!selectedPurpose} onClose={() => { setSelectedPurpose(null); setIsEditingPurpose(false); }} title={selectedPurpose ?? ''} position="bottom">
+                <div className="space-y-3">
+
+                    {/* Doc list */}
+                    <div className="space-y-1.5">
+                        {drawerDocs.length === 0 && (
+                            <p className="text-sm text-slate-400 text-center py-6">No documents in this group</p>
+                        )}
+                        {drawerDocs.map((doc: any) => (
+                            editingDocId === doc.id ? (
+                                <div key={doc.id} className="border border-jci-blue/40 bg-sky-50 rounded-xl px-3 py-2.5">
+                                    {editStep === 1 ? (
+                                        <div className="flex gap-2 items-center">
+                                            <Input value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} placeholder="Document Name *" />
+                                            <Button size="sm" variant="primary" className="shrink-0 px-3" disabled={!editForm.name.trim()} onClick={() => setEditStep(2)}><span className="text-base leading-none">›</span></Button>
+                                        </div>
+                                    ) : (
+                                        <div className="flex gap-2 items-center">
+                                            <Button size="sm" variant="outline" className="shrink-0 px-3" onClick={() => setEditStep(1)}><span className="text-base leading-none">‹</span></Button>
+                                            <Input value={editForm.fileUrl} onChange={e => setEditForm(f => ({ ...f, fileUrl: e.target.value }))} placeholder="File URL *" autoFocus />
+                                            <Button size="sm" variant="primary" className="shrink-0" disabled={!editForm.name.trim() || isSubmittingEdit} onClick={() => handleSaveEdit(doc)}>
+                                                {isSubmittingEdit ? '…' : 'Save'}
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div key={doc.id}
+                                    className="flex items-center gap-3 px-3 py-2.5 bg-white border border-slate-100 rounded-xl hover:border-slate-200 hover:shadow-sm transition-all cursor-pointer"
+                                    onClick={() => { if (doc.currentVersion?.fileUrl) window.open(doc.currentVersion.fileUrl, '_blank', 'noopener,noreferrer'); }}>
+                                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center shrink-0">
+                                        <FileText size={15} className="text-white" strokeWidth={2} />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-semibold text-slate-900 text-sm line-clamp-1">{doc.name}</p>
+                                        {doc.uploadedDate && <p className="text-xs text-slate-400">{formatDate(doc.uploadedDate)}</p>}
+                                    </div>
+                                    {canManage && (
+                                        <div className="flex items-center gap-0.5 shrink-0" onClick={e => e.stopPropagation()}>
+                                            <button className="p-1.5 rounded-lg text-slate-400 hover:text-jci-blue hover:bg-sky-50 transition-colors"
+                                                onClick={() => openEdit(doc)} aria-label="Edit">
+                                                <Edit size={14} />
+                                            </button>
+                                            <button className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                                onClick={() => handleDeleteDoc(doc)} aria-label="Delete">
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        ))}
+                    </div>
+
+                    {/* Rename purpose */}
+                    {canManage && isEditingPurpose && (
+                        <div className="flex gap-2 items-center border border-jci-blue/30 bg-sky-50 rounded-xl px-3 py-2.5">
+                            <Input value={newPurposeName} onChange={e => setNewPurposeName(e.target.value)} placeholder="New purpose name" />
+                            <Button size="sm" variant="outline" className="shrink-0" onClick={() => setIsEditingPurpose(false)}>✕</Button>
+                            <Button size="sm" variant="primary" className="shrink-0" disabled={!newPurposeName.trim() || isSavingPurpose} onClick={handleSavePurpose}>
+                                {isSavingPurpose ? '…' : 'Save'}
+                            </Button>
+                        </div>
+                    )}
+
+                    {/* Add document */}
+                    {canManage && (
+                        <div className="border border-dashed border-slate-200 rounded-xl p-3 space-y-2">
+                            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Add Document</p>
+                            <div className="flex flex-col sm:flex-row gap-2">
+                                <Input value={inlineAdd.name} onChange={e => setInlineAdd(f => ({ ...f, name: e.target.value }))} placeholder="Document Name *" />
+                                <Input value={inlineAdd.fileUrl} onChange={e => setInlineAdd(f => ({ ...f, fileUrl: e.target.value }))} placeholder="File URL *" />
+                                <Button size="sm" variant="primary" disabled={!inlineAdd.name.trim() || !inlineAdd.fileUrl.trim() || isAddingDoc} onClick={handleAddToDrawer} className="sm:shrink-0">
+                                    {isAddingDoc ? 'Adding…' : 'Add'}
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Footer actions */}
+                    <div className="flex gap-2 pt-1 border-t border-slate-100">
+                        <Button size="sm" variant="outline" className="flex-1" onClick={handleDownloadAll} disabled={drawerDocs.length === 0}>
+                            <Download size={14} className="mr-1.5" />All
+                        </Button>
+                        <Button size="sm" variant="outline" className="flex-1" disabled={drawerDocs.length === 0} onClick={() => {
+                            const lines = [selectedPurpose ?? ''];
+                            drawerDocs.forEach((doc: any) => {
+                                lines.push(doc.name ?? '');
+                                const url = doc.currentVersion?.fileUrl;
+                                if (url) lines.push(url);
+                            });
+                            navigator.clipboard.writeText(lines.join('\n')).then(() => showToast('Copied', 'success')).catch(() => showToast('Failed to copy', 'error'));
+                        }}>
+                            <Share2 size={14} className="mr-1.5" />Share
+                        </Button>
+                        {canManage && (
+                            <>
+                                <Button size="sm" variant="outline" onClick={() => { setIsEditingPurpose(v => !v); setNewPurposeName(selectedPurpose ?? ''); }}>
+                                    <Edit size={14} className="mr-1.5" />Rename
+                                </Button>
+                                <Button size="sm" variant="danger" onClick={handleDeletePurpose}>
+                                    <Trash2 size={14} />
+                                </Button>
+                            </>
+                        )}
+                    </div>
+                </div>
+            </Drawer>
         </LoadingState>
+
+        <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
+        </>
     );
 };
 
@@ -766,194 +967,3 @@ const LearningPathDetailModal: React.FC<LearningPathDetailModalProps> = ({
     );
 };
 
-interface DocumentDetailModalProps {
-    document: DocumentWithVersions;
-    onClose: () => void;
-    canManage: boolean;
-}
-
-const DocumentDetailModal: React.FC<DocumentDetailModalProps> = ({ document, onClose, canManage }) => {
-    const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
-    const [loadingVersions, setLoadingVersions] = useState(false);
-    const [documentWithVersions, setDocumentWithVersions] = useState<DocumentWithVersions>(document);
-    const [isRestoring, setIsRestoring] = useState<string | null>(null);
-    const { showToast } = useToast();
-    const { member } = useAuth();
-
-    useEffect(() => {
-        loadDocumentVersions();
-    }, [document.id]);
-
-    const loadDocumentVersions = async () => {
-        if (!document.id) return;
-        try {
-            setLoadingVersions(true);
-            const fullDocument = await DocumentsService.getDocumentById(document.id);
-            if (fullDocument) {
-                setDocumentWithVersions(fullDocument);
-            }
-        } catch (err) {
-            showToast('Failed to load document versions', 'error');
-        } finally {
-            setLoadingVersions(false);
-        }
-    };
-
-    const handleDownloadVersion = (version: DocumentVersion) => {
-        if (version.fileUrl) {
-            window.open(version.fileUrl, '_blank', 'noopener,noreferrer');
-        } else {
-            showToast('File URL not available', 'error');
-        }
-    };
-
-    const handleRestoreVersion = (versionId: string) => {
-        if (!document.id || !member) return;
-        setConfirmState({
-            open: true,
-            title: 'Restore Version',
-            message: 'Are you sure you want to restore this version? A new version will be created.',
-            variant: 'warning',
-            onConfirm: async () => {
-                setConfirmState(CONFIRM_CLOSED);
-        try {
-            setIsRestoring(versionId);
-            await DocumentsService.restoreVersion(
-                document.id,
-                versionId,
-                member.id,
-                `Restored from version ${documentWithVersions.versions?.find(v => v.id === versionId)?.version || 'previous'}`
-            );
-            showToast('Version restored successfully', 'success');
-            await loadDocumentVersions();
-        } catch (err) {
-            showToast('Failed to restore version', 'error');
-        } finally {
-            setIsRestoring(null);
-        }
-            },
-        });
-    };
-
-    return (
-        <>
-        <Modal isOpen={true} onClose={onClose} title={documentWithVersions.name} size="lg" drawerOnMobile>
-            <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <p className="text-sm text-slate-500 mb-1">Category</p>
-                        <p className="font-semibold text-slate-900">{documentWithVersions.category}</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-slate-500 mb-1">Type</p>
-                        <p className="font-semibold text-slate-900">{documentWithVersions.type}</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-slate-500 mb-1">Size</p>
-                        <p className="font-semibold text-slate-900">{documentWithVersions.size || 'N/A'}</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-slate-500 mb-1">Uploaded</p>
-                        <p className="font-semibold text-slate-900">{formatDate(documentWithVersions.uploadedDate)}</p>
-                    </div>
-                </div>
-
-                {documentWithVersions.versions && documentWithVersions.versions.length > 0 && (
-                    <div>
-                        <div className="flex items-center justify-between mb-3">
-                            <h4 className="font-semibold text-slate-900 flex items-center gap-2">
-                                <GitBranch size={18} />
-                                Version History ({documentWithVersions.versions.length})
-                            </h4>
-                            {loadingVersions && (
-                                <Badge variant="neutral">Loading...</Badge>
-                            )}
-                        </div>
-                        <div className="space-y-2 max-h-80 overflow-y-auto">
-                            {documentWithVersions.versions.map((version) => (
-                                <div
-                                    key={version.id}
-                                    className={`p-4 rounded-lg border transition-all ${version.isCurrent
-                                        ? 'border-jci-blue bg-blue-50 shadow-sm'
-                                        : 'border-slate-200 hover:border-slate-300'
-                                        }`}
-                                >
-                                    <div className="flex items-start justify-between mb-2">
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-semibold text-slate-900">Version {version.version}</span>
-                                            {version.isCurrent && (
-                                                <Badge variant="success">Current</Badge>
-                                            )}
-                                        </div>
-                                        <span className="text-xs text-slate-500">
-                                            {formatDate(version.uploadedAt as Date)}
-                                        </span>
-                                    </div>
-                                    <div className="space-y-1 mb-3">
-                                        <p className="text-xs text-slate-600">
-                                            <span className="font-medium">File:</span> {version.fileName} ({formatFileSize(version.fileSize)})
-                                        </p>
-                                        <p className="text-xs text-slate-600">
-                                            <span className="font-medium">Uploaded by:</span> {version.uploadedBy}
-                                        </p>
-                                        {version.changeLog && (
-                                            <p className="text-xs text-slate-500 mt-1 italic">
-                                                "{version.changeLog}"
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => handleDownloadVersion(version)}
-                                        >
-                                            <Download size={12} className="mr-1" />
-                                            Download
-                                        </Button>
-                                        {canManage && !version.isCurrent && (
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => version.id && handleRestoreVersion(version.id)}
-                                                isLoading={isRestoring === version.id}
-                                            >
-                                                <GitBranch size={12} className="mr-1" />
-                                                Restore
-                                            </Button>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {(!documentWithVersions.versions || documentWithVersions.versions.length === 0) && (
-                    <div className="text-center py-8 text-slate-400">
-                        <GitBranch size={32} className="mx-auto mb-2 opacity-50" />
-                        <p className="text-sm">No version history available</p>
-                    </div>
-                )}
-
-                <div className="flex gap-3 pt-4 border-t">
-                    {documentWithVersions.currentVersion && (
-                        <Button
-                            variant="outline"
-                            className="flex-1"
-                            onClick={() => documentWithVersions.currentVersion && handleDownloadVersion(documentWithVersions.currentVersion)}
-                        >
-                            <Download size={16} className="mr-2" />
-                            Download Current Version
-                        </Button>
-                    )}
-                    <Button variant="ghost" onClick={onClose}>
-                        Close
-                    </Button>
-                </div>
-            </div>
-        </Modal>
-        <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
-        </>
-    );
-};
