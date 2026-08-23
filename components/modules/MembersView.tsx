@@ -105,7 +105,7 @@ const HOBBY_OPTIONS = [
 const DUES_STATUS_LABEL: Record<string, string> = { Paid: 'Paid', Pending: 'Pending', Overdue: 'Overdue' };
 
 /** My Profile: Only shows self and allows editing MEMBER_SELF_EDITABLE_FIELDS (Story 1.3); Dues status and participation history (Story 8.1) */
-export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMemberId?: string | null; onClearSelection?: () => void }> = ({ searchQuery, initialSelectedMemberId, onClearSelection }) => {
+export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMemberId?: string | null; onClearSelection?: () => void; onNavigate?: (view: string) => void }> = ({ searchQuery, initialSelectedMemberId, onClearSelection, onNavigate }) => {
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(initialSelectedMemberId ?? null);
   const [isAddModalOpen, setAddModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -424,10 +424,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
   if (!canManageMembers && currentMember) {
     return (
       <div className="space-y-6 pb-40 md:pb-0">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Profile</h2>
-        </div>
-        <MemberDetail member={currentMember} onBack={() => { }} isSelfView />
+        <MemberDetail member={currentMember} onBack={() => onNavigate ? onNavigate('DASHBOARD') : window.history.back()} isSelfView />
       </div>
     );
   }

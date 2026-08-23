@@ -952,9 +952,7 @@ service cloud.firestore {
     
     // Knowledge / Learning: training modules, learning paths, progress, certificates
     match /trainingModules/{docId} {
-      allow read: if isAuthenticated() && 
-                     exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                     getUserRole() in ['MEMBER', 'BOARD', 'ADMIN'];
+      allow read: if isAdmin() || (isAuthenticated() && getUserRole() in ['GUEST', 'MEMBER', 'BOARD', 'ADMIN', 'SUPER_ADMIN']);
       allow create, update, delete: if isBoard();
     }
     match /learningPaths/{docId} {

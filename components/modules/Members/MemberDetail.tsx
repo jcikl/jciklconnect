@@ -839,15 +839,13 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
         {/* â”€â”€ MOBILE hero â”€â”€ */}
         <div className="md:hidden bg-gradient-to-br from-jci-blue via-jci-blue to-jci-navy px-4 pt-4 pb-3 relative overflow-hidden">
           <div className="absolute inset-0 opacity-10 mix-blend-overlay" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cpath d='M0 20 L20 0 L40 20 L20 40 Z' fill='none' stroke='white' stroke-width='0.5' opacity='0.4'/%3E%3Cpath d='M20 0 L20 40 M0 20 L40 20' fill='none' stroke='white' stroke-width='0.3' opacity='0.2'/%3E%3C/svg%3E")` }}></div>
-          {!isSelfView && (
-            <button
+          <button
               onClick={onBack}
               aria-label="Close member detail"
               className="absolute top-3 right-3 z-20 w-8 h-8 rounded-full bg-white/15 backdrop-blur-sm border border-white/25 flex items-center justify-center text-white/80 hover:bg-white/30 hover:text-white active:scale-95 transition-all"
             >
               <X size={16} />
             </button>
-          )}
           <div className="relative flex items-center gap-3">
             {/* Avatar */}
             <div className="relative shrink-0">
@@ -954,15 +952,13 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
           <div className="h-40 bg-gradient-to-br from-jci-blue via-jci-blue to-jci-navy relative overflow-hidden">
             <div className="absolute inset-0 opacity-20 mix-blend-overlay" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cpath d='M0 20 L20 0 L40 20 L20 40 Z' fill='none' stroke='white' stroke-width='0.5' opacity='0.4'/%3E%3Cpath d='M20 0 L20 40 M0 20 L40 20' fill='none' stroke='white' stroke-width='0.3' opacity='0.2'/%3E%3C/svg%3E")` }}></div>
             <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-700"></div>
-            {!isSelfView && (
-              <button
+            <button
                 onClick={onBack}
                 aria-label="Close member detail"
                 className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full bg-white/15 backdrop-blur-sm border border-white/25 flex items-center justify-center text-white/80 hover:bg-white/30 hover:text-white active:scale-95 transition-all"
               >
                 <X size={17} />
               </button>
-            )}
             {/* Name, Tier Badge, position, company — pl-52 clears avatar */}
             <div className="absolute bottom-4 left-0 right-0 px-6 pl-52 flex flex-col justify-end gap-1">
               <div className="flex flex-row items-center gap-2 flex-wrap">

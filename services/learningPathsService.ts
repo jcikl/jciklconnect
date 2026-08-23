@@ -40,6 +40,7 @@ export interface LearningPath {
   pointsReward: number;
   certificateIssued: boolean;
   prerequisites?: string[]; // Path IDs that must be completed first
+  materials?: string[]; // External resource URLs
   status: 'Active' | 'Draft' | 'Archived';
   createdAt: Date | Timestamp;
   updatedAt: Date | Timestamp;

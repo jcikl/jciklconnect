@@ -14,15 +14,20 @@ import { formatDate } from '../../utils/dateUtils';
 import { formatFileSize } from '../../utils/formatUtils';
 
 export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
-    const [activeTab, setActiveTab] = useState<'learning' | 'documents' | 'certificates'>('learning');
-    const [selectedPath, setSelectedPath] = useState<LearningPath | null>(null);
+    const [activeTab, setActiveTab] = useState<'learning' | 'documents'>('learning');
     const [selectedDocument, setSelectedDocument] = useState<DocumentWithVersions | null>(null);
-    const [myProgress, setMyProgress] = useState<LearningProgress[]>([]);
-    const [myCertificates, setMyCertificates] = useState<Certificate[]>([]);
-    const [certsLoading, setCertsLoading] = useState(false);
-    const [certsError, setCertsError] = useState<string | null>(null);
     const [isPathModalOpen, setIsPathModalOpen] = useState(false);
-    const [isDocModalOpen, setIsDocModalOpen] = useState(false);
+    const [editingPathId, setEditingPathId] = useState<string | null>(null);
+    const [pathForm, setPathForm] = useState({
+        name: '',
+        description: '',
+        category: 'Leadership' as LearningPath['category'],
+        estimatedDuration: 1,
+        difficulty: 'Beginner' as LearningPath['difficulty'],
+        status: 'Active' as LearningPath['status'],
+        materials: [''] as string[],
+    });
+    const [isSubmittingPath, setIsSubmittingPath] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState<string>('all');
     const [categories, setCategories] = useState<string[]>([]);
@@ -78,89 +83,35 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
         return filtered;
     }, [paths, searchTerm, searchQuery]);
 
-    useEffect(() => {
-        if (member) {
-            loadMyProgress();
-            loadMyCertificates();
-        }
-    }, [member]);
-
-    const loadMyProgress = async () => {
-        if (!member) return;
-        try {
-            const progress = await LearningPathsService.getMemberProgress(member.id);
-            setMyProgress(progress);
-        } catch (err) {
-            // Error handled silently
-        }
-    };
-
-    const loadMyCertificates = async () => {
-        if (!member) return;
-        setCertsLoading(true);
-        setCertsError(null);
-        try {
-            const certs = await LearningPathsService.getMemberCertificates(member.id);
-            setMyCertificates(certs);
-        } catch (err) {
-            setCertsError('Failed to load certificates');
-            showToast('Failed to load certificates', 'error');
-        } finally {
-            setCertsLoading(false);
-        }
-    };
-
-    const handleStartPath = async (pathId: string) => {
-        if (!member) return;
-        try {
-            await LearningPathsService.startLearningPath(member.id, pathId);
-            showToast('Learning path started!', 'success');
-            await loadMyProgress();
-        } catch (err) {
-            showToast('Failed to start learning path', 'error');
-        }
-    };
-
     return (
         <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div>
-                    <h2 className="text-2xl font-bold text-slate-900">Knowledge & Learning</h2>
-                    <p className="text-slate-500">Training, certifications, and document archives.</p>
-                </div>
-                <div className="flex gap-2">
-                    {(isBoard || isAdmin) && (
-                        <>
-                            <Button variant="outline" onClick={() => setIsPathModalOpen(true)}>
-                                <Plus size={16} className="mr-2" /> New Learning Path
-                            </Button>
-                            <Button variant="outline" onClick={() => setIsDocModalOpen(true)}>
-                                <FileText size={16} className="mr-2" /> Upload Document
-                            </Button>
-                        </>
-                    )}
-                </div>
+            <div>
+                <h2 className="text-xl md:text-2xl font-bold text-slate-900">Knowledge & Learning</h2>
+                <p className="text-sm text-slate-500 mt-0.5">Training resources and document archives.</p>
             </div>
 
-            <Card noPadding>
-                <div className="px-4 md:px-6 pt-4">
+            <div>
+                <div className="mb-4">
                     <Tabs
-                        tabs={[{id: 'learning', label: 'Learning Paths'}, {id: 'documents', label: 'Documents'}, {id: 'certificates', label: 'My Certificates'}]}
+                        tabs={[{id: 'learning', label: 'Learning Paths'}, {id: 'documents', label: 'Documents'}]}
                         activeTab={activeTab}
                         onTabChange={(tab) => setActiveTab(tab as typeof activeTab)}
                     />
                 </div>
-                <div className="p-4">
+                <div>
                     {activeTab === 'learning' && (
                         <LearningPathsTab
                             paths={filteredPaths}
-                            myProgress={myProgress}
                             loading={pathsLoading}
                             error={pathsError}
-                            onStartPath={handleStartPath}
-                            onSelectPath={setSelectedPath}
                             canManage={isBoard || isAdmin}
                             onDelete={deletePath}
+                            onAdd={isBoard || isAdmin ? () => { setEditingPathId(null); setIsPathModalOpen(true); } : undefined}
+                            onEdit={isBoard || isAdmin ? (path) => {
+                                setEditingPathId(path.id!);
+                                setPathForm({ name: path.name, description: path.description, category: path.category, estimatedDuration: path.estimatedDuration, difficulty: path.difficulty, status: path.status, materials: path.materials?.length ? path.materials : [''] });
+                                setIsPathModalOpen(true);
+                            } : undefined}
                         />
                     )}
                     {activeTab === 'documents' && (
@@ -177,22 +128,8 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                             categories={categories}
                         />
                     )}
-                    {activeTab === 'certificates' && (
-                        <CertificatesTab certificates={myCertificates} loading={certsLoading} error={certsError} />
-                    )}
                 </div>
-            </Card>
-
-            {/* Learning Path Detail Modal */}
-            {selectedPath && (
-                <LearningPathDetailModal
-                    path={selectedPath}
-                    progress={myProgress.find(p => p.pathId === selectedPath.id)}
-                    onClose={() => setSelectedPath(null)}
-                    onStart={handleStartPath}
-                    member={member}
-                />
-            )}
+            </div>
 
             {/* Document Detail Modal with Versions */}
             {selectedDocument && (
@@ -202,129 +139,221 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                     canManage={isBoard || isAdmin}
                 />
             )}
+
+            {/* New Learning Path Modal */}
+            <Modal
+                isOpen={isPathModalOpen}
+                onClose={() => { setIsPathModalOpen(false); setEditingPathId(null); setPathForm({ name: '', description: '', category: 'Leadership', estimatedDuration: 1, difficulty: 'Beginner', status: 'Active', materials: [''] }); }}
+                title={editingPathId ? 'Edit Learning Path' : 'New Learning Path'}
+                size="lg"
+            >
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Name <span className="text-red-500">*</span></label>
+                        <Input value={pathForm.name} onChange={e => setPathForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Leadership Fundamentals" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+                        <Textarea value={pathForm.description} onChange={e => setPathForm(f => ({ ...f, description: e.target.value }))} placeholder="Describe what members will learn..." rows={3} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
+                            <Select
+                                value={pathForm.category}
+                                onChange={e => setPathForm(f => ({ ...f, category: e.target.value as LearningPath['category'] }))}
+                                options={[
+                                    { label: 'JCI Official', value: 'JCI Official' },
+                                    { label: 'Leadership', value: 'Leadership' },
+                                    { label: 'Business', value: 'Business' },
+                                    { label: 'Personal Development', value: 'Personal Development' },
+                                    { label: 'Technical', value: 'Technical' },
+                                ]}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Difficulty</label>
+                            <Select
+                                value={pathForm.difficulty}
+                                onChange={e => setPathForm(f => ({ ...f, difficulty: e.target.value as LearningPath['difficulty'] }))}
+                                options={[
+                                    { label: 'Beginner', value: 'Beginner' },
+                                    { label: 'Intermediate', value: 'Intermediate' },
+                                    { label: 'Advanced', value: 'Advanced' },
+                                ]}
+                            />
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Est. Duration (hours)</label>
+                            <Input type="number" min={1} value={pathForm.estimatedDuration} onChange={e => setPathForm(f => ({ ...f, estimatedDuration: Number(e.target.value) }))} />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
+                            <Select
+                                value={pathForm.status}
+                                onChange={e => setPathForm(f => ({ ...f, status: e.target.value as LearningPath['status'] }))}
+                                options={[
+                                    { label: 'Active', value: 'Active' },
+                                    { label: 'Draft', value: 'Draft' },
+                                ]}
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Materials (URLs)</label>
+                        <div className="space-y-2">
+                            {pathForm.materials.map((url, idx) => (
+                                <div key={idx} className="flex gap-2">
+                                    <Input
+                                        type="url"
+                                        placeholder={`Material ${idx + 1} URL (e.g. https://docs.google.com/...)`}
+                                        value={url}
+                                        onChange={e => setPathForm(f => { const m = [...f.materials]; m[idx] = e.target.value; return { ...f, materials: m }; })}
+                                        className="flex-1"
+                                    />
+                                    {pathForm.materials.length > 1 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setPathForm(f => ({ ...f, materials: f.materials.filter((_, i) => i !== idx) }))}
+                                            className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                                        >
+                                            <X size={16} />
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+                            <button
+                                type="button"
+                                onClick={() => setPathForm(f => ({ ...f, materials: [...f.materials, ''] }))}
+                                className="flex items-center gap-1 text-sm text-jci-blue hover:text-sky-600 transition-colors"
+                            >
+                                <Plus size={14} /> Add another URL
+                            </button>
+                        </div>
+                    </div>
+                    <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
+                        <Button variant="outline" onClick={() => setIsPathModalOpen(false)} disabled={isSubmittingPath}>Cancel</Button>
+                        <Button
+                            disabled={!pathForm.name.trim() || isSubmittingPath}
+                            onClick={async () => {
+                                if (!pathForm.name.trim()) return;
+                                setIsSubmittingPath(true);
+                                try {
+                                    const materials = pathForm.materials.filter(u => u.trim());
+                                    if (editingPathId) {
+                                        await updatePath(editingPathId, { ...pathForm, materials });
+                                    } else {
+                                        await createPath({ ...pathForm, modules: [], prerequisites: [], materials, pointsReward: 0, certificateIssued: false });
+                                    }
+                                    setIsPathModalOpen(false);
+                                    setEditingPathId(null);
+                                    setPathForm({ name: '', description: '', category: 'Leadership', estimatedDuration: 1, difficulty: 'Beginner', status: 'Active', materials: [''] });
+                                } catch {
+                                    // error toast handled by hook
+                                } finally {
+                                    setIsSubmittingPath(false);
+                                }
+                            }}
+                        >
+                            {isSubmittingPath ? (editingPathId ? 'Saving...' : 'Creating...') : (editingPathId ? 'Save' : 'Create')}
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 };
 
 interface LearningPathsTabProps {
     paths: LearningPath[];
-    myProgress: LearningProgress[];
     loading: boolean;
     error?: string | null;
-    onStartPath: (pathId: string) => void;
-    onSelectPath: (path: LearningPath) => void;
     canManage: boolean;
     onDelete: (pathId: string) => Promise<void>;
+    onAdd?: () => void;
+    onEdit?: (path: LearningPath) => void;
 }
 
 const LearningPathsTab: React.FC<LearningPathsTabProps> = ({
     paths,
-    myProgress,
     loading,
     error,
-    onStartPath,
-    onSelectPath,
     canManage,
     onDelete,
+    onAdd,
+    onEdit,
 }) => {
     const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
-    const getProgress = (pathId: string) => {
-        return myProgress.find(p => p.pathId === pathId);
-    };
+
+    const addCard = onAdd ? (
+        <button
+            onClick={onAdd}
+            className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 text-slate-400 hover:border-jci-blue hover:text-jci-blue transition-colors min-h-[200px] w-full"
+        >
+            <Plus size={28} strokeWidth={1.5} />
+            <span className="text-sm font-medium">New Learning Path</span>
+        </button>
+    ) : null;
 
     return (
         <>
-        <LoadingState loading={loading} error={error ?? null} empty={paths.length === 0} emptyMessage="No learning paths available">
-            <div className="grid md:grid-cols-2 gap-6">
+        <LoadingState loading={loading} error={error ?? null} empty={false} emptyMessage="No learning paths available">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {paths.map(path => {
-                    const progress = getProgress(path.id!);
-                    const isCompleted = progress?.progress === 100;
-                    const isInProgress = progress && progress.progress > 0 && progress.progress < 100;
-
+                    const hostname = (url: string) => { try { return new URL(url).hostname.replace('www.', ''); } catch { return url; } };
                     return (
-                        <Card key={path.id} className="hover:shadow-md transition-shadow">
-                            <div className="flex items-start justify-between mb-3">
-                                <Badge variant={path.category === 'JCI Official' ? 'jci' : 'neutral'}>
-                                    {path.category}
-                                </Badge>
-                                <Badge variant={path.difficulty === 'Advanced' ? 'error' : path.difficulty === 'Intermediate' ? 'warning' : 'info'}>
-                                    {path.difficulty}
-                                </Badge>
-                            </div>
-                            <h3 className="font-bold text-lg text-slate-900 mb-2">{path.name}</h3>
-                            <p className="text-sm text-slate-600 mb-4">{path.description}</p>
-
-                            <div className="space-y-2 mb-4">
-                                <div className="flex items-center justify-between text-xs text-slate-500">
-                                    <span>Duration</span>
-                                    <span>{path.estimatedDuration} hours</span>
-                                </div>
-                                <div className="flex items-center justify-between text-xs text-slate-500">
-                                    <span>Points Reward</span>
-                                    <span className="font-semibold text-jci-blue">{path.pointsReward} pts</span>
-                                </div>
-                                {path.certificateIssued && (
-                                    <div className="flex items-center gap-1 text-xs text-green-600">
-                                        <Award size={12} />
-                                        <span>Certificate Available</span>
+                        <div key={path.id} className="bg-white rounded-xl border border-slate-200 hover:border-jci-blue/40 hover:shadow-md transition-all flex flex-col">
+                            {/* Card header */}
+                            <div className="p-4 flex-1">
+                                <div className="flex items-center justify-between gap-2 mb-3">
+                                    <span className="text-xs font-medium text-slate-500 bg-slate-100 rounded-full px-2.5 py-0.5">{path.category}</span>
+                                    <div className="flex items-center gap-1.5">
+                                        {path.status === 'Draft' && <span className="text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">Draft</span>}
+                                        <span className={`text-xs font-medium rounded-full px-2.5 py-0.5 ${path.difficulty === 'Advanced' ? 'bg-red-50 text-red-600' : path.difficulty === 'Intermediate' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'}`}>{path.difficulty}</span>
                                     </div>
-                                )}
+                                </div>
+                                <h3 className="font-bold text-base text-slate-900 mb-1 leading-snug">{path.name}</h3>
+                                {path.description && <p className="text-xs text-slate-500 mb-3 line-clamp-2">{path.description}</p>}
+                                <div className="flex items-center gap-1 text-xs text-slate-400 mb-3">
+                                    <Clock size={11} />
+                                    <span>{path.estimatedDuration} hr{path.estimatedDuration !== 1 ? 's' : ''}</span>
+                                </div>
+
+                                {/* Materials */}
+                                <div className="space-y-1.5">
+                                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Materials</p>
+                                    {path.materials && path.materials.length > 0 ? path.materials.map((url, i) => (
+                                        <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                                            className="flex items-center gap-2 text-xs text-jci-blue hover:text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-lg px-2.5 py-1.5 transition-colors"
+                                        >
+                                            <Eye size={11} className="shrink-0" />
+                                            <span className="truncate">{hostname(url)}</span>
+                                        </a>
+                                    )) : (
+                                        <p className="text-xs text-slate-400 italic">No materials available</p>
+                                    )}
+                                </div>
                             </div>
 
-                            {progress && (
-                                <div className="mb-4">
-                                    <div className="flex items-center justify-between text-xs mb-1">
-                                        <span className="text-slate-500">Progress</span>
-                                        <span className="font-semibold text-slate-900">{progress.progress}%</span>
-                                    </div>
-                                    <ProgressBar progress={progress.progress} />
+                            {canManage && (
+                                <div className="flex justify-end gap-1 px-3 py-2 border-t border-slate-100">
+                                    {onEdit && (
+                                        <button onClick={() => onEdit(path)} className="p-2 rounded-lg text-slate-400 hover:text-jci-blue hover:bg-slate-50 transition-colors">
+                                            <Edit size={14} />
+                                        </button>
+                                    )}
+                                    <button onClick={() => setConfirmState({ open: true, title: 'Delete Learning Path', message: 'Are you sure you want to delete this learning path?', variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await onDelete(path.id!); } })}
+                                        className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                                        <Trash2 size={14} />
+                                    </button>
                                 </div>
                             )}
-
-                            <div className="flex gap-2 pt-4 border-t">
-                                {!progress ? (
-                                    <Button
-                                        size="sm"
-                                        className="flex-1"
-                                        onClick={() => onStartPath(path.id!)}
-                                    >
-                                        <PlayCircle size={14} className="mr-2" />
-                                        Start Path
-                                    </Button>
-                                ) : isCompleted ? (
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="flex-1"
-                                        onClick={() => onSelectPath(path)}
-                                    >
-                                        <Award size={14} className="mr-2" />
-                                        View Certificate
-                                    </Button>
-                                ) : (
-                                    <Button
-                                        size="sm"
-                                        className="flex-1"
-                                        onClick={() => onSelectPath(path)}
-                                    >
-                                        <Clock size={14} className="mr-2" />
-                                        Continue
-                                    </Button>
-                                )}
-                                {canManage && (
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => setConfirmState({ open: true, title: 'Delete Learning Path', message: 'Are you sure you want to delete this learning path?', variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await onDelete(path.id!); } })}
-                                        className="text-red-500 hover:text-red-700"
-                                    >
-                                        <Trash2 size={14} />
-                                    </Button>
-                                )}
-                            </div>
-                        </Card>
+                        </div>
                     );
                 })}
+                {addCard}
             </div>
         </LoadingState>
         <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />

@@ -684,7 +684,7 @@ export const JCIKLApp: React.FC = () => {
     switch (view) {
       case 'MEMBERS':
         if (!canAccessWorkspaceModules && !member) return dashboardFallback;
-        return wrapEB(<MembersView searchQuery={searchQuery} initialSelectedMemberId={initialSelectedMemberId} onClearSelection={() => setInitialSelectedMemberId(null)} />, '会员');
+        return wrapEB(<MembersView searchQuery={searchQuery} initialSelectedMemberId={initialSelectedMemberId} onClearSelection={() => setInitialSelectedMemberId(null)} onNavigate={handleViewChange} />, '会员');
       case 'PROJECTS':
         if (!canViewEventsManagement) return dashboardFallback;
         return wrapEB(<ProjectsView onNavigate={handleViewChange} searchQuery={searchQuery} initialSelectedProjectId={initialSelectedProjectId} onClearSelection={() => setInitialSelectedProjectId(null)} />, '活动管理');
@@ -692,7 +692,7 @@ export const JCIKLApp: React.FC = () => {
         if (!canViewEventsManagement || isPlainMember) return dashboardFallback;
         return wrapEB(<FlagshipProjectsManagementView searchQuery={searchQuery} />, '旗舰项目');
       case 'EVENTS':
-        if (!canAccessWorkspaceModules) return dashboardFallback;
+        if (!canViewEventsManagement) return dashboardFallback;
         return wrapEB(<EventsView searchQuery={searchQuery} initialSelectedEventId={initialSelectedEventId} onClearSelection={() => setInitialSelectedEventId(null)} />, '活动列表');
       case 'FINANCE':
         if (member?.role === UserRole.GUEST) return dashboardFallback;
