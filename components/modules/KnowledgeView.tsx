@@ -23,7 +23,7 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
         description: '',
         category: 'Leadership' as LearningPath['category'],
         estimatedDuration: 1,
-        difficulty: 'Beginner' as LearningPath['difficulty'],
+        difficulty: 'Foundation' as LearningPath['difficulty'],
         status: 'Active' as LearningPath['status'],
         materials: [''] as string[],
     });
@@ -143,7 +143,7 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
             {/* New Learning Path Modal */}
             <Modal
                 isOpen={isPathModalOpen}
-                onClose={() => { setIsPathModalOpen(false); setEditingPathId(null); setPathForm({ name: '', description: '', category: 'Leadership', estimatedDuration: 1, difficulty: 'Beginner', status: 'Active', materials: [''] }); }}
+                onClose={() => { setIsPathModalOpen(false); setEditingPathId(null); setPathForm({ name: '', description: '', category: 'Leadership', estimatedDuration: 1, difficulty: 'Foundation', status: 'Active', materials: [''] }); }}
                 title={editingPathId ? 'Edit Learning Path' : 'New Learning Path'}
                 size="lg"
             >
@@ -177,9 +177,9 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                                 value={pathForm.difficulty}
                                 onChange={e => setPathForm(f => ({ ...f, difficulty: e.target.value as LearningPath['difficulty'] }))}
                                 options={[
-                                    { label: 'Beginner', value: 'Beginner' },
+                                    { label: 'Foundation', value: 'Foundation' },
                                     { label: 'Intermediate', value: 'Intermediate' },
-                                    { label: 'Advanced', value: 'Advanced' },
+                                    { label: 'Advance', value: 'Advance' },
                                 ]}
                             />
                         </div>
@@ -249,7 +249,7 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                                     }
                                     setIsPathModalOpen(false);
                                     setEditingPathId(null);
-                                    setPathForm({ name: '', description: '', category: 'Leadership', estimatedDuration: 1, difficulty: 'Beginner', status: 'Active', materials: [''] });
+                                    setPathForm({ name: '', description: '', category: 'Leadership', estimatedDuration: 1, difficulty: 'Foundation', status: 'Active', materials: [''] });
                                 } catch {
                                     // error toast handled by hook
                                 } finally {
@@ -328,7 +328,7 @@ const LearningPathsTab: React.FC<LearningPathsTabProps> = ({
                                 <p className="flex-1 min-w-0 font-semibold text-slate-900 text-sm leading-tight line-clamp-1">{path.name}</p>
                                 <div className="flex items-center gap-1 shrink-0">
                                     <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-600">{path.category}</span>
-                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${path.difficulty === 'Advanced' ? 'bg-red-100 text-red-700' : path.difficulty === 'Intermediate' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>{path.difficulty}</span>
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${path.difficulty === 'Advance' ? 'bg-red-100 text-red-700' : path.difficulty === 'Intermediate' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>{path.difficulty}</span>
                                     {path.status === 'Draft' && <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-amber-100 text-amber-700 ring-1 ring-inset ring-amber-600/20">Draft</span>}
                                 </div>
                             </div>

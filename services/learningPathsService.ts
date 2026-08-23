@@ -36,7 +36,7 @@ export interface LearningPath {
   category: 'JCI Official' | 'Leadership' | 'Business' | 'Personal Development' | 'Technical';
   modules: string[]; // Module IDs in order
   estimatedDuration: number; // in hours
-  difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
+  difficulty: 'Foundation' | 'Intermediate' | 'Advance';
   pointsReward: number;
   certificateIssued: boolean;
   prerequisites?: string[]; // Path IDs that must be completed first
@@ -90,7 +90,7 @@ const MOCK_PATHS: LearningPath[] = [
     category: 'JCI Official',
     modules: ['tm1', 'tm2', 'tm3'],
     estimatedDuration: 40,
-    difficulty: 'Intermediate',
+    difficulty: 'Foundation',
     pointsReward: 500,
     certificateIssued: true,
     status: 'Active',
