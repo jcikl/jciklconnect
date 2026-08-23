@@ -333,19 +333,6 @@ const LearningPathsTab: React.FC<LearningPathsTabProps> = ({
                                 </div>
                             </div>
 
-                            {canManage && (
-                                <div className="px-3 py-1.5 flex justify-end gap-0.5">
-                                    {onEdit && (
-                                        <button onClick={e => { e.stopPropagation(); onEdit(path); }} className="p-1.5 rounded-lg text-slate-400 hover:text-jci-blue hover:bg-slate-50 transition-colors">
-                                            <Edit size={13} />
-                                        </button>
-                                    )}
-                                    <button onClick={e => { e.stopPropagation(); setConfirmState({ open: true, title: 'Delete Learning Path', message: 'Are you sure you want to delete this learning path?', variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await onDelete(path.id!); } }); }}
-                                        className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
-                                        <Trash2 size={13} />
-                                    </button>
-                                </div>
-                            )}
                         </div>
                     );
                 })}
