@@ -321,7 +321,7 @@ const LearningPathsTab: React.FC<LearningPathsTabProps> = ({
                     return (
                         <div key={path.id} className="bg-white border rounded-2xl overflow-hidden transition-all border-slate-100 hover:border-slate-200 hover:shadow-sm cursor-pointer" onClick={() => setSelectedPath(path)}>
                             {/* Top row: icon | name | badges */}
-                            <div className="flex items-center gap-3 p-3 pb-0">
+                            <div className="flex items-center gap-3 p-3">
                                 <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center shrink-0`}>
                                     <BookOpen size={16} className="text-white" strokeWidth={2} />
                                 </div>
