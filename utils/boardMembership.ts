@@ -1,5 +1,16 @@
 import { BoardMember, Member } from '../types';
 
+/**
+ * Positions that are NOT part of the Board of Directors.
+ * Members holding these titles are tracked in boardMembers for record purposes
+ * but must NOT receive board-level system permissions.
+ */
+export const EXTERNAL_OFFICER_POSITIONS = new Set([
+  'Area Officer',
+  'National Officer',
+  'JCI Officer',
+]);
+
 /** Calendar year used for "current board" checks. */
 export function getCurrentBoardCalendarYear(): number {
   return new Date().getFullYear();
@@ -40,7 +51,10 @@ export function isActiveBoardRecordForYear(record: BoardMember, year: number): b
  */
 export function isMemberCurrentBoard(member: Member | null | undefined): boolean {
   if (!member) return false;
-  return member.jciCareer?.isCurrentBoardMember === true;
+  if (!member.jciCareer?.isCurrentBoardMember) return false;
+  const pos = member.jciCareer?.currentBoardPosition;
+  if (pos && EXTERNAL_OFFICER_POSITIONS.has(pos)) return false;
+  return true;
 }
 
 /** Whether any boardMembers record is active for the current calendar year. */

@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { useAuth } from './useAuth';
 import { UserRole } from '../types';
 import { isDevMode } from '../utils/devMode';
-import { isMemberCurrentBoard } from '../utils/boardMembership';
+import { isMemberCurrentBoard, EXTERNAL_OFFICER_POSITIONS } from '../utils/boardMembership';
 import { Permission, ROLE_PERMISSIONS, ALL_PERMISSIONS_GRANTED } from '../utils/rolePermissions';
 
 export type { Permission };
@@ -100,8 +100,11 @@ export const usePermissions = () => {
 
   const isCurrentBoardMember = isMemberCurrentBoard(member);
   const isLegacyBoardRole = effectiveRole === UserRole.BOARD;
+  // External officers (Area / National / JCI Officer) hold honorary board records but are NOT
+  // board of directors — they must not receive board-level system permissions.
+  const isExternalOfficer = EXTERNAL_OFFICER_POSITIONS.has(member?.jciCareer?.currentBoardPosition ?? '');
   // T-1: INACTIVE is a hard block — never grant board status regardless of flags
-  const isBoardUser = (isCurrentBoardMember || isLegacyBoardRole) && effectiveRole !== UserRole.INACTIVE;
+  const isBoardUser = (isCurrentBoardMember || isLegacyBoardRole) && !isExternalOfficer && effectiveRole !== UserRole.INACTIVE;
   const isPlainMember =
     effectiveRole === UserRole.MEMBER && !isBoardUser;
 

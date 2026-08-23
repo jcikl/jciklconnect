@@ -20,6 +20,7 @@ import {
   getCurrentBoardCalendarYear,
   hasActiveBoardRecordForCurrentYear,
   isActiveBoardRecordForYear,
+  EXTERNAL_OFFICER_POSITIONS,
 } from '../utils/boardMembership';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
@@ -627,7 +628,7 @@ export class BoardManagementService {
           boardBatch.update(doc(db, COLLECTIONS.MEMBERS, memberId), {
             currentBoardYear: yearNum,
             currentBoardPosition: position,
-            isCurrentBoardMember: true,
+            isCurrentBoardMember: !EXTERNAL_OFFICER_POSITIONS.has(position),
             isCurrentCommissionDirector: false,
             updatedAt: now,
           });
@@ -884,6 +885,7 @@ export class BoardManagementService {
           member.jciCareer?.isCurrentBoardMember === true || member.jciCareer?.currentBoardYear === currentYear;
 
         if (shouldBeOnBoard) {
+          const isExternalOfficer = EXTERNAL_OFFICER_POSITIONS.has(activeRecord.position);
           const needsUpdate =
             !flaggedOnBoard ||
             member.jciCareer?.currentBoardPosition !== activeRecord.position ||
@@ -894,7 +896,7 @@ export class BoardManagementService {
           const updates = {
             'jciCareer.currentBoardYear': currentYear,
             'jciCareer.currentBoardPosition': activeRecord.position,
-            'jciCareer.isCurrentBoardMember': true,
+            'jciCareer.isCurrentBoardMember': !isExternalOfficer,
           } as unknown as Partial<Member>;
           await MembersService.updateMember(member.id, updates);
           return updates;
