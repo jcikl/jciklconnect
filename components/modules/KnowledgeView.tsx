@@ -320,17 +320,36 @@ const LearningPathsTab: React.FC<LearningPathsTabProps> = ({
                     const gradient = categoryGradient[path.category ?? ''] ?? 'from-slate-400 to-slate-600';
                     return (
                         <div key={path.id} className="bg-white border rounded-2xl overflow-hidden transition-all border-slate-100 hover:border-slate-200 hover:shadow-sm">
-                            {/* Top row */}
+                            {/* Top row: icon | name | badges */}
                             <div className="flex items-center gap-3 p-3 pb-0">
                                 <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center shrink-0`}>
                                     <BookOpen size={16} className="text-white" strokeWidth={2} />
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="font-semibold text-slate-900 text-sm leading-tight line-clamp-1">{path.name}</p>
-                                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-600">{path.category}</span>
-                                        {path.status === 'Draft' && <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-amber-100 text-amber-700 ring-1 ring-inset ring-amber-600/20">Draft</span>}
-                                    </div>
+                                <p className="flex-1 min-w-0 font-semibold text-slate-900 text-sm leading-tight line-clamp-1">{path.name}</p>
+                                <div className="flex items-center gap-1 shrink-0">
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-600">{path.category}</span>
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${path.difficulty === 'Advanced' ? 'bg-red-100 text-red-700' : path.difficulty === 'Intermediate' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>{path.difficulty}</span>
+                                    {path.status === 'Draft' && <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-amber-100 text-amber-700 ring-1 ring-inset ring-amber-600/20">Draft</span>}
+                                </div>
+                            </div>
+
+                            {/* Bottom row: duration | materials | actions */}
+                            <div className="px-3 py-2 flex items-center gap-3 text-xs">
+                                <div className="flex items-center gap-1 text-slate-400 shrink-0">
+                                    <Clock size={10} />
+                                    <span>{path.estimatedDuration} hr{path.estimatedDuration !== 1 ? 's' : ''}</span>
+                                </div>
+                                <div className="flex-1 flex flex-wrap gap-1">
+                                    {path.materials && path.materials.length > 0 ? path.materials.map((url, i) => (
+                                        <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                                            className="flex items-center gap-1 text-jci-blue hover:text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-md px-2 py-0.5 transition-colors"
+                                        >
+                                            <Eye size={9} className="shrink-0" />
+                                            <span className="truncate max-w-[100px]">{hostname(url)}</span>
+                                        </a>
+                                    )) : (
+                                        <span className="text-slate-300 italic">No materials</span>
+                                    )}
                                 </div>
                                 {canManage && (
                                     <div className="flex items-center gap-0.5 shrink-0">
@@ -345,28 +364,6 @@ const LearningPathsTab: React.FC<LearningPathsTabProps> = ({
                                         </button>
                                     </div>
                                 )}
-                            </div>
-
-                            {/* Meta + materials */}
-                            <div className="px-3 py-2 flex items-start gap-3 text-xs">
-                                <div className="flex items-center gap-1 text-slate-400 shrink-0 mt-0.5">
-                                    <Clock size={10} />
-                                    <span>{path.estimatedDuration} hr{path.estimatedDuration !== 1 ? 's' : ''}</span>
-                                    <span className="mx-1 text-slate-200">·</span>
-                                    <span className={`font-medium ${path.difficulty === 'Advanced' ? 'text-red-500' : path.difficulty === 'Intermediate' ? 'text-amber-500' : 'text-blue-500'}`}>{path.difficulty}</span>
-                                </div>
-                                <div className="flex-1 flex flex-wrap gap-1 justify-end">
-                                    {path.materials && path.materials.length > 0 ? path.materials.map((url, i) => (
-                                        <a key={i} href={url} target="_blank" rel="noopener noreferrer"
-                                            className="flex items-center gap-1 text-jci-blue hover:text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-md px-2 py-0.5 transition-colors"
-                                        >
-                                            <Eye size={9} className="shrink-0" />
-                                            <span className="truncate max-w-[100px]">{hostname(url)}</span>
-                                        </a>
-                                    )) : (
-                                        <span className="text-slate-300 italic">No materials</span>
-                                    )}
-                                </div>
                             </div>
                         </div>
                     );
