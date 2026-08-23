@@ -129,15 +129,12 @@ export interface Document {
   id: string;
   name: string;
   purpose?: string;
-  description?: string;
   tags?: string[];
-  isPublic?: boolean;
   loId?: string;
   uploadedBy?: string;
   uploadedDate: string | Date;
   createdAt?: Date;
   updatedAt?: Date;
-  latestVersionNumber?: number;
 }
 
 export interface NewsPost {

@@ -905,13 +905,15 @@ export const JCIKLApp: React.FC = () => {
                 onClick={() => { handleViewChange('DIRECTORY'); setIsSidebarOpen(false); }}
                 isCollapsed={isSidebarCollapsed}
               />
-              <SidebarItem
-                icon={<BookOpen size={18} />}
-                label="Knowledge"
-                isActive={view === 'KNOWLEDGE'}
-                onClick={() => { handleViewChange('KNOWLEDGE'); setIsSidebarOpen(false); }}
-                isCollapsed={isSidebarCollapsed}
-              />
+              {!isGuest && (
+                <SidebarItem
+                  icon={<BookOpen size={18} />}
+                  label="Knowledge"
+                  isActive={view === 'KNOWLEDGE'}
+                  onClick={() => { handleViewChange('KNOWLEDGE'); setIsSidebarOpen(false); }}
+                  isCollapsed={isSidebarCollapsed}
+                />
+              )}
               {member?.role !== UserRole.INACTIVE && (
                 <SidebarItem
                   icon={<Gift size={18} />}
@@ -1483,10 +1485,12 @@ export const JCIKLApp: React.FC = () => {
                         <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Comm</span>
                       </div>
                     )}
-                    <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('KNOWLEDGE'); setShowMobileMenu(false); }}>
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-indigo-950/30 text-indigo-400 border-indigo-900/50'}`}><BookOpen size={22} /></div>
-                      <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Knowledge</span>
-                    </div>
+                    {!isGuest && (
+                      <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('KNOWLEDGE'); setShowMobileMenu(false); }}>
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-indigo-950/30 text-indigo-400 border-indigo-900/50'}`}><BookOpen size={22} /></div>
+                        <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Knowledge</span>
+                      </div>
+                    )}
                     <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('CLUBS'); setShowMobileMenu(false); }}>
                       <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-pink-950/30 text-pink-400 border-pink-900/50'}`}><Heart size={22} /></div>
                       <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Hobbies</span>

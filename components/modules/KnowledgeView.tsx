@@ -46,12 +46,8 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
         let filtered = documents || [];
         const term = (searchQuery || searchTerm).toLowerCase();
 
-        // Filter by search term
         if (term.trim()) {
-            filtered = filtered.filter(doc =>
-                doc.name.toLowerCase().includes(term) ||
-                doc.description?.toLowerCase().includes(term)
-            );
+            filtered = filtered.filter(doc => doc.name.toLowerCase().includes(term));
         }
 
         return filtered;
@@ -274,7 +270,7 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                                         const url = docForm.fileUrl.trim();
                                         const guessedName = url.split('/').pop()?.split('?')[0] || docForm.name.trim();
                                         await DocumentsService.createDocument(
-                                            { name: docForm.name.trim(), purpose: docForm.purpose.trim() || undefined, loId: (member as any)?.loId ?? 'default', uploadedBy: member?.id ?? '', uploadedDate: new Date(), description: '', tags: [], isPublic: true },
+                                            { name: docForm.name.trim(), purpose: docForm.purpose.trim() || undefined, loId: (member as any)?.loId ?? 'default', uploadedBy: member?.id ?? '', uploadedDate: new Date(), tags: [] },
                                             url, guessedName, 0, 'application/octet-stream', member?.id ?? ''
                                         );
                                         showToast('Document uploaded successfully', 'success');
@@ -562,7 +558,7 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ documents, loading, error, 
             const url = inlineAdd.fileUrl.trim();
             const guessedName = url.split('/').pop()?.split('?')[0] || inlineAdd.name.trim();
             await DocumentsService.createDocument(
-                { name: inlineAdd.name.trim(), purpose: selectedPurpose ?? undefined, loId: (member as any)?.loId ?? 'default', uploadedBy: member?.id ?? '', uploadedDate: new Date(), description: '', tags: [], isPublic: true },
+                { name: inlineAdd.name.trim(), purpose: selectedPurpose ?? undefined, loId: (member as any)?.loId ?? 'default', uploadedBy: member?.id ?? '', uploadedDate: new Date(), tags: [] },
                 url, guessedName, 0, 'application/octet-stream', member?.id ?? ''
             );
             showToast('Document added', 'success');
@@ -687,14 +683,12 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ documents, loading, error, 
                                 </div>
                             ) : (
                                 <div key={doc.id}
-                                    className="flex items-center gap-3 px-3 py-2.5 bg-white border border-slate-100 rounded-xl hover:border-slate-200 hover:shadow-sm transition-all cursor-pointer"
-                                    onClick={() => { if (doc.currentVersion?.fileUrl) window.open(doc.currentVersion.fileUrl, '_blank', 'noopener,noreferrer'); }}>
+                                    className="flex items-center gap-3 px-3 py-2.5 bg-white border border-slate-100 rounded-xl hover:border-slate-200 hover:shadow-sm transition-all">
                                     <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center shrink-0">
                                         <FileText size={15} className="text-white" strokeWidth={2} />
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="font-semibold text-slate-900 text-sm line-clamp-1">{doc.name}</p>
-                                        {doc.uploadedDate && <p className="text-xs text-slate-400">{formatDate(doc.uploadedDate)}</p>}
                                     </div>
                                     {canManage && (
                                         <div className="flex items-center gap-0.5 shrink-0" onClick={e => e.stopPropagation()}>

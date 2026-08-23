@@ -49,7 +49,6 @@ const MOCK_DOCUMENT: DocumentWithVersions = {
   name: 'JCI Constitution 2024',
   purpose: 'Board Reference',
   uploadedDate: '2024-01-15',
-  isPublic: true,
   versions: [],
   currentVersion: {
     id: 'v1',
@@ -220,7 +219,6 @@ export class DocumentsService {
             uploadedDate: now,
             createdAt: now,
             updatedAt: now,
-            latestVersionNumber: 1, // initialise atomic version counter
           });
 
           // Initial version ref
