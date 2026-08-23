@@ -903,8 +903,8 @@ const ReviewDrawer: React.FC<{
         await onUpdateContent(result);
       }
       showToast(`AI rewrite complete for ${SOCIAL_POST_PLATFORM_LABELS[activePlatform]}`, 'success');
-    } catch {
-      showToast('AI rewrite failed', 'error');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'AI rewrite failed', 'error');
     } finally {
       setRewriting(false);
     }
@@ -934,8 +934,8 @@ const ReviewDrawer: React.FC<{
       setPlatformContent(updated);
       await onUpdatePlatformContent(updated);
       showToast(`Generated ${successCount}/${post.platforms.length} platform versions`, 'success');
-    } catch {
-      showToast('Failed to generate all', 'error');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to generate all', 'error');
     } finally {
       setGeneratingAll(false);
     }

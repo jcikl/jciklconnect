@@ -26,6 +26,31 @@ const MASTER_INSTRUCTIONS = `Important principles:
 7. Prioritize concrete facts, people, numbers, and results over generic adjectives.
 8. The hook must give a real reason to continue reading, not just clickbait.`;
 
+const DEFAULT_GROQ_MODEL = 'openai/gpt-oss-120b';
+const FALLBACK_GROQ_MODEL = 'qwen/qwen3.6-27b';
+
+async function requestGroqCompletion({ apiKey, model, systemPrompt, userPrompt }) {
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      max_tokens: 900,
+      temperature: 0.75,
+    }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  return { res, data };
+}
+
 export default async (req, context) => {
   if (req.method !== 'POST') {
     return Response.json({ error: 'Method not allowed' }, { status: 405 });
@@ -78,29 +103,29 @@ Source material:
 ${content}`;
 
   try {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        max_tokens: 900,
-        temperature: 0.75,
-      }),
-    });
+    const primaryModel = process.env.GROQ_MODEL || DEFAULT_GROQ_MODEL;
+    let { res, data } = await requestGroqCompletion({ apiKey, model: primaryModel, systemPrompt, userPrompt });
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      return Response.json({ error: err.error?.message ?? 'Groq request failed' }, { status: 502 });
+    if (!res.ok && primaryModel !== FALLBACK_GROQ_MODEL) {
+      const primaryError = data.error?.message ?? 'Groq request failed';
+      console.warn(`Groq request failed for ${primaryModel}; retrying ${FALLBACK_GROQ_MODEL}: ${primaryError}`);
+      ({ res, data } = await requestGroqCompletion({ apiKey, model: FALLBACK_GROQ_MODEL, systemPrompt, userPrompt }));
+      if (!res.ok) {
+        return Response.json({
+          error: data.error?.message ?? 'Groq request failed',
+          provider: 'groq',
+          model: FALLBACK_GROQ_MODEL,
+          fallbackFrom: primaryModel,
+        }, { status: 502 });
+      }
+    } else if (!res.ok) {
+      return Response.json({
+        error: data.error?.message ?? 'Groq request failed',
+        provider: 'groq',
+        model: primaryModel,
+      }, { status: 502 });
     }
 
-    const data = await res.json();
     const rewritten = data.choices?.[0]?.message?.content?.trim() ?? '';
 
     return Response.json({ rewritten });

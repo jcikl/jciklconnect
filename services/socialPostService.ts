@@ -168,7 +168,10 @@ export class SocialPostService {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content, platform, tone, customSystemPrompt, contentType }),
     });
-    if (!res.ok) throw new Error('AI rewrite failed');
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error ?? 'AI rewrite failed');
+    }
     const data = await res.json();
     return data.rewritten;
   }
