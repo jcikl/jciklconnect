@@ -28,6 +28,9 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
         materials: [''] as string[],
     });
     const [isSubmittingPath, setIsSubmittingPath] = useState(false);
+    const [isDocUploadOpen, setIsDocUploadOpen] = useState(false);
+    const [docForm, setDocForm] = useState({ name: '', category: 'General', fileUrl: '' });
+    const [isSubmittingDoc, setIsSubmittingDoc] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState<string>('all');
     const [categories, setCategories] = useState<string[]>([]);
@@ -121,11 +124,7 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                             error={error}
                             onSelectDocument={setSelectedDocument}
                             canManage={isBoard || isAdmin}
-                            searchTerm={searchQuery || searchTerm}
-                            onSearchChange={setSearchTerm}
-                            selectedCategory={selectedCategory}
-                            onCategoryChange={setSelectedCategory}
-                            categories={categories}
+                            onAdd={isBoard || isAdmin ? () => setIsDocUploadOpen(true) : undefined}
                         />
                     )}
                 </div>
@@ -258,6 +257,53 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                             }}
                         >
                             {isSubmittingPath ? (editingPathId ? 'Saving...' : 'Creating...') : (editingPathId ? 'Save' : 'Create')}
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Upload Document Modal */}
+            <Modal
+                isOpen={isDocUploadOpen}
+                onClose={() => { setIsDocUploadOpen(false); setDocForm({ name: '', category: 'General', fileUrl: '' }); }}
+                title="Upload Document"
+                size="md"
+            >
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Document Name *</label>
+                        <Input value={docForm.name} onChange={e => setDocForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Meeting Minutes – Aug 2026" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
+                        <Select value={docForm.category} onChange={e => setDocForm(f => ({ ...f, category: e.target.value }))}
+                            options={['General', 'Meeting Minutes', 'Guidelines', 'Reports', 'Finance', 'HR', 'Legal'].map(c => ({ label: c, value: c }))} />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">File URL *</label>
+                        <Input value={docForm.fileUrl} onChange={e => setDocForm(f => ({ ...f, fileUrl: e.target.value }))} placeholder="https://drive.google.com/..." />
+                    </div>
+                    <div className="flex justify-end gap-3 pt-2">
+                        <Button variant="outline" onClick={() => { setIsDocUploadOpen(false); setDocForm({ name: '', category: 'General', fileUrl: '' }); }}>Cancel</Button>
+                        <Button variant="primary" disabled={!docForm.name.trim() || !docForm.fileUrl.trim() || isSubmittingDoc}
+                            onClick={async () => {
+                                setIsSubmittingDoc(true);
+                                try {
+                                    await DocumentsService.createDocument(
+                                        { name: docForm.name.trim(), category: docForm.category, loId: (member as any)?.loId ?? 'default', uploadedBy: member?.id ?? '', uploadedDate: new Date(), description: '', tags: [], isPublic: true } as any,
+                                        docForm.fileUrl.trim()
+                                    );
+                                    showToast('Document uploaded successfully', 'success');
+                                    setIsDocUploadOpen(false);
+                                    setDocForm({ name: '', category: 'General', fileUrl: '' });
+                                } catch {
+                                    showToast('Failed to upload document', 'error');
+                                } finally {
+                                    setIsSubmittingDoc(false);
+                                }
+                            }}
+                        >
+                            {isSubmittingDoc ? 'Uploading...' : 'Upload'}
                         </Button>
                     </div>
                 </div>
@@ -421,12 +467,17 @@ interface DocumentsTabProps {
     error?: string | null;
     onSelectDocument: (doc: DocumentWithVersions) => void;
     canManage: boolean;
-    searchTerm?: string;
-    onSearchChange?: (term: string) => void;
-    selectedCategory?: string;
-    onCategoryChange?: (category: string) => void;
-    categories?: string[];
+    onAdd?: () => void;
 }
+
+const DOC_CATEGORY_GRADIENT: Record<string, string> = {
+    'Meeting Minutes': 'from-violet-400 to-violet-600',
+    'Guidelines': 'from-emerald-400 to-emerald-600',
+    'Reports': 'from-amber-400 to-amber-500',
+    'Finance': 'from-rose-400 to-rose-600',
+    'HR': 'from-pink-400 to-pink-600',
+    'Legal': 'from-slate-500 to-slate-700',
+};
 
 const DocumentsTab: React.FC<DocumentsTabProps> = ({
     documents,
@@ -434,93 +485,62 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({
     error,
     onSelectDocument,
     canManage,
-    searchTerm = '',
-    onSearchChange,
-    selectedCategory = 'all',
-    onCategoryChange,
-    categories = [],
+    onAdd,
 }) => {
-    return (
-        <div className="space-y-4">
-            {/* Search and Filter Bar */}
-            <div className="flex flex-col sm:flex-row gap-3">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <Input
-                        type="text"
-                        placeholder="Search documents..."
-                        value={searchTerm}
-                        onChange={(e) => onSearchChange?.(e.target.value)}
-                        className="pl-10"
-                    />
-                </div>
-                {categories.length > 0 && (
-                    <div className="flex items-center gap-2">
-                        <Filter className="text-slate-400" size={18} />
-                        <Select
-                            value={selectedCategory}
-                            onChange={(e) => onCategoryChange?.(e.target.value)}
-                            options={[
-                                { label: 'All Categories', value: 'all' },
-                                ...categories.map(cat => ({ label: cat, value: cat })),
-                            ]}
-                            className="min-w-[180px]"
-                        />
-                    </div>
-                )}
-                {(searchTerm || selectedCategory !== 'all') && (
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                            onSearchChange?.('');
-                            onCategoryChange?.('all');
-                        }}
-                    >
-                        <X size={16} className="mr-1" />
-                        Clear
-                    </Button>
-                )}
+    const addCard = onAdd ? (
+        <div
+            onClick={onAdd}
+            className="border-2 border-dashed border-slate-200 rounded-xl p-3 flex items-center gap-3 text-slate-400 hover:border-jci-blue hover:text-jci-blue hover:bg-sky-50 transition-colors cursor-pointer"
+        >
+            <div className="w-9 h-9 rounded-lg border-2 border-dashed border-current flex items-center justify-center shrink-0">
+                <Plus size={16} />
             </div>
+            <div>
+                <p className="text-sm font-semibold">Upload Document</p>
+                <p className="text-xs">share a file with the team</p>
+            </div>
+        </div>
+    ) : null;
 
-            <LoadingState loading={loading} error={error ?? null} empty={documents.length === 0} emptyMessage="No documents found">
-                <div className="space-y-2">
-                    {documents.map(doc => (
+    return (
+        <LoadingState loading={loading} error={error ?? null} empty={false} emptyMessage="No documents found">
+            <div className="space-y-2">
+                {addCard}
+                {documents.map(doc => {
+                    const gradient = DOC_CATEGORY_GRADIENT[doc.category] ?? 'from-blue-400 to-blue-600';
+                    return (
                         <div
                             key={doc.id}
-                            className="p-4 hover:bg-slate-50 rounded-lg flex items-center justify-between group cursor-pointer transition-colors border border-slate-100"
+                            className="bg-white border rounded-2xl overflow-hidden transition-all border-slate-100 hover:border-slate-200 hover:shadow-sm cursor-pointer"
                             onClick={() => onSelectDocument(doc)}
                         >
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                                <div className="p-2 bg-blue-50 text-jci-blue rounded flex-shrink-0">
-                                    <FileText size={18} />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-medium text-slate-900 truncate">{doc.name}</p>
-                                    <p className="text-xs text-slate-500">
-                                        {doc.category} • {doc.size || 'N/A'} • {formatDate(doc.uploadedDate)}
-                                        {doc.versionCount && doc.versionCount > 1 && (
-                                            <span className="ml-2 flex items-center gap-1">
-                                                <GitBranch size={10} />
-                                                {doc.versionCount} versions
-                                            </span>
-                                        )}
-                                    </p>
-                                </div>
+                            {/* Row 1: category + date */}
+                            <div className="flex items-center gap-1 px-3 pt-3 pb-1.5 flex-wrap">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-600">{doc.category || 'General'}</span>
+                                {doc.versionCount && doc.versionCount > 1 && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-500">
+                                        <GitBranch size={9} />{doc.versionCount}v
+                                    </span>
+                                )}
+                                {doc.uploadedDate && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-50 text-slate-400">{formatDate(doc.uploadedDate)}</span>
+                                )}
                             </div>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                                <Button variant="ghost" size="sm">
-                                    <Eye size={14} />
-                                </Button>
-                                <Button variant="ghost" size="sm">
-                                    <Download size={14} />
-                                </Button>
+                            {/* Row 2: icon + name */}
+                            <div className="flex items-center gap-3 px-3 pb-3 pt-0">
+                                <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center shrink-0`}>
+                                    <FileText size={16} className="text-white" strokeWidth={2} />
+                                </div>
+                                <p className="flex-1 min-w-0 font-semibold text-slate-900 text-sm leading-tight line-clamp-1">{doc.name}</p>
                             </div>
                         </div>
-                    ))}
-                </div>
-            </LoadingState>
-        </div>
+                    );
+                })}
+                {!loading && documents.length === 0 && !onAdd && (
+                    <p className="text-sm text-slate-400 text-center py-8">No documents found</p>
+                )}
+            </div>
+        </LoadingState>
     );
 };
 
