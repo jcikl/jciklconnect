@@ -287,73 +287,90 @@ const LearningPathsTab: React.FC<LearningPathsTabProps> = ({
 }) => {
     const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
 
+    const categoryGradient: Record<string, string> = {
+        Leadership: 'from-blue-400 to-blue-600',
+        Development: 'from-violet-400 to-violet-600',
+        Communication: 'from-emerald-400 to-emerald-600',
+        Finance: 'from-amber-400 to-amber-500',
+        Ethics: 'from-rose-400 to-rose-600',
+    };
+
     const addCard = onAdd ? (
-        <button
+        <div
             onClick={onAdd}
-            className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 text-slate-400 hover:border-jci-blue hover:text-jci-blue transition-colors min-h-[200px] w-full"
+            className="border-2 border-dashed border-slate-200 rounded-xl p-3 flex items-center gap-3 text-slate-400 hover:border-jci-blue hover:text-jci-blue hover:bg-sky-50 transition-colors cursor-pointer"
         >
-            <Plus size={28} strokeWidth={1.5} />
-            <span className="text-sm font-medium">New Learning Path</span>
-        </button>
+            <div className="w-9 h-9 rounded-lg border-2 border-dashed border-current flex items-center justify-center shrink-0">
+                <Plus size={16} />
+            </div>
+            <div>
+                <p className="text-sm font-semibold">New Learning Path</p>
+                <p className="text-xs">add a self-study resource</p>
+            </div>
+        </div>
     ) : null;
 
     return (
         <>
         <LoadingState loading={loading} error={error ?? null} empty={false} emptyMessage="No learning paths available">
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="space-y-2">
+                {addCard}
                 {paths.map(path => {
                     const hostname = (url: string) => { try { return new URL(url).hostname.replace('www.', ''); } catch { return url; } };
+                    const gradient = categoryGradient[path.category ?? ''] ?? 'from-slate-400 to-slate-600';
                     return (
-                        <div key={path.id} className="bg-white rounded-xl border border-slate-200 hover:border-jci-blue/40 hover:shadow-md transition-all flex flex-col">
-                            {/* Card header */}
-                            <div className="p-4 flex-1">
-                                <div className="flex items-center justify-between gap-2 mb-3">
-                                    <span className="text-xs font-medium text-slate-500 bg-slate-100 rounded-full px-2.5 py-0.5">{path.category}</span>
-                                    <div className="flex items-center gap-1.5">
-                                        {path.status === 'Draft' && <span className="text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">Draft</span>}
-                                        <span className={`text-xs font-medium rounded-full px-2.5 py-0.5 ${path.difficulty === 'Advanced' ? 'bg-red-50 text-red-600' : path.difficulty === 'Intermediate' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'}`}>{path.difficulty}</span>
+                        <div key={path.id} className="bg-white border rounded-2xl overflow-hidden transition-all border-slate-100 hover:border-slate-200 hover:shadow-sm">
+                            {/* Top row */}
+                            <div className="flex items-center gap-3 p-3 pb-0">
+                                <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center shrink-0`}>
+                                    <BookOpen size={16} className="text-white" strokeWidth={2} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-slate-900 text-sm leading-tight line-clamp-1">{path.name}</p>
+                                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-600">{path.category}</span>
+                                        {path.status === 'Draft' && <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-amber-100 text-amber-700 ring-1 ring-inset ring-amber-600/20">Draft</span>}
                                     </div>
                                 </div>
-                                <h3 className="font-bold text-base text-slate-900 mb-1 leading-snug">{path.name}</h3>
-                                {path.description && <p className="text-xs text-slate-500 mb-3 line-clamp-2">{path.description}</p>}
-                                <div className="flex items-center gap-1 text-xs text-slate-400 mb-3">
-                                    <Clock size={11} />
-                                    <span>{path.estimatedDuration} hr{path.estimatedDuration !== 1 ? 's' : ''}</span>
-                                </div>
+                                {canManage && (
+                                    <div className="flex items-center gap-0.5 shrink-0">
+                                        {onEdit && (
+                                            <button onClick={() => onEdit(path)} className="p-1.5 rounded-lg text-slate-400 hover:text-jci-blue hover:bg-slate-50 transition-colors">
+                                                <Edit size={13} />
+                                            </button>
+                                        )}
+                                        <button onClick={() => setConfirmState({ open: true, title: 'Delete Learning Path', message: 'Are you sure you want to delete this learning path?', variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await onDelete(path.id!); } })}
+                                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                                            <Trash2 size={13} />
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
 
-                                {/* Materials */}
-                                <div className="space-y-1.5">
-                                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Materials</p>
+                            {/* Meta + materials */}
+                            <div className="px-3 py-2 flex items-start gap-3 text-xs">
+                                <div className="flex items-center gap-1 text-slate-400 shrink-0 mt-0.5">
+                                    <Clock size={10} />
+                                    <span>{path.estimatedDuration} hr{path.estimatedDuration !== 1 ? 's' : ''}</span>
+                                    <span className="mx-1 text-slate-200">·</span>
+                                    <span className={`font-medium ${path.difficulty === 'Advanced' ? 'text-red-500' : path.difficulty === 'Intermediate' ? 'text-amber-500' : 'text-blue-500'}`}>{path.difficulty}</span>
+                                </div>
+                                <div className="flex-1 flex flex-wrap gap-1 justify-end">
                                     {path.materials && path.materials.length > 0 ? path.materials.map((url, i) => (
                                         <a key={i} href={url} target="_blank" rel="noopener noreferrer"
-                                            className="flex items-center gap-2 text-xs text-jci-blue hover:text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-lg px-2.5 py-1.5 transition-colors"
+                                            className="flex items-center gap-1 text-jci-blue hover:text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-md px-2 py-0.5 transition-colors"
                                         >
-                                            <Eye size={11} className="shrink-0" />
-                                            <span className="truncate">{hostname(url)}</span>
+                                            <Eye size={9} className="shrink-0" />
+                                            <span className="truncate max-w-[100px]">{hostname(url)}</span>
                                         </a>
                                     )) : (
-                                        <p className="text-xs text-slate-400 italic">No materials available</p>
+                                        <span className="text-slate-300 italic">No materials</span>
                                     )}
                                 </div>
                             </div>
-
-                            {canManage && (
-                                <div className="flex justify-end gap-1 px-3 py-2 border-t border-slate-100">
-                                    {onEdit && (
-                                        <button onClick={() => onEdit(path)} className="p-2 rounded-lg text-slate-400 hover:text-jci-blue hover:bg-slate-50 transition-colors">
-                                            <Edit size={14} />
-                                        </button>
-                                    )}
-                                    <button onClick={() => setConfirmState({ open: true, title: 'Delete Learning Path', message: 'Are you sure you want to delete this learning path?', variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await onDelete(path.id!); } })}
-                                        className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
-                                        <Trash2 size={14} />
-                                    </button>
-                                </div>
-                            )}
                         </div>
                     );
                 })}
-                {addCard}
             </div>
         </LoadingState>
         <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
