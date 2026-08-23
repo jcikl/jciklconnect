@@ -316,7 +316,6 @@ const LearningPathsTab: React.FC<LearningPathsTabProps> = ({
             <div className="space-y-2">
                 {addCard}
                 {paths.map(path => {
-                    const hostname = (url: string) => { try { return new URL(url).hostname.replace('www.', ''); } catch { return url; } };
                     const gradient = categoryGradient[path.category ?? ''] ?? 'from-slate-400 to-slate-600';
                     return (
                         <div key={path.id} className="bg-white border rounded-2xl overflow-hidden transition-all border-slate-100 hover:border-slate-200 hover:shadow-sm">
@@ -333,38 +332,19 @@ const LearningPathsTab: React.FC<LearningPathsTabProps> = ({
                                 </div>
                             </div>
 
-                            {/* Bottom row: duration | materials | actions */}
-                            <div className="px-3 py-2 flex items-center gap-3 text-xs">
-                                <div className="flex items-center gap-1 text-slate-400 shrink-0">
-                                    <Clock size={10} />
-                                    <span>{path.estimatedDuration} hr{path.estimatedDuration !== 1 ? 's' : ''}</span>
-                                </div>
-                                <div className="flex-1 flex flex-wrap gap-1">
-                                    {path.materials && path.materials.length > 0 ? path.materials.map((url, i) => (
-                                        <a key={i} href={url} target="_blank" rel="noopener noreferrer"
-                                            className="flex items-center gap-1 text-jci-blue hover:text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-md px-2 py-0.5 transition-colors"
-                                        >
-                                            <Eye size={9} className="shrink-0" />
-                                            <span className="truncate max-w-[100px]">{hostname(url)}</span>
-                                        </a>
-                                    )) : (
-                                        <span className="text-slate-300 italic">No materials</span>
-                                    )}
-                                </div>
-                                {canManage && (
-                                    <div className="flex items-center gap-0.5 shrink-0">
-                                        {onEdit && (
-                                            <button onClick={() => onEdit(path)} className="p-1.5 rounded-lg text-slate-400 hover:text-jci-blue hover:bg-slate-50 transition-colors">
-                                                <Edit size={13} />
-                                            </button>
-                                        )}
-                                        <button onClick={() => setConfirmState({ open: true, title: 'Delete Learning Path', message: 'Are you sure you want to delete this learning path?', variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await onDelete(path.id!); } })}
-                                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
-                                            <Trash2 size={13} />
+                            {canManage && (
+                                <div className="px-3 py-1.5 flex justify-end gap-0.5">
+                                    {onEdit && (
+                                        <button onClick={() => onEdit(path)} className="p-1.5 rounded-lg text-slate-400 hover:text-jci-blue hover:bg-slate-50 transition-colors">
+                                            <Edit size={13} />
                                         </button>
-                                    </div>
-                                )}
-                            </div>
+                                    )}
+                                    <button onClick={() => setConfirmState({ open: true, title: 'Delete Learning Path', message: 'Are you sure you want to delete this learning path?', variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await onDelete(path.id!); } })}
+                                        className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                                        <Trash2 size={13} />
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     );
                 })}
