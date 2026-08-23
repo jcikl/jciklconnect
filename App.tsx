@@ -757,7 +757,7 @@ export const JCIKLApp: React.FC = () => {
         if (!canAccessWorkspaceModules && !isBoard && !isAdmin) return dashboardFallback;
         return wrapEB(<ActivityPlansView searchQuery={searchQuery} />, '活动计划');
       case 'REPORTS':
-        if (member?.role === UserRole.GUEST || isPlainMember) return dashboardFallback;
+        if (!(isAdmin || isBoard || isDeveloper)) return dashboardFallback;
         return wrapEB(<ReportsView />, '报告');
       case 'DEVELOPER':
         if (!isDeveloper && !isAdmin) return dashboardFallback;
@@ -1551,10 +1551,12 @@ export const JCIKLApp: React.FC = () => {
                           <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-indigo-950/30 text-indigo-400 border-indigo-900/50'}`}><FileText size={22} /></div>
                           <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Templates</span>
                         </div>
-                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('REPORTS'); setShowMobileMenu(false); }}>
-                          <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-indigo-950/30 text-indigo-400 border-indigo-900/50'}`}><BarChart3 size={22} /></div>
-                          <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Reports</span>
-                        </div>
+                        {(isAdmin || isBoard || isDeveloper) && (
+                          <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('REPORTS'); setShowMobileMenu(false); }}>
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-indigo-950/30 text-indigo-400 border-indigo-900/50'}`}><BarChart3 size={22} /></div>
+                            <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Reports</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
