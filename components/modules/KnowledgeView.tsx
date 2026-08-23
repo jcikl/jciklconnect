@@ -320,17 +320,18 @@ const LearningPathsTab: React.FC<LearningPathsTabProps> = ({
                     const gradient = categoryGradient[path.category ?? ''] ?? 'from-slate-400 to-slate-600';
                     return (
                         <div key={path.id} className="bg-white border rounded-2xl overflow-hidden transition-all border-slate-100 hover:border-slate-200 hover:shadow-sm cursor-pointer" onClick={() => setSelectedPath(path)}>
-                            {/* Top row: icon | name | badges */}
-                            <div className="flex items-center gap-3 p-3">
+                            {/* Row 1: icon | name */}
+                            <div className="flex items-center gap-3 px-3 pt-3 pb-1.5">
                                 <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center shrink-0`}>
                                     <BookOpen size={16} className="text-white" strokeWidth={2} />
                                 </div>
                                 <p className="flex-1 min-w-0 font-semibold text-slate-900 text-sm leading-tight line-clamp-1">{path.name}</p>
-                                <div className="flex items-center gap-1 shrink-0">
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-600">{path.category}</span>
-                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${path.difficulty === 'Advance' ? 'bg-red-100 text-red-700' : path.difficulty === 'Intermediate' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>{path.difficulty}</span>
-                                    {path.status === 'Draft' && <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-amber-100 text-amber-700 ring-1 ring-inset ring-amber-600/20">Draft</span>}
-                                </div>
+                            </div>
+                            {/* Row 2: badges */}
+                            <div className="flex items-center gap-1 px-3 pb-3 flex-wrap">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-600">{path.category}</span>
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${path.difficulty === 'Advance' ? 'bg-red-100 text-red-700' : path.difficulty === 'Intermediate' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>{path.difficulty}</span>
+                                {path.status === 'Draft' && <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-amber-100 text-amber-700 ring-1 ring-inset ring-amber-600/20">Draft</span>}
                             </div>
 
                         </div>
