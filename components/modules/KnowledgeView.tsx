@@ -29,7 +29,7 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
     });
     const [isSubmittingPath, setIsSubmittingPath] = useState(false);
     const [isDocUploadOpen, setIsDocUploadOpen] = useState(false);
-    const [docForm, setDocForm] = useState({ name: '', category: 'General', fileUrl: '' });
+    const [docForm, setDocForm] = useState({ name: '', category: 'General', purpose: '', fileUrl: '' });
     const [isSubmittingDoc, setIsSubmittingDoc] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -265,7 +265,7 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
             {/* Upload Document Modal */}
             <Modal
                 isOpen={isDocUploadOpen}
-                onClose={() => { setIsDocUploadOpen(false); setDocForm({ name: '', category: 'General', fileUrl: '' }); }}
+                onClose={() => { setIsDocUploadOpen(false); setDocForm({ name: '', category: 'General', purpose: '', fileUrl: '' }); }}
                 title="Upload Document"
                 size="md"
             >
@@ -273,6 +273,11 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Document Name *</label>
                         <Input value={docForm.name} onChange={e => setDocForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Meeting Minutes – Aug 2026" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Purpose *</label>
+                        <Input value={docForm.purpose} onChange={e => setDocForm(f => ({ ...f, purpose: e.target.value }))} placeholder="e.g. New Member Onboarding, Board Reference, Event Planning" />
+                        <p className="text-xs text-slate-400 mt-1">Members will use this to find the right document quickly.</p>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
@@ -284,18 +289,18 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                         <Input value={docForm.fileUrl} onChange={e => setDocForm(f => ({ ...f, fileUrl: e.target.value }))} placeholder="https://drive.google.com/..." />
                     </div>
                     <div className="flex justify-end gap-3 pt-2">
-                        <Button variant="outline" onClick={() => { setIsDocUploadOpen(false); setDocForm({ name: '', category: 'General', fileUrl: '' }); }}>Cancel</Button>
+                        <Button variant="outline" onClick={() => { setIsDocUploadOpen(false); setDocForm({ name: '', category: 'General', purpose: '', fileUrl: '' }); }}>Cancel</Button>
                         <Button variant="primary" disabled={!docForm.name.trim() || !docForm.fileUrl.trim() || isSubmittingDoc}
                             onClick={async () => {
                                 setIsSubmittingDoc(true);
                                 try {
                                     await DocumentsService.createDocument(
-                                        { name: docForm.name.trim(), category: docForm.category, loId: (member as any)?.loId ?? 'default', uploadedBy: member?.id ?? '', uploadedDate: new Date(), description: '', tags: [], isPublic: true } as any,
+                                        { name: docForm.name.trim(), category: docForm.category, purpose: docForm.purpose.trim() || undefined, loId: (member as any)?.loId ?? 'default', uploadedBy: member?.id ?? '', uploadedDate: new Date(), description: '', tags: [], isPublic: true } as any,
                                         docForm.fileUrl.trim()
                                     );
                                     showToast('Document uploaded successfully', 'success');
                                     setIsDocUploadOpen(false);
-                                    setDocForm({ name: '', category: 'General', fileUrl: '' });
+                                    setDocForm({ name: '', category: 'General', purpose: '', fileUrl: '' });
                                 } catch {
                                     showToast('Failed to upload document', 'error');
                                 } finally {
@@ -502,43 +507,67 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({
         </div>
     ) : null;
 
+    // Group documents by purpose; documents without purpose go under 'General'
+    const grouped = useMemo(() => {
+        const map = new Map<string, typeof documents>();
+        documents.forEach(doc => {
+            const key = doc.purpose?.trim() || 'General';
+            if (!map.has(key)) map.set(key, []);
+            map.get(key)!.push(doc);
+        });
+        // Sort: named purposes first (alphabetical), 'General' last
+        return Array.from(map.entries()).sort(([a], [b]) => {
+            if (a === 'General') return 1;
+            if (b === 'General') return -1;
+            return a.localeCompare(b);
+        });
+    }, [documents]);
+
+    const DocCard: React.FC<{ doc: any }> = ({ doc }) => {
+        const gradient = DOC_CATEGORY_GRADIENT[doc.category] ?? 'from-blue-400 to-blue-600';
+        return (
+            <div
+                className="bg-white border rounded-2xl overflow-hidden transition-all border-slate-100 hover:border-slate-200 hover:shadow-sm cursor-pointer"
+                onClick={() => onSelectDocument(doc)}
+            >
+                {/* Row 1: category + date */}
+                <div className="flex items-center gap-1 px-3 pt-3 pb-1.5 flex-wrap">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-600">{doc.category || 'General'}</span>
+                    {doc.versionCount && doc.versionCount > 1 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-500">
+                            <GitBranch size={9} />{doc.versionCount}v
+                        </span>
+                    )}
+                    {doc.uploadedDate && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-50 text-slate-400">{formatDate(doc.uploadedDate)}</span>
+                    )}
+                </div>
+                {/* Row 2: icon + name */}
+                <div className="flex items-center gap-3 px-3 pb-3 pt-0">
+                    <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center shrink-0`}>
+                        <FileText size={16} className="text-white" strokeWidth={2} />
+                    </div>
+                    <p className="flex-1 min-w-0 font-semibold text-slate-900 text-sm leading-tight line-clamp-1">{doc.name}</p>
+                </div>
+            </div>
+        );
+    };
+
     return (
         <LoadingState loading={loading} error={error ?? null} empty={false} emptyMessage="No documents found">
-            <div className="space-y-2">
+            <div className="space-y-5">
                 {addCard}
-                {documents.map(doc => {
-                    const gradient = DOC_CATEGORY_GRADIENT[doc.category] ?? 'from-blue-400 to-blue-600';
-                    return (
-                        <div
-                            key={doc.id}
-                            className="bg-white border rounded-2xl overflow-hidden transition-all border-slate-100 hover:border-slate-200 hover:shadow-sm cursor-pointer"
-                            onClick={() => onSelectDocument(doc)}
-                        >
-                            {/* Row 1: category + date */}
-                            <div className="flex items-center gap-1 px-3 pt-3 pb-1.5 flex-wrap">
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-600">{doc.category || 'General'}</span>
-                                {doc.versionCount && doc.versionCount > 1 && (
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-500">
-                                        <GitBranch size={9} />{doc.versionCount}v
-                                    </span>
-                                )}
-                                {doc.uploadedDate && (
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-50 text-slate-400">{formatDate(doc.uploadedDate)}</span>
-                                )}
-                            </div>
-                            {/* Row 2: icon + name */}
-                            <div className="flex items-center gap-3 px-3 pb-3 pt-0">
-                                <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center shrink-0`}>
-                                    <FileText size={16} className="text-white" strokeWidth={2} />
-                                </div>
-                                <p className="flex-1 min-w-0 font-semibold text-slate-900 text-sm leading-tight line-clamp-1">{doc.name}</p>
-                            </div>
-                        </div>
-                    );
-                })}
-                {!loading && documents.length === 0 && !onAdd && (
-                    <p className="text-sm text-slate-400 text-center py-8">No documents found</p>
+                {documents.length === 0 && !loading && (
+                    <p className="text-sm text-slate-400 text-center py-8">No documents available</p>
                 )}
+                {grouped.map(([purpose, docs]) => (
+                    <div key={purpose}>
+                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 px-1">{purpose}</p>
+                        <div className="space-y-2">
+                            {docs.map(doc => <DocCard key={doc.id} doc={doc} />)}
+                        </div>
+                    </div>
+                ))}
             </div>
         </LoadingState>
     );

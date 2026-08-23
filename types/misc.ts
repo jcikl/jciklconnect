@@ -131,6 +131,7 @@ export interface Document {
   description?: string;
   type: 'PDF' | 'DOC' | 'XLS' | 'IMG';
   category: 'Policy' | 'Meeting Minutes' | 'Project Report' | 'Template';
+  purpose?: string;
   uploadedDate: string;
   size: string;
 }
