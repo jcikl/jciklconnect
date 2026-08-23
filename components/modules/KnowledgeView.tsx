@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { BookOpen, FileText, Download, Award, PlayCircle, Plus, Edit, Trash2, GraduationCap, CheckCircle, Clock, GitBranch, Eye, Search, Filter, X } from 'lucide-react';
-import { Card, Button, ProgressBar, Badge, Tabs, Modal, useToast, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
+import { Card, Button, ProgressBar, Badge, Tabs, Modal, Drawer, useToast, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
 import type { ConfirmState } from '../ui/Common';
 import { Input, Select, Textarea } from '../ui/Form';
 import { LoadingState } from '../ui/Loading';
@@ -286,6 +286,7 @@ const LearningPathsTab: React.FC<LearningPathsTabProps> = ({
     onEdit,
 }) => {
     const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
+    const [selectedPath, setSelectedPath] = useState<LearningPath | null>(null);
 
     const categoryGradient: Record<string, string> = {
         Leadership: 'from-blue-400 to-blue-600',
@@ -318,7 +319,7 @@ const LearningPathsTab: React.FC<LearningPathsTabProps> = ({
                 {paths.map(path => {
                     const gradient = categoryGradient[path.category ?? ''] ?? 'from-slate-400 to-slate-600';
                     return (
-                        <div key={path.id} className="bg-white border rounded-2xl overflow-hidden transition-all border-slate-100 hover:border-slate-200 hover:shadow-sm">
+                        <div key={path.id} className="bg-white border rounded-2xl overflow-hidden transition-all border-slate-100 hover:border-slate-200 hover:shadow-sm cursor-pointer" onClick={() => setSelectedPath(path)}>
                             {/* Top row: icon | name | badges */}
                             <div className="flex items-center gap-3 p-3 pb-0">
                                 <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center shrink-0`}>
@@ -335,11 +336,11 @@ const LearningPathsTab: React.FC<LearningPathsTabProps> = ({
                             {canManage && (
                                 <div className="px-3 py-1.5 flex justify-end gap-0.5">
                                     {onEdit && (
-                                        <button onClick={() => onEdit(path)} className="p-1.5 rounded-lg text-slate-400 hover:text-jci-blue hover:bg-slate-50 transition-colors">
+                                        <button onClick={e => { e.stopPropagation(); onEdit(path); }} className="p-1.5 rounded-lg text-slate-400 hover:text-jci-blue hover:bg-slate-50 transition-colors">
                                             <Edit size={13} />
                                         </button>
                                     )}
-                                    <button onClick={() => setConfirmState({ open: true, title: 'Delete Learning Path', message: 'Are you sure you want to delete this learning path?', variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await onDelete(path.id!); } })}
+                                    <button onClick={e => { e.stopPropagation(); setConfirmState({ open: true, title: 'Delete Learning Path', message: 'Are you sure you want to delete this learning path?', variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await onDelete(path.id!); } }); }}
                                         className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
                                         <Trash2 size={13} />
                                     </button>
@@ -351,6 +352,77 @@ const LearningPathsTab: React.FC<LearningPathsTabProps> = ({
             </div>
         </LoadingState>
         <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
+
+        {/* Path detail drawer */}
+        {selectedPath && (() => {
+            const p = selectedPath;
+            const gradient = categoryGradient[p.category ?? ''] ?? 'from-slate-400 to-slate-600';
+            const hostname = (url: string) => { try { return new URL(url).hostname.replace('www.', ''); } catch { return url; } };
+            return (
+                <Drawer isOpen={!!selectedPath} onClose={() => setSelectedPath(null)} title={p.name} position="bottom">
+                    <div className="space-y-4">
+                        {/* Banner */}
+                        <div className={`rounded-xl bg-gradient-to-br ${gradient} px-4 py-3 flex items-center gap-3`}>
+                            <BookOpen size={20} className="text-white shrink-0" />
+                            <div>
+                                <p className="text-white font-semibold text-sm leading-tight">{p.name}</p>
+                                <p className="text-white/70 text-xs mt-0.5">{p.category}</p>
+                            </div>
+                        </div>
+
+                        {/* Badges */}
+                        <div className="flex flex-wrap gap-2">
+                            <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ${p.difficulty === 'Advance' ? 'bg-red-100 text-red-700' : p.difficulty === 'Intermediate' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>{p.difficulty}</span>
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-600">
+                                <Clock size={11} />{p.estimatedDuration} hr{p.estimatedDuration !== 1 ? 's' : ''}
+                            </span>
+                            {p.status === 'Draft' && <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-amber-100 text-amber-700">Draft</span>}
+                        </div>
+
+                        {/* Description */}
+                        {p.description && (
+                            <div>
+                                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Description</p>
+                                <p className="text-sm text-slate-600 leading-relaxed">{p.description}</p>
+                            </div>
+                        )}
+
+                        {/* Materials */}
+                        <div>
+                            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Materials</p>
+                            {p.materials && p.materials.length > 0 ? (
+                                <div className="space-y-2">
+                                    {p.materials.map((url, i) => (
+                                        <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                                            className="flex items-center gap-2 text-sm text-jci-blue hover:text-sky-600 bg-sky-50 hover:bg-sky-100 rounded-xl px-3 py-2.5 transition-colors"
+                                        >
+                                            <Eye size={14} className="shrink-0" />
+                                            <span className="truncate">{hostname(url)}</span>
+                                        </a>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-slate-400 italic">No materials available</p>
+                            )}
+                        </div>
+
+                        {/* Manage actions */}
+                        {canManage && (
+                            <div className="flex gap-2 pt-1">
+                                {onEdit && (
+                                    <Button variant="outline" size="sm" className="flex-1" onClick={() => { setSelectedPath(null); onEdit(p); }}>
+                                        <Edit size={14} className="mr-1.5" />Edit
+                                    </Button>
+                                )}
+                                <Button variant="danger" size="sm" className="flex-1" onClick={() => { setSelectedPath(null); setConfirmState({ open: true, title: 'Delete Learning Path', message: 'Are you sure you want to delete this learning path?', variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await onDelete(p.id!); } }); }}>
+                                    <Trash2 size={14} className="mr-1.5" />Delete
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+                </Drawer>
+            );
+        })()}
         </>
     );
 };
