@@ -13,6 +13,7 @@ interface ColumnFilterHeaderProps {
   selected: string[];
   onChange: (selected: string[]) => void;
   className?: string;
+  align?: 'left' | 'right';
 }
 
 /** Minimal table column filter: ghost icon + light dropdown. */
@@ -22,6 +23,7 @@ export const ColumnFilterHeader: React.FC<ColumnFilterHeaderProps> = ({
   selected,
   onChange,
   className = '',
+  align = 'left',
 }) => {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -75,7 +77,7 @@ export const ColumnFilterHeader: React.FC<ColumnFilterHeaderProps> = ({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-1.5 min-w-[180px] rounded-md border border-slate-200/90 bg-white py-1 shadow-sm">
+        <div className={`absolute top-full z-50 mt-1.5 min-w-[180px] rounded-md border border-slate-200/90 bg-white py-1 shadow-sm ${align === 'right' ? 'right-0' : 'left-0'}`}>
           {active && (
             <div className="px-2.5 py-1.5 border-b border-slate-100 flex justify-end">
               <button

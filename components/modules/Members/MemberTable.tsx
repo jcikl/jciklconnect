@@ -345,7 +345,7 @@ const MemberTableBase: React.FC<{
         </div>
 
         {/* Mobile filters */}
-        <div className="md:hidden border-b border-slate-100 px-4 py-3 flex gap-2 overflow-x-auto bg-slate-50/50">
+        <div className="md:hidden border-b border-slate-100 px-4 py-3 flex gap-2 bg-slate-50/50">
           <ColumnFilterHeader
             label="Role"
             options={roleCounts ? ROLE_FILTER_OPTIONS.map(o => ({ ...o, count: roleCounts[o.value] ?? 0 })) : ROLE_FILTER_OPTIONS}
@@ -357,6 +357,7 @@ const MemberTableBase: React.FC<{
             options={membershipTypeCounts ? MEMBERSHIP_TYPE_FILTER_OPTIONS.map(o => ({ ...o, count: membershipTypeCounts[o.value as MembershipType] ?? 0 })) : MEMBERSHIP_TYPE_FILTER_OPTIONS}
             selected={membershipTypeFilters}
             onChange={(vals) => onMembershipTypeFiltersChange(vals as MembershipType[])}
+            align="right"
           />
         </div>
 
