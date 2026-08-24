@@ -285,7 +285,12 @@ export class BoardManagementService {
               currentBoardYear: termYear,
               currentBoardPosition: m.position,
               updatedAt: now,
-              ...(isCurrentTerm ? { isCurrentBoardMember: !isExternal } : {}),
+              ...(isCurrentTerm ? {
+                isCurrentBoardMember: !isExternal,
+                'jciCareer.isCurrentBoardMember': !isExternal,
+                'jciCareer.currentBoardPosition': m.position,
+                'jciCareer.currentBoardYear': termYear,
+              } : {}),
             });
           }
 
@@ -384,7 +389,12 @@ export class BoardManagementService {
         currentBoardYear: termYear,
         currentBoardPosition: boardMember.position,
         updatedAt: now,
-        ...(isCurrentTerm ? { isCurrentBoardMember: !isExternalAdd } : {}),
+        ...(isCurrentTerm ? {
+          isCurrentBoardMember: !isExternalAdd,
+          'jciCareer.isCurrentBoardMember': !isExternalAdd,
+          'jciCareer.currentBoardPosition': boardMember.position,
+          'jciCareer.currentBoardYear': termYear,
+        } : {}),
       });
       await batch.commit();
       MembersService.invalidateMembersCache();
@@ -635,10 +645,14 @@ export class BoardManagementService {
         );
         for (const { memberId, position } of assignments) {
           if (!memberId) continue;
+          const isExtCurrentTerm = isExternalOfficerPosition(position);
           boardBatch.update(doc(db, COLLECTIONS.MEMBERS, memberId), {
             currentBoardYear: yearNum,
             currentBoardPosition: position,
-            isCurrentBoardMember: !isExternalOfficerPosition(position),
+            isCurrentBoardMember: !isExtCurrentTerm,
+            'jciCareer.isCurrentBoardMember': !isExtCurrentTerm,
+            'jciCareer.currentBoardPosition': position,
+            'jciCareer.currentBoardYear': yearNum,
             isCurrentCommissionDirector: false,
             updatedAt: now,
           });
