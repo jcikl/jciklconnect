@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Trash2, Settings, X, Sparkles, ArrowLeft, Phone, Mail,
-  Award, Clock, Briefcase, GraduationCap, UserPlus, UserMinus, Search, Users,
+  Award, Clock, Briefcase, GraduationCap, UserPlus, Search, Users,
   TrendingUp, Zap, Download, Upload, BarChart3, FileText, RefreshCw,
   Calendar, Shield, UserCheck, AlertCircle, CheckCircle, MapPin,
   Linkedin, Facebook, Instagram, MessageCircle, CalendarCheck, UserCog,
@@ -10,7 +10,7 @@ import {
   BookOpen, Trophy, Network, ChevronRight, LayoutList
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { Button, Card, Badge, ProgressBar, Modal, useToast, Pagination, Tabs, PageHeader, ConfirmDialog, CONFIRM_CLOSED, ConfirmState } from '../ui/Common';
+import { Button, Card, Badge, ProgressBar, Modal, useToast, Pagination, Tabs, PageHeader } from '../ui/Common';
 import { Input, Select, Textarea, ButtonGroup } from '../ui/Form';
 import { MultiSelectDropdown } from '../ui/MultiSelectDropdown';
 import { MemberEditForm } from './MemberEditForm';
@@ -129,9 +129,6 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [roleFilters, setRoleFilters] = useState<UserRole[]>([]);
   const [membershipTypeFilters, setMembershipTypeFilters] = useState<MembershipType[]>([]);
-  const [showLegacyBoardOnly, setShowLegacyBoardOnly] = useState(false);
-  const [isFixingLegacyBoard, setIsFixingLegacyBoard] = useState(false);
-  const [legacyBoardConfirm, setLegacyBoardConfirm] = useState<ConfirmState>(CONFIRM_CLOSED);
   const [membershipRules, setMembershipRules] = useState<
     Record<MembershipType, MembershipRuleConfig>
   >(DEFAULT_MEMBERSHIP_RULES);
@@ -228,21 +225,15 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
     getMemberDisplayMembershipType,
   });
 
-  // Legacy BOARD diagnostic: role===BOARD but isCurrentBoardMember is not true
-  const legacyBoardMembers = useMemo(() =>
-    members.filter(m => m.role === UserRole.BOARD && !m.jciCareer?.isCurrentBoardMember),
-    [members]);
-
   // Always pin current user to the top
   const sortedMembers = useMemo(() => {
-    const base = showLegacyBoardOnly ? legacyBoardMembers : filteredMembers;
-    if (!currentMember?.id) return base;
-    const idx = base.findIndex(m => m.id === currentMember.id);
-    if (idx <= 0) return base;
-    const result = [...base];
+    if (!currentMember?.id) return filteredMembers;
+    const idx = filteredMembers.findIndex(m => m.id === currentMember.id);
+    if (idx <= 0) return filteredMembers;
+    const result = [...filteredMembers];
     result.unshift(result.splice(idx, 1)[0]);
     return result;
-  }, [filteredMembers, legacyBoardMembers, showLegacyBoardOnly, currentMember?.id]);
+  }, [filteredMembers, currentMember?.id]);
 
   // Paginate filtered members
   const paginatedMembers = useMemo(() => {
@@ -275,7 +266,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
   // Reset to page 1 when search or column filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, roleFilters, membershipTypeFilters, showLegacyBoardOnly]);
+  }, [searchQuery, roleFilters, membershipTypeFilters]);
 
   // Handle Ctrl+A for Select All on current page
   useEffect(() => {
@@ -530,49 +521,6 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
           </div>
 
           <div>
-            {activeTab === 'directory' && isAdmin && legacyBoardMembers.length > 0 && (
-              <div className="hidden sm:flex flex-col gap-1 mb-2">
-                <button
-                  onClick={() => setShowLegacyBoardOnly(v => !v)}
-                  className={`flex w-full items-center gap-3 px-4 py-3 rounded-2xl border text-sm font-semibold transition-all ${showLegacyBoardOnly ? 'border-amber-400 bg-amber-50 text-amber-700' : 'border-dashed border-amber-300 bg-white text-amber-600 hover:bg-amber-50'}`}
-                >
-                  <div className="w-7 h-7 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
-                    <Shield size={14} />
-                  </div>
-                  {showLegacyBoardOnly ? `显示全部成员（正在查看 ${legacyBoardMembers.length} 位 Legacy BOARD）` : `⚠ Legacy BOARD 未同步：${legacyBoardMembers.length} 人`}
-                </button>
-                <button
-                  disabled={isFixingLegacyBoard}
-                  onClick={() => setLegacyBoardConfirm({
-                    open: true,
-                    title: 'Legacy BOARD 降回 MEMBER',
-                    message: `将 ${legacyBoardMembers.length} 位成员的 role 从 BOARD 降回 MEMBER？此操作不可撤销。`,
-                    confirmLabel: `确认降回 ${legacyBoardMembers.length} 人`,
-                    variant: 'danger',
-                    onConfirm: async () => {
-                      setLegacyBoardConfirm(CONFIRM_CLOSED);
-                      setIsFixingLegacyBoard(true);
-                      try {
-                        await batchUpdateMembers(legacyBoardMembers.map(m => m.id), { role: UserRole.MEMBER } as Partial<Member>);
-                        showToast(`已将 ${legacyBoardMembers.length} 位 Legacy BOARD 降回 MEMBER`, 'success');
-                        setShowLegacyBoardOnly(false);
-                        await loadMembers();
-                      } catch {
-                        showToast('操作失败，请重试', 'error');
-                      } finally {
-                        setIsFixingLegacyBoard(false);
-                      }
-                    },
-                  })}
-                  className="flex w-full items-center gap-3 px-4 py-2.5 rounded-2xl border border-red-200 bg-white text-red-600 hover:bg-red-50 text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <div className="w-7 h-7 rounded-lg bg-red-100 flex items-center justify-center shrink-0">
-                    <UserMinus size={14} />
-                  </div>
-                  {isFixingLegacyBoard ? '处理中…' : `全部降回 MEMBER`}
-                </button>
-              </div>
-            )}
             {activeTab === 'directory' && canManageMembers && (
               <button
                 onClick={() => setAddModalOpen(true)}
@@ -585,7 +533,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
               </button>
             )}
             {activeTab === 'directory' && (
-              <LoadingState loading={loading} error={error} empty={sortedMembers.length === 0 && roleFilters.length === 0 && membershipTypeFilters.length === 0 && !searchQuery && !showLegacyBoardOnly} emptyMessage="No members found">
+              <LoadingState loading={loading} error={error} empty={sortedMembers.length === 0 && roleFilters.length === 0 && membershipTypeFilters.length === 0 && !searchQuery} emptyMessage="No members found">
                 <MemberTable
                   members={paginatedMembers}
                   onSelect={setSelectedMemberId}
@@ -601,7 +549,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
                   membershipTypeCounts={membershipTypeCounts}
                   roleCounts={roleCounts}
                 />
-                {sortedMembers.length === 0 && (roleFilters.length > 0 || membershipTypeFilters.length > 0 || searchQuery || showLegacyBoardOnly) && (
+                {sortedMembers.length === 0 && (roleFilters.length > 0 || membershipTypeFilters.length > 0 || searchQuery) && (
                   <div className="flex flex-col items-center gap-3 py-12 text-center text-slate-400 text-sm">
                     <span>No members match the current filters.</span>
                     <Button variant="outline" size="sm" onClick={() => { setRoleFilters([]); setMembershipTypeFilters([]); }}>
@@ -869,15 +817,6 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
           </div>
         </Modal>
       )}
-      <ConfirmDialog
-        open={legacyBoardConfirm.open}
-        title={legacyBoardConfirm.title}
-        message={legacyBoardConfirm.message}
-        confirmLabel={legacyBoardConfirm.confirmLabel}
-        variant={legacyBoardConfirm.variant}
-        onConfirm={legacyBoardConfirm.onConfirm}
-        onCancel={() => setLegacyBoardConfirm(CONFIRM_CLOSED)}
-      />
     </div>
   );
 };
