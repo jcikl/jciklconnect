@@ -21,6 +21,7 @@ import {
   hasActiveBoardRecordForCurrentYear,
   isActiveBoardRecordForYear,
   EXTERNAL_OFFICER_POSITIONS,
+  isExternalOfficerPosition,
 } from '../utils/boardMembership';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
@@ -269,6 +270,9 @@ export class BoardManagementService {
               currentBoardPosition: deleteField(),
               isCurrentBoardMember: false,
               isCurrentCommissionDirector: false,
+              'jciCareer.isCurrentBoardMember': false,
+              'jciCareer.currentBoardYear': deleteField(),
+              'jciCareer.currentBoardPosition': deleteField(),
               updatedAt: now,
             });
           }
@@ -324,6 +328,9 @@ export class BoardManagementService {
         currentBoardPosition: deleteField(),
         isCurrentBoardMember: false,
         isCurrentCommissionDirector: false,
+        'jciCareer.isCurrentBoardMember': false,
+        'jciCareer.currentBoardYear': deleteField(),
+        'jciCareer.currentBoardPosition': deleteField(),
         updatedAt: now,
       });
       await archiveBatch.commit();
@@ -628,7 +635,7 @@ export class BoardManagementService {
           boardBatch.update(doc(db, COLLECTIONS.MEMBERS, memberId), {
             currentBoardYear: yearNum,
             currentBoardPosition: position,
-            isCurrentBoardMember: !EXTERNAL_OFFICER_POSITIONS.has(position),
+            isCurrentBoardMember: !isExternalOfficerPosition(position),
             isCurrentCommissionDirector: false,
             updatedAt: now,
           });
@@ -641,6 +648,9 @@ export class BoardManagementService {
               currentBoardPosition: deleteField(),
               isCurrentBoardMember: false,
               isCurrentCommissionDirector: false,
+              'jciCareer.isCurrentBoardMember': false,
+              'jciCareer.currentBoardYear': deleteField(),
+              'jciCareer.currentBoardPosition': deleteField(),
               updatedAt: now,
             });
           }
@@ -683,6 +693,9 @@ export class BoardManagementService {
           currentBoardPosition: deleteField(),
           isCurrentBoardMember: false,
           isCurrentCommissionDirector: false,
+          'jciCareer.isCurrentBoardMember': false,
+          'jciCareer.currentBoardYear': deleteField(),
+          'jciCareer.currentBoardPosition': deleteField(),
           updatedAt: new Date().toISOString(),
         });
         MembersService.invalidateMembersCache();
@@ -745,6 +758,9 @@ export class BoardManagementService {
             currentBoardPosition: deleteField(),
             isCurrentBoardMember: false,
             isCurrentCommissionDirector: false,
+            'jciCareer.isCurrentBoardMember': false,
+            'jciCareer.currentBoardYear': deleteField(),
+            'jciCareer.currentBoardPosition': deleteField(),
             updatedAt: now,
           });
         }
@@ -885,7 +901,7 @@ export class BoardManagementService {
           member.jciCareer?.isCurrentBoardMember === true || member.jciCareer?.currentBoardYear === currentYear;
 
         if (shouldBeOnBoard) {
-          const isExternalOfficer = EXTERNAL_OFFICER_POSITIONS.has(activeRecord.position);
+          const isExternalOfficer = isExternalOfficerPosition(activeRecord.position);
           const needsUpdate =
             !flaggedOnBoard ||
             member.jciCareer?.currentBoardPosition !== activeRecord.position ||

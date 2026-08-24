@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { useAuth } from './useAuth';
 import { UserRole } from '../types';
 import { isDevMode } from '../utils/devMode';
-import { isMemberCurrentBoard, EXTERNAL_OFFICER_POSITIONS } from '../utils/boardMembership';
+import { isMemberCurrentBoard, isExternalOfficerPosition, EXTERNAL_OFFICER_POSITIONS } from '../utils/boardMembership';
 import { Permission, ROLE_PERMISSIONS, ALL_PERMISSIONS_GRANTED } from '../utils/rolePermissions';
 
 export type { Permission };
@@ -36,10 +36,13 @@ export const usePermissions = () => {
     // Legacy BOARD role (static assignment, pre-dynamic board system) gets the same elevation
     const effectiveRoleInner = simulatedRole ?? (member.role as UserRole) ?? UserRole.GUEST;
     const isLegacyBoardRoleInner = effectiveRoleInner === UserRole.BOARD;
+    // External officers (Area / National / JCI Officer) must not receive board-level permissions
+    // regardless of their role field or isCurrentBoardMember flag.
+    const isExternalOfficerInner = EXTERNAL_OFFICER_POSITIONS.has(member.jciCareer?.currentBoardPosition ?? '');
 
     // ADMIN and SUPER_ADMIN are excluded here because they receive permissions from ROLE_PERMISSIONS[ADMIN/SUPER_ADMIN].
     // Firestore rules (isBoard()) does include ADMIN for collection access — the two systems have different semantics by design.
-    if ((isCurrentBoardMember || isLegacyBoardRoleInner) && member.role !== UserRole.ADMIN && member.role !== UserRole.SUPER_ADMIN && member.role !== UserRole.INACTIVE) {
+    if ((isCurrentBoardMember || isLegacyBoardRoleInner) && !isExternalOfficerInner && member.role !== UserRole.ADMIN && member.role !== UserRole.SUPER_ADMIN && member.role !== UserRole.INACTIVE) {
       basePermissions = {
         ...basePermissions,
         canViewMembers: true,
@@ -102,7 +105,7 @@ export const usePermissions = () => {
   const isLegacyBoardRole = effectiveRole === UserRole.BOARD;
   // External officers (Area / National / JCI Officer) hold honorary board records but are NOT
   // board of directors — they must not receive board-level system permissions.
-  const isExternalOfficer = EXTERNAL_OFFICER_POSITIONS.has(member?.jciCareer?.currentBoardPosition ?? '');
+  const isExternalOfficer = isExternalOfficerPosition(member?.jciCareer?.currentBoardPosition);
   // T-1: INACTIVE is a hard block — never grant board status regardless of flags
   const isBoardUser = (isCurrentBoardMember || isLegacyBoardRole) && !isExternalOfficer && effectiveRole !== UserRole.INACTIVE;
   const isPlainMember =

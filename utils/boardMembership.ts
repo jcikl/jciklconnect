@@ -4,12 +4,29 @@ import { BoardMember, Member } from '../types';
  * Positions that are NOT part of the Board of Directors.
  * Members holding these titles are tracked in boardMembers for record purposes
  * but must NOT receive board-level system permissions.
+ *
+ * Uses the same regex grouping as BoardOfDirectorsSection tabs:
+ *   - /area/i  → Area Officer tab
+ *   - /national/i → National Officer tab
+ *   - 'JCI Officer' → EXCO tab but honorary; no board permissions
+ *
+ * Kept as a Set for callers that need exact-name lookup (e.g. saveBoardTerm position param).
  */
 export const EXTERNAL_OFFICER_POSITIONS = new Set([
   'Area Officer',
   'National Officer',
   'JCI Officer',
 ]);
+
+/**
+ * Returns true if the position falls outside the Board of Directors permission scope.
+ * Matches any position under the Area or National tabs (regex-based, same as tab grouping)
+ * plus the legacy "JCI Officer" exact match.
+ */
+export function isExternalOfficerPosition(position: string | null | undefined): boolean {
+  if (!position) return false;
+  return /area/i.test(position) || /national/i.test(position) || position === 'JCI Officer';
+}
 
 /** Calendar year used for "current board" checks. */
 export function getCurrentBoardCalendarYear(): number {
@@ -53,7 +70,7 @@ export function isMemberCurrentBoard(member: Member | null | undefined): boolean
   if (!member) return false;
   if (!member.jciCareer?.isCurrentBoardMember) return false;
   const pos = member.jciCareer?.currentBoardPosition;
-  if (pos && EXTERNAL_OFFICER_POSITIONS.has(pos)) return false;
+  if (isExternalOfficerPosition(pos)) return false;
   return true;
 }
 

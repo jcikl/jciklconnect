@@ -33,6 +33,7 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../../config/firebase';
 import { JOIN_US_SURVEY_QUESTIONS, nationalityOptionsForValue, INDUSTRY_OPTIONS, IDEAL_REFERRAL_OPTIONS, BUSINESS_CATEGORIES_OPTIONS, DEFAULT_LO_ID } from '../../../config/constants';
 import { useSisterChapters } from '../../../hooks/useSisterChapters';
+import { isMemberCurrentBoard } from '../../../utils/boardMembership';
 import { getBirthPlaceFromIC, isMalaysianIC, getDateOfBirthFromIC, getGenderFromIC } from '../../../utils/malaysianIdUtils';
 import { formatDateToDDMMMYYYY } from '../../../utils/dateUtils';
 import { MembershipTypeDisplay } from '../../shared/MembershipTypeDisplay';
@@ -883,7 +884,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
           <div className="flex flex-wrap gap-1.5">
             <span className="flex items-center gap-1 text-[11px] bg-slate-50 border border-slate-100 rounded-lg px-2 py-1">
               <Shield size={10} className="text-jci-blue shrink-0" />
-              <span className="text-jci-blue">{member.role}</span>
+              <span className="text-jci-blue">{isMemberCurrentBoard(member) ? UserRole.BOARD : member.role === UserRole.BOARD ? UserRole.MEMBER : member.role}</span>
               {member.jciCareer?.introducer && (
                 <>
                   <span className="text-slate-300 mx-0.5">·</span>
@@ -1001,7 +1002,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
               <div className="flex flex-wrap gap-1.5 items-center">
                 <span className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100 text-xs font-medium">
                   <Shield size={12} className="text-jci-blue shrink-0" />
-                  <span className="text-jci-blue">{member.role}</span>
+                  <span className="text-jci-blue">{isMemberCurrentBoard(member) ? UserRole.BOARD : member.role === UserRole.BOARD ? UserRole.MEMBER : member.role}</span>
                   {member.jciCareer?.introducer && (
                     <>
                       <span className="text-slate-300 mx-0.5">·</span>

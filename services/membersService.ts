@@ -433,8 +433,11 @@ export class MembersService {
     if (data.jciCareer?.senatorship?.boardValidated !== undefined) jciCareer.senatorship.boardValidated = data.jciCareer?.senatorship?.boardValidated;
 
     if (data.jciCareer?.currentBoardYear !== undefined) jciCareer.currentBoardYear = data.jciCareer?.currentBoardYear;
+    else if ((data as any).currentBoardYear !== undefined) jciCareer.currentBoardYear = (data as any).currentBoardYear;
     if (data.jciCareer?.currentBoardPosition !== undefined) jciCareer.currentBoardPosition = data.jciCareer?.currentBoardPosition;
+    else if ((data as any).currentBoardPosition !== undefined) jciCareer.currentBoardPosition = (data as any).currentBoardPosition;
     if (data.jciCareer?.isCurrentBoardMember !== undefined) jciCareer.isCurrentBoardMember = data.jciCareer?.isCurrentBoardMember;
+    else if ((data as any).isCurrentBoardMember !== undefined) jciCareer.isCurrentBoardMember = (data as any).isCurrentBoardMember;
     if (data.jciCareer?.boardHistory !== undefined) jciCareer.boardHistory = data.jciCareer?.boardHistory;
 
     if (data.points !== undefined) jciCareer.points = data.points;
