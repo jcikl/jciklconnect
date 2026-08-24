@@ -625,28 +625,24 @@ export class BoardManagementService {
       for (const bm of existing) {
         boardBatch.delete(doc(db, COLLECTIONS.BOARD_MEMBERS, bm.id));
       }
+      const yearNum = parseInt(year, 10);
+      const isCurrentTerm = yearNum === getCurrentBoardCalendarYear();
+
+      // Build a position lookup so we can merge both updates into a single batch.update per member.
+      const positionByMemberId = new Map<string, string>(
+        assignments.filter(a => a.memberId).map(a => [a.memberId!, a.position])
+      );
+
       for (const { newRef, data, memberId } of boardMemberEntries) {
         boardBatch.set(newRef, data);
         const isExternalEntry = isExternalOfficerPosition(data.position);
+        const position = positionByMemberId.get(memberId) ?? data.position;
+        const isExtCurrentTerm = isExternalOfficerPosition(position);
+        // Single update per member — merges role elevation + current-term board fields to avoid
+        // "document already in batch" error when the same memberId appears in both loops.
         boardBatch.update(doc(db, COLLECTIONS.MEMBERS, memberId), {
           ...(!isExternalEntry ? { role: UserRole.BOARD } : {}),
-          updatedAt: now,
-        });
-      }
-
-      // P1 Fix: Inline the syncMemberDocumentsForTerm current-term field updates directly
-      // into the boardBatch so that boardMembers creation and member.currentBoard* fields
-      // land atomically — no window between two separate commits where reads see stale data.
-      const yearNum = parseInt(year, 10);
-      const isCurrentTerm = yearNum === getCurrentBoardCalendarYear();
-      if (isCurrentTerm) {
-        const newMemberIds = new Set<string>(
-          assignments.map(a => a.memberId).filter((id): id is string => Boolean(id))
-        );
-        for (const { memberId, position } of assignments) {
-          if (!memberId) continue;
-          const isExtCurrentTerm = isExternalOfficerPosition(position);
-          boardBatch.update(doc(db, COLLECTIONS.MEMBERS, memberId), {
+          ...(isCurrentTerm ? {
             currentBoardYear: yearNum,
             currentBoardPosition: position,
             isCurrentBoardMember: !isExtCurrentTerm,
@@ -654,9 +650,15 @@ export class BoardManagementService {
             'jciCareer.currentBoardPosition': position,
             'jciCareer.currentBoardYear': yearNum,
             isCurrentCommissionDirector: false,
-            updatedAt: now,
-          });
-        }
+          } : {}),
+          updatedAt: now,
+        });
+      }
+
+      if (isCurrentTerm) {
+        const newMemberIds = new Set<string>(
+          assignments.map(a => a.memberId).filter((id): id is string => Boolean(id))
+        );
         // Clear currentBoard* fields on members removed from this term
         for (const bm of existing) {
           if (bm.memberId && !newMemberIds.has(bm.memberId)) {
