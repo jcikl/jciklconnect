@@ -279,12 +279,13 @@ export class BoardManagementService {
           for (const m of transition.incomingBoard) {
             const termYear = parseInt(m.term, 10);
             const isCurrentTerm = termYear === getCurrentBoardCalendarYear();
+            const isExternal = isExternalOfficerPosition(m.position);
             batch.update(doc(db, COLLECTIONS.MEMBERS, m.memberId), {
-              role: UserRole.BOARD,
+              ...(!isExternal ? { role: UserRole.BOARD } : {}),
               currentBoardYear: termYear,
               currentBoardPosition: m.position,
               updatedAt: now,
-              ...(isCurrentTerm ? { isCurrentBoardMember: true } : {}),
+              ...(isCurrentTerm ? { isCurrentBoardMember: !isExternal } : {}),
             });
           }
 
@@ -374,15 +375,16 @@ export class BoardManagementService {
       const isCurrentTerm = termYear === getCurrentBoardCalendarYear();
 
       // Atomic: boardMembers record + member role update in a single batch
+      const isExternalAdd = isExternalOfficerPosition(boardMember.position);
       const batch = writeBatch(db);
       const newBoardMemberRef = doc(collection(db, COLLECTIONS.BOARD_MEMBERS));
       batch.set(newBoardMemberRef, boardMemberData);
       batch.update(doc(db, COLLECTIONS.MEMBERS, boardMember.memberId), {
-        role: UserRole.BOARD,
+        ...(!isExternalAdd ? { role: UserRole.BOARD } : {}),
         currentBoardYear: termYear,
         currentBoardPosition: boardMember.position,
         updatedAt: now,
-        ...(isCurrentTerm ? { isCurrentBoardMember: true } : {}),
+        ...(isCurrentTerm ? { isCurrentBoardMember: !isExternalAdd } : {}),
       });
       await batch.commit();
       MembersService.invalidateMembersCache();
@@ -615,8 +617,9 @@ export class BoardManagementService {
       }
       for (const { newRef, data, memberId } of boardMemberEntries) {
         boardBatch.set(newRef, data);
+        const isExternalEntry = isExternalOfficerPosition(data.position);
         boardBatch.update(doc(db, COLLECTIONS.MEMBERS, memberId), {
-          role: UserRole.BOARD,
+          ...(!isExternalEntry ? { role: UserRole.BOARD } : {}),
           updatedAt: now,
         });
       }
@@ -1106,8 +1109,9 @@ export class BoardManagementService {
             };
             boardHistory.push(newPosition);
 
+            const isExternalAssign = isExternalOfficerPosition(assignment.position);
             assignBatch.update(doc(db, COLLECTIONS.MEMBERS, assignment.memberId), {
-              role: UserRole.BOARD,
+              ...(!isExternalAssign ? { role: UserRole.BOARD } : {}),
               currentBoardYear: year,
               currentBoardPosition: assignment.position,
               boardHistory,
