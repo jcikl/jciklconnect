@@ -291,13 +291,19 @@ service cloud.firestore {
       allow delete: if isBoard() || isAdmin();
     }
     
-    // Treasurer: current board member whose position title contains "Treasurer", plus Admin override
-    function isTreasurer() {
+    function isFinanceOperatorPosition(position) {
+      return position.matches('.*[Tt]reasurer.*') ||
+             position.matches('.*[Ss]ecretary.*') ||
+             (position.matches('.*[Pp]resident.*') &&
+              !position.matches('.*[Vv]ice.*'));
+    }
+
+    // Finance operators: current board Treasurer, Secretary, or President.
+    function isFinanceOperator() {
       return isAuthenticated() &&
              exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-             (isAdmin() ||
-              (isCurrentBoardMember() &&
-               currentBoardPosition().matches('.*[Tt]reasurer.*')));
+             isCurrentBoardMember() &&
+             isFinanceOperatorPosition(currentBoardPosition());
     }
 
     // Finance access: current-calendar-year board members and admins
@@ -307,7 +313,7 @@ service cloud.firestore {
 
     // Deletion is destructive and irreversible — reserved for board members and admins.
     function canDeleteFinance() {
-      return isBoard();
+      return isFinanceOperator();
     }
 
     // Transactions: board / finance roles; multi-LO scoped by loId unless isAdmin/Board()
@@ -320,15 +326,15 @@ service cloud.firestore {
       allow list: if isAuthenticated() && (isAdmin() || isBoard());
       // E8 fix: on CREATE resource is null; must use request.resource.data not resource.data
       // P1 Fix: require critical fields on create to prevent partial/malformed transaction documents
-      allow create: if canAccessFinance() &&
+      allow create: if isFinanceOperator() &&
         request.resource.data.keys().hasAll(['amount', 'type', 'date', 'bankAccountId']) &&
         (request.resource.data.get('status', '') != 'Reconciled' &&
          request.resource.data.get('status', '') != 'Partially Reconciled' &&
          request.resource.data.get('status', '') != 'Voided');
       // TX-R2: finance staff limited to business fields; Admin unrestricted (TX-A: added missing writable fields)
       // C1: isAdmin() bypass before Reconciled check so void/unmatch/deleteReconciliation always work
-      allow update: if isAdmin() ||
-        (canAccessFinance() &&
+      allow update: if isFinanceOperator() &&
+        (
         (resource == null ||
           (resource.data.get('status', '') != 'Reconciled' &&
            resource.data.get('status', '') != 'Partially Reconciled' &&
@@ -344,11 +350,11 @@ service cloud.firestore {
            'matchStatus', 'matchedBankTxIds',
            'memberId', 'loId', 'transactionType', 'year'
          ]));
-      allow delete: if isAdmin() || (canDeleteFinance() &&
+      allow delete: if canDeleteFinance() &&
         resource.data.get('status', '') != 'Reconciled' &&
         resource.data.get('status', '') != 'Partially Reconciled' &&
         resource.data.get('status', '') != 'Cleared' &&
-        resource.data.get('status', '') != 'Voided');
+        resource.data.get('status', '') != 'Voided';
     }
 
     // Transaction Splits: same rules as transactions; update/delete blocked on Reconciled parent
@@ -358,9 +364,9 @@ service cloud.firestore {
       // Cross-LO isolation at split level requires a data migration to add loId — out of scope here.
       allow read: if isAuthenticated() && (isAdmin() || isBoard());
       // T7: block adding splits to already-reconciled parent transactions
-      allow create: if canAccessFinance() &&
+      allow create: if isFinanceOperator() &&
         get(/databases/$(database)/documents/transactions/$(request.resource.data.get('parentTransactionId', ''))).data.get('status', '') != 'Reconciled';
-      allow update: if canAccessFinance() &&
+      allow update: if isFinanceOperator() &&
         (!exists(/databases/$(database)/documents/transactions/$(resource.data.parentTransactionId)) ||
          (get(/databases/$(database)/documents/transactions/$(resource.data.parentTransactionId)).data.get('status', '') != 'Reconciled' &&
           get(/databases/$(database)/documents/transactions/$(resource.data.parentTransactionId)).data.get('status', '') != 'Partially Reconciled' &&
@@ -391,14 +397,14 @@ service cloud.firestore {
       allow list: if isAuthenticated() && (isAdmin() || isBoard() ||
         (canAccessFinance() && getMyLoId() != null));
       // E1 fix: add hasOnly to prevent arbitrary fields being written on create
-      allow create: if canAccessFinance() &&
+      allow create: if isFinanceOperator() &&
         request.resource.data.keys().hasAll(['projectId', 'amount', 'type']) &&
         request.resource.data.keys().hasOnly([
           'projectId', 'amount', 'type', 'description', 'date', 'createdBy', 'createdAt',
           'bankAccountId', 'loId', 'currency', 'status', 'updatedAt'
         ]);
       // PT-update/delete: block modifications to already-reconciled project transactions; PT-U2: add hasOnly
-      allow update: if canAccessFinance() &&
+      allow update: if isFinanceOperator() &&
         resource.data.get('status', '') != 'Reconciled' &&
         (isAdmin() ||
          // E2 fix: removed 'status' from non-admin hasOnly — regular finance users must not set status=Reconciled
@@ -419,7 +425,7 @@ service cloud.firestore {
          resource.data.get('loId', null) == null ||
          resource.data.get('loId', null) == getMyLoId());
       allow list: if isAdmin() || canAccessFinance();
-      allow create, update, delete: if isTreasurer();
+      allow create, update, delete: if isFinanceOperator();
     }
     
     // Payment Requests (Story 2.1): applicantId, amount, purpose, activityRef, referenceNumber, status, loId, 审计
@@ -636,9 +642,9 @@ service cloud.firestore {
     // C12: restrict read to isMember() to exclude GUEST/INACTIVE
     match /inventory/{itemId} {
       allow read: if isAuthenticated() && isMember();
-      allow create, delete: if isAuthenticated() && (isAdmin() || isBoard());
-      allow update: if isAuthenticated() && (isAdmin() || isBoard()) &&
-        (isAdmin() ||
+      allow create, delete: if isFinanceOperator();
+      allow update: if isFinanceOperator() &&
+        (
          // E4 fix: removed 'lastTransactionId' and 'lastTransactionDate' — these are system-managed
          // link fields written by the inventory transaction service, not by Board users directly.
          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
@@ -657,7 +663,7 @@ service cloud.firestore {
     //         Board was able to overwrite movement records, corrupting the inventory audit trail
     match /stock_movements/{movementId} {
       allow read: if isAuthenticated() && isMember();
-      allow create: if isMember() || isBoard() || isAdmin();
+      allow create: if isFinanceOperator();
       // No allow update — stock movements are immutable audit records
       allow delete: if isAdmin();
     }
@@ -989,34 +995,34 @@ service cloud.firestore {
       // FIX: removed getUserRole()-in-list resource.data check that blocked list queries; simplified to isMember()
       allow read: if isAuthenticated() && isMember();
       // FIX: added hasOnly whitelist on create to prevent arbitrary field injection
-      allow create: if isBoard() &&
+      allow create: if isFinanceOperator() &&
         request.resource.data.keys().hasOnly([
           'itemId','scheduledDate','nextMaintenanceDate','frequency','assignedTo','status','notes','createdAt','loId',
           'updatedAt','type','description','priority','estimatedDuration'
         ]);
       // FIX: added hasOnly on update to lock immutable fields (itemId)
-      allow update: if isBoard() &&
+      allow update: if isFinanceOperator() &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'scheduledDate','nextMaintenanceDate','frequency','assignedTo','status','notes','updatedAt','completedAt','completedBy'
         ]);
-      allow delete: if isBoard();
+      allow delete: if isFinanceOperator();
     }
     match /inventory_alerts/{docId} {
       allow read: if isAuthenticated() && isMember();
       // E9 fix: split create from update/delete to add field whitelist on create
       // FIX: added 'acknowledged' to hasOnly list
-      allow create: if isBoard() &&
+      allow create: if isFinanceOperator() &&
         request.resource.data.keys().hasAll(['itemId', 'type', 'severity', 'message']) &&
         request.resource.data.keys().hasOnly([
           'itemId', 'type', 'severity', 'message', 'threshold', 'currentValue',
           'createdAt', 'loId', 'resolved', 'acknowledged'
         ]);
       // FIX: added hasOnly whitelist to update — acknowledgement and resolution fields writable by Board
-      allow update: if isBoard() &&
+      allow update: if isFinanceOperator() &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'acknowledged','acknowledgedBy','acknowledgedAt','resolved','resolvedAt'
         ]);
-      allow delete: if isBoard();
+      allow delete: if isFinanceOperator();
     }
     
     // Behavioral nudging: nudge rules (Gamification — Behavioral Nudging config)
@@ -1215,7 +1221,7 @@ service cloud.firestore {
       allow list: if isAuthenticated() && (isAdmin() || isBoard());
       // FA-1: whitelist only resolution fields; block tampering with message/transactionId
       // E5 fix: added resolved == false precondition — already-resolved alerts cannot be re-modified
-      allow update: if canAccessFinance() &&
+      allow update: if isFinanceOperator() &&
         resource.data.resolved == false &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(
           ['resolved', 'resolvedAt', 'resolvedBy', 'updatedAt']

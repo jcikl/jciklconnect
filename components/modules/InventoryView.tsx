@@ -6,6 +6,7 @@ import { LoadingState } from '../ui/Loading';
 import { useInventory } from '../../hooks/useInventory';
 import { useMembers } from '../../hooks/useMembers';
 import { useAuth } from '../../hooks/useAuth';
+import { usePermissions } from '../../hooks/usePermissions';
 import { FinanceService } from '../../services/financeService';
 import { InventoryItem, MaintenanceSchedule, InventoryAlert, Transaction, StockMovement } from '../../types';
 import { formatDate } from '../../utils/dateUtils';
@@ -50,6 +51,7 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
   } = useInventory();
   const { members } = useMembers();
   const { member } = useAuth();
+  const { canOperateFinance } = usePermissions();
   const { showToast } = useToast();
 
   const filteredItems = useMemo(() => {
@@ -274,11 +276,11 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
       <PageHeader
         title="Asset & Inventory"
         description="Track physical assets, locations, and custodians."
-        action={
+        action={canOperateFinance ? (
           <Button onClick={() => setAddModalOpen(true)} size="sm">
             <Plus size={15} className="mr-1.5" /> Add Item
           </Button>
-        }
+        ) : undefined}
       />
 
       <LoadingState loading={loading} error={error}>
@@ -380,11 +382,11 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                               </td>
                               <td className="py-2.5 px-3">
                                 <div className="flex justify-end items-center gap-0.5">
-                                  {item.status === 'Available' ? (
+                                  {canOperateFinance && item.status === 'Available' ? (
                                     <button onClick={() => { setSelectedItem(item); setCheckOutModalOpen(true); }} className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors whitespace-nowrap">
                                       <LogOut size={11} /> Out
                                     </button>
-                                  ) : item.status === 'Checked Out' ? (
+                                  ) : canOperateFinance && item.status === 'Checked Out' ? (
                                     <button onClick={() => checkInItem(item.id)} className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg text-green-700 bg-green-50 hover:bg-green-100 transition-colors whitespace-nowrap">
                                       <LogIn size={11} /> In
                                     </button>
@@ -392,12 +394,16 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                                   <button title="Stock Card" onClick={() => handleOpenStockCard(item)} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
                                     <History size={13} />
                                   </button>
-                                  <button title="Adjust Stock" onClick={() => { setSelectedItem(item); setAdjustmentModalOpen(true); }} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
-                                    <RefreshCw size={13} />
-                                  </button>
-                                  <button title="Edit" onClick={() => { setSelectedItem(item); setFormVariants(item.variants || []); setEditModalOpen(true); }} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
-                                    <Edit size={13} />
-                                  </button>
+                                  {canOperateFinance && (
+                                    <>
+                                      <button title="Adjust Stock" onClick={() => { setSelectedItem(item); setAdjustmentModalOpen(true); }} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+                                        <RefreshCw size={13} />
+                                      </button>
+                                      <button title="Edit" onClick={() => { setSelectedItem(item); setFormVariants(item.variants || []); setEditModalOpen(true); }} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
+                                        <Edit size={13} />
+                                      </button>
+                                    </>
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -447,11 +453,11 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                             <div className="flex items-center justify-between gap-2 mt-2">
                               <span className="text-[11px] text-slate-400 truncate">{custodianName || ''}</span>
                               <div className="flex items-center gap-1 shrink-0">
-                                {item.status === 'Available' ? (
+                                {canOperateFinance && item.status === 'Available' ? (
                                   <button onClick={() => { setSelectedItem(item); setCheckOutModalOpen(true); }} className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors">
                                     <LogOut size={11} /> Out
                                   </button>
-                                ) : item.status === 'Checked Out' ? (
+                                ) : canOperateFinance && item.status === 'Checked Out' ? (
                                   <button onClick={() => checkInItem(item.id)} className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg text-green-700 bg-green-50 border border-green-200 hover:bg-green-100 transition-colors">
                                     <LogIn size={11} /> In
                                   </button>
@@ -459,12 +465,16 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                                 <button title="Stock Card" onClick={() => handleOpenStockCard(item)} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
                                   <History size={13} />
                                 </button>
-                                <button title="Adjust" onClick={() => { setSelectedItem(item); setAdjustmentModalOpen(true); }} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
-                                  <RefreshCw size={13} />
-                                </button>
-                                <button title="Edit" onClick={() => { setSelectedItem(item); setFormVariants(item.variants || []); setEditModalOpen(true); }} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
-                                  <Edit size={13} />
-                                </button>
+                                {canOperateFinance && (
+                                  <>
+                                    <button title="Adjust" onClick={() => { setSelectedItem(item); setAdjustmentModalOpen(true); }} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+                                      <RefreshCw size={13} />
+                                    </button>
+                                    <button title="Edit" onClick={() => { setSelectedItem(item); setFormVariants(item.variants || []); setEditModalOpen(true); }} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
+                                      <Edit size={13} />
+                                    </button>
+                                  </>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -499,6 +509,7 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                 onCompleteMaintenance={completeMaintenance}
                 onSelectSchedule={setSelectedSchedule}
                 onOpenModal={() => setMaintenanceModalOpen(true)}
+                canOperateFinance={canOperateFinance}
               />
             )}
 
@@ -510,6 +521,7 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                 onAcknowledge={acknowledgeAlert}
                 onCheckAlerts={checkAndGenerateAlerts}
                 member={member}
+                canOperateFinance={canOperateFinance}
               />
             )}
 
@@ -517,6 +529,7 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
               <DepreciationTab
                 items={items}
                 loading={loading}
+                canOperateFinance={canOperateFinance}
                 onUpdateDepreciation={async (itemId) => {
                   try {
                     const { InventoryService } = await import('../../services/inventoryService');
@@ -542,7 +555,7 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
       {/* Stock Adjustment Modal */}
       {selectedItem && (
         <Modal
-          isOpen={isAdjustmentModalOpen}
+          isOpen={canOperateFinance && isAdjustmentModalOpen}
           onClose={() => { setAdjustmentModalOpen(false); setSelectedItem(null); }}
           title={`Stock Adjustment: ${selectedItem.name}`}
           bottomSheet
@@ -669,7 +682,7 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
 
       {/* Add Item Modal */}
       <Modal
-        isOpen={isAddModalOpen}
+        isOpen={canOperateFinance && isAddModalOpen}
         onClose={() => setAddModalOpen(false)}
         title="Add Inventory Item"
         bottomSheet
@@ -788,7 +801,7 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
       {
         selectedItem && (
           <Modal
-            isOpen={isEditModalOpen}
+            isOpen={canOperateFinance && isEditModalOpen}
             onClose={() => { setEditModalOpen(false); setSelectedItem(null); }}
             title="Edit Inventory Item"
             bottomSheet
@@ -921,7 +934,7 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
       {/* Check Out Modal */}
       {selectedItem && (
         <Modal
-          isOpen={isCheckOutModalOpen}
+          isOpen={canOperateFinance && isCheckOutModalOpen}
           onClose={() => { setCheckOutModalOpen(false); setSelectedItem(null); }}
           title="Check Out Item"
           bottomSheet
@@ -943,7 +956,7 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
 
       {/* Maintenance Schedule Modal */}
       {
-        isMaintenanceModalOpen && (
+        canOperateFinance && isMaintenanceModalOpen && (
           <MaintenanceScheduleModal
             isOpen={true}
             onClose={() => {
@@ -989,6 +1002,7 @@ interface MaintenanceTabProps {
   onCompleteMaintenance: (scheduleId: string, notes?: string) => Promise<void>;
   onSelectSchedule: (schedule: MaintenanceSchedule) => void;
   onOpenModal: () => void;
+  canOperateFinance: boolean;
 }
 
 const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
@@ -1001,6 +1015,7 @@ const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
   onCompleteMaintenance,
   onSelectSchedule,
   onOpenModal,
+  canOperateFinance,
 }) => {
   const { showToast } = useToast();
   const { member } = useAuth();
@@ -1018,10 +1033,12 @@ const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-bold text-slate-900">Maintenance Schedules</h3>
-        <Button onClick={onOpenModal} size="sm">
-          <Plus size={15} className="mr-1.5" />
-          Schedule Maintenance
-        </Button>
+        {canOperateFinance && (
+          <Button onClick={onOpenModal} size="sm">
+            <Plus size={15} className="mr-1.5" />
+            Schedule Maintenance
+          </Button>
+        )}
       </div>
 
       <LoadingState loading={loading} error={null} empty={schedules.length === 0} emptyMessage="No maintenance schedules">
@@ -1071,7 +1088,8 @@ const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                       <p className="text-sm text-slate-500 mt-2">{schedule.notes}</p>
                     )}
                   </div>
-                  <div className="flex gap-2 ml-4">
+                  {canOperateFinance && (
+                    <div className="flex gap-2 ml-4">
                     {!isOverdue && schedule.id && (
                       <Button
                         variant="outline"
@@ -1092,7 +1110,8 @@ const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                     >
                       <Edit size={14} />
                     </Button>
-                  </div>
+                    </div>
+                  )}
                 </div>
               </Card>
             );
@@ -1111,6 +1130,7 @@ interface AlertsTabProps {
   onAcknowledge: (alertId: string, acknowledgedBy: string) => Promise<void>;
   onCheckAlerts: () => Promise<void>;
   member: any;
+  canOperateFinance: boolean;
 }
 
 const AlertsTab: React.FC<AlertsTabProps> = ({
@@ -1120,6 +1140,7 @@ const AlertsTab: React.FC<AlertsTabProps> = ({
   onAcknowledge,
   onCheckAlerts,
   member,
+  canOperateFinance,
 }) => {
   const { showToast } = useToast();
   const [checkingAlerts, setCheckingAlerts] = useState(false);
@@ -1174,10 +1195,12 @@ const AlertsTab: React.FC<AlertsTabProps> = ({
           <h3 className="text-base md:text-lg font-bold text-slate-900">Inventory Alerts</h3>
           <p className="text-xs text-slate-500 mt-0.5">Stock levels, maintenance, and system warnings</p>
         </div>
-        <Button variant="outline" size="sm" onClick={handleCheckAlerts} disabled={checkingAlerts}>
-          <Bell size={14} className={`mr-1.5 ${checkingAlerts ? 'animate-pulse' : ''}`} />
-          {checkingAlerts ? 'Checking...' : 'Check Alerts'}
-        </Button>
+        {canOperateFinance && (
+          <Button variant="outline" size="sm" onClick={handleCheckAlerts} disabled={checkingAlerts}>
+            <Bell size={14} className={`mr-1.5 ${checkingAlerts ? 'animate-pulse' : ''}`} />
+            {checkingAlerts ? 'Checking...' : 'Check Alerts'}
+          </Button>
+        )}
       </div>
 
       {/* KPI strip */}
@@ -1232,7 +1255,7 @@ const AlertsTab: React.FC<AlertsTabProps> = ({
                         )}
                       </div>
                     </div>
-                    {!alert.acknowledged && member && alert.id && (
+                    {canOperateFinance && !alert.acknowledged && member && alert.id && (
                       <button
                         onClick={() => handleAcknowledge(alert.id)}
                         className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 border border-slate-200 hover:border-green-300 hover:text-green-600 hover:bg-green-50 transition-colors"
@@ -1384,12 +1407,14 @@ const MaintenanceScheduleModal: React.FC<MaintenanceScheduleModalProps> = ({
 interface DepreciationTabProps {
   items: InventoryItem[];
   loading: boolean;
+  canOperateFinance: boolean;
   onUpdateDepreciation: (itemId: string) => Promise<void>;
 }
 
 const DepreciationTab: React.FC<DepreciationTabProps> = ({
   items,
   loading,
+  canOperateFinance,
   onUpdateDepreciation,
 }) => {
   const { showToast } = useToast();
@@ -1437,7 +1462,7 @@ const DepreciationTab: React.FC<DepreciationTabProps> = ({
           <h3 className="text-base md:text-lg font-bold text-slate-900">Depreciation Tracking</h3>
           <p className="text-xs text-slate-500 mt-0.5">Track asset depreciation and current book values</p>
         </div>
-        {itemsWithDepreciation.length > 0 && (
+        {canOperateFinance && itemsWithDepreciation.length > 0 && (
           <Button variant="outline" size="sm" onClick={handleUpdateAllDepreciation} disabled={updatingItems.size > 0}>
             <RefreshCw size={14} className={`mr-1.5 ${updatingItems.size > 0 ? 'animate-spin' : ''}`} />
             {updatingItems.size > 0 ? 'Updating...' : 'Update All'}
@@ -1520,14 +1545,16 @@ const DepreciationTab: React.FC<DepreciationTabProps> = ({
                         </div>
                       </td>
                       <td className="py-2.5 px-3 text-right">
-                        <button
-                          onClick={() => handleUpdateDepreciation(item.id)}
-                          disabled={isUpdating}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-40 transition-colors"
-                          title="Recalculate depreciation"
-                        >
-                          <RefreshCw size={13} className={isUpdating ? 'animate-spin' : ''} />
-                        </button>
+                        {canOperateFinance && (
+                          <button
+                            onClick={() => handleUpdateDepreciation(item.id)}
+                            disabled={isUpdating}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-40 transition-colors"
+                            title="Recalculate depreciation"
+                          >
+                            <RefreshCw size={13} className={isUpdating ? 'animate-spin' : ''} />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
@@ -1558,14 +1585,16 @@ const DepreciationTab: React.FC<DepreciationTabProps> = ({
                           )}
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleUpdateDepreciation(item.id)}
-                        disabled={isUpdating}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-40 transition-colors shrink-0"
-                        title="Recalculate"
-                      >
-                        <RefreshCw size={13} className={isUpdating ? 'animate-spin' : ''} />
-                      </button>
+                      {canOperateFinance && (
+                        <button
+                          onClick={() => handleUpdateDepreciation(item.id)}
+                          disabled={isUpdating}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-40 transition-colors shrink-0"
+                          title="Recalculate"
+                        >
+                          <RefreshCw size={13} className={isUpdating ? 'animate-spin' : ''} />
+                        </button>
+                      )}
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center mb-2.5">
                       <div className="bg-slate-50 rounded-lg py-1.5 px-1">

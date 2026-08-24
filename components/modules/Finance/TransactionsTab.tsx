@@ -56,6 +56,7 @@ interface TransactionsTabProps {
   getTransactionAccountLabel: (tx: Transaction | TransactionSplit, parentTx?: Transaction) => string;
   hasMoreTransactions: boolean;
   setTransactionLimit: (fn: (prev: number) => number) => void;
+  canOperateFinance: boolean;
 }
 
 // Flat item types for the virtual list
@@ -114,6 +115,7 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
   getTransactionAccountLabel,
   hasMoreTransactions,
   setTransactionLimit,
+  canOperateFinance,
 }) => {
   const { showToast } = useToast();
   const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
@@ -261,17 +263,19 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
           style={{ height: DESKTOP_SPLIT_H }}
         >
           <div className="py-2 px-2 flex-none" style={{ width: '2.5rem' }}>
-            <input
-              type="checkbox"
-              checked={selectedSplitIds.has(split.id)}
-              onChange={(e) => {
-                const next = new Set(selectedSplitIds);
-                if (e.target.checked) next.add(split.id);
-                else next.delete(split.id);
-                setSelectedSplitIds(next);
-              }}
-              className="accent-blue-600 cursor-pointer"
-            />
+            {canOperateFinance && (
+              <input
+                type="checkbox"
+                checked={selectedSplitIds.has(split.id)}
+                onChange={(e) => {
+                  const next = new Set(selectedSplitIds);
+                  if (e.target.checked) next.add(split.id);
+                  else next.delete(split.id);
+                  setSelectedSplitIds(next);
+                }}
+                className="accent-blue-600 cursor-pointer"
+              />
+            )}
           </div>
           <div className="py-2 px-4 flex-none" style={{ width: '7.5rem' }} />
           <div className="py-2 px-4 pl-12 flex-1 min-w-0 overflow-hidden">
@@ -329,7 +333,9 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
         style={{ height: DESKTOP_TX_H }}
       >
         <div className="py-4 px-2 flex-none" style={{ width: '2.5rem' }}>
-          <input type="checkbox" checked={selectedTxIds.has(tx.id)} onChange={handleTxCheckbox} className="accent-blue-600 cursor-pointer" />
+          {canOperateFinance && (
+            <input type="checkbox" checked={selectedTxIds.has(tx.id)} onChange={handleTxCheckbox} className="accent-blue-600 cursor-pointer" />
+          )}
         </div>
         <div className="py-4 px-3 text-slate-500 whitespace-nowrap flex-none" style={{ width: '7.5rem' }}>{formatDate(tx.date)}</div>
         <div className="py-4 px-3 flex-1 min-w-0 overflow-hidden">
@@ -372,29 +378,31 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
           {formatCurrency(tx.runningBalance)}
         </div>
         <div className="py-4 px-3 flex-none" style={{ width: '9rem' }}>
-          <div className="flex items-center justify-center gap-1">
-            <Button variant="ghost" size="sm" onClick={() => handleEditTransaction(tx)} className="text-slate-600 hover:text-blue-600 p-1" title="Edit transaction">
-              <Edit size={16} />
-            </Button>
-            {tx.status === 'Reconciled' || tx.status === 'Partially Reconciled' ? (
-              <Button variant="ghost" size="sm" onClick={() => handleVoidTransaction(tx)} className="text-slate-400 hover:text-red-600 p-1" title="Void reconciled transaction">
-                <Ban size={16} />
+          {canOperateFinance && (
+            <div className="flex items-center justify-center gap-1">
+              <Button variant="ghost" size="sm" onClick={() => handleEditTransaction(tx)} className="text-slate-600 hover:text-blue-600 p-1" title="Edit transaction">
+                <Edit size={16} />
               </Button>
-            ) : (
-              <Button variant="ghost" size="sm" onClick={() => requestDeleteTransaction(tx.id, tx.description)} className="text-slate-600 hover:text-red-600 p-1" title="Delete transaction">
-                <Trash2 size={16} />
-              </Button>
-            )}
-            {tx.matchStatus === 'full' && tx.matchedBankTxIds?.length ? (
-              <Button variant="ghost" size="sm" onClick={() => handleUnmatchTransaction(tx)} className="text-amber-500 hover:text-amber-700 p-1" title="Unmatch bank transaction">
-                <Link2Off size={16} />
-              </Button>
-            ) : (
-              <Button variant="ghost" size="sm" onClick={() => openSplitModal(tx)} className="text-blue-600 hover:text-blue-700 text-xs px-2" title={tx.isSplit ? 'Edit split' : 'Split transaction'}>
-                {tx.isSplit ? 'Edit Split' : 'Split'}
-              </Button>
-            )}
-          </div>
+              {tx.status === 'Reconciled' || tx.status === 'Partially Reconciled' ? (
+                <Button variant="ghost" size="sm" onClick={() => handleVoidTransaction(tx)} className="text-slate-400 hover:text-red-600 p-1" title="Void reconciled transaction">
+                  <Ban size={16} />
+                </Button>
+              ) : (
+                <Button variant="ghost" size="sm" onClick={() => requestDeleteTransaction(tx.id, tx.description)} className="text-slate-600 hover:text-red-600 p-1" title="Delete transaction">
+                  <Trash2 size={16} />
+                </Button>
+              )}
+              {tx.matchStatus === 'full' && tx.matchedBankTxIds?.length ? (
+                <Button variant="ghost" size="sm" onClick={() => handleUnmatchTransaction(tx)} className="text-amber-500 hover:text-amber-700 p-1" title="Unmatch bank transaction">
+                  <Link2Off size={16} />
+                </Button>
+              ) : (
+                <Button variant="ghost" size="sm" onClick={() => openSplitModal(tx)} className="text-blue-600 hover:text-blue-700 text-xs px-2" title={tx.isSplit ? 'Edit split' : 'Split transaction'}>
+                  {tx.isSplit ? 'Edit Split' : 'Split'}
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -436,7 +444,9 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
             {/* Row 1: checkbox + date + pending | amount */}
             <div className="flex items-center justify-between gap-2 mb-1">
               <div className="flex items-center gap-2 min-w-0">
-                <input type="checkbox" checked={selectedTxIds.has(tx.id)} onChange={handleTxCheckbox} className="accent-blue-600 w-4 h-4 cursor-pointer shrink-0" />
+                {canOperateFinance && (
+                  <input type="checkbox" checked={selectedTxIds.has(tx.id)} onChange={handleTxCheckbox} className="accent-blue-600 w-4 h-4 cursor-pointer shrink-0" />
+                )}
                 <span className="text-[11px] text-slate-400 font-medium shrink-0">{formatDate(tx.date)}</span>
                 {tx.status === 'Pending' && (
                   <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded px-1 shrink-0">
@@ -462,29 +472,31 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
                 })()}
                 <span className="text-[10px] text-slate-400 font-mono whitespace-nowrap shrink-0">Bal {formatCurrency(tx.runningBalance)}</span>
               </div>
-              <div className="flex items-center gap-0.5 shrink-0">
-                <button onClick={() => handleEditTransaction(tx)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors" title="Edit">
-                  <Edit size={14} />
-                </button>
-                {tx.status === 'Reconciled' || tx.status === 'Partially Reconciled' ? (
-                  <button onClick={() => handleVoidTransaction(tx)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors" title="Void reconciled transaction">
-                    <Ban size={14} />
+              {canOperateFinance && (
+                <div className="flex items-center gap-0.5 shrink-0">
+                  <button onClick={() => handleEditTransaction(tx)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors" title="Edit">
+                    <Edit size={14} />
                   </button>
-                ) : (
-                  <button onClick={() => requestDeleteTransaction(tx.id, tx.description)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors" title="Delete">
-                    <Trash2 size={14} />
-                  </button>
-                )}
-                {tx.matchStatus === 'full' && tx.matchedBankTxIds?.length ? (
-                  <button onClick={() => handleUnmatchTransaction(tx)} className="p-1.5 rounded-lg text-amber-500 hover:text-amber-700 hover:bg-amber-50 transition-colors" title="Unmatch bank transaction">
-                    <Link2Off size={14} />
-                  </button>
-                ) : (
-                  <button onClick={() => openSplitModal(tx)} className="px-2 py-1 rounded-lg text-[11px] font-bold text-blue-600 hover:bg-blue-50 transition-colors">
-                    {tx.isSplit ? 'Edit Split' : 'Split'}
-                  </button>
-                )}
-              </div>
+                  {tx.status === 'Reconciled' || tx.status === 'Partially Reconciled' ? (
+                    <button onClick={() => handleVoidTransaction(tx)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors" title="Void reconciled transaction">
+                      <Ban size={14} />
+                    </button>
+                  ) : (
+                    <button onClick={() => requestDeleteTransaction(tx.id, tx.description)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors" title="Delete">
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                  {tx.matchStatus === 'full' && tx.matchedBankTxIds?.length ? (
+                    <button onClick={() => handleUnmatchTransaction(tx)} className="p-1.5 rounded-lg text-amber-500 hover:text-amber-700 hover:bg-amber-50 transition-colors" title="Unmatch bank transaction">
+                      <Link2Off size={14} />
+                    </button>
+                  ) : (
+                    <button onClick={() => openSplitModal(tx)} className="px-2 py-1 rounded-lg text-[11px] font-bold text-blue-600 hover:bg-blue-50 transition-colors">
+                      {tx.isSplit ? 'Edit Split' : 'Split'}
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
             {/* Split details */}
             {splits.length > 0 && (
@@ -627,19 +639,21 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
               <div style={{ minWidth: 760 }}>
                 <div className="flex bg-slate-50 text-slate-500 border-b border-slate-100 sticky top-0 z-10">
                   <div className="py-3 px-2 font-semibold flex-none" style={{ width: '2.5rem' }}>
-                    <input
-                      type="checkbox"
-                      checked={(() => {
-                        const allVisibleTxIds = visibleTransactions.map(t => t.id);
-                        const allVisibleSplitIds = visibleTransactions.flatMap(t =>
-                          t.isSplit && transactionSplits[t.id] ? transactionSplits[t.id].map(s => s.id) : []
-                        );
-                        return allVisibleTxIds.length > 0 && allVisibleTxIds.every(id => selectedTxIds.has(id)) &&
-                          (allVisibleSplitIds.length === 0 || allVisibleSplitIds.every(id => selectedSplitIds.has(id)));
-                      })()}
-                      onChange={handleSelectAllTransactions}
-                      className="accent-blue-600 cursor-pointer"
-                    />
+                    {canOperateFinance && (
+                      <input
+                        type="checkbox"
+                        checked={(() => {
+                          const allVisibleTxIds = visibleTransactions.map(t => t.id);
+                          const allVisibleSplitIds = visibleTransactions.flatMap(t =>
+                            t.isSplit && transactionSplits[t.id] ? transactionSplits[t.id].map(s => s.id) : []
+                          );
+                          return allVisibleTxIds.length > 0 && allVisibleTxIds.every(id => selectedTxIds.has(id)) &&
+                            (allVisibleSplitIds.length === 0 || allVisibleSplitIds.every(id => selectedSplitIds.has(id)));
+                        })()}
+                        onChange={handleSelectAllTransactions}
+                        className="accent-blue-600 cursor-pointer"
+                      />
+                    )}
                   </div>
                   <div className="py-3 px-3 font-semibold whitespace-nowrap flex-none" style={{ width: '7.5rem' }}>Date</div>
                   <div className="py-3 px-3 font-semibold flex-1">Description</div>

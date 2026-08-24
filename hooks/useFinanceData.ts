@@ -141,7 +141,7 @@ export function useFinanceData(searchQuery?: string) {
   const [loadingSelectedProjectTransactions, setLoadingSelectedProjectTransactions] = useState<boolean>(false);
 
   const { showToast } = useToast();
-  const { hasPermission, isDeveloper } = usePermissions();
+  const { hasPermission, isDeveloper, canOperateFinance } = usePermissions();
   const { user } = useAuth();
 
   // Tracks which projectIds have already been fetched for purpose autocomplete
@@ -1804,6 +1804,7 @@ export function useFinanceData(searchQuery?: string) {
     showToast,
     hasPermission,
     isDeveloper,
+    canOperateFinance,
     user,
 
     // core data

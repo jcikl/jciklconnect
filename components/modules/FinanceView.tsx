@@ -113,7 +113,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
 
   const {
     // auth / permissions (also used in JSX)
-    showToast, hasPermission, isDeveloper, user,
+    showToast, hasPermission, isDeveloper, canOperateFinance, user,
 
     // core data
     transactions, setTransactions,
@@ -331,16 +331,18 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
           <Button variant="outline" size="sm" onClick={() => setIsReportsModalOpen(true)} title="Reports" className="shrink-0 h-[38px] px-2.5 sm:px-3">
             <FileText size={14} className="sm:mr-1.5" /><span className="hidden sm:inline">Reports</span>
           </Button>
-          {hasPermission('canEditFinance') && (
+          {canOperateFinance && (
             <>
               <Button variant="outline" size="sm" onClick={() => setIsImportModalOpen(true)} title="Batch Import" className="shrink-0 h-[38px] px-2.5 sm:px-3">
                 <Upload size={14} className="sm:mr-1.5" /><span className="hidden sm:inline">Batch Import</span>
               </Button>
             </>
           )}
-          <Button className="shrink-0 h-[38px]" onClick={() => { setAddDefaultCategory(null); setRecordFormCategory('Projects & Activities'); setIsModalOpen(true); }}>
-            <DollarSign size={16} className="mr-1.5" />Transaction
-          </Button>
+          {canOperateFinance && (
+            <Button className="shrink-0 h-[38px]" onClick={() => { setAddDefaultCategory(null); setRecordFormCategory('Projects & Activities'); setIsModalOpen(true); }}>
+              <DollarSign size={16} className="mr-1.5" />Transaction
+            </Button>
+          )}
         </div>
       </div>
 
@@ -474,11 +476,11 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
 
             {/* Sidebar: Accounts */}
             <div className="order-1 md:order-2 min-w-0">
-              <Card title="Bank Accounts" action={
+              <Card title="Bank Accounts" action={canOperateFinance ? (
                 <Button variant="ghost" size="sm" onClick={() => setIsAddAccountModalOpen(true)}>
                   <Plus size={14} className="mr-1" /> Add
                 </Button>
-              }>
+              ) : undefined}>
                 {accounts.length === 0 ? (
                   <p className="text-sm text-slate-500 text-center py-4">No bank accounts configured</p>
                 ) : (
@@ -534,7 +536,9 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
                               <CheckCircle size={11} className="text-green-500 shrink-0" />
                               <span className="text-[10px] text-slate-400">Reconciled {formatDate(acc.lastReconciled)}</span>
                             </div>
-                            <button className="text-[10px] text-blue-500 hover:text-blue-700 font-medium" onClick={e => { e.stopPropagation(); setMatchingAccount(acc); }}>Match txs</button>
+                            {canOperateFinance && (
+                              <button className="text-[10px] text-blue-500 hover:text-blue-700 font-medium" onClick={e => { e.stopPropagation(); setMatchingAccount(acc); }}>Match txs</button>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -560,7 +564,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
             setEditingMembershipYear(yearFromProjectId ? parseInt(yearFromProjectId, 10) : new Date(tx.date).getFullYear());
             setIsEditModalOpen(true);
           }}
-          hasEditPermission={hasPermission('canEditFinance')}
+          hasEditPermission={canOperateFinance}
           formatCurrency={(n) => formatCurrency(n)}
           formatDate={(d) => formatDate(d)}
           onMembershipDataChanged={loadData}
@@ -582,7 +586,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
             loading={loading}
             error={error}
             getTransactionAccountLabel={getTransactionAccountLabel}
-            hasPermission={hasPermission}
+            hasPermission={(permission) => permission === 'canEditFinance' ? canOperateFinance : hasPermission(permission as Parameters<typeof hasPermission>[0])}
             handleEditTransaction={handleEditTransaction}
             handleDeleteTransaction={handleDeleteTransaction}
             setIsAddAdministrativeProjectOpen={setIsAddAdministrativeProjectOpen}
@@ -705,7 +709,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
                           <Button
                             size="sm"
                             onClick={() => handleLinkPrToBankTx(pr.id)}
-                            disabled={!selectedId || prLinkingId === pr.id}
+                            disabled={!canOperateFinance || !selectedId || prLinkingId === pr.id}
                             className="w-full"
                           >
                             <Link2 size={13} className="mr-1.5" />
@@ -790,7 +794,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
                                   {tx.referenceNumber && <span className="text-[10px] text-slate-400 font-mono truncate">{tx.referenceNumber}</span>}
                                 </div>
                                 {tx.status !== 'Reconciled' && (
-                                  <Button size="sm" onClick={() => handleMarkReconciled(tx.id)} disabled={reconcilingId !== null} className="shrink-0 text-[11px] px-2 py-1">
+                                  <Button size="sm" onClick={() => handleMarkReconciled(tx.id)} disabled={!canOperateFinance || reconcilingId !== null} className="shrink-0 text-[11px] px-2 py-1">
                                     {reconcilingId === tx.id ? 'Processing…' : 'Mark Reconciled'}
                                   </Button>
                                 )}
@@ -858,7 +862,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
             loading={loading}
             error={error}
             getTransactionAccountLabel={getTransactionAccountLabel}
-            hasPermission={hasPermission}
+            hasPermission={(permission) => permission === 'canEditFinance' ? canOperateFinance : hasPermission(permission as Parameters<typeof hasPermission>[0])}
             handleEditTransaction={handleEditTransaction}
             handleDeleteTransaction={handleDeleteTransaction}
             loadProjectTrxList={loadProjectTrxList}
@@ -908,12 +912,13 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
             getTransactionAccountLabel={getTransactionAccountLabel}
             hasMoreTransactions={hasMoreTransactions}
             setTransactionLimit={setTransactionLimit}
+            canOperateFinance={canOperateFinance}
           />
         </AsyncErrorBoundary>
       )}
 
       <Modal
-        isOpen={isModalOpen}
+        isOpen={canOperateFinance && isModalOpen}
         onClose={() => { setIsModalOpen(false); setAddDefaultCategory(null); setRecordFormCategory('Projects & Activities'); setRecordFormMemberId(''); setRecordFormYear(new Date().getFullYear()); setRecordFormProjectId(''); }}
         title="Record Transaction"
         size="2xl"
@@ -958,7 +963,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
       {/* Edit Transaction Modal */}
       {editingTransaction && (
         <Modal
-          isOpen={isEditModalOpen}
+          isOpen={canOperateFinance && isEditModalOpen}
           onClose={() => { setIsEditModalOpen(false); setEditingTransaction(null); setEditingMembershipFilterYear(null); setEditingMembershipMemberId(''); setEditingMembershipYear(new Date().getFullYear()); setEditingAdministrativeYear(new Date().getFullYear()); setEditingAdministrativePurposeBase(''); }}
           title="Edit Transaction"
           size="2xl"
@@ -1017,7 +1022,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
       {/* Project Tracker Transactions (Project Trx) Modal */}
       {selectedProjectFilter && selectedProjectInfo && (
         <Modal
-          isOpen={isProjectTrxModalOpen}
+          isOpen={canOperateFinance && isProjectTrxModalOpen}
           onClose={() => setIsProjectTrxModalOpen(false)}
           title={`Configure Project Tracker Transactions - ${selectedProjectInfo.name || selectedProjectInfo.title}`}
           size="4xl"
@@ -1397,7 +1402,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
 
       {/* Dues Renewal Modal */}
       <DuesRenewalModal
-        isOpen={isDuesRenewalModalOpen}
+        isOpen={canOperateFinance && isDuesRenewalModalOpen}
         onClose={() => setIsDuesRenewalModalOpen(false)}
         year={renewalYear}
         onYearChange={setRenewalYear}
@@ -1423,7 +1428,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
       {/* Batch Import Modal */}
       <Suspense fallback={null}>
         <BankTransactionImportModal
-          isOpen={isImportModalOpen}
+          isOpen={canOperateFinance && isImportModalOpen}
           onClose={() => setIsImportModalOpen(false)}
           onImported={async () => {
             await loadData();
@@ -1437,7 +1442,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
           <Suspense fallback={null}>
           <TransactionSplitModal
             transaction={selectedTransaction}
-            isOpen={isSplitModalOpen}
+            isOpen={canOperateFinance && isSplitModalOpen}
             adminProjectIds={dynamicAdministrativeProjectIds}
             memberOptions={members}
             projectOptions={projects.map(p => {
@@ -1467,7 +1472,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
       {/* Batch Category Modal */}
       <Suspense fallback={null}>
       <BatchCategoryModal
-        isOpen={isBatchCategoryModalOpen}
+        isOpen={canOperateFinance && isBatchCategoryModalOpen}
         onClose={() => setIsBatchCategoryModalOpen(false)}
         onSuccess={() => {
           showToast('Batch category update applied successfully', 'success');
@@ -1585,7 +1590,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
       </Drawer>
 
       {/* Fixed Bottom Action Bar for Batch Selection */}
-      {moduleTab === 'Transactions' && displayTransactions.length > 0 && (selectedTxIds.size + selectedSplitIds.size) > 1 && (
+      {canOperateFinance && moduleTab === 'Transactions' && displayTransactions.length > 0 && (selectedTxIds.size + selectedSplitIds.size) > 1 && (
         <div className="fixed bottom-6 left-4 right-4 md:left-1/2 md:right-auto md:-translate-x-1/2 z-[40] animate-in fade-in slide-in-from-bottom-4 duration-300">
           <div className="flex items-center justify-between md:justify-start gap-2 md:gap-6 bg-slate-900/95 backdrop-blur-md px-4 md:px-6 py-3 md:py-4 rounded-2xl shadow-2xl border border-white/10">
             <div className="flex items-center gap-3 pr-2 md:pr-4 md:border-r border-slate-700">
@@ -1649,13 +1654,13 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
 
       {/* Add Bank Account Modal */}
       <AddBankAccountModal
-        isOpen={isAddAccountModalOpen}
+        isOpen={canOperateFinance && isAddAccountModalOpen}
         onClose={() => setIsAddAccountModalOpen(false)}
         onAdded={loadData}
       />
 
       {/* Bank Transaction Matching Modal */}
-      {matchingAccount && (
+      {canOperateFinance && matchingAccount && (
         <Suspense fallback={null}>
           <BankMatchingModal
             isOpen={!!matchingAccount}
@@ -1691,7 +1696,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
       />
 
       <Modal
-        isOpen={isAddAdministrativeProjectOpen}
+        isOpen={canOperateFinance && isAddAdministrativeProjectOpen}
         onClose={() => setIsAddAdministrativeProjectOpen(false)}
         title="Add Admin Account"
         size="md"

@@ -15,12 +15,14 @@ type LegacyBoardFields = {
 const DEV_MODE_PERMISSIONS: Permission = ALL_PERMISSIONS_GRANTED;
 
 export const usePermissions = () => {
-  const { member, isDevMode: isDevModeFromAuth, simulatedRole } = useAuth();
+  const { member, isDevMode: isDevModeFromAuth, simulatedRole, simulatedMemberId } = useAuth();
   const devMode = isDevMode() || isDevModeFromAuth;
 
   const permissions = useMemo(() => {
-    // If role is being simulated, use that role's permissions
-    if (simulatedRole) {
+    // Role-only simulation intentionally uses the static role baseline.
+    // Member impersonation must continue into dynamic checks so current-board
+    // members receive board-elevated finance/inventory permissions.
+    if (simulatedRole && !simulatedMemberId) {
       return ROLE_PERMISSIONS[simulatedRole] || ROLE_PERMISSIONS[UserRole.MEMBER];
     }
 
@@ -46,6 +48,13 @@ export const usePermissions = () => {
     const currentBoardPositionInner =
       member.jciCareer?.currentBoardPosition ?? memberWithLegacyBoardFields.currentBoardPosition;
     const isExternalOfficerInner = isExternalOfficerPosition(currentBoardPositionInner);
+    const boardPositionInner = (currentBoardPositionInner ?? '').toLowerCase();
+    const isFinanceOperatorInner =
+      isCurrentBoardMember &&
+      !isExternalOfficerInner &&
+      (boardPositionInner.includes('treasurer') ||
+        boardPositionInner.includes('secretary') ||
+        (boardPositionInner.includes('president') && !boardPositionInner.includes('vice')));
 
     // ADMIN and SUPER_ADMIN are excluded here because they receive permissions from ROLE_PERMISSIONS[ADMIN/SUPER_ADMIN].
     // Firestore rules (isBoard()) does include ADMIN for collection access — the two systems have different semantics by design.
@@ -55,7 +64,7 @@ export const usePermissions = () => {
         canViewMembers: true,
         canEditMembers: true,
         canViewFinance: true,
-        canEditFinance: true,
+        canEditFinance: isFinanceOperatorInner,
         canManageProjects: true,
         canManageEvents: true,
         canManageInventory: true,
@@ -67,10 +76,10 @@ export const usePermissions = () => {
     }
 
     return basePermissions;
-  }, [member, devMode, simulatedRole]);
+  }, [member, devMode, simulatedRole, simulatedMemberId]);
 
   const hasPermission = (permission: keyof Permission): boolean => {
-    // If role is being simulated, use that role's permissions
+    // During simulation, use the permissions computed above.
     if (simulatedRole) {
       return permissions[permission];
     }
@@ -82,7 +91,7 @@ export const usePermissions = () => {
   };
 
   const hasAnyPermission = (...perms: (keyof Permission)[]): boolean => {
-    // If role is being simulated, use that role's permissions
+    // During simulation, use the permissions computed above.
     if (simulatedRole) {
       return perms.some(perm => permissions[perm]);
     }
@@ -94,7 +103,7 @@ export const usePermissions = () => {
   };
 
   const hasAllPermissions = (...perms: (keyof Permission)[]): boolean => {
-    // If role is being simulated, use that role's permissions
+    // During simulation, use the permissions computed above.
     if (simulatedRole) {
       return perms.every(perm => permissions[perm]);
     }
@@ -152,6 +161,13 @@ export const usePermissions = () => {
       (boardPosition.includes('finance') && !boardPosition.includes('activity')));
   const isActivityFinance =
     isBoardUser && boardPosition.includes('activity') && boardPosition.includes('finance');
+  const isCurrentBoardFinanceOperator =
+    isCurrentBoardMember && !isExternalOfficer && effectiveRole !== UserRole.INACTIVE;
+  const canOperateFinance =
+    isCurrentBoardFinanceOperator &&
+    (boardPosition.includes('treasurer') ||
+      boardPosition.includes('secretary') ||
+      (boardPosition.includes('president') && !boardPosition.includes('vice')));
 
   return {
     permissions,
@@ -172,6 +188,7 @@ export const usePermissions = () => {
     isPresident,
     isOrganizationFinance,
     isActivityFinance,
+    canOperateFinance,
     isDeveloper: isDevMode() && !simulatedRole,
     effectiveRole,
   };
