@@ -113,27 +113,12 @@ const DesktopMemberRow = React.memo(function DesktopMemberRow({
       <div className="px-6 flex-none" style={{ width: 160 }}>
         <Badge variant={membershipTypeBadgeVariant(displayType)}>{displayType}</Badge>
       </div>
-      {/* Tier / Points */}
-      <div className="px-6 flex-none" style={{ width: 140 }}>
-        <div className="flex flex-col">
-          <span className={`text-sm font-medium ${member.tier === 'Platinum' ? 'text-purple-600' : member.tier === 'Gold' ? 'text-amber-600' : 'text-slate-600'}`}>
-            {member.tier}
-          </span>
-          <span className="text-xs text-slate-500">{member.points} pts</span>
-        </div>
-      </div>
       {/* Engagement */}
       <div className="px-6 flex-none" style={{ width: 192 }}>
         <div className="flex items-center space-x-2">
           <ProgressBar progress={att.ratio} color={att.checkins < att.months ? 'bg-amber-500' : 'bg-green-500'} />
           <span className="text-xs font-medium text-slate-600 whitespace-nowrap">{att.text}</span>
         </div>
-      </div>
-      {/* Risk Status */}
-      <div className="px-6 flex-none" style={{ width: 120 }}>
-        {member.churnRisk === 'High' && <Badge variant="error">At Risk</Badge>}
-        {member.churnRisk === 'Low' && <Badge variant="success">Stable</Badge>}
-        {member.churnRisk === 'Medium' && <Badge variant="warning">Monitor</Badge>}
       </div>
       {/* Action */}
       <div className="px-6 flex-none" style={{ width: 80 }}>
@@ -322,9 +307,8 @@ const MemberTableBase: React.FC<{
                   onChange={(vals) => onMembershipTypeFiltersChange(vals as MembershipType[])}
                 />
               </div>
-              <div className="px-6 py-4 flex-none text-sm font-semibold text-slate-500" style={{ width: 140 }}>Tier / Points</div>
               <div className="px-6 py-4 flex-none text-sm font-semibold text-slate-500" style={{ width: 192 }}>Engagement</div>
-              <div className="px-6 py-4 flex-none text-sm font-semibold text-slate-500" style={{ width: 120 }}>Risk Status</div>
+
               <div className="px-6 py-4 flex-none text-sm font-semibold text-slate-500" style={{ width: 80 }}>Action</div>
             </div>
 

@@ -1457,9 +1457,6 @@ export const JCIKLApp: React.FC = () => {
                     <div className="flex-1 min-w-0">
                       <p className={`font-black text-sm leading-tight truncate ${'text-white'}`}>{member?.general?.name || 'Member'}</p>
                       <p className={`text-xs truncate mt-0.5 ${'text-slate-400'}`}>{member?.contact?.email || ''}</p>
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <span className={`text-[10px] font-bold ${'text-slate-500'}`}>{((member as any)?.yearlyPoints?.[new Date().getFullYear()] ?? member?.points ?? 0)} pts {new Date().getFullYear()}</span>
-                      </div>
                     </div>
                     <div className={`text-xs font-bold shrink-0 ${'text-slate-500'}`}>
                       View Profile →
