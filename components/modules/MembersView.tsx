@@ -10,7 +10,7 @@ import {
   BookOpen, Trophy, Network, ChevronRight, LayoutList
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { Button, Card, Badge, ProgressBar, Modal, useToast, Pagination, Tabs, PageHeader } from '../ui/Common';
+import { Button, Card, Badge, ProgressBar, Modal, useToast, Pagination, Tabs, PageHeader, ConfirmDialog, CONFIRM_CLOSED, ConfirmState } from '../ui/Common';
 import { Input, Select, Textarea, ButtonGroup } from '../ui/Form';
 import { MultiSelectDropdown } from '../ui/MultiSelectDropdown';
 import { MemberEditForm } from './MemberEditForm';
@@ -131,6 +131,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
   const [membershipTypeFilters, setMembershipTypeFilters] = useState<MembershipType[]>([]);
   const [showLegacyBoardOnly, setShowLegacyBoardOnly] = useState(false);
   const [isFixingLegacyBoard, setIsFixingLegacyBoard] = useState(false);
+  const [legacyBoardConfirm, setLegacyBoardConfirm] = useState<ConfirmState>(CONFIRM_CLOSED);
   const [membershipRules, setMembershipRules] = useState<
     Record<MembershipType, MembershipRuleConfig>
   >(DEFAULT_MEMBERSHIP_RULES);
@@ -542,20 +543,27 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
                 </button>
                 <button
                   disabled={isFixingLegacyBoard}
-                  onClick={async () => {
-                    if (!window.confirm(`将 ${legacyBoardMembers.length} 位成员的 role 从 BOARD 降回 MEMBER？此操作不可撤销。`)) return;
-                    setIsFixingLegacyBoard(true);
-                    try {
-                      await batchUpdateMembers(legacyBoardMembers.map(m => m.id), { role: UserRole.MEMBER } as Partial<Member>);
-                      showToast(`已将 ${legacyBoardMembers.length} 位 Legacy BOARD 降回 MEMBER`, 'success');
-                      setShowLegacyBoardOnly(false);
-                      await loadMembers();
-                    } catch {
-                      showToast('操作失败，请重试', 'error');
-                    } finally {
-                      setIsFixingLegacyBoard(false);
-                    }
-                  }}
+                  onClick={() => setLegacyBoardConfirm({
+                    open: true,
+                    title: 'Legacy BOARD 降回 MEMBER',
+                    message: `将 ${legacyBoardMembers.length} 位成员的 role 从 BOARD 降回 MEMBER？此操作不可撤销。`,
+                    confirmLabel: `确认降回 ${legacyBoardMembers.length} 人`,
+                    variant: 'danger',
+                    onConfirm: async () => {
+                      setLegacyBoardConfirm(CONFIRM_CLOSED);
+                      setIsFixingLegacyBoard(true);
+                      try {
+                        await batchUpdateMembers(legacyBoardMembers.map(m => m.id), { role: UserRole.MEMBER } as Partial<Member>);
+                        showToast(`已将 ${legacyBoardMembers.length} 位 Legacy BOARD 降回 MEMBER`, 'success');
+                        setShowLegacyBoardOnly(false);
+                        await loadMembers();
+                      } catch {
+                        showToast('操作失败，请重试', 'error');
+                      } finally {
+                        setIsFixingLegacyBoard(false);
+                      }
+                    },
+                  })}
                   className="flex w-full items-center gap-3 px-4 py-2.5 rounded-2xl border border-red-200 bg-white text-red-600 hover:bg-red-50 text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <div className="w-7 h-7 rounded-lg bg-red-100 flex items-center justify-center shrink-0">
@@ -861,6 +869,15 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
           </div>
         </Modal>
       )}
+      <ConfirmDialog
+        open={legacyBoardConfirm.open}
+        title={legacyBoardConfirm.title}
+        message={legacyBoardConfirm.message}
+        confirmLabel={legacyBoardConfirm.confirmLabel}
+        variant={legacyBoardConfirm.variant}
+        onConfirm={legacyBoardConfirm.onConfirm}
+        onCancel={() => setLegacyBoardConfirm(CONFIRM_CLOSED)}
+      />
     </div>
   );
 };
