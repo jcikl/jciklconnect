@@ -278,6 +278,7 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                                     setIsDocUploadOpen(false);
                                     setEditingDoc(null);
                                     setDocForm({ name: '', purpose: '', fileUrl: '' });
+                                    reloadDocs();
                                 } catch {
                                     showToast(editingDoc ? 'Failed to update document' : 'Failed to upload document', 'error');
                                 } finally {
