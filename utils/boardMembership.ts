@@ -68,8 +68,12 @@ export function isActiveBoardRecordForYear(record: BoardMember, year: number): b
  */
 export function isMemberCurrentBoard(member: Member | null | undefined): boolean {
   if (!member) return false;
-  if (!member.jciCareer?.isCurrentBoardMember) return false;
-  const pos = member.jciCareer?.currentBoardPosition;
+  const legacyMember = member as Member & {
+    isCurrentBoardMember?: boolean;
+    currentBoardPosition?: string;
+  };
+  if (!(member.jciCareer?.isCurrentBoardMember ?? legacyMember.isCurrentBoardMember)) return false;
+  const pos = member.jciCareer?.currentBoardPosition ?? legacyMember.currentBoardPosition;
   if (isExternalOfficerPosition(pos)) return false;
   return true;
 }

@@ -36,10 +36,20 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/members/$(request.auth.uid)).data;
     }
 
-    // Synced from boardMembers when assigned to the current calendar-year board
+    function memberJciCareer() {
+      return memberData().get('jciCareer', {});
+    }
+
+    // Synced from boardMembers when assigned to the current calendar-year board.
+    // Supports both legacy top-level fields and the canonical jciCareer.* fields.
     function isCurrentBoardMember() {
       return exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-             memberData().get('isCurrentBoardMember', false) == true;
+             (memberData().get('isCurrentBoardMember', false) == true ||
+              memberJciCareer().get('isCurrentBoardMember', false) == true);
+    }
+
+    function currentBoardPosition() {
+      return memberData().get('currentBoardPosition', memberJciCareer().get('currentBoardPosition', ''));
     }
 
     // isBoard() intentionally includes ADMIN as a superset of BOARD for Firestore collection access.
@@ -287,7 +297,7 @@ service cloud.firestore {
              exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
              (isAdmin() ||
               (isCurrentBoardMember() &&
-               memberData().get('currentBoardPosition', '').matches('.*[Tt]reasurer.*')));
+               currentBoardPosition().matches('.*[Tt]reasurer.*')));
     }
 
     // Finance access: current-calendar-year board members and admins

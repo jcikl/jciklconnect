@@ -934,15 +934,25 @@ export class BoardManagementService {
             'jciCareer.isCurrentBoardMember': !isExternalOfficer,
           } as unknown as Partial<Member>;
           await MembersService.updateMember(member.id, updates);
-          return updates;
+          return {
+            jciCareer: {
+              ...(member.jciCareer ?? {}),
+              currentBoardYear: currentYear,
+              currentBoardPosition: activeRecord.position,
+              isCurrentBoardMember: !isExternalOfficer,
+            },
+          } as Partial<Member>;
         }
 
         if (flaggedOnBoard && !hasActiveBoardRecordForCurrentYear(records)) {
           await this.clearMemberCurrentBoardStatus(member.id);
           return {
-            currentBoardYear: undefined,
-            currentBoardPosition: undefined,
-            isCurrentBoardMember: false,
+            jciCareer: {
+              ...(member.jciCareer ?? {}),
+              currentBoardYear: undefined,
+              currentBoardPosition: undefined,
+              isCurrentBoardMember: false,
+            },
           };
         }
 

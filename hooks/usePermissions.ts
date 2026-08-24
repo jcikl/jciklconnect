@@ -8,6 +8,10 @@ import { Permission, ROLE_PERMISSIONS, ALL_PERMISSIONS_GRANTED } from '../utils/
 
 export type { Permission };
 
+type LegacyBoardFields = {
+  currentBoardPosition?: string;
+};
+
 const DEV_MODE_PERMISSIONS: Permission = ALL_PERMISSIONS_GRANTED;
 
 export const usePermissions = () => {
@@ -38,7 +42,10 @@ export const usePermissions = () => {
     const isLegacyBoardRoleInner = effectiveRoleInner === UserRole.BOARD;
     // External officers (Area / National / JCI Officer) must not receive board-level permissions
     // regardless of their role field or isCurrentBoardMember flag.
-    const isExternalOfficerInner = isExternalOfficerPosition(member.jciCareer?.currentBoardPosition);
+    const memberWithLegacyBoardFields = member as typeof member & LegacyBoardFields;
+    const currentBoardPositionInner =
+      member.jciCareer?.currentBoardPosition ?? memberWithLegacyBoardFields.currentBoardPosition;
+    const isExternalOfficerInner = isExternalOfficerPosition(currentBoardPositionInner);
 
     // ADMIN and SUPER_ADMIN are excluded here because they receive permissions from ROLE_PERMISSIONS[ADMIN/SUPER_ADMIN].
     // Firestore rules (isBoard()) does include ADMIN for collection access — the two systems have different semantics by design.
@@ -105,7 +112,10 @@ export const usePermissions = () => {
   const isLegacyBoardRole = effectiveRole === UserRole.BOARD;
   // External officers (Area / National / JCI Officer) hold honorary board records but are NOT
   // board of directors — they must not receive board-level system permissions.
-  const isExternalOfficer = isExternalOfficerPosition(member?.jciCareer?.currentBoardPosition);
+  const memberWithLegacyBoardFields = member as typeof member & LegacyBoardFields | null;
+  const currentBoardPosition =
+    member?.jciCareer?.currentBoardPosition ?? memberWithLegacyBoardFields?.currentBoardPosition;
+  const isExternalOfficer = isExternalOfficerPosition(currentBoardPosition);
   // T-1: INACTIVE is a hard block — never grant board status regardless of flags
   const isBoardUser = (isCurrentBoardMember || isLegacyBoardRole) && !isExternalOfficer && effectiveRole !== UserRole.INACTIVE;
   const isPlainMember =
@@ -133,7 +143,7 @@ export const usePermissions = () => {
     effectiveRole !== UserRole.INACTIVE;
 
   // B-3: Derive board-position flags from currentBoardPosition field
-  const boardPosition = (member?.jciCareer?.currentBoardPosition ?? '').toLowerCase();
+  const boardPosition = (currentBoardPosition ?? '').toLowerCase();
   const isOrganizationSecretary = isBoardUser && boardPosition.includes('secretary');
   const isPresident = isBoardUser && boardPosition.includes('president') && !boardPosition.includes('vice');
   const isOrganizationFinance =
