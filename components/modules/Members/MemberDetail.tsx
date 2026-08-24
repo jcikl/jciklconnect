@@ -1068,14 +1068,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
           </div>{/* end åŒºå—ä¸‰ */}
         </div>{/* end desktop hero wrapper */}
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-0 border-t border-slate-100 divide-slate-100 bg-slate-50/50 [&>*]:border-b [&>*]:sm:border-b-0 [&>*]:border-slate-100 divide-x">
-          <div className="p-2 md:p-4 text-center hover:bg-white transition-colors group">
-            <div className="flex items-center justify-center gap-1.5 mb-1">
-              <Coins size={12} className="text-jci-blue" />
-              <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Total Points</p>
-            </div>
-            <p className="text-lg md:text-2xl font-black text-jci-blue">{(member.points ?? 0).toLocaleString()}</p>
-          </div>
+        <div className="grid grid-cols-3 gap-0 border-t border-slate-100 divide-slate-100 bg-slate-50/50 [&>*]:border-b [&>*]:sm:border-b-0 [&>*]:border-slate-100 divide-x">
           <div className="p-2 md:p-4 text-center hover:bg-white transition-colors">
             <div className="flex items-center justify-center gap-1.5 mb-1">
               <Calendar size={12} className="text-slate-400" />

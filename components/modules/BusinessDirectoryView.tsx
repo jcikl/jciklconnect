@@ -499,7 +499,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                               <div className="flex items-center gap-1.5">
                                 <span className="text-sm font-bold text-slate-900 truncate">{biz.ownerName}</span>
                                 {chineseName && <span className="text-xs text-slate-400 font-medium truncate hidden sm:inline">({chineseName})</span>}
-                                {!isGuest && getBizScore(biz) === 1 && <span className="ml-auto text-[10px] font-bold bg-violet-50 text-violet-600 border border-violet-200 px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shrink-0">âœ¦ Ideal</span>}
+                                {!isGuest && getBizScore(biz) === 1 && <span className="ml-auto text-[10px] font-bold bg-violet-50 text-violet-600 border border-violet-200 px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shrink-0">✦ Ideal</span>}
                               </div>
                               <p className="text-xs text-slate-500 truncate">{position} · {biz.companyName}</p>
                               <div className="flex items-center gap-1.5 mt-1 flex-wrap">
@@ -615,7 +615,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                     {!isGuest && filteredBusinesses.length > 0 && (() => {
                       const firstScore = getBizScore(filteredBusinesses[0]);
                       if (firstScore === 0) return <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1.5"><Bookmark size={10} className="fill-slate-400 text-slate-400" /> Bookmarked</p>;
-                      if (firstScore === 1) return <p className="text-[10px] font-black text-sky-500 uppercase tracking-widest mb-1 flex items-center gap-1.5">âœ¦ Suggested for You</p>;
+                      if (firstScore === 1) return <p className="text-[10px] font-black text-sky-500 uppercase tracking-widest mb-1 flex items-center gap-1.5">✦ Suggested for You</p>;
                       return null;
                     })()}
                     <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
@@ -647,7 +647,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-center gap-1.5">
                                     <p className="font-bold text-sm text-slate-900 truncate leading-tight">{biz.ownerName}</p>
-                                    {!isGuest && getBizScore(biz) === 1 && <span className="ml-auto text-[10px] font-bold bg-violet-50 text-violet-600 border border-violet-200 px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shrink-0">âœ¦ Ideal</span>}
+                                    {!isGuest && getBizScore(biz) === 1 && <span className="ml-auto text-[10px] font-bold bg-violet-50 text-violet-600 border border-violet-200 px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shrink-0">✦ Ideal</span>}
                                   </div>
                                   {chineseName && <p className="text-[11px] text-slate-400 truncate">{chineseName}</p>}
                                   <p className="text-xs text-slate-500 truncate mt-0.5">{position}</p>
