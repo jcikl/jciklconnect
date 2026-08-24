@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { useAuth } from './useAuth';
 import { UserRole } from '../types';
 import { isDevMode } from '../utils/devMode';
-import { isMemberCurrentBoard, isExternalOfficerPosition, EXTERNAL_OFFICER_POSITIONS } from '../utils/boardMembership';
+import { isMemberCurrentBoard, isExternalOfficerPosition } from '../utils/boardMembership';
 import { Permission, ROLE_PERMISSIONS, ALL_PERMISSIONS_GRANTED } from '../utils/rolePermissions';
 
 export type { Permission };
@@ -38,7 +38,7 @@ export const usePermissions = () => {
     const isLegacyBoardRoleInner = effectiveRoleInner === UserRole.BOARD;
     // External officers (Area / National / JCI Officer) must not receive board-level permissions
     // regardless of their role field or isCurrentBoardMember flag.
-    const isExternalOfficerInner = EXTERNAL_OFFICER_POSITIONS.has(member.jciCareer?.currentBoardPosition ?? '');
+    const isExternalOfficerInner = isExternalOfficerPosition(member.jciCareer?.currentBoardPosition);
 
     // ADMIN and SUPER_ADMIN are excluded here because they receive permissions from ROLE_PERMISSIONS[ADMIN/SUPER_ADMIN].
     // Firestore rules (isBoard()) does include ADMIN for collection access — the two systems have different semantics by design.
