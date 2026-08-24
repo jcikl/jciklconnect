@@ -225,14 +225,16 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
     getMemberDisplayMembershipType,
   });
 
-  // Always pin current user to the top
+  // Sort alphabetically by name, then pin current user to the top
   const sortedMembers = useMemo(() => {
-    if (!currentMember?.id) return filteredMembers;
-    const idx = filteredMembers.findIndex(m => m.id === currentMember.id);
-    if (idx <= 0) return filteredMembers;
-    const result = [...filteredMembers];
-    result.unshift(result.splice(idx, 1)[0]);
-    return result;
+    const sorted = [...filteredMembers].sort((a, b) =>
+      (a.general?.name ?? '').localeCompare(b.general?.name ?? '', undefined, { sensitivity: 'base' })
+    );
+    if (!currentMember?.id) return sorted;
+    const idx = sorted.findIndex(m => m.id === currentMember.id);
+    if (idx <= 0) return sorted;
+    sorted.unshift(sorted.splice(idx, 1)[0]);
+    return sorted;
   }, [filteredMembers, currentMember?.id]);
 
   // Paginate filtered members
