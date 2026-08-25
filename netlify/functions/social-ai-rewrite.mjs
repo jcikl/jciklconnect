@@ -1,3 +1,17 @@
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
+
+if (!getApps().length) {
+  initializeApp({
+    credential: cert({
+      projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    }),
+  });
+}
+
 const PLATFORM_BRIEFS = {
   Facebook: 'Facebook role: Community + Distribution. Optimize for comments, shares, community pride, and clear participation. Use short paragraphs, warm professional language, and a natural CTA.',
   Instagram: 'Instagram role: Visual + Emotion. Let the visual carry the basic facts; the caption should add a sharp first-line hook, human emotion, and a lightweight CTA. Use mobile-friendly line breaks and 5-8 precise hashtags.',
@@ -28,6 +42,26 @@ const MASTER_INSTRUCTIONS = `Important principles:
 
 const DEFAULT_GROQ_MODEL = 'openai/gpt-oss-120b';
 const FALLBACK_GROQ_MODEL = 'qwen/qwen3.6-27b';
+const ALLOWED_ROLES = ['BOARD', 'ADMIN', 'SUPER_ADMIN'];
+
+async function requireBoardCaller(req) {
+  const authHeader = req.headers.get('authorization') ?? '';
+  if (!authHeader?.startsWith('Bearer ')) {
+    return { error: Response.json({ error: 'Unauthorized' }, { status: 401 }) };
+  }
+
+  try {
+    const decoded = await getAuth().verifyIdToken(authHeader.split('Bearer ')[1]);
+    const callerDoc = await getFirestore().collection('members').doc(decoded.uid).get();
+    const role = callerDoc.data()?.role;
+    if (!ALLOWED_ROLES.includes(role)) {
+      return { error: Response.json({ error: 'Forbidden' }, { status: 403 }) };
+    }
+    return { uid: decoded.uid, role };
+  } catch {
+    return { error: Response.json({ error: 'Unauthorized' }, { status: 401 }) };
+  }
+}
 
 async function requestGroqCompletion({ apiKey, model, systemPrompt, userPrompt }) {
   const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -56,6 +90,9 @@ export default async (req, context) => {
     return Response.json({ error: 'Method not allowed' }, { status: 405 });
   }
 
+  const caller = await requireBoardCaller(req);
+  if (caller.error) return caller.error;
+
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     return Response.json({ error: 'Groq API key not configured' }, { status: 500 });
@@ -68,16 +105,17 @@ export default async (req, context) => {
     return Response.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { content, platform = 'Facebook', tone = 'professional and engaging', customSystemPrompt, contentType = 'event_highlight' } = body;
+  const { content, platform = 'Facebook', tone = 'professional and engaging', contentType = 'event_highlight' } = body;
   if (!content) {
     return Response.json({ error: 'content is required' }, { status: 400 });
+  }
+  if (typeof content !== 'string' || content.length > 8000) {
+    return Response.json({ error: 'content must be a string up to 8000 characters' }, { status: 400 });
   }
 
   const platformBrief = PLATFORM_BRIEFS[platform] ?? PLATFORM_BRIEFS.Facebook;
   const contentTypeBrief = CONTENT_TYPE_BRIEFS[contentType] ?? CONTENT_TYPE_BRIEFS.event_highlight;
-  const basePrompt = customSystemPrompt
-    ? customSystemPrompt
-    : 'You are a social media copywriter for JCI Kuala Lumpur, a leadership development organization for young active citizens aged 18-40.';
+  const basePrompt = 'You are a social media copywriter for JCI Kuala Lumpur, a leadership development organization for young active citizens aged 18-40.';
 
   const systemPrompt = `${basePrompt}
 

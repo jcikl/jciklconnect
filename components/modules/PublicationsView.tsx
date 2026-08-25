@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  Plus, Edit2, Trash2, FileText, Eye, EyeOff,
-  ExternalLink, AlertCircle, CheckCircle, Loader, Search,
-  Filter
+  Plus, Edit2, Trash2, Eye, EyeOff,
+  ExternalLink, AlertCircle, CheckCircle,
+  Loader
 } from 'lucide-react';
-import { Button, Card, Badge, Modal, useToast, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
+import { Button, Card, Badge, Modal, useToast, ConfirmDialog, CONFIRM_CLOSED, PageScaffold, ModuleToolbar } from '../ui/Common';
 import type { ConfirmState } from '../ui/Common';
 import * as Forms from '../ui/Form';
 import {
@@ -253,65 +253,54 @@ export const PublicationsView: React.FC = () => {
     : null;
 
   return (
-    <div className="space-y-4 sm:space-y-5">
-
-      {/* Page Header */}
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-xl font-bold text-slate-900 tracking-tight">Publications</h1>
-        <Button size="sm" onClick={openCreate} className="flex items-center gap-1.5 shrink-0">
-          <Plus size={14} />
-          Add Issue
-        </Button>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2 items-center">
-        <div className="relative flex-1 min-w-0" style={{ minWidth: '140px' }}>
-          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search…"
-            className="w-full pl-7 pr-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-jci-blue/20 focus:border-jci-blue outline-none bg-white"
+    <>
+      <PageScaffold
+        title="Publications"
+        actions={
+          <Button size="sm" onClick={openCreate} className="flex items-center gap-1.5 shrink-0">
+            <Plus size={14} />
+            Add Issue
+          </Button>
+        }
+        toolbar={
+          <ModuleToolbar
+            searchValue={searchQuery}
+            searchPlaceholder="Search..."
+            onSearchChange={setSearchQuery}
+            onClearSearch={() => setSearchQuery('')}
+            searchClassName="md:max-w-md"
+            leftContent={
+              <>
+                <select
+                  value={filterYear}
+                  onChange={e => setFilterYear(e.target.value)}
+                  className="border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-jci-blue/20 focus:border-jci-blue outline-none bg-white"
+                >
+                  {years.map(y => <option key={y}>{y}</option>)}
+                </select>
+                <select
+                  value={filterStatus}
+                  onChange={e => setFilterStatus(e.target.value)}
+                  className="border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-jci-blue/20 focus:border-jci-blue outline-none bg-white"
+                >
+                  <option>All</option>
+                  <option>Published</option>
+                  <option>Draft</option>
+                </select>
+                <span className="text-xs text-slate-400 tabular-nums">
+                  {filtered.length} issue{filtered.length !== 1 ? 's' : ''}
+                </span>
+              </>
+            }
           />
-        </div>
-        <select
-          value={filterYear}
-          onChange={e => setFilterYear(e.target.value)}
-          className="border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-jci-blue/20 focus:border-jci-blue outline-none bg-white"
-        >
-          {years.map(y => <option key={y}>{y}</option>)}
-        </select>
-        <select
-          value={filterStatus}
-          onChange={e => setFilterStatus(e.target.value)}
-          className="border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-jci-blue/20 focus:border-jci-blue outline-none bg-white"
-        >
-          <option>All</option>
-          <option>Published</option>
-          <option>Draft</option>
-        </select>
-        <span className="text-xs text-slate-400 tabular-nums">
-          {filtered.length} issue{filtered.length !== 1 ? 's' : ''}
-        </span>
-      </div>
+        }
+        loading={loading}
+        empty={filtered.length === 0}
+        emptyMessage="No publications found"
+        contentClassName="space-y-4 sm:space-y-5"
+      >
 
       {/* Content */}
-      {loading ? (
-        <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-          <Loader size={28} className="animate-spin mb-3 opacity-50" />
-          <p className="text-sm font-medium">Loading…</p>
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-slate-400 bg-white border border-slate-200 rounded-xl">
-          <FileText size={36} className="mb-3 opacity-20" />
-          <p className="font-semibold text-slate-600 text-sm">No publications found</p>
-          <p className="text-xs mt-1 text-slate-400">
-            {publications.length === 0 ? 'Click "Add Issue" to get started.' : 'Try adjusting the filters.'}
-          </p>
-        </div>
-      ) : (
         <div className="space-y-6 sm:space-y-8">
           {sortedYears.map(year => (
             <div key={year}>
@@ -403,7 +392,7 @@ export const PublicationsView: React.FC = () => {
             </div>
           ))}
         </div>
-      )}
+      </PageScaffold>
 
       {/* ── Add / Edit Modal ─────────────────────────────────────────────────── */}
       <Modal
@@ -534,6 +523,6 @@ export const PublicationsView: React.FC = () => {
         </div>
       </Modal>
       <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
-    </div>
+    </>
   );
 };

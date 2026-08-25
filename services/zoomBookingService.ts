@@ -18,7 +18,6 @@ const MOCK_BOOKINGS: ZoomBooking[] = [
     duration: 60,
     zoomMeetingId: 123456789,
     zoomJoinUrl: 'https://zoom.us/j/123456789',
-    zoomHostUrl: 'https://zoom.us/s/123456789',
     zoomPassword: 'abc123',
     status: 'confirmed',
     createdAt: new Date().toISOString(),
@@ -45,7 +44,6 @@ export class ZoomBookingService {
         ...input,
         zoomMeetingId: Math.floor(Math.random() * 1e9),
         zoomJoinUrl: 'https://zoom.us/j/mock',
-        zoomHostUrl: 'https://zoom.us/s/mock',
         zoomPassword: 'devmode',
         status: 'confirmed',
         createdAt: new Date().toISOString(),
@@ -81,7 +79,6 @@ export class ZoomBookingService {
       duration: input.duration,
       zoomMeetingId: zoom.meetingId,
       zoomJoinUrl: zoom.joinUrl,
-      zoomHostUrl: zoom.hostUrl,
       zoomPassword: zoom.password,
       status: 'confirmed' as const,
       createdAt: new Date().toISOString(),
@@ -129,7 +126,6 @@ export class ZoomBookingService {
       duration: input.duration,
       zoomMeetingId: zoom.meetingId,
       zoomJoinUrl: zoom.joinUrl,
-      zoomHostUrl: zoom.hostUrl,
       zoomPassword: zoom.password,
     };
 

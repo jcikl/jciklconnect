@@ -1,5 +1,6 @@
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
 
 if (!getApps().length) {
   initializeApp({
@@ -24,20 +25,32 @@ async function getZoomToken() {
   return data.access_token;
 }
 
+async function requireBoardCaller(req) {
+  const authHeader = req.headers.get('authorization') ?? '';
+  if (!authHeader?.startsWith('Bearer ')) {
+    return { error: Response.json({ error: 'Unauthorized' }, { status: 401 }) };
+  }
+
+  try {
+    const decoded = await getAuth().verifyIdToken(authHeader.split('Bearer ')[1]);
+    const callerDoc = await getFirestore().collection('members').doc(decoded.uid).get();
+    const role = callerDoc.data()?.role;
+    if (!['BOARD', 'ADMIN', 'SUPER_ADMIN'].includes(role)) {
+      return { error: Response.json({ error: 'Forbidden' }, { status: 403 }) };
+    }
+    return { uid: decoded.uid, role };
+  } catch {
+    return { error: Response.json({ error: 'Unauthorized' }, { status: 401 }) };
+  }
+}
+
 export default async (req, context) => {
   if (req.method !== 'POST') {
     return new Response('Method Not Allowed', { status: 405 });
   }
 
-  const authHeader = req.headers.get('authorization') ?? '';
-  if (!authHeader?.startsWith('Bearer ')) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  try {
-    await getAuth().verifyIdToken(authHeader.split('Bearer ')[1]);
-  } catch {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const caller = await requireBoardCaller(req);
+  if (caller.error) return caller.error;
 
   let meetingId;
   try {
@@ -50,6 +63,14 @@ export default async (req, context) => {
   }
 
   try {
+    const bookingSnap = await getFirestore().collection('zoomBookings')
+      .where('zoomMeetingId', '==', Number(meetingId))
+      .limit(1)
+      .get();
+    if (bookingSnap.empty) {
+      return Response.json({ error: 'Booking not found' }, { status: 404 });
+    }
+
     const token = await getZoomToken();
     const res = await fetch(`https://api.zoom.us/v2/meetings/${meetingId}`, {
       method: 'DELETE',

@@ -41,61 +41,6 @@ export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
   );
 };
 
-interface LoadingStateProps {
-  loading: boolean;
-  error?: string | null;
-  children: React.ReactNode;
-  emptyMessage?: string;
-  empty?: boolean;
-  onRetry?: () => void;
-}
-
-export const LoadingState: React.FC<LoadingStateProps> = ({
-  loading,
-  error,
-  children,
-  emptyMessage = 'No data available',
-  empty = false,
-  onRetry,
-}) => {
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="flex flex-col items-center gap-3">
-          <LoadingSpinner size="lg" />
-          <p className="text-slate-500 text-sm">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <p className="text-red-600 font-medium mb-2">Error loading data</p>
-          <p className="text-slate-500 text-sm">{error}</p>
-          {onRetry && (
-            <button
-              onClick={onRetry}
-              className="mt-3 px-4 py-1.5 text-sm font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
-            >
-              Try Again
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  if (empty) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <p className="text-slate-500">{emptyMessage}</p>
-      </div>
-    );
-  }
-
-  return <>{children}</>;
-};
+export { LoadingState } from './LoadingState';
+export type { LoadingStateProps } from './LoadingState';
 

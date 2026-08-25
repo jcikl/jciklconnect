@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useMemo, useRef, lazy, Suspense, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { BrowserRouter, Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import {
   Users, Calendar, LayoutDashboard, Briefcase, FolderKanban,
   LogOut, Award, Sparkles, TrendingUp, Banknote,
@@ -27,6 +27,7 @@ import { usePoints } from './hooks/usePoints';
 import { useBehavioralNudging } from './hooks/useBehavioralNudging';
 import { NudgeBanner } from './components/ui/NudgeBanner';
 import { useInstallPrompt } from './hooks/useInstallPrompt';
+import { useAppNavigation } from './hooks/useAppNavigation';
 
 // Error Boundary Components
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
@@ -51,38 +52,6 @@ EmailService.initialize({
   fromName: 'JCI Kuala Lumpur',
 }).catch(err => console.error('[EmailService] init failed:', err));
 
-// Module Imports &#8212; lazy-loaded for code splitting (each view is a separate chunk)
-const FinanceView = lazy(() => import('./components/modules/FinanceView').then(m => ({ default: m.FinanceView })));
-const PaymentRequestsView = lazy(() => import('./components/modules/PaymentRequestsView').then(m => ({ default: m.PaymentRequestsView })));
-const GamificationView = lazy(() => import('./components/modules/GamificationView').then(m => ({ default: m.GamificationView })));
-const EventsView = lazy(() => import('./components/modules/EventsView').then(m => ({ default: m.EventsView })));
-const MembersView = lazy(() => import('./components/modules/MembersView').then(m => ({ default: m.MembersView })));
-const ProjectsView = lazy(() => import('./components/modules/ProjectsView').then(m => ({ default: m.ProjectsView })));
-const FlagshipProjectsManagementView = lazy(() => import('./components/modules/FlagshipProjectsManagementView').then(m => ({ default: m.FlagshipProjectsManagementView })));
-const InventoryView = lazy(() => import('./components/modules/InventoryView').then(m => ({ default: m.InventoryView })));
-const BusinessDirectoryView = lazy(() => import('./components/modules/BusinessDirectoryView').then(m => ({ default: m.BusinessDirectoryView })));
-const AutomationStudio = lazy(() => import('./components/modules/AutomationStudio').then(m => ({ default: m.AutomationStudio })));
-const KnowledgeView = lazy(() => import('./components/modules/KnowledgeView').then(m => ({ default: m.KnowledgeView })));
-const CommunicationView = lazy(() => import('./components/modules/CommunicationView').then(m => ({ default: m.CommunicationView })));
-const HobbyClubsView = lazy(() => import('./components/modules/HobbyClubsView').then(m => ({ default: m.HobbyClubsView })));
-const ZoomBookingView = lazy(() => import('./components/modules/ZoomBookingView').then(m => ({ default: m.ZoomBookingView })));
-const SocialMediaView = lazy(() => import('./components/modules/SocialMediaView').then(m => ({ default: m.SocialMediaView })));
-const SurveysView = lazy(() => import('./components/modules/SurveysView').then(m => ({ default: m.SurveysView })));
-const MemberBenefitsView = lazy(() => import('./components/modules/MemberBenefitsView').then(m => ({ default: m.MemberBenefitsView })));
-const DataImportExportView = lazy(() => import('./components/modules/DataImportExportView').then(m => ({ default: m.DataImportExportView })));
-const AdvertisementsView = lazy(() => import('./components/modules/AdvertisementsView').then(m => ({ default: m.AdvertisementsView })));
-const AIInsightsView = lazy(() => import('./components/modules/AIInsightsView').then(m => ({ default: m.AIInsightsView })));
-const TemplatesView = lazy(() => import('./components/modules/TemplatesView').then(m => ({ default: m.TemplatesView })));
-const ActivityPlansView = lazy(() => import('./components/modules/ActivityPlansView').then(m => ({ default: m.ActivityPlansView })));
-const ReportsView = lazy(() => import('./components/modules/ReportsView').then(m => ({ default: m.ReportsView })));
-const BoardDashboard = lazy(() => import('./components/dashboard/BoardDashboard').then(m => ({ default: m.BoardDashboard })));
-const DashboardHome = lazy(() => import('./components/dashboard/DashboardHome').then(m => ({ default: m.DashboardHome })));
-const DeveloperInterface = lazy(() => import('./components/modules/DeveloperInterface').then(m => ({ default: m.DeveloperInterface })));
-const ToyyibView = lazy(() => import('./components/modules/ToyyibView').then(m => ({ default: m.ToyyibView })));
-const SystemConfigView = lazy(() => import('./components/modules/SystemConfigView').then(m => ({ default: m.SystemConfigView })));
-const PublicationsView = lazy(() => import('./components/modules/PublicationsView').then(m => ({ default: m.PublicationsView })));
-const RadarDataImporter = lazy(() => import('./components/admin/RadarDataImporter').then(m => ({ default: m.RadarDataImporter })));
-const SponsorshipView = lazy(() => import('./components/modules/SponsorshipView').then(m => ({ default: m.SponsorshipView })));
 import { PublicationService, toGoogleDrivePreviewUrl, extractGoogleDriveFileId } from './services/publicationService';
 import { BatchModeProvider, useBatchMode } from './contexts/BatchModeContext';
 import { PartnershipsService } from './services/partnershipsService';
@@ -97,10 +66,13 @@ import { ViewType } from './types/views';
 // --- Layout Components (extracted) ---
 import { GuestHeader } from './components/layout/GuestHeader';
 import { GuestFooter } from './components/layout/GuestFooter';
-import { SidebarItem } from './components/layout/SidebarItem';
 import { NotificationDrawer } from './components/layout/NotificationDrawer';
 import { SearchDropdown } from './components/layout/SearchDropdown';
 import { GuestAnalyticsTracker } from './components/layout/GuestAnalyticsTracker';
+import { AppShell } from './components/app/AppShell';
+import { SidebarNavigationContext } from './components/app/navigationConfig';
+import { renderAppView } from './components/app/viewRegistry';
+import { getShortViewTitle, getViewTitle } from './components/app/viewTitles';
 
 // REMOVED: inline GuestHeader definition (moved to components/layout/GuestHeader.tsx)
 // REMOVED: inline GuestFooter definition (moved to components/layout/GuestFooter.tsx)
@@ -132,10 +104,6 @@ const NotFoundPage = lazy(() => import('./components/pages/NotFoundPage').then(m
 
 
 export const JCIKLApp: React.FC = () => {
-  const [view, setView] = useState<ViewType>(() => {
-    const savedView = localStorage.getItem('jc_last_view');
-    return (savedView as ViewType) || 'GUEST';
-  });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMenuDrawerOpen, setIsMenuDrawerOpen] = useState(false);
@@ -150,20 +118,10 @@ export const JCIKLApp: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchInputValue, setSearchInputValue] = useState('');
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [initialSelectedMemberId, setInitialSelectedMemberId] = useState<string | null>(null);
-  const [initialSelectedEventId, setInitialSelectedEventId] = useState<string | null>(null);
-  const [initialSelectedProjectId, setInitialSelectedProjectId] = useState<string | null>(null);
-  const [initialSelectedBusinessId, setInitialSelectedBusinessId] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const viewRef = useRef(view);
-  useEffect(() => { viewRef.current = view; }, [view]);
 
   const { isBatchMode } = useBatchMode();
   const { showBanner: showInstallBanner, triggerInstall, dismiss: dismissInstall } = useInstallPrompt();
-
-  // All hooks must be called before any conditional returns
-  const navigate = useNavigate();
-  const location = useLocation();
 
   const [isUpgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -193,6 +151,35 @@ export const JCIKLApp: React.FC = () => {
 
   const { user, member, loading: authLoading, signOut, simulatedRole, simulatedMemberId, simulateRole, simulateAsMember, isDevMode, authError } = useAuth();
   const { showToast } = useToast();
+  const resetSearch = useCallback(() => setSearchQuery(''), []);
+  const {
+    view,
+    setView,
+    handleViewChange,
+    handleGuestPageChange,
+    resetToGuestHome,
+    initialSelectedMemberId,
+    initialSelectedEventId,
+    initialSelectedProjectId,
+    initialSelectedBusinessId,
+    clearSelectedMember,
+    clearSelectedEvent,
+    clearSelectedProject,
+    clearSelectedBusiness,
+  } = useAppNavigation({
+    isAuthenticated: !!(user && member),
+    authLoading,
+    showToast,
+    resetSearch,
+    closeMenuDrawer: () => setIsMenuDrawerOpen(false),
+    closeNotificationDrawer: () => setNotificationDrawerOpen(false),
+    closeSearchDrawer: () => setSearchDrawerOpen(false),
+    closeLoginModal: () => setLoginModalOpen(false),
+    isMenuDrawerOpen,
+    isNotificationDrawerOpen,
+    isSearchDrawerOpen,
+    isLoginModalOpen,
+  });
 
   // Surface auth-state errors (Firestore/App Check failures during sign-in) as a toast
   useEffect(() => {
@@ -342,127 +329,6 @@ export const JCIKLApp: React.FC = () => {
   const allNotifications = notifications;
   const unreadNotifications = allNotifications.filter(n => !n.read);
 
-  // Sync document.business?.position for accessibility (WCAG 2.4.2)
-  React.useEffect(() => {
-    const titles: Partial<Record<ViewType, string>> = {
-      GUEST: 'Home',
-      GUEST_EVENTS: 'Events',
-      FLAGSHIP_PROJECTS: 'Flagship Projects',
-      GUEST_ABOUT: 'About',
-      GUEST_ENEWSLETTERS: 'E-Newsletters',
-      DASHBOARD: 'Dashboard',
-      MEMBERS: 'Members',
-      EVENTS: 'Events',
-      PROJECTS: 'Projects',
-      FINANCE: 'Finance',
-      PAYMENT_REQUESTS: 'Payment Requests',
-      GAMIFICATION: 'Gamification',
-      INVENTORY: 'Inventory',
-      DIRECTORY: 'Business Directory',
-      AUTOMATION: 'Automation Studio',
-      KNOWLEDGE: 'Knowledge',
-      COMMUNICATION: 'Communication',
-      CLUBS: 'Hobby Clubs',
-      SURVEYS: 'Surveys',
-      BENEFITS: 'Member Benefits',
-      DATA_IMPORT_EXPORT: 'Data Import/Export',
-      TOYYIB: 'ToyyibPay Test',
-      ADVERTISEMENTS: 'Partnership & Promotions',
-      AI_INSIGHTS: 'AI Insights',
-      TEMPLATES: 'Templates',
-      ACTIVITY_PLANS: 'Activity Plans',
-      REPORTS: 'Reports',
-      DEVELOPER: 'Developer Interface',
-      WHAPI_CONFIG: 'Whapi Configuration',
-      API_CONFIG: 'API Settings',
-    };
-    const pageTitle = titles[view] ?? 'JCI LO Management';
-    document.title = `${pageTitle} | JCI Kuala Lumpur`;
-
-    // Persist non-guest views to localStorage
-    if (view && !view.startsWith('GUEST')) {
-      localStorage.setItem('jc_last_view', view);
-    }
-  }, [view]);
-
-
-  // Update view based on auth state
-  React.useEffect(() => {
-    if (!authLoading) {
-      if (user && member) {
-        // Authenticated
-        navigate('/roadmap');
-
-        // If the current view is a GUEST view, switch to DASHBOARD
-        // Otherwise, keep the current view (likely restored from localStorage)
-        // Read viewRef.current to avoid stale closure without adding view to deps
-        if (viewRef.current.startsWith('GUEST')) {
-          setView('DASHBOARD');
-        }
-        setSearchQuery('');
-      } else {
-        // Not authenticated
-        const savedView = localStorage.getItem('jc_last_view');
-        // If we have a saved guest view, use it, otherwise default to GUEST
-        if (savedView && savedView.startsWith('GUEST')) {
-          setView(savedView as ViewType);
-        } else {
-          setView('GUEST');
-        }
-        setSearchQuery('');
-      }
-    }
-  }, [user, member, authLoading, navigate]);
-
-  // Sync URL with view state - must be before any conditional returns
-  React.useEffect(() => {
-    if (!user || !member) {
-      // Guest pages - sync view with URL
-      const path = location.pathname;
-
-      // Protect /roadmap route - redirect to home if not authenticated
-      if (path === '/roadmap') {
-        navigate('/', { replace: true });
-        setView('GUEST');
-        return;
-      }
-
-      if (path === '/about') {
-        setView('GUEST_ABOUT');
-      } else if (path === '/events') {
-        setView('GUEST_EVENTS');
-      } else if (path === '/projects') {
-        setView('FLAGSHIP_PROJECTS');
-      } else if (path === '/enewsletters') {
-        setView('GUEST_ENEWSLETTERS');
-      } else if (path === '/partnerships') {
-        setView('GUEST_PARTNERSHIPS');
-      } else if (path === '/') {
-        setView('GUEST');
-      }
-    } else {
-      // Authenticated pages - redirect if accessing guest pages
-      const path = location.pathname;
-      const guestPaths = ['/', '/about', '/events', '/projects', '/enewsletters', '/partnerships'];
-
-      if (guestPaths.includes(path)) {
-        // Redirect authenticated users away from guest pages
-        navigate('/roadmap', { replace: true });
-        // Only set to DASHBOARD if we're coming from a guest page
-        if (view.startsWith('GUEST')) {
-          setView('DASHBOARD');
-        }
-      } else if (path === '/roadmap') {
-        // We're already on roadmap. If view is still a guest view, 
-        // it means we just loaded/refreshed and need to default to DASHBOARD
-        // OR restore from local state (handled by the other useEffect)
-        if (view.startsWith('GUEST')) {
-          setView('DASHBOARD');
-        }
-      }
-    }
-  }, [location.pathname, user, member, navigate]);
-
   const handleLogin = () => {
     setLoginModalOpen(true);
   };
@@ -472,74 +338,10 @@ export const JCIKLApp: React.FC = () => {
   const handleLogout = async () => {
     try {
       await handleSignOut();
-      localStorage.removeItem('jc_last_view');
-      navigate('/', { replace: true });
-      setView('GUEST');
+      resetToGuestHome();
       showToast('Logged out successfully', 'success');
     } catch (error) {
       showToast('Failed to logout', 'error');
-    }
-  };
-
-  const [viewHistory, setViewHistory] = useState<ViewType[]>([]);
-  const backPressedOnceRef = useRef(false);
-  const backPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const handleViewChange = (newView: ViewType, selectedId?: string) => {
-    setSearchQuery('');
-    setViewHistory(prev => [...prev, view]);
-    setView(newView);
-    if (newView === 'MEMBERS' && selectedId) setInitialSelectedMemberId(selectedId);
-    if (newView === 'EVENTS' && selectedId) setInitialSelectedEventId(selectedId);
-    if (newView === 'PROJECTS' && selectedId) setInitialSelectedProjectId(selectedId);
-    if (newView === 'DIRECTORY' && selectedId) setInitialSelectedBusinessId(selectedId);
-  };
-
-  // Android hardware back button (Capacitor only — skip on web/Netlify)
-  useEffect(() => {
-    let listener: { remove: () => void } | null = null;
-    let cancelled = false;
-    import(/* @vite-ignore */ '@capacitor/app').then(({ App: CapApp }) => {
-      if (cancelled) return;
-      CapApp.addListener('backButton', () => {
-        // Close any open drawer/modal first
-        if (isMenuDrawerOpen) { setIsMenuDrawerOpen(false); return; }
-        if (isNotificationDrawerOpen) { setNotificationDrawerOpen(false); return; }
-        if (isSearchDrawerOpen) { setSearchDrawerOpen(false); return; }
-        if (isLoginModalOpen) { setLoginModalOpen(false); return; }
-
-        // Navigate back through view history
-        if (viewHistory.length > 0) {
-          const prev = viewHistory[viewHistory.length - 1];
-          setViewHistory(h => h.slice(0, -1));
-          setView(prev);
-          return;
-        }
-
-        // On root view (DASHBOARD or GUEST) — double-press to exit
-        if (backPressedOnceRef.current) {
-          CapApp.exitApp();
-        } else {
-          backPressedOnceRef.current = true;
-          showToast('Press back again to exit', 'info');
-          backPressTimerRef.current = setTimeout(() => {
-            backPressedOnceRef.current = false;
-          }, 2000);
-        }
-      }).then(l => { listener = l; });
-    }).catch(() => { /* not in Capacitor environment */ });
-
-    return () => {
-      cancelled = true;
-      listener?.remove();
-      if (backPressTimerRef.current) clearTimeout(backPressTimerRef.current);
-    };
-  }, [view, viewHistory, isMenuDrawerOpen, isNotificationDrawerOpen, isSearchDrawerOpen, isLoginModalOpen]);
-
-  const handleEditProfile = () => {
-    if (member) {
-      setInitialSelectedMemberId(member.id);
-      setView('MEMBERS');
     }
   };
 
@@ -566,30 +368,6 @@ export const JCIKLApp: React.FC = () => {
     const page = pathToGuestPage(window.location.pathname);
     if (page) GuestAnalyticsService.trackSignupClick(page);
     openRegistration();
-  };
-
-  const handleGuestPageChange = (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'partnerships') => {
-    window.scrollTo({ top: 0, behavior: 'instant' });
-    setSearchQuery('');
-    if (page === 'home') {
-      setView('GUEST');
-      navigate('/');
-    } else if (page === 'events') {
-      setView('GUEST_EVENTS');
-      navigate('/events');
-    } else if (page === 'projects') {
-      setView('FLAGSHIP_PROJECTS');
-      navigate('/projects');
-    } else if (page === 'about') {
-      setView('GUEST_ABOUT');
-      navigate('/about');
-    } else if (page === 'enewsletters') {
-      setView('GUEST_ENEWSLETTERS');
-      navigate('/enewsletters');
-    } else if (page === 'partnerships') {
-      setView('GUEST_PARTNERSHIPS');
-      navigate('/partnerships');
-    }
   };
 
   // Conditional Rendering Helper for Guest Pages
@@ -679,438 +457,58 @@ export const JCIKLApp: React.FC = () => {
       </ErrorBoundary>
     );
 
-    const dashboardFallback = <DashboardHome userRole={(member?.role as UserRole) || UserRole.MEMBER} onNavigate={handleViewChange} searchQuery={searchQuery} onSearchChange={setSearchQuery} scrollRef={scrollRef} />;
+    return renderAppView(view, {
+      memberRole: member?.role,
+      hasMember: !!member,
+      isBoard,
+      isAdmin,
+      isDeveloper,
+      isPlainMember,
+      canAccessWorkspaceModules,
+      canAccessEventsAndPayments,
+      canViewEventsManagement,
+      hasPermission,
+      showBoardDashboard,
+      searchQuery,
+      onSearchChange: setSearchQuery,
+      onNavigate: handleViewChange,
+      scrollRef,
+      initialSelectedMemberId,
+      initialSelectedEventId,
+      initialSelectedProjectId,
+      initialSelectedBusinessId,
+      clearSelectedMember,
+      clearSelectedEvent,
+      clearSelectedProject,
+      clearSelectedBusiness,
+      wrapErrorBoundary: wrapEB,
+    });
+  };
 
-    switch (view) {
-      case 'MEMBERS':
-        if (!canAccessWorkspaceModules && !member) return dashboardFallback;
-        return wrapEB(<MembersView searchQuery={searchQuery} initialSelectedMemberId={initialSelectedMemberId} onClearSelection={() => setInitialSelectedMemberId(null)} onNavigate={handleViewChange} />, '会员');
-      case 'PROJECTS':
-        if (!canViewEventsManagement) return dashboardFallback;
-        return wrapEB(<ProjectsView onNavigate={handleViewChange} searchQuery={searchQuery} initialSelectedProjectId={initialSelectedProjectId} onClearSelection={() => setInitialSelectedProjectId(null)} />, '活动管理');
-      case 'FLAGSHIP_PROJECTS_MGT':
-        if (!canViewEventsManagement || isPlainMember) return dashboardFallback;
-        return wrapEB(<FlagshipProjectsManagementView searchQuery={searchQuery} />, '旗舰项目');
-      case 'EVENTS':
-        if (!canViewEventsManagement) return dashboardFallback;
-        return wrapEB(<EventsView searchQuery={searchQuery} initialSelectedEventId={initialSelectedEventId} onClearSelection={() => setInitialSelectedEventId(null)} />, '活动列表');
-      case 'FINANCE':
-        if (member?.role === UserRole.GUEST) return dashboardFallback;
-        if (!hasPermission('canViewFinance')) return dashboardFallback;
-        return wrapEB(<FinanceView searchQuery={searchQuery} />, '财务');
-      case 'PAYMENT_REQUESTS':
-        if (!hasPermission('canViewFinance') && !canAccessEventsAndPayments) return dashboardFallback;
-        return wrapEB(<PaymentRequestsView searchQuery={searchQuery} />, '付款申请');
-      case 'GAMIFICATION':
-        if (member?.role === UserRole.GUEST) return dashboardFallback;
-        return wrapEB(<GamificationView />, '积分系统');
-      case 'INVENTORY':
-        if (member?.role === UserRole.GUEST) return dashboardFallback;
-        if (!hasPermission('canViewFinance')) return dashboardFallback;
-        return wrapEB(<InventoryView searchQuery={searchQuery} />, '库存');
-      case 'DIRECTORY':
-        // AUTH-004: Block unauthenticated users; GUEST role sees the view with MembersOnlyOverlay mask.
-        if (!member) return dashboardFallback;
-        return wrapEB(<BusinessDirectoryView searchQuery={searchQuery} initialSelectedBusinessId={initialSelectedBusinessId} onClearSelection={() => setInitialSelectedBusinessId(null)} />, '商业目录');
-      case 'AUTOMATION':
-        if (!isAdmin && !isBoard) return dashboardFallback;
-        return wrapEB(<AutomationStudio />, '自动化');
-      case 'KNOWLEDGE':
-        // AUTH-004: KNOWLEDGE is an authenticated-member resource — block guests.
-        if (!member || member.role === UserRole.GUEST) return dashboardFallback;
-        return wrapEB(<KnowledgeView searchQuery={searchQuery} />, '知识库');
-      case 'COMMUNICATION':
-        if (!canAccessWorkspaceModules) return dashboardFallback;
-        return wrapEB(<CommunicationView searchQuery={searchQuery} />, '通讯');
-      case 'CLUBS':
-        if (member?.role === UserRole.INACTIVE) return dashboardFallback;
-        return wrapEB(<HobbyClubsView searchQuery={searchQuery} />, '兴趣小组');
-      case 'ZOOM_BOOKING':
-        if (member?.role === UserRole.INACTIVE) return dashboardFallback;
-        return wrapEB(<ZoomBookingView />, 'Zoom Booking');
-      case 'SOCIAL_MEDIA':
-        if (member?.role === UserRole.INACTIVE) return dashboardFallback;
-        return wrapEB(<SocialMediaView />, 'Social Media');
-      case 'SURVEYS':
-        if (member?.role === UserRole.INACTIVE) return dashboardFallback;
-        return wrapEB(<SurveysView searchQuery={searchQuery} />, '问卷');
-      case 'BENEFITS':
-        // GUEST sees Benefits with MembersOnlyOverlay mask; INACTIVE is a hard block.
-        if (member?.role === UserRole.INACTIVE) return dashboardFallback;
-        return wrapEB(<MemberBenefitsView searchQuery={searchQuery} />, '会员福利');
-      case 'DATA_IMPORT_EXPORT':
-        if (member?.role === UserRole.GUEST || isPlainMember) return dashboardFallback;
-        return wrapEB(<DataImportExportView />, '数据导入导出');
-      case 'RADAR_IMPORTER':
-        if (member?.role === UserRole.GUEST || isPlainMember) return dashboardFallback;
-        return wrapEB(<RadarDataImporter />, 'Radar 导入');
-      case 'ADVERTISEMENTS':
-        if (member?.role === UserRole.GUEST || isPlainMember) return dashboardFallback;
-        return wrapEB(<AdvertisementsView searchQuery={searchQuery} />, '合作推广');
-      case 'AI_INSIGHTS':
-        if (!isDeveloper && !isAdmin && !isBoard) return dashboardFallback;
-        return wrapEB(<AIInsightsView onNavigate={handleViewChange} searchQuery={searchQuery} />, 'AI 洞察');
-      case 'TEMPLATES':
-        if (member?.role === UserRole.GUEST || isPlainMember) return dashboardFallback;
-        return wrapEB(<TemplatesView searchQuery={searchQuery} />, '模板');
-      case 'ACTIVITY_PLANS':
-        if (!canAccessWorkspaceModules && !isBoard && !isAdmin) return dashboardFallback;
-        return wrapEB(<ActivityPlansView searchQuery={searchQuery} />, '活动计划');
-      case 'REPORTS':
-        if (!(isAdmin || isBoard || isDeveloper)) return dashboardFallback;
-        return wrapEB(<ReportsView />, '报告');
-      case 'DEVELOPER':
-        if (!isDeveloper && !isAdmin) return dashboardFallback;
-        return wrapEB(<DeveloperInterface />, '开发者界面');
-      case 'TOYYIB':
-        if (!isAdmin && !isBoard && !isDeveloper) return dashboardFallback;
-        return wrapEB(<ToyyibView />, 'ToyyibPay');
-      case 'WHAPI_CONFIG':
-        if (!isAdmin && !isBoard && !isDeveloper) return dashboardFallback;
-        return wrapEB(<SystemConfigView initialTab="whapi" />, '系统配置');
-      case 'API_CONFIG':
-        if (!isAdmin && !isBoard && !isDeveloper) return dashboardFallback;
-        return wrapEB(<SystemConfigView initialTab="toyyib" />, '系统配置');
-      case 'MEMBERSHIP_CONFIG':
-        if (!isAdmin && !isBoard) return dashboardFallback;
-        return wrapEB(<SystemConfigView initialTab="membership" />, '会籍配置');
-      case 'ACCESS_CONFIG':
-        if (!isAdmin && !isBoard) return dashboardFallback;
-        return wrapEB(<SystemConfigView initialTab="access" />, '访问配置');
-      case 'SYSTEM_CONFIG':
-        if (!isAdmin && !isBoard) return dashboardFallback;
-        return wrapEB(<SystemConfigView />, '系统配置');
-      case 'PUBLICATIONS':
-        if (member?.role === UserRole.GUEST || isPlainMember) return dashboardFallback;
-        return wrapEB(<PublicationsView />, '刊物');
-      case 'SPONSORSHIPS':
-        if (!isBoard && !isAdmin) return dashboardFallback;
-        return wrapEB(<SponsorshipView searchQuery={searchQuery} />, '赞助');
-      default:
-        if ((isBoard || isAdmin) && showBoardDashboard) {
-          return wrapEB(
-            <BoardDashboard
-              onNavigate={handleViewChange}
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              scrollRef={scrollRef}
-            />,
-            '董事会仪表板'
-          );
-        }
-        return wrapEB(
-          <DashboardHome
-            userRole={(member?.role as UserRole) || UserRole.MEMBER}
-            onNavigate={handleViewChange}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            scrollRef={scrollRef}
-          />,
-          '仪表板'
-        );
-    }
+  const sidebarNavigationContext: SidebarNavigationContext = {
+    memberRole: member?.role,
+    isBoard,
+    isAdmin,
+    isDeveloper,
+    isGuest,
+    isPlainMember,
+    canAccessWorkspaceModules,
+    canViewEventsManagement,
+    hasPermission,
   };
 
   return (
     <>
-      <div className="h-screen bg-slate-50 flex overflow-hidden">
-        {/* Mobile Sidebar Overlay */}
-        {isSidebarOpen && (
-          <div
-            className="fixed inset-0 bg-black/50 z-40 md:hidden"
-            onClick={() => setIsSidebarOpen(false)}
-            role="presentation"
-            aria-hidden="true"
-          />
-        )}
-
-        {/* Sidebar - Responsive (Desktop & Mobile Drawer) */}
-        <aside className={`
-        fixed inset-y-0 left-0 z-50 flex flex-col bg-white border-r border-slate-200 transition-all duration-300 ease-in-out
-        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-        md:translate-x-0 md:relative md:flex
-        ${isSidebarCollapsed ? 'w-40' : 'w-64'}
-      `}>
-          <div className="h-full flex flex-col min-h-0">
-            {/* Logo & Toggle */}
-            <div className={`h-16 flex items-center border-b border-slate-100 flex-shrink-0 transition-all duration-200 ${isSidebarCollapsed ? 'pl-4 justify-center' : 'pl-6 justify-between'}`}>
-              {!isSidebarCollapsed && (
-                <img
-                  src="/JCI Kuala Lumpur-transparent.png"
-                  alt="JCI Kuala Lumpur Logo"
-                  className="h-8 w-auto object-contain"
-                />
-              )}
-              {isSidebarCollapsed && (
-                <img
-                  src="/JCI-logo-only.png"
-                  alt="JCI Logo"
-                  className="h-8 w-auto object-contain"
-                  onError={(e) => {
-                    // Fallback if logo-only doesn't exist
-                    e.currentTarget.src = "/JCI Kuala Lumpur-transparent.png";
-                  }}
-                />
-              )}
-              <button
-                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                className="hidden md:flex rounded-lg text-slate-400 items-center hover:text-jci-blue transition-colors"
-                title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-              >
-                {isSidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-              </button>
-            </div>
-
-            {/* Navigation */}
-            <nav className="flex-1 p-4 space-y-1 overflow-y-auto overflow-x-hidden min-h-0">
-              <SidebarItem
-                icon={<LayoutDashboard size={18} />}
-                label="Dashboard"
-                isActive={view === 'DASHBOARD'}
-                onClick={() => { handleViewChange('DASHBOARD'); setIsSidebarOpen(false); }}
-                isCollapsed={isSidebarCollapsed}
-              />
-
-              {canAccessWorkspaceModules && (
-                <SidebarItem
-                  icon={<Users size={18} />}
-                  label="Members"
-                  isActive={view === 'MEMBERS'}
-                  onClick={() => { handleViewChange('MEMBERS'); setIsSidebarOpen(false); }}
-                  isCollapsed={isSidebarCollapsed}
-                />
-              )}
-              {canAccessWorkspaceModules && (
-                <SidebarItem
-                  icon={<Calendar size={18} />}
-                  label="Event List"
-                  isActive={view === 'EVENTS'}
-                  onClick={() => { handleViewChange('EVENTS'); setIsSidebarOpen(false); }}
-                  isCollapsed={isSidebarCollapsed}
-                />
-              )}
-              {canAccessWorkspaceModules && (
-                <SidebarItem
-                  icon={<MessageSquare size={18} />}
-                  label="Communication"
-                  isActive={view === 'COMMUNICATION'}
-                  onClick={() => { handleViewChange('COMMUNICATION'); setIsSidebarOpen(false); }}
-                  isCollapsed={isSidebarCollapsed}
-                />
-              )}
-              <SidebarItem
-                icon={<Building2 size={18} />}
-                label="Directory"
-                isActive={view === 'DIRECTORY'}
-                onClick={() => { handleViewChange('DIRECTORY'); setIsSidebarOpen(false); }}
-                isCollapsed={isSidebarCollapsed}
-              />
-              {!isGuest && (
-                <SidebarItem
-                  icon={<BookOpen size={18} />}
-                  label="Knowledge"
-                  isActive={view === 'KNOWLEDGE'}
-                  onClick={() => { handleViewChange('KNOWLEDGE'); setIsSidebarOpen(false); }}
-                  isCollapsed={isSidebarCollapsed}
-                />
-              )}
-              {member?.role !== UserRole.INACTIVE && (
-                <SidebarItem
-                  icon={<Gift size={18} />}
-                  label="Benefits"
-                  isActive={view === 'BENEFITS'}
-                  onClick={() => { handleViewChange('BENEFITS'); setIsSidebarOpen(false); }}
-                  isCollapsed={isSidebarCollapsed}
-                />
-              )}
-              <SidebarItem
-                icon={<Heart size={18} />}
-                label="Hobby Clubs"
-                isActive={view === 'CLUBS'}
-                onClick={() => { handleViewChange('CLUBS'); setIsSidebarOpen(false); }}
-                isCollapsed={isSidebarCollapsed}
-              />
-
-              {member?.role !== UserRole.GUEST && (
-                <div className="pt-4 mt-4 border-t border-slate-100">
-                  <p className={`px-4 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 transition-opacity duration-200 ${isSidebarCollapsed ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}>Workspace</p>
-
-                  {canViewEventsManagement && (
-                    <SidebarItem
-                      icon={<FolderKanban size={18} />}
-                      label="Events Management"
-                      isActive={view === 'PROJECTS'}
-                      onClick={() => { handleViewChange('PROJECTS'); setIsSidebarOpen(false); }}
-                      isCollapsed={isSidebarCollapsed}
-                    />
-                  )}
-                  <SidebarItem
-                    icon={<CheckSquare size={18} />}
-                    label="Surveys"
-                    isActive={view === 'SURVEYS'}
-                    onClick={() => { handleViewChange('SURVEYS'); setIsSidebarOpen(false); }}
-                    isCollapsed={isSidebarCollapsed}
-                  />
-                  <SidebarItem
-                    icon={<Video size={18} />}
-                    label="Zoom Booking"
-                    isActive={view === 'ZOOM_BOOKING'}
-                    onClick={() => { handleViewChange('ZOOM_BOOKING'); setIsSidebarOpen(false); }}
-                    isCollapsed={isSidebarCollapsed}
-                  />
-                  <SidebarItem
-                    icon={<Share2 size={18} />}
-                    label="Social Media"
-                    isActive={view === 'SOCIAL_MEDIA'}
-                    onClick={() => { handleViewChange('SOCIAL_MEDIA'); setIsSidebarOpen(false); }}
-                    isCollapsed={isSidebarCollapsed}
-                  />
-                  {hasPermission('canViewFinance') && (
-                    <>
-                      <SidebarItem
-                        icon={<Banknote size={18} />}
-                        label="Finances"
-                        isActive={view === 'FINANCE'}
-                        onClick={() => { handleViewChange('FINANCE'); setIsSidebarOpen(false); }}
-                        isCollapsed={isSidebarCollapsed}
-                      />
-                      <SidebarItem
-                        icon={<Package size={18} />}
-                        label="Inventory"
-                        isActive={view === 'INVENTORY'}
-                        onClick={() => { handleViewChange('INVENTORY'); setIsSidebarOpen(false); }}
-                        isCollapsed={isSidebarCollapsed}
-                      />
-                    </>
-                  )}
-                  {(isBoard || isAdmin) && (
-                    <SidebarItem
-                      icon={<Handshake size={18} />}
-                      label="Sponsorships"
-                      isActive={view === 'SPONSORSHIPS'}
-                      onClick={() => { handleViewChange('SPONSORSHIPS'); setIsSidebarOpen(false); }}
-                      isCollapsed={isSidebarCollapsed}
-                    />
-                  )}
-                  {canAccessWorkspaceModules && (
-                    <SidebarItem
-                      icon={<Award size={18} />}
-                      label="Gamification"
-                      isActive={view === 'GAMIFICATION'}
-                      onClick={() => { handleViewChange('GAMIFICATION'); setIsSidebarOpen(false); }}
-                      isCollapsed={isSidebarCollapsed}
-                    />
-                  )}
-                </div>
-              )}
-              {(isBoard || isAdmin || isDeveloper) && (
-                <div className="pt-4 mt-4 border-t border-slate-100">
-                  <p className={`px-4 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 transition-opacity duration-200 ${isSidebarCollapsed ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}>Portal</p>
-                  {canViewEventsManagement && !isPlainMember && (
-                    <SidebarItem
-                      icon={<Briefcase size={18} />}
-                      label="Flagship Projects Mgt"
-                      isActive={view === 'FLAGSHIP_PROJECTS_MGT'}
-                      onClick={() => { handleViewChange('FLAGSHIP_PROJECTS_MGT'); setIsSidebarOpen(false); }}
-                      isCollapsed={isSidebarCollapsed}
-                    />
-                  )}
-                  {(isBoard || isAdmin) && (
-                    <SidebarItem
-                      icon={<Megaphone size={18} />}
-                      label="Partnerships & Promotions"
-                      isActive={view === 'ADVERTISEMENTS'}
-                      onClick={() => { handleViewChange('ADVERTISEMENTS'); setIsSidebarOpen(false); }}
-                      isCollapsed={isSidebarCollapsed}
-                    />
-                  )}
-                  <SidebarItem
-                    icon={<BookOpen size={18} />}
-                    label="Publications"
-                    isActive={view === 'PUBLICATIONS'}
-                    onClick={() => { handleViewChange('PUBLICATIONS'); setIsSidebarOpen(false); }}
-                    isCollapsed={isSidebarCollapsed}
-                  />
-                </div>
-              )}
-              {member?.role !== UserRole.GUEST && (isBoard || isAdmin || isDeveloper) && (
-                <div className="pt-4 mt-4 border-t border-slate-100 px-2">
-                  <p className={`px-4 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 transition-opacity duration-200 ${isSidebarCollapsed ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}>System</p>
-                  {(isBoard || isAdmin || isDeveloper) && (
-                    <>
-                      <SidebarItem
-                        icon={<FileText size={18} />}
-                        label="Templates"
-                        isActive={view === 'TEMPLATES'}
-                        onClick={() => { handleViewChange('TEMPLATES'); setIsSidebarOpen(false); }}
-                        isCollapsed={isSidebarCollapsed}
-                      />
-                      <SidebarItem
-                        icon={<BarChart3 size={18} />}
-                        label="Reports"
-                        isActive={view === 'REPORTS'}
-                        onClick={() => { handleViewChange('REPORTS'); setIsSidebarOpen(false); }}
-                        isCollapsed={isSidebarCollapsed}
-                      />
-                      <SidebarItem
-                        icon={<Database size={18} />}
-                        label="Data Import / Export"
-                        isActive={view === 'DATA_IMPORT_EXPORT'}
-                        onClick={() => { handleViewChange('DATA_IMPORT_EXPORT'); setIsSidebarOpen(false); }}
-                        isCollapsed={isSidebarCollapsed}
-                      />
-                      <SidebarItem
-                        icon={<Zap size={18} />}
-                        label="Radar Data Importer"
-                        isActive={view === 'RADAR_IMPORTER'}
-                        onClick={() => { handleViewChange('RADAR_IMPORTER'); setIsSidebarOpen(false); }}
-                        isCollapsed={isSidebarCollapsed}
-                      />
-                      <SidebarItem
-                        icon={<SlidersHorizontal size={18} />}
-                        label="Config"
-                        isActive={view === 'SYSTEM_CONFIG' || view === 'MEMBERSHIP_CONFIG' || view === 'ACCESS_CONFIG' || view === 'API_CONFIG' || view === 'TOYYIB' || view === 'WHAPI_CONFIG'}
-                        onClick={() => { handleViewChange('SYSTEM_CONFIG'); setIsSidebarOpen(false); }}
-                        isCollapsed={isSidebarCollapsed}
-                      />
-                    </>
-                  )}
-                  {(isBoard || isAdmin) && (
-                    <SidebarItem
-                      icon={<Workflow size={18} />}
-                      label="Automation Studio"
-                      isActive={view === 'AUTOMATION'}
-                      onClick={() => { handleViewChange('AUTOMATION'); setIsSidebarOpen(false); }}
-                      isCollapsed={isSidebarCollapsed}
-                    />
-                  )}
-                </div>
-              )}
-              {isDeveloper && (
-                <div className="pt-4 mt-4 border-t border-slate-100 px-2">
-                  <p className={`px-4 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 transition-opacity duration-200 ${isSidebarCollapsed ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}>Developer</p>
-                  <SidebarItem
-                    icon={<Sparkles size={18} />}
-                    label="AI Insights"
-                    isActive={view === 'AI_INSIGHTS'}
-                    onClick={() => { setView('AI_INSIGHTS'); setIsSidebarOpen(false); }}
-                    isCollapsed={isSidebarCollapsed}
-                  />
-                  <SidebarItem
-                    icon={<Code size={18} />}
-                    label="Developer Interface"
-                    isActive={view === 'DEVELOPER'}
-                    onClick={() => { handleViewChange('DEVELOPER'); setIsSidebarOpen(false); }}
-                    isCollapsed={isSidebarCollapsed}
-                  />
-                </div>
-              )}
-            </nav>
-          </div>
-        </aside>
-
-        {/* Main Content */}
-        <main id="main-content" className="flex-1 flex flex-col min-w-0 h-full overflow-hidden" tabIndex={-1} role="main">
+      <AppShell
+        currentView={view}
+        isSidebarOpen={isSidebarOpen}
+        isSidebarCollapsed={isSidebarCollapsed}
+        navigationContext={sidebarNavigationContext}
+        onCloseSidebar={() => setIsSidebarOpen(false)}
+        onToggleSidebarCollapsed={() => setIsSidebarCollapsed(prev => !prev)}
+        onNavigate={handleViewChange}
+        onDirectNavigate={setView}
+      >
           {!isOnline && (
             <div role="status" aria-live="polite" className="shrink-0 bg-yellow-500 text-white text-xs text-center py-1 px-4 z-[100]">
               离线模式 — 显示缓存数据，操作将在恢复连接后同步
@@ -1126,7 +524,7 @@ export const JCIKLApp: React.FC = () => {
             </div>
           )}
           <h1 className="sr-only">
-            {view === 'DASHBOARD' ? 'Dashboard' : view === 'MEMBERS' ? 'Members' : view === 'EVENTS' ? 'Event List' : view === 'PROJECTS' ? 'Events Management' : view === 'FINANCE' ? 'Finance' : view === 'PAYMENT_REQUESTS' ? 'Payment Requests' : view === 'GAMIFICATION' ? 'Gamification' : view === 'INVENTORY' ? 'Inventory' : view === 'DIRECTORY' ? 'Business Directory' : view === 'AUTOMATION' ? 'Automation Studio' : view === 'KNOWLEDGE' ? 'Knowledge' : view === 'COMMUNICATION' ? 'Communication' : view === 'CLUBS' ? 'Hobby Clubs' : view === 'SURVEYS' ? 'Surveys' : view === 'ZOOM_BOOKING' ? 'Zoom Booking' : view === 'SOCIAL_MEDIA' ? 'Social Media' : view === 'BENEFITS' ? 'Member Benefits' : view === 'DATA_IMPORT_EXPORT' ? 'Data Import/Export' : view === 'ADVERTISEMENTS' ? 'Partnership & Promotions' : view === 'AI_INSIGHTS' ? 'AI Insights' : view === 'TEMPLATES' ? 'Templates' : view === 'ACTIVITY_PLANS' ? 'Activity Plans' : view === 'REPORTS' ? 'Reports' : view === 'DEVELOPER' ? 'Developer Interface' : 'JCI LO Management'}
+            {getViewTitle(view)}
           </h1>
           {/* Topbar removed for premium gradient header replacement */}
 
@@ -1159,7 +557,7 @@ export const JCIKLApp: React.FC = () => {
                   <div className="hidden sm:flex flex-col leading-none gap-0.5 min-w-0">
                     <span className="text-[10px] font-bold text-white/55 uppercase tracking-widest">Kuala Lumpur</span>
                     <span className="text-sm font-semibold text-white truncate">
-                      {({ 'DASHBOARD': 'Dashboard', 'MEMBERS': 'Members', 'EVENTS': 'Event List', 'PROJECTS': 'Events Mgmt', 'FINANCE': 'Finance', 'PAYMENT_REQUESTS': 'Payments', 'GAMIFICATION': 'Gamification', 'INVENTORY': 'Inventory', 'DIRECTORY': 'Biz Directory', 'AUTOMATION': 'Automation', 'KNOWLEDGE': 'Knowledge', 'COMMUNICATION': 'Communication', 'CLUBS': 'Hobby Clubs', 'SURVEYS': 'Surveys', 'BENEFITS': 'Benefits', 'DATA_IMPORT_EXPORT': 'Data I/O', 'ADVERTISEMENTS': 'Partnerships', 'AI_INSIGHTS': 'AI Insights', 'TEMPLATES': 'Templates', 'REPORTS': 'Reports', 'DEVELOPER': 'Developer' } as Record<string, string>)[view] ?? 'Dashboard'}
+                      {getShortViewTitle(view)}
                     </span>
                   </div>
                 </div>
@@ -1319,54 +717,52 @@ export const JCIKLApp: React.FC = () => {
               </Suspense>
             </AsyncErrorBoundary>
           </div>
-        </main>
+      </AppShell>
 
-        <NotificationDrawer
-          isOpen={isNotificationDrawerOpen}
-          onClose={() => setNotificationDrawerOpen(false)}
-          notifications={allNotifications}
-          onMarkAsRead={markNotificationAsRead}
-        />
+      <NotificationDrawer
+        isOpen={isNotificationDrawerOpen}
+        onClose={() => setNotificationDrawerOpen(false)}
+        notifications={allNotifications}
+        onMarkAsRead={markNotificationAsRead}
+      />
 
-        {/* Search dropdown — backdrop tap to close */}
-        {isSearchDrawerOpen && (
-          <div className="fixed inset-0 z-[48]" onClick={() => { setHeaderSearchActive(false); setSearchQuery(''); setSearchDrawerOpen(false); }} />
-        )}
-        <SearchDropdown
-          isOpen={isSearchDrawerOpen}
-          onClose={() => { setHeaderSearchActive(false); setSearchQuery(''); setSearchDrawerOpen(false); }}
-          searchQuery={searchQuery}
-          onNavigate={handleViewChange}
-        />
+      {/* Search dropdown — backdrop tap to close */}
+      {isSearchDrawerOpen && (
+        <div className="fixed inset-0 z-[48]" onClick={() => { setHeaderSearchActive(false); setSearchQuery(''); setSearchDrawerOpen(false); }} />
+      )}
+      <SearchDropdown
+        isOpen={isSearchDrawerOpen}
+        onClose={() => { setHeaderSearchActive(false); setSearchQuery(''); setSearchDrawerOpen(false); }}
+        searchQuery={searchQuery}
+        onNavigate={handleViewChange}
+      />
 
-        <Modal
-          isOpen={isSignOutConfirmOpen}
-          onClose={() => setSignOutConfirmOpen(false)}
-          title=""
-          size="sm"
-          noHeader
-        >
-          <div className="relative flex flex-col items-center text-center px-6 pt-8 pb-6 gap-5">
-            <button
-              onClick={() => setSignOutConfirmOpen(false)}
-              className="absolute top-0 right-0 p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-              aria-label="Close"
-            >
-              <X size={18} />
-            </button>
-            <picture><source type="image/webp" srcSet="/mascot/logout.webp" /><img src="/mascot/logout.png" alt="" className="w-auto h-auto max-h-32 object-contain" loading="lazy" /></picture>
-            <div className="space-y-1.5">
-              <p className="font-semibold text-slate-800 text-base">Sign out?</p>
-              <p className="text-sm text-slate-400">You'll need to log in again to access your account.</p>
-            </div>
-            <div className="flex gap-3 w-full">
-              <Button variant="outline" className="flex-1" onClick={() => setSignOutConfirmOpen(false)}>Cancel</Button>
-              <Button variant="danger" className="flex-1" onClick={() => { setSignOutConfirmOpen(false); handleLogout(); }}>Sign Out</Button>
-            </div>
+      <Modal
+        isOpen={isSignOutConfirmOpen}
+        onClose={() => setSignOutConfirmOpen(false)}
+        title=""
+        size="sm"
+        noHeader
+      >
+        <div className="relative flex flex-col items-center text-center px-6 pt-8 pb-6 gap-5">
+          <button
+            onClick={() => setSignOutConfirmOpen(false)}
+            className="absolute top-0 right-0 p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+            aria-label="Close"
+          >
+            <X size={18} />
+          </button>
+          <picture><source type="image/webp" srcSet="/mascot/logout.webp" /><img src="/mascot/logout.png" alt="" className="w-auto h-auto max-h-32 object-contain" loading="lazy" /></picture>
+          <div className="space-y-1.5">
+            <p className="font-semibold text-slate-800 text-base">Sign out?</p>
+            <p className="text-sm text-slate-400">You'll need to log in again to access your account.</p>
           </div>
-        </Modal>
-
-      </div >
+          <div className="flex gap-3 w-full">
+            <Button variant="outline" className="flex-1" onClick={() => setSignOutConfirmOpen(false)}>Cancel</Button>
+            <Button variant="danger" className="flex-1" onClick={() => { setSignOutConfirmOpen(false); handleLogout(); }}>Sign Out</Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Floating Bottom Navigation Bar (Mobile) */}
       {

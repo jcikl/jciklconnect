@@ -54,12 +54,14 @@ export default async (req, context) => {
 
   // Verify signature for all other events
   const secret = process.env.ZOOM_WEBHOOK_SECRET_TOKEN;
-  if (secret) {
-    const timestamp = req.headers.get('x-zm-request-timestamp') ?? '';
-    const signature = req.headers.get('x-zm-signature') ?? '';
-    if (!verifySignature(secret, timestamp, bodyText, signature)) {
-      return new Response('Unauthorized', { status: 401 });
-    }
+  if (!secret) {
+    console.error('[zoom-webhook] ZOOM_WEBHOOK_SECRET_TOKEN is not configured');
+    return new Response('Webhook secret not configured', { status: 500 });
+  }
+  const timestamp = req.headers.get('x-zm-request-timestamp') ?? '';
+  const signature = req.headers.get('x-zm-signature') ?? '';
+  if (!verifySignature(secret, timestamp, bodyText, signature)) {
+    return new Response('Unauthorized', { status: 401 });
   }
 
   const { event, payload: eventPayload } = payload;

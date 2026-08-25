@@ -10,7 +10,6 @@ export interface ZoomBooking {
   duration: number;    // minutes
   zoomMeetingId: number;
   zoomJoinUrl: string;
-  zoomHostUrl: string;
   zoomPassword: string;
   status: ZoomBookingStatus;
   createdAt: string;

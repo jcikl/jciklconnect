@@ -1,6 +1,7 @@
 import {
   collection, addDoc, updateDoc, deleteDoc, doc, query, where, getDocs, orderBy, getDoc,
 } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 import { db, auth } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { isDevMode } from '../utils/devMode';
@@ -159,14 +160,16 @@ export class SocialPostService {
     AuditLogService.writeAuditEntry({ action: 'social_post_deleted', performedBy: auth?.currentUser?.uid ?? '', targetCollection: COL, targetId: id });
   }
 
-  static async aiRewrite(content: string, platform: string, tone: string, customSystemPrompt?: string, contentType?: SocialPostContentType): Promise<string> {
+  static async aiRewrite(content: string, platform: string, tone: string, _customSystemPrompt?: string, contentType?: SocialPostContentType): Promise<string> {
     if (isDevMode()) {
       return `✨ [AI Rewritten for ${platform}${contentType ? ` / ${contentType}` : ''}]\n\n${content}\n\n#JCIKL #Leadership #Community`;
     }
+    const token = await getAuth().currentUser?.getIdToken();
+    if (!token) throw new Error('Not authenticated');
     const res = await fetch('/.netlify/functions/social-ai-rewrite', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content, platform, tone, customSystemPrompt, contentType }),
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ content, platform, tone, contentType }),
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));

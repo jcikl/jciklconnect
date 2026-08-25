@@ -1,15 +1,23 @@
 import React, { useState, useMemo } from 'react';
 import { FileText, Plus, Edit, Trash2, Send, CheckCircle, XCircle, Clock, History, Users, Calendar, DollarSign, Target, Eye } from 'lucide-react';
-import { Card, Button, Badge, Modal, useToast, Tabs, Pagination, PageHeader, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
+import { Card, Button, Badge, Modal, useToast, PageScaffold, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
 import type { ConfirmState } from '../ui/Common';
 import { Input, Select, Textarea } from '../ui/Form';
-import { LoadingState } from '../ui/Loading';
+import { Pagination } from '../ui/Pagination';
 import { useActivityPlans } from '../../hooks/useActivityPlans';
 import { useAuth } from '../../hooks/useAuth';
 import { usePermissions } from '../../hooks/usePermissions';
 import { ActivityPlan } from '../../services/activityPlansService';
 import { formatDate } from '../../utils/dateUtils';
 import { formatCurrency } from '../../utils/formatUtils';
+
+const ACTIVITY_PLAN_TABS = [
+  { id: 'all', label: 'All' },
+  { id: 'draft', label: 'Draft' },
+  { id: 'submitted', label: 'Submitted' },
+  { id: 'approved', label: 'Approved' },
+  { id: 'rejected', label: 'Rejected' },
+];
 
 export const ActivityPlansView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
   const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
@@ -173,11 +181,11 @@ export const ActivityPlansView: React.FC<{ searchQuery?: string }> = ({ searchQu
   };
 
   return (
-    <div className="space-y-6">
-      <PageHeader
+    <>
+      <PageScaffold
         title="Activity Plans"
         description="Propose, review, and manage activity plans."
-        action={member ? (
+        actions={member ? (
           <Button onClick={() => {
             setSelectedPlan(null);
             setIsModalOpen(true);
@@ -186,31 +194,19 @@ export const ActivityPlansView: React.FC<{ searchQuery?: string }> = ({ searchQu
             Create Activity Plan
           </Button>
         ) : undefined}
-      />
-
-      <Card noPadding>
-        <div className="">
-          <Tabs
-            tabs={['All', 'Draft', 'Submitted', 'Approved', 'Rejected']}
-            activeTab={
-              activeTab === 'all' ? 'All' :
-                activeTab === 'draft' ? 'Draft' :
-                  activeTab === 'submitted' ? 'Submitted' :
-                    activeTab === 'approved' ? 'Approved' : 'Rejected'
-            }
-            onTabChange={(tab) => {
-              if (tab === 'All') setActiveTab('all');
-              else if (tab === 'Draft') setActiveTab('draft');
-              else if (tab === 'Submitted') setActiveTab('submitted');
-              else if (tab === 'Approved') setActiveTab('approved');
-              else setActiveTab('rejected');
+        tabs={{
+          items: ACTIVITY_PLAN_TABS,
+          activeTab,
+          onTabChange: (tab) => {
+              setActiveTab(tab as typeof activeTab);
               setCurrentPage(1);
-            }}
-            className="px-4 md:px-6"
-          />
-        </div>
-        <div className="p-4">
-          <LoadingState loading={loading} error={error} empty={filteredPlans.length === 0} emptyMessage="No activity plans found">
+          },
+        }}
+        loading={loading}
+        error={error}
+        empty={filteredPlans.length === 0}
+        emptyMessage="No activity plans found"
+      >
             <div className="space-y-4">
               {paginatedPlans.map(plan => (
                 <Card key={plan.id} className="hover:shadow-md transition-shadow">
@@ -334,9 +330,7 @@ export const ActivityPlansView: React.FC<{ searchQuery?: string }> = ({ searchQu
                 />
               </div>
             )}
-          </LoadingState>
-        </div>
-      </Card>
+      </PageScaffold>
 
       {/* Create/Edit Activity Plan Modal */}
       <Modal
@@ -577,7 +571,7 @@ export const ActivityPlansView: React.FC<{ searchQuery?: string }> = ({ searchQu
         </Modal>
       )}
       <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
-    </div>
+    </>
   );
 };
 

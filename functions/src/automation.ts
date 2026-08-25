@@ -155,6 +155,32 @@ function evaluateCondition(config: any, data: any): boolean {
 }
 
 // Helper function to execute actions
+const AUTOMATION_ALLOWED_FIELDS: Record<string, string[]> = {
+  members: ['status', 'updatedAt'],
+  events: ['status', 'updatedAt'],
+  projects: ['status', 'updatedAt'],
+  tasks: ['title', 'assignedTo', 'assignee', 'projectId', 'status', 'updatedAt'],
+  notifications: ['memberId', 'title', 'message', 'type', 'read', 'createdAt', 'updatedAt'],
+  workflows: ['status', 'updatedAt'],
+  activityPlans: ['status', 'updatedAt'],
+  eventRegistrations: ['status', 'checkedInAt', 'updatedAt'],
+};
+
+const AUTOMATION_CREATE_COLLECTIONS = new Set([
+  'tasks',
+  'notifications',
+  'activityPlans',
+]);
+
+function isAllowedAutomationField(collection: string, field: string): boolean {
+  return (AUTOMATION_ALLOWED_FIELDS[collection] ?? []).includes(field);
+}
+
+function pickAllowedAutomationData(collection: string, data: Record<string, any>): Record<string, any> {
+  const allowed = new Set(AUTOMATION_ALLOWED_FIELDS[collection] ?? []);
+  return Object.fromEntries(Object.entries(data).filter(([key]) => allowed.has(key)));
+}
+
 async function executeAction(config: any, data: any): Promise<any> {
   switch (config.type) {
     case 'send_email':
@@ -165,13 +191,14 @@ async function executeAction(config: any, data: any): Promise<any> {
     case 'update_field': {
       // Update a document field — restricted to an explicit allowlist to prevent
       // workflows from writing to sensitive or unintended collections.
-      const ALLOWED_COLLECTIONS = [
-        'members', 'events', 'projects', 'tasks', 'notifications',
-        'workflows', 'activityPlans', 'eventRegistrations'
-      ];
+      const ALLOWED_COLLECTIONS = Object.keys(AUTOMATION_ALLOWED_FIELDS);
       if (config.collection && config.documentId && config.field) {
         if (!ALLOWED_COLLECTIONS.includes(config.collection)) {
           console.error(`executeAction: collection '${config.collection}' not in allowlist — update_field blocked`);
+          return { fieldUpdated: false, blocked: true };
+        }
+        if (!isAllowedAutomationField(config.collection, config.field)) {
+          console.error(`executeAction: field '${config.collection}.${config.field}' not in allowlist - update_field blocked`);
           return { fieldUpdated: false, blocked: true };
         }
         await db.collection(config.collection).doc(config.documentId).update({
@@ -184,10 +211,18 @@ async function executeAction(config: any, data: any): Promise<any> {
     }
       
     case 'create_record':
-      // Create a new document
+      // Create a new document, restricted to low-risk automation-owned collections.
       if (config.collection && config.data) {
+        if (!AUTOMATION_CREATE_COLLECTIONS.has(config.collection)) {
+          console.error(`executeAction: collection '${config.collection}' not in create allowlist - create_record blocked`);
+          return { recordCreated: false, blocked: true };
+        }
+        const sanitizedData = pickAllowedAutomationData(config.collection, config.data);
+        if (Object.keys(sanitizedData).length === 0) {
+          throw new Error('create_record has no allowed fields');
+        }
         const docRef = await db.collection(config.collection).add({
-          ...config.data,
+          ...sanitizedData,
           createdAt: admin.firestore.FieldValue.serverTimestamp()
         });
         return { recordCreated: true, documentId: docRef.id };

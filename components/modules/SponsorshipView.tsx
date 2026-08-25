@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Handshake, Plus, Edit, Trash2, DollarSign, Users, Building2, TrendingUp, Search } from 'lucide-react';
-import { Button, Card, StatCard, StatCardsContainer, Badge, Modal, useToast, Tabs } from '../ui/Common';
+import { Plus, Edit, Trash2, DollarSign, Users, Building2, TrendingUp } from 'lucide-react';
+import { Button, Card, StatCard, StatCardsContainer, Badge, Modal, useToast, Tabs, PageScaffold, ModuleToolbar } from '../ui/Common';
 import { Input, Textarea } from '../ui/Form';
 import { useSponsorships } from '../../hooks/useSponsorships';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -186,16 +186,6 @@ export const SponsorshipView: React.FC<{ searchQuery?: string }> = ({ searchQuer
     setConfirmDelete(null);
   };
 
-  if (loading) return (
-    <div className="flex items-center justify-center py-20">
-      <div className="flex flex-col items-center gap-3">
-        <div className="w-8 h-8 border-4 border-violet-300 border-t-violet-600 rounded-full animate-spin" />
-        <p className="text-sm text-slate-500">Loading sponsorships…</p>
-      </div>
-    </div>
-  );
-  if (error) return <div className="p-6 text-red-500">{error}</div>;
-
   const tabs = [
     { id: 'records', label: 'All Records' },
     { id: 'by_sponsor', label: 'By Sponsor' },
@@ -203,22 +193,23 @@ export const SponsorshipView: React.FC<{ searchQuery?: string }> = ({ searchQuer
   ];
 
   return (
-    <div className="p-4 md:p-6 space-y-5 max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Handshake size={24} className="text-violet-500" />
-          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Sponsorships</h1>
-        </div>
-        {canManage && (
+    <PageScaffold
+      title="Sponsorships"
+      actions={
+        canManage ? (
           <Button
             variant="primary"
             onClick={() => { setEditing(null); setIsModalOpen(true); }}
           >
             <Plus size={16} className="mr-1.5" /> Add Record
           </Button>
-        )}
-      </div>
+        ) : null
+      }
+      loading={loading}
+      error={error}
+      className="p-4 md:p-6 max-w-6xl mx-auto"
+      contentClassName="space-y-5"
+    >
 
       {/* Stats */}
       <StatCardsContainer>
@@ -237,16 +228,13 @@ export const SponsorshipView: React.FC<{ searchQuery?: string }> = ({ searchQuer
 
       {/* Search bar (records tab only) */}
       {activeTab === 'records' && (
-        <div className="relative max-w-md">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-          <input
-            type="text"
-            placeholder="Search records…"
-            value={localQuery}
-            onChange={e => setLocalQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-400"
-          />
-        </div>
+        <ModuleToolbar
+          searchValue={localQuery}
+          searchPlaceholder="Search records..."
+          onSearchChange={setLocalQuery}
+          onClearSearch={() => setLocalQuery('')}
+          searchClassName="md:max-w-md"
+        />
       )}
 
       {/* ---- Records Tab ---- */}
@@ -413,6 +401,6 @@ export const SponsorshipView: React.FC<{ searchQuery?: string }> = ({ searchQuer
           <Button variant="danger" onClick={handleDelete}>Delete</Button>
         </div>
       </Modal>
-    </div>
+    </PageScaffold>
   );
 };

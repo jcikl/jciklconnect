@@ -1,8 +1,7 @@
 ﻿import React, { useState } from 'react';
 import { MessageSquare, BarChart2, Plus, ArrowRight, Edit, Trash2, Type, List, Star, CheckSquare, Share2, Send, FileText } from 'lucide-react';
-import { Card, Button, Badge, Modal, useToast, Tabs, PageHeader, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
+import { Button, Badge, Modal, useToast, PageScaffold, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
 import type { ConfirmState } from '../ui/Common';
-import { LoadingState } from '../ui/Loading';
 import { useSurveys } from '../../hooks/useSurveys';
 import { useAuth } from '../../hooks/useAuth';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -15,6 +14,11 @@ import { SurveyResponseModal } from './Surveys/SurveyResponseModal';
 import { SurveyResultsView } from './Surveys/SurveyResultsView';
 import { QuestionEditorModal } from './Surveys/QuestionEditorModal';
 import { SurveyDistributionModal } from './Surveys/SurveyDistributionModal';
+
+const SURVEY_TABS = [
+    { id: 'surveys', label: 'Surveys' },
+    { id: 'results', label: 'Results' },
+];
 
 export const SurveysView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
     const [isCreateModalOpen, setCreateModalOpen] = useState(false);
@@ -184,25 +188,28 @@ export const SurveysView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
     };
 
     return (
-        <div className="space-y-6">
-            <PageHeader title="Feedback & Surveys" description="Pulse checks, satisfaction surveys, and polls." />
-
-            <Card noPadding>
-                <div className="px-4 md:px-6 pt-4">
-                    <Tabs
-                        tabs={['Surveys', 'Results']}
-                        activeTab={activeTab === 'surveys' ? 'Surveys' : 'Results'}
-                        onTabChange={(tab) => {
-                            setActiveTab(tab === 'Surveys' ? 'surveys' : 'results');
-                            if (tab === 'Results' && analyticsSurveyId) {
-                                loadAnalytics(analyticsSurveyId);
-                            }
-                        }}
-                    />
-                </div>
-                <div className="p-4">
-                    {activeTab === 'surveys' ? (
-                        <LoadingState loading={loading} error={error} empty={filteredSurveys.length === 0}>
+        <>
+            <PageScaffold
+                title="Feedback & Surveys"
+                description="Pulse checks, satisfaction surveys, and polls."
+                tabs={{
+                    items: SURVEY_TABS,
+                    activeTab,
+                    onTabChange: (tab) => {
+                        const nextTab = tab as typeof activeTab;
+                        setActiveTab(nextTab);
+                        if (nextTab === 'results' && analyticsSurveyId) {
+                            loadAnalytics(analyticsSurveyId);
+                        }
+                    },
+                }}
+                loading={activeTab === 'surveys' ? loading : false}
+                error={activeTab === 'surveys' ? error : null}
+                empty={activeTab === 'surveys' && filteredSurveys.length === 0}
+                emptyMessage="No surveys found"
+            >
+                {activeTab === 'surveys' ? (
+                    <>
                             {/* â”€â”€ Desktop table â”€â”€ */}
                             <div className="hidden md:block overflow-x-auto">
                                 <table className="w-full text-sm">
@@ -353,36 +360,35 @@ export const SurveysView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                                     </div>
                                 ))}
                             </div>
-                        </LoadingState>
-                    ) : (
-                        <SurveyResultsView
-                            surveys={surveys}
-                            selectedSurveyId={analyticsSurveyId}
-                            analytics={analytics}
-                            loading={loadingAnalytics}
-                            onSelectSurvey={(id) => {
-                                setAnalyticsSurveyId(id);
-                                loadAnalytics(id);
-                            }}
-                            onExport={(surveyId) => {
-                                SurveyAnalyticsService.exportAnalyticsAsCSV(surveyId)
-                                    .then(csv => {
-                                        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-                                        const link = document.createElement('a');
-                                        link.href = URL.createObjectURL(blob);
-                                        link.download = `survey-analytics-${surveyId}-${Date.now()}.csv`;
-                                        document.body.appendChild(link);
-                                        link.click();
-                                        document.body.removeChild(link);
-                                        URL.revokeObjectURL(link.href);
-                                        showToast('Analytics exported successfully', 'success');
-                                    })
-                                    .catch(() => showToast('Failed to export analytics', 'error'));
-                            }}
-                        />
-                    )}
-                </div>
-            </Card>
+                    </>
+                ) : (
+                    <SurveyResultsView
+                        surveys={surveys}
+                        selectedSurveyId={analyticsSurveyId}
+                        analytics={analytics}
+                        loading={loadingAnalytics}
+                        onSelectSurvey={(id) => {
+                            setAnalyticsSurveyId(id);
+                            loadAnalytics(id);
+                        }}
+                        onExport={(surveyId) => {
+                            SurveyAnalyticsService.exportAnalyticsAsCSV(surveyId)
+                                .then(csv => {
+                                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                                    const link = document.createElement('a');
+                                    link.href = URL.createObjectURL(blob);
+                                    link.download = `survey-analytics-${surveyId}-${Date.now()}.csv`;
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                    URL.revokeObjectURL(link.href);
+                                    showToast('Analytics exported successfully', 'success');
+                                })
+                                .catch(() => showToast('Failed to export analytics', 'error'));
+                        }}
+                    />
+                )}
+            </PageScaffold>
 
             {/* Create Survey Modal */}
             <Modal
@@ -518,7 +524,7 @@ export const SurveysView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                     drawerOnMobile
                 />
             )}
-        <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
-        </div>
+            <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
+        </>
     );
 };

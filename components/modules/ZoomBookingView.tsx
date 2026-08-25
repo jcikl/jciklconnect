@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Video, Plus, X, ExternalLink, Clock, Calendar, Copy, Check, List, ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
-import { Button, Modal, Tabs, useToast } from '../ui/Common';
+import { Button, Modal, Tabs, PageScaffold, useToast } from '../ui/Common';
 import { Input } from '../ui/Form';
 import { useAuth } from '../../hooks/useAuth';
 import { useZoomBookings } from '../../hooks/useZoomBookings';
@@ -224,16 +224,10 @@ export const ZoomBookingView: React.FC = () => {
   const past = bookings.filter(b => b.status === 'cancelled' || !isFuture(b.startTime));
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-            <Video size={20} className="text-jci-blue" /> Zoom Booking
-          </h2>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* View toggle */}
+    <>
+      <PageScaffold
+        title="Zoom Booking"
+        actions={
           <div className="flex rounded-lg border border-slate-200 overflow-hidden">
             <button
               onClick={() => setViewMode('list')}
@@ -248,21 +242,22 @@ export const ZoomBookingView: React.FC = () => {
               <Calendar size={13} /> Calendar
             </button>
           </div>
-        </div>
-      </div>
+        }
+        className="max-w-2xl mx-auto"
+        contentClassName="space-y-6"
+      >
+        {/* Calendar view */}
+        {viewMode === 'calendar' && (
+          <ZoomBookingCalendar
+            bookings={bookings}
+            onDateClick={(d) => openModal(d.toLocaleDateString('en-CA', { timeZone: 'Asia/Kuala_Lumpur' }))}
+            onBookingClick={(b) => { /* scroll to list or show detail */ }}
+          />
+        )}
 
-      {/* Calendar view */}
-      {viewMode === 'calendar' && (
-        <ZoomBookingCalendar
-          bookings={bookings}
-          onDateClick={(d) => openModal(d.toLocaleDateString('en-CA', { timeZone: 'Asia/Kuala_Lumpur' }))}
-          onBookingClick={(b) => { /* scroll to list or show detail */ }}
-        />
-      )}
-
-      {/* List view */}
-      {viewMode === 'list' && (
-        <>
+        {/* List view */}
+        {viewMode === 'list' && (
+          <>
           {/* New Booking Row */}
           <button
             onClick={() => openModal()}
@@ -313,8 +308,9 @@ export const ZoomBookingView: React.FC = () => {
               </div>
             )
           )}
-        </>
-      )}
+          </>
+        )}
+      </PageScaffold>
 
       {/* Create Modal */}
       <Modal
@@ -397,7 +393,7 @@ export const ZoomBookingView: React.FC = () => {
           </div>
         )}
       </Modal>
-    </div>
+    </>
   );
 };
 

@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { Download, Upload, FileText, Database, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
-import { Button, Card, Badge, Modal, useToast, Tabs } from '../ui/Common';
-import { Input, Select } from '../ui/Form';
-import { LoadingState } from '../ui/Loading';
+import { Download, Upload, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Button, Card, PageScaffold, useToast } from '../ui/Common';
+import { Select } from '../ui/Form';
 import { DataImportExportService } from '../../services/dataImportExportService';
 import { DataImportResult } from '../../types';
 
@@ -98,22 +97,19 @@ export const DataImportExportView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">Data Import & Export</h2>
-          <p className="text-slate-500">Import and export data in various formats.</p>
-        </div>
-      </div>
-
+    <PageScaffold
+      title="Data Import & Export"
+      description="Import and export data in various formats."
+      tabs={{
+        items: [
+          { id: 'export', label: 'Export Data' },
+          { id: 'import', label: 'Import Data' },
+        ],
+        activeTab,
+        onTabChange: (tab) => setActiveTab(tab as typeof activeTab),
+      }}
+    >
       <Card noPadding>
-        <div className="px-4 md:px-6 pt-4">
-          <Tabs
-            tabs={['Export Data', 'Import Data']}
-            activeTab={activeTab === 'export' ? 'Export Data' : 'Import Data'}
-            onTabChange={(tab) => setActiveTab(tab === 'Export Data' ? 'export' : 'import')}
-          />
-        </div>
         <div className="p-4">
           {activeTab === 'export' ? (
             <div className="space-y-6">
@@ -235,7 +231,7 @@ export const DataImportExportView: React.FC = () => {
           )}
         </div>
       </Card>
-    </div>
+    </PageScaffold>
   );
 };
 

@@ -41,12 +41,13 @@ const db = admin.firestore();
 exports.checkMemberPromotion = functions.firestore
     .document('members/{memberId}')
     .onUpdate(async (change, context) => {
-    var _a, _b;
+    var _a, _b, _c, _d;
     const before = change.before.data();
     const after = change.after.data();
     const memberId = context.params.memberId;
     // Only check Probation members
-    if (after.membershipType !== 'probation' && after.membershipType !== 'Probation') {
+    const afterMembershipType = (_b = (_a = after.jciCareer) === null || _a === void 0 ? void 0 : _a.membershipType) !== null && _b !== void 0 ? _b : after.membershipType;
+    if (afterMembershipType !== 'probation' && afterMembershipType !== 'Probation') {
         return null;
     }
     // Check if promotion progress was updated
@@ -65,7 +66,7 @@ exports.checkMemberPromotion = functions.firestore
             // Idempotency: re-read the member to confirm not already promoted before committing.
             // Retries triggered by a transient batch.commit() failure would otherwise double-promote.
             const freshSnap = await db.collection('members').doc(memberId).get();
-            if (((_b = (_a = freshSnap.data()) === null || _a === void 0 ? void 0 : _a.promotionProgress) === null || _b === void 0 ? void 0 : _b.promotedToFull) === true) {
+            if (((_d = (_c = freshSnap.data()) === null || _c === void 0 ? void 0 : _c.promotionProgress) === null || _d === void 0 ? void 0 : _d.promotedToFull) === true) {
                 console.log(`Member ${memberId} already promoted — skipping (idempotent retry)`);
                 return null;
             }
@@ -100,7 +101,7 @@ exports.checkMemberPromotion = functions.firestore
 });
 // Function to handle annual dues renewal
 exports.generateDuesRenewal = functions.runWith({ timeoutSeconds: 300 }).https.onCall(async (data, context) => {
-    var _a, _b, _c;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
     // Verify admin permissions
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
@@ -141,8 +142,9 @@ exports.generateDuesRenewal = functions.runWith({ timeoutSeconds: 300 }).https.o
             continue;
         }
         // Determine dues amount based on membership type
+        const memberMembershipType = (_c = (_b = member.jciCareer) === null || _b === void 0 ? void 0 : _b.membershipType) !== null && _c !== void 0 ? _c : member.membershipType;
         let amount = 0;
-        switch (((_c = (_b = member.membershipType) === null || _b === void 0 ? void 0 : _b.toLowerCase) === null || _c === void 0 ? void 0 : _c.call(_b)) || member.membershipType) {
+        switch (((_d = memberMembershipType === null || memberMembershipType === void 0 ? void 0 : memberMembershipType.toLowerCase) === null || _d === void 0 ? void 0 : _d.call(memberMembershipType)) || memberMembershipType) {
             case 'probation':
                 amount = 350;
                 break;
@@ -159,7 +161,7 @@ exports.generateDuesRenewal = functions.runWith({ timeoutSeconds: 300 }).https.o
                 break;
             case 'senator':
                 // Verify senator certification
-                if (!member.senatorCertified) {
+                if (!((_g = (_f = (_e = member.jciCareer) === null || _e === void 0 ? void 0 : _e.senatorship) === null || _f === void 0 ? void 0 : _f.senatorCertified) !== null && _g !== void 0 ? _g : member.senatorCertified)) {
                     console.warn(`Senator ${memberId} does not have valid certification`);
                     continue;
                 }
@@ -167,14 +169,14 @@ exports.generateDuesRenewal = functions.runWith({ timeoutSeconds: 300 }).https.o
                 break;
             case 'visiting':
                 // Verify non-Malaysian citizenship
-                if (member.citizenship === 'Malaysian') {
+                if (((_k = (_j = (_h = member.general) === null || _h === void 0 ? void 0 : _h.nationality) !== null && _j !== void 0 ? _j : member.citizenship) !== null && _k !== void 0 ? _k : member.nationality) === 'Malaysian') {
                     console.warn(`Visiting member ${memberId} has Malaysian citizenship`);
                     continue;
                 }
                 amount = 500;
                 break;
             default:
-                console.warn(`Unknown membership type for member ${memberId}: ${member.membershipType}`);
+                console.warn(`Unknown membership type for member ${memberId}: ${memberMembershipType}`);
                 continue;
         }
         // Create dues transaction (type: 'DUES' + duesYear field enables single-query idempotency check)
@@ -204,7 +206,7 @@ exports.autoInitiateDuesRenewal = functions.pubsub
     .schedule('0 0 1 10 *')
     .timeZone('Asia/Kuala_Lumpur')
     .onRun(async () => {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e, _f, _g;
     const nowMYT = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }));
     const targetYear = nowMYT.getFullYear() + 1;
     const prevYear = targetYear - 1;
@@ -281,13 +283,15 @@ exports.autoInitiateDuesRenewal = functions.pubsub
         if (!memberSnap.exists)
             continue;
         const m = memberSnap.data();
-        if (m.status === 'Inactive' || m.membershipType === 'Guest')
+        const mMembershipType = (_d = (_c = m.jciCareer) === null || _c === void 0 ? void 0 : _c.membershipType) !== null && _d !== void 0 ? _d : m.membershipType;
+        const mJoinDate = (_f = (_e = m.jciCareer) === null || _e === void 0 ? void 0 : _e.joinDate) !== null && _f !== void 0 ? _f : m.joinDate;
+        if (m.status === 'Inactive' || mMembershipType === 'Guest')
             continue;
-        const type = (_c = m.membershipType) !== null && _c !== void 0 ? _c : 'Probation';
+        const type = mMembershipType !== null && mMembershipType !== void 0 ? mMembershipType : 'Probation';
         const baseDues = getDues(type);
         if (baseDues === 0)
             continue; // Honorary / Senator
-        const initFee = (m.hasPaidInitiationFee || ((_d = m.jciCareer) === null || _d === void 0 ? void 0 : _d.hasPaidInitiationFee)) ? 0 : 50;
+        const initFee = (m.hasPaidInitiationFee || ((_g = m.jciCareer) === null || _g === void 0 ? void 0 : _g.hasPaidInitiationFee)) ? 0 : 50;
         const totalDues = baseDues + initFee;
         const txRef = db.collection('transactions').doc();
         batch.set(txRef, {
@@ -341,7 +345,7 @@ exports.sendAnnualDuesReminders = functions.pubsub
     .schedule('0 10 1 1 *')
     .timeZone('Asia/Kuala_Lumpur')
     .onRun(async () => {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d, _e, _f;
     const nowMYT = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }));
     const year = nowMYT.getFullYear();
     console.log(`[sendAnnualDuesReminders] Sending dues reminders for ${year}`);
@@ -361,15 +365,16 @@ exports.sendAnnualDuesReminders = functions.pubsub
         const status = (_b = rec.status) !== null && _b !== void 0 ? _b : '';
         if (!['pending', 'partial', 'overdue'].includes(status))
             continue;
-        if (m.membershipType === 'Guest' || m.membershipType === 'Honorary' || m.membershipType === 'Senator')
+        const mType = (_d = (_c = m.jciCareer) === null || _c === void 0 ? void 0 : _c.membershipType) !== null && _d !== void 0 ? _d : m.membershipType;
+        if (mType === 'Guest' || mType === 'Honorary' || mType === 'Senator')
             continue;
-        const outstanding = Math.max(0, ((_c = rec.dues) !== null && _c !== void 0 ? _c : 0) - ((_d = rec.amount) !== null && _d !== void 0 ? _d : 0));
+        const outstanding = Math.max(0, ((_e = rec.dues) !== null && _e !== void 0 ? _e : 0) - ((_f = rec.amount) !== null && _f !== void 0 ? _f : 0));
         const notifRef = db.collection('notifications').doc();
         batch.set(notifRef, {
             memberId,
             type: 'dues_reminder',
             title: `${year} 年度会费提醒`,
-            message: `温馨提醒：您 ${year} 年度的 ${(_e = m.membershipType) !== null && _e !== void 0 ? _e : ''} 会费 RM${outstanding} 尚未缴清。请尽快完成缴费以维持您的会籍权益。`,
+            message: `温馨提醒：您 ${year} 年度的 ${mType !== null && mType !== void 0 ? mType : ''} 会费 RM${outstanding} 尚未缴清。请尽快完成缴费以维持您的会籍权益。`,
             read: false,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });

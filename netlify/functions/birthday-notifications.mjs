@@ -53,6 +53,12 @@ export default async (req, context) => {
   if (!_fbProjectId || !_fbClientEmail || !_fbPrivateKey) {
     return Response.json({ error: 'Missing Firebase Admin credentials' }, { status: 500 });
   }
+  const cronSecret = process.env.CRON_SECRET;
+  const receivedSecret = req.headers.get('x-cron-secret') ?? new URL(req.url).searchParams.get('secret');
+  const isScheduledInvocation = context?.scheduled === true;
+  if (!isScheduledInvocation && (!cronSecret || receivedSecret !== cronSecret)) {
+    return new Response('Unauthorized', { status: 401 });
+  }
 
   try {
     const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }));

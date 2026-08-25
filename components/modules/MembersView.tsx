@@ -10,7 +10,8 @@ import {
   BookOpen, Trophy, Network, ChevronRight, LayoutList
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { Button, Card, Badge, ProgressBar, Modal, useToast, Pagination, Tabs, PageHeader } from '../ui/Common';
+import { Button, Card, Badge, ProgressBar, Modal, useToast, Tabs, PageScaffold } from '../ui/Common';
+import { Pagination } from '../ui/Pagination';
 import { Input, Select, Textarea, ButtonGroup } from '../ui/Form';
 import { MultiSelectDropdown } from '../ui/MultiSelectDropdown';
 import { MemberEditForm } from './MemberEditForm';
@@ -459,26 +460,20 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
   return (
     <div className="space-y-0 pb-24 md:pb-0">
       {!selectedMember ? (
-        <>
-          {/* â"€â"€ PAGE HEADER â"€â"€ */}
-          <PageHeader
-            title="Member Directory"
-            description="Manage membership, tiers, and engagement."
-            className="mb-4"
-            action={canManageMembers ? (
-              <div className="flex items-center gap-2">
-                {/* Desktop: full buttons */}
-                <div className="hidden sm:flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setIsExportModalOpen(true)}>
-                    <Download size={14} className="mr-1.5" /> Export
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setIsImportModalOpen(true)}>
-                    <Upload size={14} className="mr-1.5" /> Import
-                  </Button>
-                </div>
-              </div>
-            ) : undefined}
-          />
+        <PageScaffold
+          title="Member Directory"
+          description="Manage membership, tiers, and engagement."
+          actions={canManageMembers ? (
+            <div className="hidden sm:flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setIsExportModalOpen(true)}>
+                <Download size={14} className="mr-1.5" /> Export
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setIsImportModalOpen(true)}>
+                <Upload size={14} className="mr-1.5" /> Import
+              </Button>
+            </div>
+          ) : undefined}
+        >
 
           {/* TAB NAVIGATION + mobile overflow menu */}
           <div className="flex gap-2 mb-4">
@@ -627,7 +622,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
               />
             )}
           </div>
-        </>
+        </PageScaffold>
       ) : (
         <MemberDetail member={selectedMember} onBack={() => setSelectedMemberId(null)} isSelfView={selectedMember?.id === currentMember?.id} />
       )}

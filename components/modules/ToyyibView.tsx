@@ -16,6 +16,9 @@ import { PaymentButton } from '../shared/toyyib/PaymentButton';
 import { MembersService } from '../../services/membersService';
 import { EventRegistrationService } from '../../services/eventRegistrationService';
 import { Combobox } from '../ui/Combobox';
+import { billStatusBadge, linkedLabel } from './Toyyib/toyyibUi';
+import { ToyyibCategoriesTab } from './Toyyib/ToyyibCategoriesTab';
+import { ToyyibBillsTab } from './Toyyib/ToyyibBillsTab';
 
 export const ToyyibView: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
   const { showToast } = useToast();
@@ -196,6 +199,12 @@ export const ToyyibView: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
     } catch { showToast('Failed to remove', 'error'); }
   };
 
+  const handleShowCategoryDetails = (category: ToyyibCategory) => {
+    ToyyibService.getCategoryDetails(category.categoryCode)
+      .then(details => setDetailsCat(details?.[0] ?? category))
+      .catch(() => setDetailsCat(category));
+  };
+
   const totalBillAmount = bills.reduce((s, b) => s + (b.billAmount || 0), 0);
   const paidBills = bills.filter(b => b.billpaymentStatus === '1');
 
@@ -207,20 +216,6 @@ export const ToyyibView: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
   ];
 
   // ── Helpers ────────────────────────────────────────────────────────────────
-  const billStatusBadge = (billpaymentStatus: string) => {
-    switch (billpaymentStatus) {
-      case '1': return { variant: 'success' as const, label: 'PAID' };
-      case '3': return { variant: 'error' as const, label: 'FAILED' };
-      default: return { variant: 'warning' as const, label: 'PENDING' };
-    }
-  };
-
-  const linkedLabel = (cat: ToyyibCategory) => {
-    if (cat.linkedType === 'membership') return { icon: <Users size={10} />, text: `Membership · ${cat.membershipType || ''}`, color: 'bg-purple-50 text-purple-700' };
-    if (cat.linkedType === 'project' && cat.linkedProjectName) return { icon: <Briefcase size={10} />, text: cat.linkedProjectName, color: 'bg-blue-50 text-blue-700' };
-    return null;
-  };
-
   // ── Settings ───────────────────────────────────────────────────────────────
   const copyField = (value: string, key: string) => {
     navigator.clipboard.writeText(value);
@@ -771,544 +766,48 @@ export const ToyyibView: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
 
   // ── Category Management ────────────────────────────────────────────────────
   const renderCategories = () => (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <h3 className="font-bold text-slate-800 text-sm md:text-base">Bill Categories</h3>
-          <p className="text-xs text-slate-400">{categories.length} categories linked</p>
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <Button size="sm" variant="ghost" className="h-8 w-8 p-0 border border-slate-200 rounded-lg" onClick={loadData} isLoading={isRefreshing} title="Refresh">
-            <RefreshCw size={14} className="text-slate-500" />
-          </Button>
-          <Button size="sm" variant="ghost" className="h-8 px-3 border border-slate-200 rounded-lg text-xs font-medium" onClick={() => setIsImportModalOpen(true)}>
-            Import
-          </Button>
-        </div>
-      </div>
-
-      {/* Mobile: cards */}
-      <div className="md:hidden space-y-2">
-        {/* Inline create row — mobile, always visible at top */}
-        <div className="bg-jci-blue/5 border border-jci-blue/20 rounded-xl p-4 space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            {(['membership', 'project'] as const).map(t => (
-              <button key={t} onClick={() => setCreateType(t)}
-                className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-medium transition-colors ${createType === t ? 'border-jci-blue bg-jci-blue/10 text-jci-blue' : 'border-slate-200 bg-white text-slate-500'
-                  }`}>
-                {t === 'membership' ? <><Users size={12} /> Membership</> : <><Briefcase size={12} /> Project</>}
-              </button>
-            ))}
-          </div>
-          {createType === 'membership' && (
-            <div className="grid grid-cols-2 gap-2">
-              <Input value={createYear} onChange={e => setCreateYear(e.target.value)} placeholder="Year e.g. 2026" />
-              <select className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-jci-blue/30"
-                value={createMembershipType} onChange={e => setCreateMembershipType(e.target.value)}>
-                <option value="">— Type —</option>
-                {(['Guest', 'Probation', 'Official', 'Honorary', 'Senator', 'Visiting', 'Associate'] as const).map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
-          )}
-          {createType === 'project' && (
-            <select className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-jci-blue/30"
-              value={createProjectId} onChange={e => setCreateProjectId(e.target.value)}>
-              <option value="">— Select project —</option>
-              {projects.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
-            </select>
-          )}
-          {((createType === 'membership' && createYear && createMembershipType) || (createType === 'project' && createProjectId)) && (
-            <p className="text-[11px] text-slate-500">
-              Name: <span className="font-semibold text-slate-800">
-                {createType === 'membership' ? `${createYear} Membership` : projects.find(p => p.id === createProjectId)?.title}
-              </span>
-            </p>
-          )}
-          <div className="flex gap-2">
-            <Button size="sm" variant="ghost" className="flex-1 h-8 text-xs" onClick={() => { setCreateType('membership'); setCreateMembershipType(''); setCreateProjectId(''); setCreateYear(String(new Date().getFullYear())); }}>Reset</Button>
-            <Button size="sm" variant="primary" className="flex-1 h-8 text-xs" isLoading={isCreatingCat} onClick={handleCreateCategory}>Create & Link</Button>
-          </div>
-        </div>
-        {isRefreshing ? (
-          [1, 2, 3].map(i => <div key={i} className="h-24 bg-slate-100 rounded-xl animate-pulse" />)
-        ) : categories.length === 0 ? (
-          <div className="py-12 text-center space-y-2">
-            <CreditCard size={32} className="mx-auto text-slate-300" />
-            <p className="text-sm text-slate-400">No categories found</p>
-            <p className="text-xs text-slate-300">Import a code or create a new category</p>
-          </div>
-        ) : categories.map((cat, i) => {
-          const tag = linkedLabel(cat);
-          return (
-            <div key={cat.categoryCode || i} className="bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold text-slate-900 text-sm">{cat.categoryName || '—'}</span>
-                    <Badge variant={cat.categoryStatus === '1' ? 'success' : 'neutral'} className="text-[10px] flex-shrink-0">
-                      {cat.categoryStatus === '1' ? 'ACTIVE' : 'INACTIVE'}
-                    </Badge>
-                  </div>
-                  {tag ? (
-                    <span className={`inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${tag.color}`}>
-                      {tag.icon}{tag.text}
-                    </span>
-                  ) : null}
-                  <p className="text-[11px] font-mono text-slate-400 mt-1.5">{cat.categoryCode}</p>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  {cat.billCount ? (
-                    <>
-                      <p className="font-bold text-slate-800 text-sm">{cat.billCount} bills</p>
-                      <p className="text-xs text-jci-blue font-medium">RM {(cat.totalAmount || 0).toFixed(2)}</p>
-                    </>
-                  ) : <p className="text-xs text-slate-300">No bills</p>}
-                </div>
-              </div>
-              <div className="flex gap-1 mt-3 pt-3 border-t border-slate-50">
-                <Button size="sm" variant="ghost" className="flex-1 h-7 text-xs text-slate-500" onClick={() => openLinkModal(cat)}>
-                  <Link2 size={11} className="mr-1" />Link
-                </Button>
-                <Button size="sm" variant="ghost" className="flex-1 h-7 text-xs text-jci-blue" onClick={() => ToyyibService.getCategoryDetails(cat.categoryCode).then(d => setDetailsCat(d?.[0] ?? cat)).catch(() => setDetailsCat(cat))}>
-                  Details
-                </Button>
-                <Button size="sm" variant="ghost" className="flex-1 h-7 text-xs text-red-500 hover:bg-red-50" onClick={() => handleDelete(cat.categoryCode)}>
-                  Remove
-                </Button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Desktop: table */}
-      <div className="hidden md:block">
-        <Card>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs text-slate-400 uppercase tracking-wide border-b border-slate-100">
-                  <th className="px-5 py-3 font-medium">Category</th>
-                  <th className="px-5 py-3 font-medium">Linked To</th>
-                  <th className="px-5 py-3 font-medium">Code</th>
-                  <th className="px-5 py-3 font-medium">Status</th>
-                  <th className="px-5 py-3 font-medium">Bills / Total</th>
-                  <th className="px-5 py-3 font-medium text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {/* Inline create row — desktop, always visible at top */}
-                <tr className="bg-jci-blue/5 border-b border-jci-blue/20">
-                  <td colSpan={6} className="px-5 py-4">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      {/* Type toggle */}
-                      <div className="flex gap-1.5 flex-shrink-0">
-                        {(['membership', 'project'] as const).map(t => (
-                          <button key={t} onClick={() => setCreateType(t)}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${createType === t ? 'border-jci-blue bg-jci-blue/10 text-jci-blue' : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
-                              }`}>
-                            {t === 'membership' ? <><Users size={12} /> Membership</> : <><Briefcase size={12} /> Project</>}
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* Fields */}
-                      {createType === 'membership' && (
-                        <>
-                          <Input value={createYear} onChange={e => setCreateYear(e.target.value)}
-                            placeholder="Year" className="w-24 h-8 text-xs" />
-                          <select className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 h-8 focus:outline-none focus:ring-2 focus:ring-jci-blue/30"
-                            value={createMembershipType} onChange={e => setCreateMembershipType(e.target.value)}>
-                            <option value="">— Type —</option>
-                            {(['Guest', 'Probation', 'Official', 'Honorary', 'Senator', 'Visiting', 'Associate'] as const).map(t => <option key={t} value={t}>{t}</option>)}
-                          </select>
-                        </>
-                      )}
-                      {createType === 'project' && (
-                        <select className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 h-8 min-w-[200px] focus:outline-none focus:ring-2 focus:ring-jci-blue/30"
-                          value={createProjectId} onChange={e => setCreateProjectId(e.target.value)}>
-                          <option value="">— Select project —</option>
-                          {projects.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
-                        </select>
-                      )}
-
-                      {/* Name preview */}
-                      {((createType === 'membership' && createYear && createMembershipType) || (createType === 'project' && createProjectId)) && (
-                        <span className="text-xs text-slate-500">
-                          → <span className="font-semibold text-slate-800">
-                            {createType === 'membership' ? `${createYear} Membership` : projects.find(p => p.id === createProjectId)?.title}
-                          </span>
-                        </span>
-                      )}
-
-                      {/* Actions */}
-                      <div className="flex gap-2 ml-auto flex-shrink-0">
-                        <Button size="sm" variant="ghost" className="h-8 px-3 text-xs"
-                          onClick={() => { setCreateType('membership'); setCreateMembershipType(''); setCreateProjectId(''); setCreateYear(String(new Date().getFullYear())); }}>
-                          Reset
-                        </Button>
-                        <Button size="sm" variant="primary" className="h-8 px-3 text-xs" isLoading={isCreatingCat} onClick={handleCreateCategory}>
-                          Create & Link
-                        </Button>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-                {isRefreshing ? (
-                  [1, 2, 3].map(i => (
-                    <tr key={i}>
-                      {[1, 2, 3, 4, 5, 6].map(j => <td key={j} className="px-5 py-4"><div className="h-3 bg-slate-100 rounded animate-pulse" /></td>)}
-                    </tr>
-                  ))
-                ) : categories.length === 0 && !isCreateModalOpen ? (
-                  <tr>
-                    <td colSpan={6} className="px-5 py-10 text-center">
-                      <CreditCard size={28} className="mx-auto text-slate-200 mb-2" />
-                      <p className="text-slate-400 text-sm">No categories — import a code or create new</p>
-                    </td>
-                  </tr>
-                ) : categories.map((cat, i) => {
-                  const tag = linkedLabel(cat);
-                  return (
-                    <tr key={cat.categoryCode || i} className="group hover:bg-slate-50/70 transition-colors">
-                      <td className="px-5 py-4">
-                        <p className="font-semibold text-slate-900">{cat.categoryName || '—'}</p>
-                        <p className="text-xs text-slate-400 mt-0.5">{cat.categoryDescription}</p>
-                      </td>
-                      <td className="px-5 py-4">
-                        {tag ? (
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${tag.color}`}>
-                            {tag.icon}{tag.text}
-                          </span>
-                        ) : (
-                          <button onClick={() => openLinkModal(cat)} className="flex items-center gap-1 text-xs text-slate-400 hover:text-jci-blue">
-                            <Link2 size={11} /> Assign
-                          </button>
-                        )}
-                      </td>
-                      <td className="px-5 py-4 font-mono text-xs text-slate-400">{cat.categoryCode}</td>
-                      <td className="px-5 py-4">
-                        <Badge variant={cat.categoryStatus === '1' ? 'success' : 'neutral'} className="text-[10px]">
-                          {cat.categoryStatus === '1' ? 'ACTIVE' : 'INACTIVE'}
-                        </Badge>
-                      </td>
-                      <td className="px-5 py-4">
-                        {cat.billCount ? (
-                          <div>
-                            <span className="font-semibold text-slate-800">{cat.billCount}</span>
-                            <p className="text-xs text-slate-400">RM {(cat.totalAmount || 0).toFixed(2)}</p>
-                          </div>
-                        ) : <span className="text-slate-300">—</span>}
-                      </td>
-                      <td className="px-5 py-4 text-right space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button size="sm" variant="ghost" className="h-7 px-2 text-slate-500 text-xs" onClick={() => openLinkModal(cat)}>
-                          Link
-                        </Button>
-                        <Button size="sm" variant="ghost" className="h-7 px-2 text-jci-blue text-xs"
-                          onClick={() => ToyyibService.getCategoryDetails(cat.categoryCode).then(d => setDetailsCat(d?.[0] ?? cat)).catch(() => setDetailsCat(cat))}>
-                          Details
-                        </Button>
-                        <Button size="sm" variant="ghost" className="h-7 px-2 text-red-400 hover:bg-red-50 text-xs"
-                          onClick={() => handleDelete(cat.categoryCode)}>
-                          Remove
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      </div>
-    </div>
+    <ToyyibCategoriesTab
+      categories={categories}
+      projects={projects}
+      isRefreshing={isRefreshing}
+      isCreateModalOpen={isCreateModalOpen}
+      createType={createType}
+      createYear={createYear}
+      createMembershipType={createMembershipType}
+      createProjectId={createProjectId}
+      isCreatingCat={isCreatingCat}
+      onRefresh={loadData}
+      onOpenImport={() => setIsImportModalOpen(true)}
+      onCreateTypeChange={setCreateType}
+      onCreateYearChange={setCreateYear}
+      onCreateMembershipTypeChange={setCreateMembershipType}
+      onCreateProjectIdChange={setCreateProjectId}
+      onResetCreate={() => { setCreateType('membership'); setCreateMembershipType(''); setCreateProjectId(''); setCreateYear(String(new Date().getFullYear())); }}
+      onCreateCategory={handleCreateCategory}
+      onOpenLink={openLinkModal}
+      onShowDetails={handleShowCategoryDetails}
+      onDelete={handleDelete}
+    />
   );
-
   // ── Bill Management ────────────────────────────────────────────────────────
-
-  const renderBills = () => {
-    const filteredBills = billFilter === 'all'
-      ? bills
-      : bills.filter(b => {
-        const s = b.billpaymentStatus ?? '2';
-        if (billFilter === '1') return s === '1';
-        if (billFilter === '3') return s === '3';
-        return s === '2' || s === '4'; // pending
-      });
-
-    const catMap = Object.fromEntries(categories.map(c => [c.categoryCode, c]));
-
-    const FILTERS: { key: 'all' | '1' | '2' | '3'; label: string }[] = [
-      { key: 'all', label: 'All' },
-      { key: '2', label: 'Pending' },
-      { key: '1', label: 'Paid' },
-      { key: '3', label: 'Failed' },
-    ];
-
-    const createBillCat = categories.find(c => c.categoryCode === billCategoryCode);
-    const createBillCatTag = createBillCat ? linkedLabel(createBillCat) : null;
-
-    return (
-      <div className="space-y-4">
-
-        {/* Stats strip */}
-        <div className="grid grid-cols-3 gap-2 md:gap-3">
-          {[
-            { label: 'Total Bills', value: String(bills.length) },
-            { label: 'Total Amount', value: `RM ${totalBillAmount.toFixed(2)}` },
-            { label: 'Paid', value: bills.length ? `${Math.round(paidBills.length / bills.length * 100)}%` : '0%' },
-          ].map(s => (
-            <div key={s.label} className="bg-white border border-slate-100 rounded-xl px-3 py-3 shadow-sm text-center">
-              <p className="text-[10px] text-slate-400 uppercase font-semibold tracking-wide leading-tight">{s.label}</p>
-              <p className="font-bold text-slate-900 text-sm md:text-base mt-1 leading-tight">{s.value}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Create Bill — collapsible */}
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-          <button
-            className="w-full px-5 py-3.5 flex items-center justify-between gap-3 hover:bg-slate-50 transition-colors"
-            onClick={() => { setShowCreateBill(v => !v); setBillCategoryCode(''); }}
-          >
-            <div className="flex items-center gap-3">
-              <div className="h-7 w-7 rounded-lg bg-jci-blue/10 flex items-center justify-center flex-shrink-0">
-                <Plus size={14} className="text-jci-blue" />
-              </div>
-              <div className="text-left">
-                <p className="font-bold text-slate-900 text-sm leading-tight">Manual Bill</p>
-                <p className="text-[11px] text-slate-400 leading-tight">Generate a payment link manually</p>
-              </div>
-            </div>
-            <span className={`text-slate-400 text-xs font-medium transition-transform duration-200 ${showCreateBill ? 'rotate-180' : ''}`}>▾</span>
-          </button>
-
-          {showCreateBill && (
-            <div className="border-t border-slate-100 p-5 space-y-4">
-              {/* Category picker */}
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Category</label>
-                <select
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-jci-blue/30 focus:bg-white transition-colors"
-                  value={billCategoryCode}
-                  onChange={e => setBillCategoryCode(e.target.value)}
-                >
-                  <option value="">— Select a category —</option>
-                  {categories.map(c => {
-                    const suffix = c.linkedType === 'membership'
-                      ? ` · Membership`
-                      : c.linkedProjectName ? ` · ${c.linkedProjectName}` : '';
-                    return <option key={c.categoryCode} value={c.categoryCode}>{c.categoryName}{suffix}</option>;
-                  })}
-                </select>
-                {createBillCat && (
-                  <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium ${createBillCatTag ? createBillCatTag.color : 'bg-slate-50 text-slate-500'}`}>
-                    {createBillCatTag ? <>{createBillCatTag.icon}<span>{createBillCatTag.text}</span></> : <span className="text-slate-400">No activity linked</span>}
-                    <span className="mx-1 opacity-30">·</span>
-                    <span className="font-mono opacity-60">{createBillCat.categoryCode}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Bill form */}
-              {billCategoryCode ? (
-                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
-                  <CreateBillForm
-                    key={billCategoryCode}
-                    categoryCode={billCategoryCode}
-                    defaultBillName={createBillCat?.linkedType === 'membership'
-                      ? `${new Date().getFullYear()} Renewal Membership`
-                      : createBillCat?.linkedProjectName}
-                    onSuccess={() => { showToast('Bill created!', 'success'); setShowCreateBill(false); loadData(); }}
-                    onError={e => showToast(e.message, 'error')}
-                  />
-                </div>
-              ) : (
-                <div className="rounded-xl border border-dashed border-slate-200 py-6 text-center">
-                  <p className="text-xs text-slate-400">Select a category above to fill in bill details</p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Bills list */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-          {/* List header */}
-          <div className="px-4 md:px-5 py-3.5 border-b border-slate-100 flex items-center justify-between gap-3">
-            <div>
-              <h3 className="font-bold text-slate-800 text-sm">Bills</h3>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                {filteredBills.length}{billFilter !== 'all' ? ` of ${bills.length}` : ''} bill{bills.length !== 1 ? 's' : ''}
-              </p>
-            </div>
-            <Button size="sm" variant="ghost" className="h-8 w-8 p-0 border border-slate-200 rounded-lg flex-shrink-0" onClick={loadData} isLoading={isRefreshing} title="Refresh">
-              <RefreshCw size={14} className="text-slate-500" />
-            </Button>
-          </div>
-
-          {/* Filter bar */}
-          <div className="px-4 md:px-5 py-2.5 border-b border-slate-100 flex items-center gap-1.5 overflow-x-auto scrollbar-none">
-            {FILTERS.map(f => (
-              <button key={f.key} onClick={() => setBillFilter(f.key)}
-                className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold transition-colors ${billFilter === f.key
-                  ? 'bg-jci-blue text-white'
-                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                  }`}>
-                {f.label}
-                {f.key !== 'all' && (
-                  <span className="ml-1 opacity-70">
-                    {f.key === '1' ? paidBills.length
-                      : f.key === '3' ? bills.filter(b => b.billpaymentStatus === '3').length
-                        : bills.filter(b => !b.billpaymentStatus || b.billpaymentStatus === '2' || b.billpaymentStatus === '4').length}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-
-          {/* Mobile cards */}
-          <div className="md:hidden divide-y divide-slate-50">
-            {isRefreshing ? (
-              [1, 2, 3].map(i => <div key={i} className="px-4 py-3"><div className="h-16 bg-slate-100 rounded-lg animate-pulse" /></div>)
-            ) : filteredBills.length === 0 ? (
-              <div className="py-12 text-center space-y-2">
-                <CreditCard size={28} className="mx-auto text-slate-200" />
-                <p className="text-sm text-slate-400">{billFilter === 'all' ? 'No bills yet' : 'No bills in this filter'}</p>
-              </div>
-            ) : filteredBills.slice(0, 30).map((b: any, i) => {
-              const cat = catMap[b.categoryCode];
-              const catTag = cat ? linkedLabel(cat) : null;
-              const bs = billStatusBadge(b.billpaymentStatus ?? '2');
-              return (
-                <div key={b.billCode || i} className="px-4 py-3 space-y-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-slate-900 text-sm leading-tight truncate">{b.billTo || b.billName}</p>
-                      <p className="text-[11px] text-slate-400 mt-0.5 truncate">{b.billName}</p>
-                      {b.billDescription && (
-                        <p className="text-[10px] text-slate-400 truncate">{b.billDescription}</p>
-                      )}
-                    </div>
-                    <div className="text-right flex-shrink-0 space-y-0.5">
-                      <p className="font-bold text-slate-900 text-sm">RM {(b.billAmount || 0).toFixed(2)}</p>
-                      <Badge variant={bs.variant} className="text-[10px]">{bs.label}</Badge>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      {catTag ? (
-                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0 ${catTag.color}`}>
-                          {catTag.icon}{cat?.categoryName}
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-mono text-slate-300 truncate">{b.categoryCode}</span>
-                      )}
-                      {b.billPaymentDate && typeof b.billPaymentDate !== 'object' && (
-                        <span className="text-[10px] text-slate-400 truncate">{b.billPaymentDate}</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {b.billCode && b.billpaymentStatus !== '1' && (
-                        <button
-                          className="text-[11px] text-slate-400 hover:text-jci-blue disabled:opacity-40 transition-colors"
-                          disabled={syncingBill === b.billCode}
-                          onClick={() => handleSyncBillStatus(b.billCode)}
-                        >
-                          {syncingBill === b.billCode ? '…' : 'Sync'}
-                        </button>
-                      )}
-                      {b.billCode && <BillPaymentLink billCode={b.billCode} variant="link" label="Open" className="text-[11px]" />}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Desktop table */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs text-slate-400 uppercase tracking-wide border-b border-slate-100">
-                  <th className="px-5 py-3 font-medium">Payer / Bill</th>
-                  <th className="px-5 py-3 font-medium">Category</th>
-                  <th className="px-5 py-3 font-medium">Code</th>
-                  <th className="px-5 py-3 font-medium text-right">Amount</th>
-                  <th className="px-5 py-3 font-medium">Status</th>
-                  <th className="px-5 py-3 font-medium text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {isRefreshing ? (
-                  [1, 2, 3].map(i => (
-                    <tr key={i}>
-                      {[1, 2, 3, 4, 5, 6].map(j => <td key={j} className="px-5 py-4"><div className="h-3 bg-slate-100 rounded animate-pulse" /></td>)}
-                    </tr>
-                  ))
-                ) : filteredBills.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-5 py-12 text-center">
-                      <CreditCard size={28} className="mx-auto text-slate-200 mb-2" />
-                      <p className="text-slate-400 text-sm">{billFilter === 'all' ? 'No bills yet — create one above' : 'No bills in this filter'}</p>
-                    </td>
-                  </tr>
-                ) : filteredBills.slice(0, 50).map((b: any, i) => {
-                  const cat = catMap[b.categoryCode];
-                  const catTag = cat ? linkedLabel(cat) : null;
-                  const bs = billStatusBadge(b.billpaymentStatus ?? '2');
-                  return (
-                    <tr key={b.billCode || i} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="px-5 py-3.5">
-                        <p className="font-semibold text-slate-900">{b.billTo || '—'}</p>
-                        <p className="text-xs text-slate-400 mt-0.5">{b.billName}</p>
-                        {b.billDescription && (
-                          <p className="text-[10px] text-slate-300 mt-0.5 max-w-xs truncate">{b.billDescription}</p>
-                        )}
-                      </td>
-                      <td className="px-5 py-3.5">
-                        {catTag ? (
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${catTag.color}`}>
-                            {catTag.icon}{cat?.categoryName}
-                          </span>
-                        ) : (
-                          <span className="text-xs font-mono text-slate-300">{b.categoryCode || '—'}</span>
-                        )}
-                      </td>
-                      <td className="px-5 py-3.5 font-mono text-xs text-slate-400">{b.billCode}</td>
-                      <td className="px-5 py-3.5 text-right font-bold text-slate-900">RM {(b.billAmount || 0).toFixed(2)}</td>
-                      <td className="px-5 py-3.5">
-                        <Badge variant={bs.variant} className="text-[10px]">{bs.label}</Badge>
-                        {b.billPaymentDate && typeof b.billPaymentDate !== 'object' && (
-                          <p className="text-[10px] text-slate-400 mt-0.5">{b.billPaymentDate}</p>
-                        )}
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center justify-end gap-3">
-                          {b.billCode && b.billpaymentStatus !== '1' && (
-                            <button
-                              className="text-xs text-slate-400 hover:text-jci-blue disabled:opacity-40 transition-colors whitespace-nowrap"
-                              disabled={syncingBill === b.billCode}
-                              onClick={() => handleSyncBillStatus(b.billCode)}
-                            >
-                              {syncingBill === b.billCode ? 'Syncing…' : 'Sync'}
-                            </button>
-                          )}
-                          {b.billCode && <BillPaymentLink billCode={b.billCode} variant="link" label="Open" />}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
+  const renderBills = () => (
+    <ToyyibBillsTab
+      bills={bills}
+      categories={categories}
+      billFilter={billFilter}
+      showCreateBill={showCreateBill}
+      billCategoryCode={billCategoryCode}
+      syncingBill={syncingBill}
+      isRefreshing={isRefreshing}
+      onBillFilterChange={setBillFilter}
+      onToggleCreateBill={() => { setShowCreateBill(v => !v); setBillCategoryCode(''); }}
+      onBillCategoryCodeChange={setBillCategoryCode}
+      onRefresh={loadData}
+      onSyncBillStatus={handleSyncBillStatus}
+      onCreateBillSuccess={() => { showToast('Bill created!', 'success'); setShowCreateBill(false); loadData(); }}
+      onCreateBillError={error => showToast(error.message, 'error')}
+    />
+  );
   // ── Settlement ─────────────────────────────────────────────────────────────
   const renderSettlement = () => (
     <div className="py-16 text-center space-y-3">

@@ -1,18 +1,7 @@
 // Member Dashboard Home Component
 import React from 'react';
-import { createPortal } from 'react-dom';
-import {
-  Calendar, Briefcase, Award, Sparkles, AlertTriangle, CheckCircle,
-  TrendingUp, Users, Clock, Target, Zap, FileText, DollarSign, UserCog,
-  CheckSquare, Heart, BookOpen, LayoutDashboard, Building2,
-  Flame, Trophy, Coins, Timer, ArrowUpRight, Crown, RefreshCw, ChevronRight
-} from 'lucide-react';
-import { Card, StatCard, StatCardsContainer, Badge, Button, useToast, Modal, Skeleton, Drawer } from '../ui/Common';
-import { Input, Select, Textarea } from '../ui/Form';
-import { Tabs } from '../ui/Tabs';
-import { MembersOnlyOverlay } from '../ui/MembersOnlyOverlay';
+import { Skeleton } from '../ui/Common';
 import { useAuth } from '../../hooks/useAuth';
-import { usePermissions } from '../../hooks/usePermissions';
 import { useEvents } from '../../hooks/useEvents';
 import { useProjects } from '../../hooks/useProjects';
 import { useMembers } from '../../hooks/useMembers';
@@ -20,42 +9,27 @@ import { useBehavioralNudging } from '../../hooks/useBehavioralNudging';
 import { NudgeBanner } from '../ui/NudgeBanner';
 import { AIPredictionService, PersonalizedRecommendation } from '../../services/aiPredictionService';
 import { EventRegistrationService } from '../../services/eventRegistrationService';
-import { MEMBER_TIERS, BOUNTY_STATUS } from '../../config/constants';
 import { ContractService, CommitmentContract } from '../../services/contractService';
-import { PromotionService, type MemberEngagementProgressSummary, type EngagementYear } from '../../services/promotionService';
+import { PromotionService, type MemberEngagementProgressSummary } from '../../services/promotionService';
 import { MembersService } from '../../services/membersService';
 import { MemberJourneyService, MemberJourney } from '../../services/memberJourneyService';
 import { AdvertisementService, Advertisement } from '../../services/advertisementService';
 import type { Event } from '../../types';
-import { EventRow } from '../modules/Events/EventRow';
 import { UserRole } from '../../types';
-import { SpecialOffer, getSpecialOfferSummary } from '../../types/member';
-import { motion, AnimatePresence } from 'framer-motion';
 import { EventDetailModal } from '../modules/EventsView';
 import { PartnershipDetailModal } from './PartnershipDetailModal';
-import { PaymentButton } from '../shared/toyyib/PaymentButton';
 import { useState, useEffect, useRef } from 'react';
-// TODO BUNDLE-009: Swiper (~60KB gz) is statically imported here but only used for the conditional ads
-// carousel. If the carousel grows in complexity, extract it into a lazy AdsCarousel component and
-// wrap with React.lazy/Suspense. The vite chunk config (BUNDLE-011) already puts swiper in its own
-// cached chunk, so this is P2 — skip the lazy refactor until the carousel gets more features.
-import { Swiper, SwiperSlide } from 'swiper/react';
-import { Autoplay, Pagination } from 'swiper/modules';
-import 'swiper/css';
-import 'swiper/css/pagination';
-
-
-/** membershipType 归一化：兼容旧版小写值（'probation member' / 'official member'…）与缺失值（按角色兜底） */
-const normalizeMembership = (m: { membershipType?: string; role?: UserRole | string; jciCareer?: { membershipType?: string } } | null): 'probation' | 'full' | 'guest' => {
-  if (!m) return 'guest';
-  const mt = (m.jciCareer?.membershipType || '').toLowerCase();
-  if (mt.includes('probation')) return 'probation';
-  if (mt && !mt.includes('guest')) return 'full';
-  if (!mt) {
-    if (m.role && [UserRole.MEMBER, UserRole.BOARD, UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(m.role as UserRole)) return 'full';
-  }
-  return 'guest';
-};
+import { DashboardActiveCommitments } from './DashboardActiveCommitments';
+import { DashboardBirthdayBanner } from './DashboardBirthdayBanner';
+import { DashboardBirthdayDrawer } from './DashboardBirthdayDrawer';
+import { DashboardEventsPanel } from './DashboardEventsPanel';
+import { DashboardMembershipJourneyCard } from './DashboardMembershipJourneyCard';
+import { DashboardMembershipJourneyModal } from './DashboardMembershipJourneyModal';
+import { DashboardPartnersCarousel } from './DashboardPartnersCarousel';
+import { DashboardProfileCompletionSheet } from './DashboardProfileCompletionSheet';
+import { DashboardProfileCompletionWidget } from './DashboardProfileCompletionWidget';
+import { DashboardUpgradeModal } from './DashboardUpgradeModal';
+import { getMemberDob, getProfileCompleteness, normalizeMembership } from './dashboardHomeUtils';
 
 interface DashboardHomeProps {
   userRole: import('../../types').UserRole;
@@ -73,19 +47,16 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   scrollRef
 }) => {
 
-  const { showToast } = useToast();
-  const { member, isDevMode, simulatedRole, simulateRole } = useAuth();
-  const { isBoard, isAdmin, isDeveloper, hasPermission, isOrganizationFinance, isActivityFinance, isOrganizationSecretary } = usePermissions();
+  const { member } = useAuth();
   const { events, loading: eventsLoading, registerForEvent, markAttendance, cancelRegistration } = useEvents();
   const { projects, loading: projectsLoading } = useProjects();
   const { members, loading: membersLoading } = useMembers();
   const { nudges, dismissNudge } = useBehavioralNudging();
   const [recommendations, setRecommendations] = useState<PersonalizedRecommendation[]>([]);
-  const [loadingRecommendations, setLoadingRecommendations] = useState(false);
   const [topRecommendation, setTopRecommendation] = useState<PersonalizedRecommendation | null>(null);
   const [myRegistrationEventIds, setMyRegistrationEventIds] = useState<string[]>([]);
   const [loadingRegistrations, setLoadingRegistrations] = useState(false);
-  const [eventTab, setEventTab] = useState<'upcoming' | 'past'>('upcoming');
+  const eventTab: 'upcoming' | 'past' = 'upcoming';
   const [contracts, setContracts] = useState<CommitmentContract[]>([]);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [homepageAds, setHomepageAds] = useState<Advertisement[]>([]);
@@ -93,7 +64,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   // Promotion Progress state (for Probation members)
   const [promotionProgress, setPromotionProgress] = useState<any>(null);
   const [promoLoading, setPromoLoading] = useState(false);
-  const [showPromoModal, setShowPromoModal] = useState(false);
   // Membership Journey modal state
   const [showJourneyModal, setShowJourneyModal] = useState(false);
   const [journeyActiveTab, setJourneyActiveTab] = useState<'probation' | 'firstYear' | 'secondYear' | 'leadership' | 'trainer'>('probation');
@@ -113,47 +83,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const [profileTab, setProfileTab] = useState('basic');
 
 
-  const profileCompleteness = React.useMemo(() => {
-    if (!member) return null;
-    const tabs = [
-      {
-        label: 'Basic', checks: [
-          { label: 'Profile photo', done: !!(member.general?.avatarUrl || (member as any).general?.avatarUrl) },
-          { label: 'Apparel & Items', done: !!(member.others?.tshirtSize && member.others?.shirtStyle) || !!(member.others?.tshirtSize && member.others?.shirtStyle) },
-        ]
-      },
-      {
-        label: 'Contact', checks: [
-          { label: 'Address', done: !!(member.contact?.address ?? member.contact?.address) },
-          { label: 'Emergency contact', done: !!(member.contact?.emergency?.name) },
-        ]
-      },
-      {
-        label: 'Professional', checks: [
-          { label: 'Company name', done: !!member.companyName },
-          { label: 'Industry', done: !!member.industry },
-          { label: 'Position / title', done: !!(member.business?.departmentAndPosition ?? member.business?.departmentAndPosition) },
-          { label: 'Business categories', done: Array.isArray(member.business?.businessCategory) && member.business?.businessCategory.length > 0 },
-          { label: 'Company description', done: !!(member.business?.companyDescription ?? member.business?.companyDescription) },
-          { label: 'Ideal referral', done: !!(member.idealReferralIndustry || (Array.isArray(member.business?.idealReferrals) ? member.business!.idealReferrals!.length > 0 : !!member.business?.idealReferrals)) },
-          { label: 'International business', done: !!member.business?.acceptInternationalBusiness },
-          { label: 'Level of management', done: !!member.business?.levelOfManagement },
-        ]
-      },
-    ];
-    const allChecks = tabs.flatMap(t => t.checks);
-    const done = allChecks.filter(c => c.done).length;
-    const total = allChecks.length;
-    const pct = Math.round((done / total) * 100);
-    const missing = allChecks.filter(c => !c.done);
-    const tabStats = tabs.map(t => ({
-      label: t.label,
-      done: t.checks.filter(c => c.done).length,
-      total: t.checks.length,
-      pct: Math.round((t.checks.filter(c => c.done).length / t.checks.length) * 100),
-    }));
-    return pct < 100 ? { done, total, pct, missing, tabStats } : null;
-  }, [member]);
+  const profileCompleteness = React.useMemo(() => getProfileCompleteness(member), [member]);
 
   const handleRestrictedAction = (viewType: string) => {
     // Benefits is reachable by guests — the page itself masks its content
@@ -178,13 +108,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     };
     loadAds();
   }, []);
-
-  // Initial impression for the first ad
-  useEffect(() => {
-    if (homepageAds.length > 0 && homepageAds[0]?.id) {
-      AdvertisementService.recordImpression(homepageAds[0].id!);
-    }
-  }, [homepageAds.length]);
 
   // Load active commitments (Phase 3)
   useEffect(() => {
@@ -285,7 +208,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   useEffect(() => {
     const loadRecommendations = async () => {
       if (!member) return;
-      setLoadingRecommendations(true);
       try {
         const recs = await AIPredictionService.getPersonalizedRecommendations(member.id, 5);
         setRecommendations(recs);
@@ -294,8 +216,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         }
       } catch (err) {
         console.error('Failed to load recommendations:', err);
-      } finally {
-        setLoadingRecommendations(false);
       }
     };
     loadRecommendations();
@@ -325,21 +245,18 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const currentMonth = parseInt(mytTodayStr.slice(0, 2), 10) - 1; // 0-indexed for compat
   const currentDay = parseInt(mytTodayStr.slice(3), 10);
   const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }));
-  const getDob = (m: any): string | undefined =>
-    m.general?.dob || m.general?.dob || m.general?.dob;
-
   const birthdayMembers = React.useMemo(() => {
     return members
       .filter(m => {
-        const dob = getDob(m);
+        const dob = getMemberDob(m);
         if (!dob) return false;
         // Compare only MM portion of the stored "YYYY-MM-DD" string
         const dobMonth = parseInt(dob.slice(5, 7), 10) - 1; // 0-indexed
         return dobMonth === currentMonth;
       })
       .sort((a, b) => {
-        const dayA = parseInt((getDob(a) || '').slice(8, 10), 10);
-        const dayB = parseInt((getDob(b) || '').slice(8, 10), 10);
+        const dayA = parseInt((getMemberDob(a) || '').slice(8, 10), 10);
+        const dayB = parseInt((getMemberDob(b) || '').slice(8, 10), 10);
         // Passed birthdays sink to the bottom; upcoming/today stay on top (both ascending)
         const passedA = dayA < currentDay ? 1 : 0;
         const passedB = dayB < currentDay ? 1 : 0;
@@ -350,7 +267,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
   const todayBirthdays = React.useMemo(() => {
     return birthdayMembers.filter(m => {
-      const dob = getDob(m);
+      const dob = getMemberDob(m);
       if (!dob) return false;
       // Compare "MM-DD" slices directly — no Date parsing needed
       return dob.slice(5, 10) === mytTodayStr;
@@ -359,7 +276,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
   const nextBirthdayMember = React.useMemo(() => {
     const nextBirthdays = birthdayMembers.filter(m => {
-      const dob = getDob(m);
+      const dob = getMemberDob(m);
       if (!dob) return false;
       return parseInt(dob.slice(8, 10), 10) > currentDay;
     });
@@ -431,810 +348,91 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   return (
     <div className="space-y-4">
 
-      {/* Birthday This Month — top of dashboard */}
-      {birthdayMembers.length > 0 && (
-        <div
-          onClick={() => setShowBirthdayDrawer(true)}
-          className="relative overflow-hidden rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group"
-        >
-          <div className="absolute inset-0" style={{ backgroundImage: 'url(/background/birthday-background.webp)', backgroundSize: 'cover', backgroundPosition: 'center' }} />
-          <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(190,18,60,0.82) 0%, rgba(134,25,143,0.78) 50%, rgba(79,70,229,0.75) 100%)' }} />
-          <div className="relative z-10 p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2.5">
-                <span className="text-3xl leading-none select-none drop-shadow-md">🎂</span>
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-rose-200/80 leading-none mb-0.5">This Month</p>
-                  <h3 className="font-extrabold text-white text-lg leading-tight drop-shadow-sm">Birthdays</h3>
-                </div>
-              </div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-white bg-white/20 backdrop-blur-sm px-2.5 py-1 rounded-full border border-white/30">
-                {now.toLocaleString('default', { month: 'long' })}
-              </span>
-            </div>
-            {todayBirthdays.length > 0 ? (
-              <div className="mb-3 flex items-center gap-2 bg-white/20 backdrop-blur-sm border border-white/30 rounded-xl px-3 py-2">
-                <span className="w-2 h-2 rounded-full bg-amber-300 animate-pulse flex-shrink-0" />
-                <span className="text-[12px] font-bold text-white truncate">🎉 Today: {todayBirthdays.map(m => m.general?.name?.split(' ')[0] || m.general?.name?.split(' ')[0]).join(', ')}</span>
-              </div>
-            ) : nextBirthdayMember ? (
-              <div className="mb-3 flex items-center gap-2 bg-white/15 backdrop-blur-sm border border-white/20 rounded-xl px-3 py-2">
-                <span className="text-[12px] font-semibold text-white/90 truncate">📅 Next: {nextBirthdayMember.general?.name?.split(' ')[0] || nextBirthdayMember.general?.name?.split(' ')[0]} — {new Date(getDob(nextBirthdayMember)!).getDate()} {now.toLocaleString('default', { month: 'short' })}</span>
-              </div>
-            ) : null}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="flex items-center">
-                  {birthdayMembers.slice(0, 5).map((m, i) => {
-                    const name = m.general?.name || m.general?.name || '';
-                    const avatarUrl = m.general?.avatarUrl || m.general?.avatarUrl;
-                    const sharedStyle = { width: '36px', height: '36px', marginLeft: i > 0 ? '-10px' : '0px', zIndex: 10 - i };
-                    if (avatarUrl) return <img key={m.id} src={avatarUrl} alt={name} className="rounded-full object-cover border-2 border-white/60 shadow-md flex-shrink-0 group-hover:-translate-y-0.5 transition-transform" style={sharedStyle} />;
-                    const initials = name.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase();
-                    let hash = 0; for (let j = 0; j < name.length; j++) hash = name.charCodeAt(j) + ((hash << 5) - hash);
-                    const gradients = ['from-pink-400 to-rose-500', 'from-violet-400 to-purple-500', 'from-sky-400 to-blue-500', 'from-teal-400 to-emerald-500', 'from-amber-400 to-orange-500'];
-                    return <div key={m.id} className={`rounded-full bg-gradient-to-br ${gradients[Math.abs(hash) % gradients.length]} flex items-center justify-center text-[10px] font-bold text-white border-2 border-white/60 shadow-md flex-shrink-0 group-hover:-translate-y-0.5 transition-transform`} style={sharedStyle}>{initials}</div>;
-                  })}
-                  {birthdayMembers.length > 5 && <div className="rounded-full border-2 border-white/60 bg-white/25 flex items-center justify-center text-[10px] font-bold text-white shadow-md flex-shrink-0" style={{ width: '36px', height: '36px', marginLeft: '-10px', zIndex: 5 }}>+{birthdayMembers.length - 5}</div>}
-                </div>
-                <span className="text-[11px] font-semibold text-white/80">{birthdayMembers.length} celebrating</span>
-              </div>
-              <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30 group-hover:bg-white/30 transition-all duration-200">
-                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-white group-hover:translate-x-0.5 transition-transform duration-200"><path d="m9 18 6-6-6-6" /></svg>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <DashboardBirthdayBanner
+        birthdayMembers={birthdayMembers}
+        todayBirthdays={todayBirthdays}
+        nextBirthdayMember={nextBirthdayMember}
+        now={now}
+        onOpen={() => setShowBirthdayDrawer(true)}
+      />
 
-      {/* Partners Banner (Swiper) */}
-      {(adsLoading || homepageAds.length > 0) && (
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 shrink-0">Partners</span>
-          <div className="flex-1 h-px bg-slate-100" />
-        </div>
-      )}
-      {adsLoading ? (
-        <div className="flex gap-3 overflow-hidden">
-          {[1, 2, 3].map(i => <Skeleton key={i} className="flex-none w-[58%] sm:w-[30%] lg:w-[23%] h-36 sm:h-40" rounded="2xl" />)}
-        </div>
-      ) : homepageAds.length > 0 && (
-        <div className="w-full relative rounded-2xl overflow-hidden">
-          {/* Guest mask — partner benefits are members only */}
-          {member?.role === UserRole.GUEST && (
-            <MembersOnlyOverlay compact description="Join JCI KL to unlock partner privileges." member={member} />
-          )}
-          <Swiper
-            modules={[Autoplay, Pagination]}
-            spaceBetween={16}
-            slidesPerView={1.65}
-            breakpoints={{
-              640: { slidesPerView: 3.15 },
-              1024: { slidesPerView: 4.15 },
-            }}
-            autoplay={{ delay: 3000, disableOnInteraction: false }}
-            pagination={{ clickable: true, dynamicBullets: true }}
-            loop={false}
-            rewind={homepageAds.length > 1}
-            className="w-full"
-            onSlideChange={(swiper) => {
-              if (homepageAds.length > 0) {
-                const currentAd = homepageAds[swiper.realIndex];
-                if (currentAd?.id) {
-                  AdvertisementService.recordImpression(currentAd.id);
-                }
-              }
-            }}
-          >
-            {homepageAds.map((ad, idx) => (
-              <SwiperSlide key={ad.id || idx}>
-                <div
-                  className="h-36 sm:h-40 w-full rounded-2xl overflow-hidden relative shadow-md cursor-pointer group transform transition-all duration-300 hover:scale-[1.02] hover:shadow-lg"
-                  onClick={() => {
-                    if (ad.id) AdvertisementService.recordClick(ad.id);
-                    setSelectedAdForDetail(ad);
-                  }}
-                >
-                  <img src={ad.imageUrl} alt={ad.title} className="w-full h-full object-cover" />
-                  {/* Overlay Gradient */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
-                  {/* Content */}
-                  <div className="absolute bottom-0 left-0 right-0 p-4 z-10">
-                    <h3 className="text-white font-bold text-sm sm:text-base line-clamp-1">{ad.title}</h3>
-                  </div>
-                </div>
-              </SwiperSlide>
-            ))}
-          </Swiper>
-        </div>
-      )}
+      <DashboardPartnersCarousel
+        adsLoading={adsLoading}
+        homepageAds={homepageAds}
+        member={member}
+        onSelectAd={setSelectedAdForDetail}
+      />
 
 
-      {/* Profile Completeness Widget */}
-      {profileCompleteness && (() => {
-        const { done, total, pct, missing, tabStats } = profileCompleteness;
-        return (
-          <div
-            className="relative overflow-hidden rounded-2xl shadow-md cursor-pointer group"
-            style={{ backgroundImage: 'linear-gradient(135deg, rgba(0,111,183,0.90) 0%, rgba(0,75,135,0.88) 55%, rgba(0,40,90,0.86) 100%), url(/background/birthday-background.webp)', backgroundSize: 'cover', backgroundPosition: 'center' }}
-            onClick={() => { setProfileDraft({}); setShowProfileDrawer(true); }}
-          >
+      <DashboardProfileCompletionWidget
+        profileCompleteness={profileCompleteness}
+        onOpen={() => { setProfileDraft({}); setShowProfileDrawer(true); }}
+      />
 
-            <div className="relative z-10 p-4 space-y-3">
-              {/* header row */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <span className="text-3xl leading-none select-none drop-shadow-md">📋</span>
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-white/60 leading-none mb-0.5">Your Profile</p>
-                    <h3 className="font-extrabold text-white text-lg leading-tight drop-shadow-sm">{pct}% Complete</h3>
-                  </div>
-                </div>
-                <span className="text-[10px] font-black uppercase tracking-widest text-white bg-white/20 backdrop-blur-sm px-2.5 py-1 rounded-full border border-white/30">
-                  {done} of {total}
-                </span>
-              </div>
-
-              {/* segmented progress bars */}
-              <div className="mb-1 bg-white/15 backdrop-blur-sm border border-white/20 rounded-xl px-3 py-2">
-                <div className="flex items-start gap-1.5">
-                  {tabStats.map(tab => (
-                    <div key={tab.label} className="flex-1 min-w-0">
-                      <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${tab.pct}%` }}
-                          transition={{ duration: 0.8, ease: 'easeOut' }}
-                          className={`h-full rounded-full ${tab.pct >= 100 ? 'bg-green-300' : 'bg-white'}`}
-                        />
-                      </div>
-                      <p className="text-[8px] font-black uppercase tracking-wide text-white/60 text-center mt-1 truncate">{tab.label}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* CTA row */}
-              <div className="flex items-center justify-between">
-                <p className="text-[11px] text-white/60">
-                  {missing.length > 0 ? `${missing[0].label}${missing.length > 1 ? ` +${missing.length - 1} more` : ''} pending` : ''}
-                </p>
-                <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30 group-hover:bg-white/30 transition-all duration-200 flex-shrink-0">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-white group-hover:translate-x-0.5 transition-transform duration-200"><path d="m9 18 6-6-6-6" /></svg>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Membership Journey Card */}
-      {showJourneyCard && (
-        <div
-          className="relative overflow-hidden rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group"
-          onClick={(isProbationMember || isFullMember) ? openJourneyModal : () => setShowUpgradeModal(true)}
-        >
-          <div className="absolute inset-0" style={{ backgroundImage: 'url(/background/birthday-background.webp)', backgroundSize: 'cover', backgroundPosition: 'center' }} />
-          <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(217,119,6,0.88) 0%, rgba(180,83,9,0.84) 50%, rgba(120,53,15,0.82) 100%)' }} />
-          <div className="relative z-10 p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2.5">
-                <span className="text-3xl leading-none select-none drop-shadow-md">🏅</span>
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-200/80 leading-none mb-0.5">Your Progress</p>
-                  <h3 className="font-extrabold text-white text-lg leading-tight drop-shadow-sm">Membership Journey</h3>
-                </div>
-              </div>
-              {(isProbationMember || isFullMember) && (
-                <span className="text-[10px] font-black uppercase tracking-widest text-white bg-white/20 backdrop-blur-sm px-2.5 py-1 rounded-full border border-white/30">
-                  {isProbationMember ? 'Probation' : isVeteranMember ? `Member since ${joinYear}` : yearsInMembership >= 1 ? '2nd Year' : '1st Year'}
-                </span>
-              )}
-            </div>
-            {isFullMember ? (
-              <>
-                {/* Per-stage mini progress: Probation / (1st, 2nd) / Leadership / Trainer */}
-                <div className="mb-3 bg-white/15 backdrop-blur-sm border border-white/20 rounded-xl px-3 py-2">
-                  <div className="flex items-start gap-1.5">
-                    {[
-                      { label: 'Probation', pct: 100 },
-                      ...(showEngagementSteps ? [
-                        { label: '1st Year', pct: engagementFirst?.overallProgress || 0 },
-                        { label: '2nd Year', pct: engagementSecond?.overallProgress || 0 },
-                      ] : []),
-                      { label: 'Leadership', pct: pathwayJourney ? ((pathwayJourney.leadership.currentIndex + 1) / pathwayJourney.leadership.steps.length) * 100 : 0 },
-                      { label: 'Trainer', pct: pathwayJourney ? ((pathwayJourney.trainer.currentIndex + 1) / pathwayJourney.trainer.steps.length) * 100 : 0 },
-                    ].map(stage => (
-                      <div key={stage.label} className="flex-1 min-w-0">
-                        <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
-                          <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: `${Math.min(100, stage.pct)}%` }}
-                            transition={{ duration: 1, ease: 'easeOut' }}
-                            className={`h-full rounded-full ${stage.pct >= 100 ? 'bg-green-300' : 'bg-amber-200'}`}
-                          />
-                        </div>
-                        <p className="text-[8px] font-black uppercase tracking-wide text-white/60 text-center mt-1 truncate">{stage.label}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <p className="text-[11px] font-semibold text-white/70 truncate">
-                    {isVeteranMember && pathwayJourney ? (
-                      `${membershipStatusLabel} · ${pathwayJourney.leadership.steps[pathwayJourney.leadership.currentIndex]?.title} · Trainer: ${pathwayJourney.trainer.currentIndex >= 0 ? pathwayJourney.trainer.steps[pathwayJourney.trainer.currentIndex]?.title : 'Not started'}`
-                    ) : nextStepHint && !journeyIsComplete ? (
-                      <><ArrowUpRight size={10} className="inline -mt-0.5 mr-0.5" />Next: {nextStepHint}</>
-                    ) : journeyIsComplete ? (
-                      '✓ All requirements completed'
-                    ) : (
-                      membershipStatusLabel || 'Keep going — you\'re making progress!'
-                    )}
-                  </p>
-                  <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30 group-hover:bg-white/30 transition-all duration-200 flex-shrink-0 ml-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-white group-hover:translate-x-0.5 transition-transform duration-200"><path d="m9 18 6-6-6-6" /></svg>
-                  </div>
-                </div>
-              </>
-            ) : isProbationMember ? (
-              <>
-                <div className="mb-3 flex items-center gap-3 bg-white/15 backdrop-blur-sm border border-white/20 rounded-xl px-3 py-2">
-                  <div className="flex-1 h-1.5 bg-white/20 rounded-full overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${journeyProgress}%` }}
-                      transition={{ duration: 1, ease: 'easeOut' }}
-                      className={`h-full rounded-full ${journeyIsComplete ? 'bg-green-300' : 'bg-amber-200'}`}
-                    />
-                  </div>
-                  <span className="text-[11px] font-bold text-white/90 flex-shrink-0">
-                    {promoLoading ? '...' : journeyLabel.split(' · ')[0]}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <p className="text-[11px] font-semibold text-white/70 truncate">
-                    {nextStepHint && !journeyIsComplete ? (
-                      <><ArrowUpRight size={10} className="inline -mt-0.5 mr-0.5" />Next: {nextStepHint}</>
-                    ) : journeyIsComplete ? (
-                      '✓ All requirements completed'
-                    ) : (
-                      'Keep going — you\'re making progress!'
-                    )}
-                  </p>
-                  <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30 group-hover:bg-white/30 transition-all duration-200 flex-shrink-0 ml-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-white group-hover:translate-x-0.5 transition-transform duration-200"><path d="m9 18 6-6-6-6" /></svg>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="flex items-center justify-between">
-                <p className="text-[12px] font-semibold text-white/80">Join us to unlock more benefits</p>
-                <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30 flex-shrink-0">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-white"><path d="m9 18 6-6-6-6" /></svg>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <DashboardMembershipJourneyCard
+        show={showJourneyCard}
+        isProbationMember={isProbationMember}
+        isFullMember={isFullMember}
+        isVeteranMember={isVeteranMember}
+        joinYear={joinYear}
+        yearsInMembership={yearsInMembership}
+        showEngagementSteps={showEngagementSteps}
+        engagementFirst={engagementFirst}
+        engagementSecond={engagementSecond}
+        pathwayJourney={pathwayJourney}
+        membershipStatusLabel={membershipStatusLabel}
+        nextStepHint={nextStepHint}
+        journeyIsComplete={journeyIsComplete}
+        journeyProgress={journeyProgress}
+        journeyLabel={journeyLabel}
+        promoLoading={promoLoading}
+        onOpen={openJourneyModal}
+        onRestricted={() => setShowUpgradeModal(true)}
+      />
 
       {/* Main Content Grid */}
       <div className="grid lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-3">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 shrink-0">Events</span>
-            <div className="flex-1 h-px bg-slate-100" />
-            <button
-              onClick={() => onNavigate?.('EVENTS')}
-              className="text-[10px] font-black text-jci-blue uppercase tracking-widest hover:opacity-70 transition-opacity shrink-0"
-            >
-              View All
-            </button>
-          </div>
-          {eventsLoading ? (
-            <div className="flex overflow-x-auto gap-3 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-2 lg:grid-cols-4">
-              {[1, 2, 3, 4].map(i => <Skeleton key={i} className="flex-none w-[60.6%] sm:w-auto h-[200px]" rounded="2xl" />)}
-            </div>
-          ) : (eventTab === 'upcoming' ? upcomingEvents : events.filter(e => new Date(e.date) < new Date())).length === 0 ? (
-            <div className="text-center py-8 text-slate-400 font-medium">
-              <Calendar size={32} className="mx-auto mb-2 text-slate-300" />
-              <p className="text-sm">No {eventTab} events</p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {(eventTab === 'upcoming' ? upcomingEvents : events.filter(e => new Date(e.date) < new Date()))
-                .sort((a, b) => eventTab === 'upcoming' ? new Date(a.date).getTime() - new Date(b.date).getTime() : new Date(b.date).getTime() - new Date(a.date).getTime())
-                .slice(0, 5)
-                .map(event => (
-                  <EventRow
-                    key={event.id}
-                    event={event}
-                    member={member}
-                    horizontal
-                    onRegister={() => setSelectedEventForDetail(event)}
-                    onClick={() => setSelectedEventForDetail(event)}
-                  />
-                ))}
-            </div>
-          )}
-          {((eventTab === 'upcoming' ? upcomingEvents : events.filter(e => new Date(e.date) < new Date())).length > 8 && onNavigate) && (
-            <Button variant="ghost" className="w-full mt-3 text-sm text-jci-blue hover:bg-blue-50" onClick={() => onNavigate('EVENTS')}>
-              View All {(eventTab === 'upcoming' ? upcomingEvents : events.filter(e => new Date(e.date) < new Date())).length} Events
-            </Button>
-          )}
-        </div>
+        <DashboardEventsPanel
+          eventsLoading={eventsLoading}
+          eventTab={eventTab}
+          upcomingEvents={upcomingEvents}
+          events={events}
+          member={member}
+          onNavigate={onNavigate}
+          onSelectEvent={setSelectedEventForDetail}
+        />
 
         {member.role !== UserRole.GUEST && (
           <>
-            {/* ACTIVE COMMITMENTS / BETS */}
-            {contracts.filter(c => c.status === 'Active').length > 0 && (
-              <Card className="bg-slate-50 border-2 border-slate-200 hover:bg-white transition-all group overflow-hidden">
-                <div className="flex items-center justify-between p-1 mb-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center text-red-600">
-                      <Flame size={18} className="animate-bounce" />
-                    </div>
-                    <h3 className="font-extrabold text-slate-900 uppercase tracking-tight">Active Commitments</h3>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Your Active Bets</p>
-                  {contracts.filter(c => c.status === 'Active').map(c => (
-                    <div key={c.id} className="p-4 bg-white border-2 border-slate-900 rounded-2xl shadow-[4px_4px_0px_rgba(15,23,42,0.1)] hover:translate-x-0.5 hover:translate-y-0.5 transition-all">
-                      <div className="flex justify-between items-start mb-2">
-                        <h4 className="text-xs font-black text-slate-900 uppercase italic">Goal: {c.goalTitle}</h4>
-                        <div className="flex items-center gap-1 text-red-600 font-black">
-                          -{c.stakedPoints} <Target size={12} className="fill-red-600" />
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500">
-                        <Clock size={12} />
-                        Ends: {c.deadline ? (typeof (c.deadline as any).seconds === 'number' ? new Date((c.deadline as any).seconds * 1000).toLocaleDateString() : new Date(c.deadline as unknown as Date).toLocaleDateString()) : 'N/A'}
-                      </div>
-                      <div className="mt-3 text-[10px] p-2 bg-red-50 text-red-700 rounded-lg border border-red-100 font-bold italic">
-                        WARNING: Failure to prove completion will results in permanent loss of {c.stakedPoints} PTS.
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            )}
-
-
-
-            {/* Engagement Points Source removed per user request */}
+            <DashboardActiveCommitments contracts={contracts} />
           </>
         )}
       </div>
 
-      {showUpgradeModal && createPortal(
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-fade-in">
-            <div className="p-6 text-center">
-              <div className="w-16 h-16 bg-blue-50 text-jci-blue rounded-full flex items-center justify-center mx-auto mb-4">
-                <Award size={32} />
-              </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-2">Join Member to Unlock More</h3>
-              <p className="text-sm text-slate-500 mb-8">
-                Upgrade your account to access Projects, find Mentors, view business directories, and enjoy exclusive member benefits!
-              </p>
-              <div className="flex flex-col gap-3">
-                <Button className="w-full" onClick={() => { setShowUpgradeModal(false); /* Optional route to join */ }}>
-                  Join Us Now
-                </Button>
-                <Button variant="ghost" className="w-full" onClick={() => setShowUpgradeModal(false)}>
-                  Maybe Later
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-        , document.body)}
+      <DashboardUpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+      />
 
-      {/* Membership Journey Modal — 3-tab: Probation / 1st Year / 2nd Year */}
-      {showJourneyModal && createPortal(
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-end md:items-center md:justify-center" onClick={() => setShowJourneyModal(false)}>
-          <div className="rounded-t-[32px] md:rounded-2xl w-full md:max-w-lg shadow-2xl overflow-hidden max-h-[90vh] flex flex-col md:mx-4 animate-slide-up" style={{ background: '#0f172a' }} onClick={(e) => e.stopPropagation()}>
-
-            {/* Header — matches journey card background (drag handle integrated) */}
-            <div className="px-5 pt-3 pb-4 flex-shrink-0" style={{
-              backgroundImage: 'linear-gradient(135deg, rgba(217,119,6,0.88) 0%, rgba(180,83,9,0.84) 50%, rgba(120,53,15,0.82) 100%), url(/background/birthday-background.webp)',
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-            }}>
-              <div className="flex justify-center pb-2 md:hidden">
-                <div className="w-10 h-1 rounded-full bg-white/30" />
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-white border border-white/25">
-                    <TrendingUp size={18} />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-white">Membership Journey</h3>
-                    <p className="text-xs text-amber-200/80">Track your progress at each stage</p>
-                  </div>
-                </div>
-                <button onClick={() => setShowJourneyModal(false)} className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/20 transition-colors">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                </button>
-              </div>
-            </div>
-
-            {/* Journey Stepper */}
-            <div className="px-5 py-4 flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-              <div className="flex items-start">
-
-                {/* Probation step */}
-                <button
-                  className="flex flex-col items-center gap-1.5 flex-1 focus:outline-none"
-                  onClick={() => setJourneyActiveTab('probation')}
-                >
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${isFullMember ? 'bg-emerald-500 text-white'
-                    : journeyActiveTab === 'probation' ? 'bg-amber-500 text-white'
-                      : 'bg-white/10 text-white/40'
-                    }`}>
-                    {isFullMember ? <CheckCircle size={14} /> : 'P'}
-                  </div>
-                  <span className={`text-[10px] font-semibold whitespace-nowrap ${journeyActiveTab === 'probation' ? 'text-amber-400'
-                    : isFullMember ? 'text-emerald-400'
-                      : 'text-white/40'
-                    }`}>Probation</span>
-                  <span className={`text-[10px] ${isFullMember ? 'text-emerald-400' : 'text-amber-400'}`}>
-                    {isProbationMember
-                      ? `${promotionProgress?.overallProgress?.toFixed(0) ?? 0}%`
-                      : '100%'}
-                  </span>
-                </button>
-
-                {showEngagementSteps && (<>
-                  {/* Connector */}
-                  <div className={`flex-1 h-0.5 mt-4 transition-colors ${isFullMember ? 'bg-emerald-500/60' : 'bg-white/15'}`} />
-
-                  {/* 1st Year step */}
-                  <button
-                    className="flex flex-col items-center gap-1.5 flex-1 focus:outline-none"
-                    onClick={() => setJourneyActiveTab('firstYear')}
-                  >
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${engagementFirst?.isCompleted ? 'bg-emerald-500 text-white'
-                      : journeyActiveTab === 'firstYear' ? 'bg-sky-500 text-white'
-                        : 'bg-white/10 text-white/40'
-                      }`}>
-                      {engagementFirst?.isCompleted ? <CheckCircle size={14} /> : '1'}
-                    </div>
-                    <span className={`text-[10px] font-semibold whitespace-nowrap ${journeyActiveTab === 'firstYear' ? 'text-sky-400'
-                      : engagementFirst?.isCompleted ? 'text-emerald-400'
-                        : 'text-white/40'
-                      }`}>1st Year</span>
-                    {engagementFirst && (
-                      <span className={`text-[10px] ${engagementFirst.isCompleted ? 'text-emerald-400' : 'text-sky-400'}`}>
-                        {engagementFirst.overallProgress.toFixed(0)}%
-                      </span>
-                    )}
-                  </button>
-
-                  {/* Connector */}
-                  <div className={`flex-1 h-0.5 mt-4 transition-colors ${engagementFirst?.isCompleted ? 'bg-emerald-500/60' : 'bg-white/15'}`} />
-
-                  {/* 2nd Year step */}
-                  <button
-                    className="flex flex-col items-center gap-1.5 flex-1 focus:outline-none"
-                    onClick={() => setJourneyActiveTab('secondYear')}
-                  >
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${engagementSecond?.isCompleted ? 'bg-emerald-500 text-white'
-                      : journeyActiveTab === 'secondYear' ? 'bg-violet-500 text-white'
-                        : 'bg-white/10 text-white/40'
-                      }`}>
-                      {engagementSecond?.isCompleted ? <CheckCircle size={14} /> : '2'}
-                    </div>
-                    <span className={`text-[10px] font-semibold whitespace-nowrap ${journeyActiveTab === 'secondYear' ? 'text-violet-400'
-                      : engagementSecond?.isCompleted ? 'text-emerald-400'
-                        : 'text-white/40'
-                      }`}>2nd Year</span>
-                    {engagementSecond && (
-                      <span className={`text-[10px] ${engagementSecond.isCompleted ? 'text-emerald-400' : 'text-violet-400'}`}>
-                        {engagementSecond.overallProgress.toFixed(0)}%
-                      </span>
-                    )}
-                  </button>
-                </>)}
-
-                {/* Connector */}
-                <div className={`flex-1 h-0.5 mt-4 transition-colors ${showEngagementSteps
-                  ? (engagementSecond?.isCompleted ? 'bg-emerald-500/60' : 'bg-white/15')
-                  : (isFullMember ? 'bg-emerald-500/60' : 'bg-white/15')}`} />
-
-                {/* Leadership step */}
-                <button
-                  className="flex flex-col items-center gap-1.5 flex-1 focus:outline-none"
-                  onClick={() => setJourneyActiveTab('leadership')}
-                >
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${journeyActiveTab === 'leadership' ? 'bg-amber-500 text-white' : 'bg-white/10 text-white/40'}`}>
-                    <Crown size={14} />
-                  </div>
-                  <span className={`text-[10px] font-semibold ${journeyActiveTab === 'leadership' ? 'text-amber-400' : 'text-white/40'}`}>Leadership</span>
-                  <span className="text-[10px] text-amber-400">
-                    {pathwayJourney ? `${pathwayJourney.leadership.currentIndex + 1}/${pathwayJourney.leadership.steps.length}` : '...'}
-                  </span>
-                </button>
-
-                {/* Connector */}
-                <div className="flex-1 h-0.5 mt-4 bg-white/15" />
-
-                {/* Trainer step */}
-                <button
-                  className="flex flex-col items-center gap-1.5 flex-1 focus:outline-none"
-                  onClick={() => setJourneyActiveTab('trainer')}
-                >
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${journeyActiveTab === 'trainer' ? 'bg-sky-500 text-white' : 'bg-white/10 text-white/40'}`}>
-                    <BookOpen size={14} />
-                  </div>
-                  <span className={`text-[10px] font-semibold ${journeyActiveTab === 'trainer' ? 'text-sky-400' : 'text-white/40'}`}>Trainer</span>
-                  <span className="text-[10px] text-sky-400">
-                    {pathwayJourney ? `${pathwayJourney.trainer.currentIndex + 1}/${pathwayJourney.trainer.steps.length}` : '...'}
-                  </span>
-                </button>
-
-              </div>
-            </div>
-
-            {/* Tab Body */}
-            <div className="p-4 overflow-y-auto no-scrollbar flex-1 space-y-3">
-
-              {/* ── Probation Tab ── */}
-              {journeyActiveTab === 'probation' && (
-                <>
-                  {promotionProgress && (
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-medium text-white/50">
-                          {promotionProgress.requirements?.filter((r: any) => r.isCompleted).length || 0}/{promotionProgress.requirements?.length || 4} completed
-                        </span>
-                        <span className="text-xs font-bold text-white/80">{promotionProgress.overallProgress?.toFixed(0) || 0}%</span>
-                      </div>
-                      <div className="flex gap-1">
-                        {(promotionProgress.requirements || []).map((req: any, i: number) => (
-                          <div key={i} className={`flex-1 h-1.5 rounded-full transition-all duration-500 ${req.isCompleted ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-white/10'}`} />
-                        ))}
-                      </div>
-                      {promotionProgress.isEligibleForPromotion && (
-                        <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-400">
-                          <CheckCircle size={12} /> All requirements met
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {promoLoading ? (
-                    <div className="flex items-center justify-center py-10">
-                      <RefreshCw className="animate-spin text-amber-400" size={24} />
-                    </div>
-                  ) : promotionProgress?.requirements ? (
-                    <div className="space-y-2">
-                      {promotionProgress.requirements.map((req: any) => (
-                        <div key={req.id} className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl" style={{ background: req.isCompleted ? 'rgba(52,211,153,0.10)' : 'rgba(255,255,255,0.05)', border: req.isCompleted ? '1px solid rgba(52,211,153,0.25)' : '1px solid rgba(255,255,255,0.08)' }}>
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${req.isCompleted ? 'bg-emerald-500' : 'bg-white/10'}`}>
-                              {req.isCompleted
-                                ? <CheckCircle size={11} className="text-white" />
-                                : <Clock size={11} className="text-white/30" />}
-                            </div>
-                            <div className="min-w-0">
-                              <span className={`font-semibold text-xs truncate block ${req.isCompleted ? 'text-white' : 'text-white/60'}`}>{req.general?.name}</span>
-                              {req.isCompleted && req.completionDetails && (() => {
-                                const rawVal = Object.values(req.completionDetails)[0];
-                                const raw = typeof rawVal === 'string' ? rawVal : Array.isArray(rawVal) ? (rawVal as string[]).join(' ') : String(rawVal ?? '');
-                                const lines = raw ? raw.split(/\s+(?=\d{4}-\d{2}-\d{2})/) : [];
-                                return lines.length > 1
-                                  ? <div className="space-y-0.5 mt-0.5">{lines.map((l, i) => <p key={i} className="text-[10px] text-emerald-400 font-medium truncate">{l}</p>)}</div>
-                                  : <p className="text-[10px] text-emerald-400 font-medium truncate">{raw}</p>;
-                              })()}
-                              {!req.isCompleted && req.description && (
-                                <p className="text-[10px] text-white/30 truncate">{req.description}</p>
-                              )}
-                            </div>
-                          </div>
-                          {req.isCompleted && <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full flex-shrink-0 bg-emerald-400/20 text-emerald-300 border border-emerald-400/30">Done</span>}
-                        </div>
-                      ))}
-                    </div>
-                  ) : isFullMember ? (
-                    <div className="flex flex-col items-center justify-center py-8 gap-2">
-                      <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400">
-                        <CheckCircle size={22} />
-                      </div>
-                      <p className="text-sm font-semibold text-emerald-400">Probation completed</p>
-                      <p className="text-xs text-white/40">You have been promoted to Full Member.</p>
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-white/30 text-sm">
-                      <AlertTriangle size={24} className="mx-auto mb-2" />
-                      Unable to load promotion requirements.
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* ── Leadership / Trainer Pathway Tab ── */}
-              {(journeyActiveTab === 'leadership' || journeyActiveTab === 'trainer') && (() => {
-                if (!pathwayJourney) return (
-                  <div className="flex items-center justify-center py-10">
-                    <RefreshCw className="animate-spin text-amber-400" size={24} />
-                  </div>
-                );
-                const data = pathwayJourney[journeyActiveTab];
-                const accentColor = journeyActiveTab === 'leadership' ? 'text-amber-400' : 'text-sky-400';
-                return (
-                  <>
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-medium text-white/50">
-                          {data.steps.filter(s => s.achieved).length}/{data.steps.length} achieved
-                        </span>
-                        <span className={`text-xs font-bold ${accentColor}`}>
-                          {Math.round(((data.currentIndex + 1) / data.steps.length) * 100)}%
-                        </span>
-                      </div>
-                      <div className="flex gap-1">
-                        {data.steps.map((s, i) => (
-                          <div key={i} className={`flex-1 h-1.5 rounded-full transition-all duration-500 ${s.achieved ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-white/10'}`} />
-                        ))}
-                      </div>
-                    </div>
-
-                    {data.steps.map((step, i) => {
-                      const isCurrent = i === data.currentIndex && step.achieved;
-                      const isExpanded = expandedJourneySteps.has(step.title);
-                      const allEntries = step.details ?? (step.detail ? [step.detail] : []);
-                      const hasMore = allEntries.length > 1;
-                      const visibleEntries = allEntries.slice(0, 1);
-                      return (
-                        <div
-                          key={step.title}
-                          className={`rounded-xl overflow-hidden ${hasMore ? 'cursor-pointer' : ''}`}
-                          style={{ background: step.achieved ? 'rgba(52,211,153,0.08)' : 'rgba(255,255,255,0.04)', border: step.achieved ? '1px solid rgba(52,211,153,0.20)' : '1px solid rgba(255,255,255,0.07)' }}
-                          onClick={hasMore ? () => setExpandedJourneySteps(prev => { const next = new Set(prev); isExpanded ? next.delete(step.title) : next.add(step.title); return next; }) : undefined}
-                        >
-                          <div className="flex items-center gap-3 px-3 py-2.5">
-                            <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${step.achieved
-                              ? isCurrent ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'
-                              : 'bg-white/10 text-white/25'
-                              }`}>
-                              {step.achieved ? <CheckCircle size={13} /> : i + 1}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <p className={`text-sm leading-tight ${step.achieved ? 'font-bold text-white' : 'font-medium text-white/35'}`}>{step.title}</p>
-                                {isCurrent && (
-                                  <span className="text-[9px] font-black uppercase tracking-wide bg-amber-400/20 text-amber-300 border border-amber-400/30 px-1.5 py-0.5 rounded-full flex-shrink-0">Current</span>
-                                )}
-                              </div>
-                              {visibleEntries.length > 0 && (
-                                <p className="text-[11px] text-white/30 truncate mt-0.5">{visibleEntries[0]}</p>
-                              )}
-                            </div>
-                            {hasMore && (
-                              <span className="flex-shrink-0 text-[9px] font-black px-1.5 py-0.5 rounded-full border bg-white/10 text-white/40 border-white/15">
-                                {isExpanded ? '−' : `+${allEntries.length}`}
-                              </span>
-                            )}
-                          </div>
-                          {isExpanded && allEntries.length > 0 && (
-                            <div className="px-3 pb-3 pt-1 space-y-1.5 border-t border-white/6 mt-0">
-                              {allEntries.map((e, ei) => (
-                                <div key={ei} className="flex items-center gap-2 pl-9">
-                                  <div className="w-1 h-1 rounded-full bg-emerald-400/50 flex-shrink-0" />
-                                  <p className="text-[11px] text-white/50 truncate">{e}</p>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </>
-                );
-              })()}
-
-              {/* ── 1st / 2nd Year Engagement Tab ── */}
-              {(journeyActiveTab === 'firstYear' || journeyActiveTab === 'secondYear') && (() => {
-                const summary = journeyActiveTab === 'firstYear' ? engagementFirst : engagementSecond;
-                const accentPct = journeyActiveTab === 'firstYear' ? 'text-sky-400' : 'text-violet-400';
-                const accentDot = journeyActiveTab === 'firstYear' ? 'from-sky-400 to-sky-600' : 'from-violet-400 to-violet-600';
-
-                if (engagementLoading) return (
-                  <div className="flex items-center justify-center py-10">
-                    <RefreshCw className={`animate-spin ${journeyActiveTab === 'firstYear' ? 'text-sky-400' : 'text-violet-400'}`} size={24} />
-                  </div>
-                );
-                if (!summary) return (
-                  <div className="text-center py-8 text-white/30 text-sm">
-                    <AlertTriangle size={24} className="mx-auto mb-2" />
-                    Unable to load engagement progress.
-                  </div>
-                );
-
-                const groupReqs = summary.requirements.filter(r => r.group === journeyGroupTab);
-
-                return (
-                  <>
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-medium text-white/50">{summary.completedCount}/{summary.totalCount} completed</span>
-                        <span className={`text-xs font-bold ${accentPct}`}>{summary.overallProgress.toFixed(0)}%</span>
-                      </div>
-                      <div className="flex gap-1">
-                        {summary.requirements.map((req, i) => {
-                          const isPending = !!req.progress.pendingVerification;
-                          return (
-                            <div key={i} className={`flex-1 h-1.5 rounded-full transition-all duration-500 ${req.isCompleted ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : isPending ? 'bg-amber-400' : summary.isCompleted ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : `bg-gradient-to-r ${accentDot} opacity-20`}`} />
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Group tabs */}
-                    <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.07)' }}>
-                      {(['Leadership Experience', 'Skills Development', 'JCI Experience'] as const).map(g => {
-                        const gReqs = summary.requirements.filter(r => r.group === g);
-                        if (gReqs.length === 0) return null;
-                        const doneCount = gReqs.filter(r => r.isCompleted).length;
-                        const isActive = journeyGroupTab === g;
-                        const label = g === 'Leadership Experience' ? 'Lead' : g === 'Skills Development' ? 'Skills' : 'JCI';
-                        return (
-                          <button
-                            key={g}
-                            onClick={() => setJourneyGroupTab(g)}
-                            className={`flex-1 py-1.5 px-1 rounded-lg text-[10px] font-bold transition-all flex flex-col items-center gap-0.5 ${isActive ? 'bg-white/15 text-white' : 'text-white/35 hover:text-white/60'}`}
-                          >
-                            <span>{label}</span>
-                            <span className={`text-[9px] font-black ${doneCount === gReqs.length ? 'text-emerald-400' : isActive ? accentPct : 'text-white/25'}`}>
-                              {doneCount}/{gReqs.length}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    <div className="space-y-2">
-                      {groupReqs.map(req => {
-                        const isPending = !!req.progress.pendingVerification;
-                        return (
-                          <div key={req.key} className="px-3 py-2.5 rounded-xl" style={{ background: req.isCompleted ? 'rgba(52,211,153,0.08)' : isPending ? 'rgba(251,191,36,0.08)' : 'rgba(255,255,255,0.04)', border: req.isCompleted ? '1px solid rgba(52,211,153,0.20)' : isPending ? '1px solid rgba(251,191,36,0.25)' : '1px solid rgba(255,255,255,0.07)' }}>
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${req.isCompleted ? 'bg-emerald-500' : isPending ? 'bg-amber-400' : 'bg-white/10'}`}>
-                                  {req.isCompleted
-                                    ? <CheckCircle size={11} className="text-white" />
-                                    : <Clock size={11} className={isPending ? 'text-white' : 'text-white/30'} />}
-                                </div>
-                                <span className={`font-semibold text-xs truncate ${req.isCompleted || isPending ? 'text-white' : 'text-white/50'}`}>{req.title}</span>
-                              </div>
-                              <div className="flex-shrink-0">
-                                {req.isCompleted && !isPending && <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-emerald-400/20 text-emerald-300 border border-emerald-400/30">Done</span>}
-                                {isPending && <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30">Pending</span>}
-                              </div>
-                            </div>
-                            {(isPending || req.isCompleted) && (req.progress.detail || req.progress.date) ? (
-                              <div className="mt-1 pl-7 flex items-center gap-2 text-[11px]">
-                                {req.progress.detail && <span className={isPending ? 'text-amber-300 font-medium' : 'text-emerald-400 font-medium'}>{req.progress.detail}</span>}
-                                {req.progress.date && <span className="text-white/30">{req.progress.date}</span>}
-                              </div>
-                            ) : !req.isCompleted ? (
-                              <p className="text-[11px] text-white/25 mt-0.5 pl-7 line-clamp-1">{req.description}</p>
-                            ) : null}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </>
-                );
-              })()}
-            </div>
-          </div>
-        </div>
-        , document.body)}
+      <DashboardMembershipJourneyModal
+        isOpen={showJourneyModal}
+        onClose={() => setShowJourneyModal(false)}
+        journeyActiveTab={journeyActiveTab}
+        setJourneyActiveTab={setJourneyActiveTab}
+        isFullMember={isFullMember}
+        isProbationMember={isProbationMember}
+        showEngagementSteps={showEngagementSteps}
+        promotionProgress={promotionProgress}
+        promoLoading={promoLoading}
+        pathwayJourney={pathwayJourney}
+        engagementFirst={engagementFirst}
+        engagementSecond={engagementSecond}
+        engagementLoading={engagementLoading}
+        expandedJourneySteps={expandedJourneySteps}
+        setExpandedJourneySteps={setExpandedJourneySteps}
+        journeyGroupTab={journeyGroupTab}
+        setJourneyGroupTab={setJourneyGroupTab}
+      />
       {/* Event Detail Modal */}
       {selectedEventForDetail && (
         <EventDetailModal
@@ -1264,462 +462,26 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         />
       )}
 
-      {/* Birthday Drawer */}
-      <Modal
+      <DashboardBirthdayDrawer
         isOpen={showBirthdayDrawer}
         onClose={() => setShowBirthdayDrawer(false)}
-        title={
-          <div className="flex items-center gap-2">
-            <span className="text-xl leading-none">🎂</span>
-            <span className="font-bold text-white">Birthdays This Month</span>
-            <span className="text-[10px] font-black uppercase tracking-widest text-rose-200/80 bg-white/15 px-2 py-0.5 rounded-full border border-white/20">
-              {now.toLocaleString('default', { month: 'long' })}
-            </span>
-          </div>
-        }
-        headerStyle={{
-          backgroundImage: 'linear-gradient(135deg, rgba(190,18,60,0.82) 0%, rgba(134,25,143,0.78) 50%, rgba(79,70,229,0.75) 100%), url(/background/birthday-background.webp)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        }}
-        size="md"
-        drawerOnMobile={true}
-        bottomSheet={true}
-        dragHandleInHeader
-        className="!bg-slate-900"
-        scrollInBody={false}
-      >
-        {(() => {
-          const membershipBadge = (type: string) => {
-            const t = (type || '').toLowerCase();
-            if (t.includes('probation')) return { label: 'Probation', cls: 'bg-amber-400/20 text-amber-300 border-amber-400/30' };
-            if (t.includes('associate')) return { label: 'Associate', cls: 'bg-sky-400/20 text-sky-300 border-sky-400/30' };
-            if (t.includes('full') || t.includes('voting') || t.includes('member')) return { label: 'Member', cls: 'bg-violet-400/20 text-violet-300 border-violet-400/30' };
-            return { label: type || 'Member', cls: 'bg-white/10 text-white/50 border-white/15' };
-          };
-          return (
-            <div className="space-y-2 max-h-[60vh] overflow-y-auto no-scrollbar -mx-4 px-4 md:-mx-6 md:px-6 pb-2">
-              {birthdayMembers.map(m => {
-                const dob = new Date(getDob(m)!);
-                const day = dob.getDate();
-                const isToday = day === currentDay;
-                const name = m.general?.name || m.general?.name || '';
-                const avatarUrl = m.general?.avatarUrl || m.general?.avatarUrl;
-                const initials = name.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase();
-                let hash = 0; for (let j = 0; j < name.length; j++) hash = name.charCodeAt(j) + ((hash << 5) - hash);
-                const gradients = ['from-pink-400 to-rose-500', 'from-violet-400 to-purple-500', 'from-sky-400 to-blue-500', 'from-teal-400 to-emerald-500', 'from-amber-400 to-orange-500'];
-                const avatarGradient = gradients[Math.abs(hash) % gradients.length];
-                const badge = membershipBadge(m.jciCareer?.membershipType || '');
-                const duesPaid = m.jciCareer?.isDuesPaidCurrentYear ?? (m.duesStatus === 'paid');
-                const duesLabel = duesPaid ? 'Dues Paid' : 'Dues Pending';
-                const duesCls = duesPaid
-                  ? 'bg-emerald-400/15 text-emerald-300 border-emerald-400/30'
-                  : 'bg-red-400/15 text-red-300 border-red-400/30';
+        birthdayMembers={birthdayMembers}
+        now={now}
+        currentDay={currentDay}
+      />
 
-                return (
-                  <div
-                    key={m.id}
-                    className="flex items-center gap-3 px-3.5 py-3 rounded-2xl transition-all"
-                    style={{
-                      background: isToday
-                        ? 'linear-gradient(135deg, rgba(190,18,60,0.25) 0%, rgba(134,25,143,0.20) 100%)'
-                        : 'rgba(255,255,255,0.06)',
-                      border: isToday ? '1px solid rgba(251,113,133,0.35)' : '1px solid rgba(255,255,255,0.08)',
-                    }}
-                  >
-                    {/* Avatar */}
-                    <div className="relative flex-shrink-0">
-                      {avatarUrl ? (
-                        <img
-                          src={avatarUrl}
-                          alt={name}
-                          className={`w-11 h-11 rounded-full object-cover shadow-md ${isToday ? 'ring-2 ring-rose-400/70 ring-offset-1 ring-offset-slate-900' : 'ring-1 ring-white/20'}`}
-                        />
-                      ) : (
-                        <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-sm font-bold text-white shadow-md ${isToday ? 'ring-2 ring-rose-400/70 ring-offset-1 ring-offset-slate-900' : 'ring-1 ring-white/20'}`}>
-                          {initials}
-                        </div>
-                      )}
-                      {/* WhatsApp group status */}
-                      <span
-                        className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center shadow-md"
-                        style={m.contact?.whatsappJoined || m.contact?.whatsappJoined
-                          ? { background: '#25d366', border: '1.5px solid rgba(255,255,255,0.25)' }
-                          : { background: '#475569', border: '1.5px solid rgba(255,255,255,0.10)' }}
-                        title={m.contact?.whatsappJoined || m.contact?.whatsappJoined ? 'In WhatsApp group' : 'Not in WhatsApp group'}
-                      >
-                        <svg viewBox="0 0 24 24" fill="currentColor" className={`w-2.5 h-2.5 ${m.contact?.whatsappJoined || m.contact?.whatsappJoined ? 'text-slate-900' : 'text-white'}`}>
-                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
-                          <path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.528 5.85L.057 23.25a.75.75 0 0 0 .918.919l5.4-1.47A11.95 11.95 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.88 0-3.638-.502-5.153-1.378l-.37-.213-3.833 1.043 1.044-3.832-.214-.372A9.944 9.944 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z" />
-                        </svg>
-                      </span>
-                      {isToday && (
-                        <span className="absolute -top-0.5 -left-0.5 text-xs leading-none">🎉</span>
-                      )}
-                    </div>
-
-                    {/* Name + badges */}
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-bold text-white text-sm leading-snug truncate">{name}</h4>
-                      <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-                        <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${badge.cls}`}>
-                          {badge.label}
-                        </span>
-                        <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${duesCls}`}>
-                          {duesLabel}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Date / today */}
-                    <div className="flex-shrink-0 flex flex-col items-end gap-1.5">
-                      {isToday ? (
-                        <>
-                          <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full text-white shadow-sm" style={{ background: 'rgba(225,29,72,0.7)', border: '1px solid rgba(251,113,133,0.5)' }}>
-                            Today 🎂
-                          </span>
-                          <button
-                            className="text-[9px] font-bold px-2 py-0.5 rounded-full text-white/80 border border-white/20 hover:bg-white/15 transition-colors"
-                            style={{ background: 'rgba(255,255,255,0.10)' }}
-                            onClick={() => {
-                              navigator.clipboard.writeText(`Happy Birthday ${name}! 🎂 Wishing you a wonderful day!`);
-                              showToast(`Copied wishes to clipboard!`, 'success');
-                            }}
-                          >
-                            Copy Wishes
-                          </button>
-                        </>
-                      ) : (
-                        <div className="flex flex-col items-center px-2.5 py-1.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.10)' }}>
-                          <span className="text-[9px] font-black uppercase tracking-wider text-white/40 leading-none">{dob.toLocaleString('default', { month: 'short' })}</span>
-                          <span className="text-base font-extrabold text-white leading-tight">{day}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })()}
-      </Modal>
-
-      {/* Profile Completion Sheet */}
-      {showProfileDrawer && profileCompleteness && (() => {
-        const { done, total, pct, missing } = profileCompleteness;
-        const set = (key: string, v: string) => setProfileDraft(d => ({ ...d, [key]: v }));
-        const val = (key: string, fallback = '') => profileDraft[key] ?? fallback;
-        const basicLabels = ['Profile photo', 'Apparel & Items'];
-        const contactLabels = ['Phone number', 'Address', 'Emergency contact'];
-        const professionalLabels = ['Company name', 'Industry', 'Position / title', 'Business categories', 'Company description', 'Ideal referral', 'International business', 'Level of management'];
-        const basicCount = missing.filter(f => basicLabels.includes(f.label)).length;
-        const contactCount = missing.filter(f => contactLabels.includes(f.label)).length;
-        const professionalCount = missing.filter(f => professionalLabels.includes(f.label)).length;
-        const profileTabs = [
-          { id: 'basic', label: 'Basic Info', badge: basicCount > 0 ? <span className="inline-flex items-center justify-center w-4 h-4 bg-amber-500 text-white text-[9px] font-black rounded-full leading-none">{basicCount}</span> : undefined },
-          { id: 'contact', label: 'Contact', badge: contactCount > 0 ? <span className="inline-flex items-center justify-center w-4 h-4 bg-amber-500 text-white text-[9px] font-black rounded-full leading-none">{contactCount}</span> : undefined },
-          { id: 'professional', label: 'Professional', badge: professionalCount > 0 ? <span className="inline-flex items-center justify-center w-4 h-4 bg-amber-500 text-white text-[9px] font-black rounded-full leading-none">{professionalCount}</span> : undefined },
-        ];
-        const r = 26, circ = 2 * Math.PI * r;
-        const handleSave = async () => {
-          if (!member?.id || Object.keys(profileDraft).length === 0) return;
-          setProfileSaving(true);
-          try {
-            const updates: Record<string, unknown> = {};
-            if ('phone' in profileDraft) updates['contact.phone'] = profileDraft.phone;
-            if ('companyName' in profileDraft) updates.companyName = profileDraft.companyName;
-            if ('industry' in profileDraft) updates.industry = profileDraft.industry;
-            if ('companyDescription' in profileDraft) updates['business.companyDescription'] = profileDraft.companyDescription;
-            if ('idealReferral' in profileDraft) updates['business.idealReferrals'] = profileDraft.idealReferral;
-            if ('address' in profileDraft) updates['contact.address'] = profileDraft.address;
-            if ('emergencyContactName' in profileDraft) updates['contact.emergency.name'] = profileDraft.emergencyContactName;
-            if ('emergencyContactRelationship' in profileDraft) updates['contact.emergency.relationship'] = profileDraft.emergencyContactRelationship;
-            if ('emergencyContact' in profileDraft) updates['contact.emergency.name'] = profileDraft.emergencyContact;
-            if ('shirtStyle' in profileDraft) updates['others.shirtStyle'] = profileDraft.shirtStyle;
-            if ('tshirtSize' in profileDraft) updates['others.tshirtSize'] = profileDraft.tshirtSize;
-            if ('jacketSize' in profileDraft) updates['others.jacketSize'] = profileDraft.jacketSize;
-            if ('departmentAndPosition' in profileDraft) updates['business.departmentAndPosition'] = profileDraft.departmentAndPosition;
-            if ('specialOffer' in profileDraft) updates['business.specialOffer'] = profileDraft.specialOffer;
-            if ('companyWebsite' in profileDraft) updates['business.companyWebsite'] = profileDraft.companyWebsite;
-            if ('acceptInternationalBusiness' in profileDraft) updates['business.acceptInternationalBusiness'] = profileDraft.acceptInternationalBusiness;
-            if ('levelOfManagement' in profileDraft) updates['business.levelOfManagement'] = profileDraft.levelOfManagement;
-            await MembersService.updateMember(member.id, updates as Parameters<typeof MembersService.updateMember>[1]);
-            showToast('Profile updated!', 'success');
-            setShowProfileDrawer(false);
-            setProfileDraft({});
-          } catch {
-            showToast('Failed to save. Please try again.', 'error');
-          } finally {
-            setProfileSaving(false);
-          }
-        };
-        const tabDefs = [
-          { id: 'basic', label: 'Basic Info', count: basicCount, total: basicLabels.length },
-          { id: 'contact', label: 'Contact', count: contactCount, total: contactLabels.length },
-          { id: 'professional', label: 'Professional', count: professionalCount, total: professionalLabels.length },
-        ];
-        return createPortal(
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-end md:items-center md:justify-center" onClick={() => setShowProfileDrawer(false)}>
-            <div className="rounded-t-[32px] md:rounded-2xl w-full md:max-w-lg shadow-2xl overflow-hidden max-h-[90vh] flex flex-col md:mx-4 animate-slide-up" style={{ background: '#0f172a' }} onClick={e => e.stopPropagation()}>
-
-              {/* Header */}
-              <div className="px-5 pt-3 pb-4 flex-shrink-0" style={{
-                backgroundImage: 'linear-gradient(135deg, rgba(0,111,183,0.92) 0%, rgba(0,75,135,0.90) 55%, rgba(0,40,90,0.88) 100%), url(/background/birthday-background.webp)',
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-              }}>
-                <div className="flex justify-center pb-2 md:hidden"><div className="w-10 h-1 rounded-full bg-white/30" /></div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="relative flex-shrink-0 w-10 h-10">
-                      <svg width="40" height="40" viewBox="0 0 40 40" className="-rotate-90" aria-hidden="true">
-                        <circle cx="20" cy="20" r="16" fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="3.5" />
-                        <circle cx="20" cy="20" r="16" fill="none" stroke="white" strokeWidth="3.5"
-                          strokeDasharray={`${2 * Math.PI * 16} ${2 * Math.PI * 16}`}
-                          strokeDashoffset={2 * Math.PI * 16 * (1 - pct / 100)}
-                          strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.7s ease' }} />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-[10px] font-black text-white leading-none">{pct}%</span>
-                      </div>
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-white">{member?.general?.name ?? 'Your Profile'}</h3>
-                      <p className="text-xs text-blue-200/80">{done} of {total} sections filled</p>
-                    </div>
-                  </div>
-                  <button onClick={() => setShowProfileDrawer(false)} aria-label="Close"
-                    className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/20 transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                  </button>
-                </div>
-              </div>
-
-              {/* Tab stepper */}
-              <div className="px-5 py-4 flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                <div className="flex items-start">
-                  {tabDefs.map((tab, i) => (
-                    <React.Fragment key={tab.id}>
-                      {i > 0 && (
-                        <div className={`flex-1 h-0.5 mt-4 transition-colors ${tabDefs[i - 1].count === 0 ? 'bg-emerald-500/60' : 'bg-white/15'}`} />
-                      )}
-                      <button className="flex flex-col items-center gap-1.5 flex-1 focus:outline-none" onClick={() => setProfileTab(tab.id)}>
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${tab.count === 0 ? 'bg-emerald-500 text-white'
-                            : profileTab === tab.id ? 'bg-jci-blue text-white'
-                              : 'bg-white/10 text-white/40'
-                          }`}>
-                          {tab.count === 0 ? <CheckCircle size={14} /> : tab.count}
-                        </div>
-                        <span className={`text-[10px] font-semibold whitespace-nowrap ${tab.count === 0 ? 'text-emerald-400'
-                            : profileTab === tab.id ? 'text-blue-300'
-                              : 'text-white/40'
-                          }`}>{tab.label}</span>
-                        <span className={`text-[10px] ${tab.count === 0 ? 'text-emerald-400' : 'text-blue-300'}`}>
-                          {`${Math.round((tab.total - tab.count) / tab.total * 100)}%`}
-                        </span>
-                      </button>
-                    </React.Fragment>
-                  ))}
-                </div>
-              </div>
-
-              {/* Tab content */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-3
-                [&_input]:bg-white/10 [&_input]:border-white/20 [&_input]:text-white [&_input]:placeholder:text-white/30
-                [&_button[type=button]]:bg-white/10 [&_button[type=button]]:border-white/20 [&_button[type=button]]:text-white
-                [&_textarea]:bg-white/10 [&_textarea]:border-white/20 [&_textarea]:text-white [&_textarea]:placeholder:text-white/30
-                [&_label]:text-white/60">
-                {profileTab === 'basic' && (
-                  basicCount === 0
-                    ? <div className="space-y-2">
-                        <div className="flex items-center gap-2 pb-1 mb-1">
-                          <CheckCircle size={16} className="text-emerald-400 shrink-0" />
-                          <p className="text-xs font-semibold text-emerald-400">All basic info filled</p>
-                        </div>
-                        {(member?.general?.avatarUrl || (member as any).avatarUrl) && (
-                          <div className="flex items-center justify-between py-2 px-3 rounded-xl bg-white/5">
-                            <span className="text-xs text-white/40">Profile Photo</span>
-                            <img src={member?.general?.avatarUrl || (member as any).avatarUrl} alt="avatar" className="w-8 h-8 rounded-full object-cover border border-white/20" />
-                          </div>
-                        )}
-                        {[
-                          { label: 'Shirt Style', value: member?.others?.shirtStyle },
-                          { label: 'T-Shirt Size', value: member?.others?.tshirtSize },
-                          { label: 'Jacket Size', value: member?.others?.jacketSize },
-                        ].filter(r => r.value).map(r => (
-                          <div key={r.label} className="flex items-center justify-between py-2 px-3 rounded-xl bg-white/5">
-                            <span className="text-xs text-white/40">{r.label}</span>
-                            <span className="text-xs text-white/80 font-medium">{r.value}</span>
-                          </div>
-                        ))}
-                      </div>
-                    : <div className="space-y-3">
-                      {missing.find(f => f.label === 'Apparel & Items') && (
-                        <div className="space-y-3">
-                          <p className="text-xs font-semibold text-white/40 uppercase tracking-wider">Apparel & Items</p>
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <Select label="Shirt Style"
-                              value={val('shirtStyle', member?.others?.shirtStyle ?? '')}
-                              onChange={e => set('shirtStyle', e.target.value)}
-                              options={[{ value: '', label: 'Select…' }, { value: 'Unisex', label: 'Unisex' }, { value: 'Lady Cut', label: 'Lady Cut' }]} />
-                            <Select label="T-Shirt Size"
-                              value={val('tshirtSize', member?.others?.tshirtSize ?? '')}
-                              onChange={e => set('tshirtSize', e.target.value)}
-                              options={[{ value: '', label: 'Select…' }, ...['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '5XL', '7XL'].map(s => ({ value: s, label: s }))]} />
-                            <Select label="Jacket Size"
-                              value={val('jacketSize', member?.others?.jacketSize ?? '')}
-                              onChange={e => set('jacketSize', e.target.value)}
-                              options={[{ value: '', label: 'Select…' }, ...['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '5XL', '7XL'].map(s => ({ value: s, label: s }))]} />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                )}
-                {profileTab === 'contact' && (
-                  contactCount === 0
-                    ? <div className="space-y-2">
-                        <div className="flex items-center gap-2 pb-1 mb-1">
-                          <CheckCircle size={16} className="text-emerald-400 shrink-0" />
-                          <p className="text-xs font-semibold text-emerald-400">All contact info filled</p>
-                        </div>
-                        {[
-                          { label: 'Phone Number', value: member?.contact?.phone },
-                          { label: 'Address', value: member?.contact?.address },
-                          { label: 'Emergency Contact Name', value: member?.contact?.emergency?.name },
-                          { label: 'Emergency Relationship', value: member?.contact?.emergency?.relationship },
-                          { label: 'Emergency Phone', value: member?.contact?.emergency?.phone },
-                        ].filter(r => r.value).map(r => (
-                          <div key={r.label} className="flex items-start justify-between gap-3 py-2 px-3 rounded-xl bg-white/5">
-                            <span className="text-xs text-white/40 shrink-0">{r.label}</span>
-                            <span className="text-xs text-white/80 font-medium text-right">{r.value}</span>
-                          </div>
-                        ))}
-                      </div>
-                    : <div className="space-y-3">
-                      {missing.find(f => f.label === 'Phone number') && (
-                        <Input label="Phone Number" type="tel"
-                          value={val('phone', member?.contact?.phone ?? '')}
-                          onChange={e => set('phone', e.target.value)} />
-                      )}
-                      {missing.find(f => f.label === 'Address') && (
-                        <Input label="Address"
-                          value={val('address', member?.contact?.address ?? '')}
-                          onChange={e => set('address', e.target.value)} />
-                      )}
-                      {missing.find(f => f.label === 'Emergency contact') && (
-                        <div className="space-y-3">
-                          <p className="text-xs font-semibold text-white/40 uppercase tracking-wider">Emergency Contact</p>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <Input label="Name"
-                              value={val('emergencyContactName', member?.contact?.emergency?.name ?? '')}
-                              onChange={e => set('emergencyContactName', e.target.value)} />
-                            <Input label="Relationship"
-                              value={val('emergencyContactRelationship', member?.contact?.emergency?.relationship ?? '')}
-                              onChange={e => set('emergencyContactRelationship', e.target.value)} />
-                          </div>
-                          <Input label="Phone" type="tel"
-                            value={val('emergencyContact', member?.contact?.emergency?.name ?? '')}
-                            onChange={e => set('emergencyContact', e.target.value)} />
-                        </div>
-                      )}
-                    </div>
-                )}
-                {profileTab === 'professional' && (
-                  <div className="space-y-3">
-                    {/* Filled fields — always shown as read-only */}
-                    {[
-                      { label: 'Company Name', value: member?.companyName },
-                      { label: 'Industry', value: member?.industry },
-                      { label: 'Position / Title', value: member?.business?.departmentAndPosition },
-                      { label: 'Business Categories', value: Array.isArray(member?.business?.businessCategory) && member.business!.businessCategory!.length > 0 ? member.business!.businessCategory!.join(', ') : undefined },
-                      { label: 'Company Description', value: member?.business?.companyDescription },
-                      { label: 'Ideal Referral', value: (Array.isArray(member?.business?.idealReferrals) && member.business!.idealReferrals!.length > 0) ? member.business!.idealReferrals!.join(', ') : (member?.idealReferralIndustry || undefined) },
-                      { label: 'International Business', value: member?.business?.acceptInternationalBusiness },
-                      { label: 'Level of Management', value: member?.business?.levelOfManagement },
-                    ].filter(r => r.value).map(r => (
-                      <div key={r.label} className="flex items-start justify-between gap-3 py-2 px-3 rounded-xl bg-white/5">
-                        <span className="text-xs text-white/40 shrink-0">{r.label}</span>
-                        <span className="text-xs text-white/80 font-medium text-right">{r.value}</span>
-                      </div>
-                    ))}
-                    {/* Missing fields — inputs */}
-                    {professionalCount === 0
-                      ? <div className="flex items-center gap-2 pt-1">
-                          <CheckCircle size={14} className="text-emerald-400 shrink-0" />
-                          <p className="text-xs font-semibold text-emerald-400">All professional info filled</p>
-                        </div>
-                      : <>
-                          {missing.find(f => f.label === 'Company name') && (
-                            <Input label="Company Name"
-                              value={val('companyName', member?.companyName ?? '')}
-                              onChange={e => set('companyName', e.target.value)} />
-                          )}
-                          {missing.find(f => f.label === 'Industry') && (
-                            <Input label="Industry"
-                              value={val('industry', member?.industry ?? '')}
-                              onChange={e => set('industry', e.target.value)} />
-                          )}
-                          {missing.find(f => f.label === 'Position / title') && (
-                            <Input label="Position / Title"
-                              value={val('departmentAndPosition', member?.business?.departmentAndPosition ?? '')}
-                              onChange={e => set('departmentAndPosition', e.target.value)} />
-                          )}
-                          {missing.find(f => f.label === 'Company description') && (
-                            <Textarea label="Company Description" rows={2}
-                              value={val('companyDescription', member?.business?.companyDescription ?? '')}
-                              onChange={e => set('companyDescription', e.target.value)} />
-                          )}
-                          {missing.find(f => f.label === 'Ideal referral') && (
-                            <Input label="Ideal Referral" placeholder="e.g. SME owners in F&B industry"
-                              value={val('idealReferral', Array.isArray(member?.business?.idealReferrals) ? member.business!.idealReferrals!.join(', ') : '')}
-                              onChange={e => set('idealReferral', e.target.value)} />
-                          )}
-                          {missing.find(f => f.label === 'International business') && (
-                            <Select label="International Business"
-                              value={val('acceptInternationalBusiness', member?.business?.acceptInternationalBusiness ?? '')}
-                              onChange={e => set('acceptInternationalBusiness', e.target.value)}
-                              options={[{ value: '', label: 'Select…' }, { value: 'Yes', label: 'Yes' }, { value: 'No', label: 'No' }, { value: 'Willing to Explore', label: 'Willing to Explore' }]} />
-                          )}
-                          {missing.find(f => f.label === 'Level of management') && (
-                            <div className="space-y-1.5">
-                              <span className="text-xs text-white/60">Level of Management</span>
-                              <div className="flex gap-2">
-                                {['Top', 'Middle', 'Frontline'].map(opt => (
-                                  <button key={opt} type="button"
-                                    onClick={() => set('levelOfManagement', opt)}
-                                    className="flex-1 py-2 rounded-lg text-xs font-semibold transition-colors"
-                                    style={val('levelOfManagement', member?.business?.levelOfManagement ?? '') === opt
-                                      ? { backgroundColor: '#0097D7', color: '#fff' }
-                                      : { backgroundColor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)' }}>
-                                    {opt}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </>
-                    }
-                  </div>
-                )}
-              </div>
-
-              {/* Footer */}
-              <div className="flex-none px-4 py-3 flex items-center gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                <button onClick={() => setShowProfileDrawer(false)}
-                  className="flex-shrink-0 px-4 py-2.5 text-sm font-semibold text-white/50 hover:text-white/80 transition-colors rounded-xl hover:bg-white/10">
-                  Cancel
-                </button>
-                <button disabled={profileSaving || Object.keys(profileDraft).length === 0}
-                  onClick={handleSave}
-                  className="flex-1 py-2.5 rounded-xl bg-jci-blue text-white text-sm font-bold disabled:opacity-40 hover:bg-blue-600 transition-all active:scale-[0.98]">
-                  {profileSaving ? 'Saving…' : 'Save Changes'}
-                </button>
-              </div>
-
-            </div>
-          </div>
-          , document.body);
-      })()}
+      <DashboardProfileCompletionSheet
+        isOpen={showProfileDrawer}
+        member={member}
+        profileCompleteness={profileCompleteness}
+        profileDraft={profileDraft}
+        setProfileDraft={setProfileDraft}
+        profileSaving={profileSaving}
+        setProfileSaving={setProfileSaving}
+        profileTab={profileTab}
+        setProfileTab={setProfileTab}
+        onClose={() => setShowProfileDrawer(false)}
+      />
     </div>
   );
 };

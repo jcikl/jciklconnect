@@ -1,14 +1,19 @@
 import React, { useState, useMemo } from 'react';
 import { FileText, Plus, Edit, Trash2, Copy, Calendar, DollarSign, Target, CheckSquare, X } from 'lucide-react';
-import { Card, Button, Badge, Modal, useToast, Tabs, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
+import { Card, Button, Badge, Modal, useToast, PageScaffold, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
 import type { ConfirmState } from '../ui/Common';
 import { Input, Select, Textarea } from '../ui/Form';
-import { LoadingState } from '../ui/Loading';
 import { useTemplates } from '../../hooks/useTemplates';
 import { usePermissions } from '../../hooks/usePermissions';
 import { EventTemplate, ActivityPlanTemplate, EventBudgetTemplate } from '../../services/templatesService';
 import { formatDate } from '../../utils/dateUtils';
 import { formatCurrency } from '../../utils/formatUtils';
+
+const TEMPLATE_TABS = [
+  { id: 'events', label: 'Event Templates' },
+  { id: 'activityPlans', label: 'Activity Plan Templates' },
+  { id: 'budgets', label: 'Budget Templates' },
+];
 
 export const TemplatesView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
@@ -172,31 +177,19 @@ export const TemplatesView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900">Templates</h2>
-        <p className="text-slate-500">Manage reusable templates for events, activity plans, and budgets.</p>
-      </div>
-
-      <Card noPadding>
-        <div className="px-4 md:px-6 pt-4">
-          <Tabs
-            tabs={['Event Templates', 'Activity Plan Templates', 'Budget Templates']}
-            activeTab={
-              activeTab === 'events' ? 'Event Templates' :
-                activeTab === 'activityPlans' ? 'Activity Plan Templates' :
-                  'Budget Templates'
-            }
-            onTabChange={(tab) => {
-              if (tab === 'Event Templates') setActiveTab('events');
-              else if (tab === 'Activity Plan Templates') setActiveTab('activityPlans');
-              else setActiveTab('budgets');
-            }}
-          />
-        </div>
-        <div className="p-4">
+    <>
+      <PageScaffold
+        title="Templates"
+        description="Manage reusable templates for events, activity plans, and budgets."
+        tabs={{
+          items: TEMPLATE_TABS,
+          activeTab,
+          onTabChange: (tab) => setActiveTab(tab as typeof activeTab),
+        }}
+        loading={loading}
+        error={error}
+      >
           {activeTab === 'events' && (
-            <LoadingState loading={loading} error={error}>
               <div className="space-y-4">
                 {canManage && (
                   <button
@@ -244,11 +237,9 @@ export const TemplatesView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                   ))}
                 </div>
               </div>
-            </LoadingState>
           )}
 
           {activeTab === 'activityPlans' && (
-            <LoadingState loading={loading} error={error}>
               <div className="space-y-4">
                 {canManage && (
                   <button
@@ -297,11 +288,9 @@ export const TemplatesView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                   ))}
                 </div>
               </div>
-            </LoadingState>
           )}
 
           {activeTab === 'budgets' && (
-            <LoadingState loading={loading} error={error}>
               <div className="space-y-4">
                 {canManage && (
                   <button
@@ -375,10 +364,8 @@ export const TemplatesView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                 ))}
                 </div>
               </div>
-            </LoadingState>
           )}
-        </div>
-      </Card>
+      </PageScaffold>
 
       {/* Event Template Modal */}
       <Modal
@@ -577,7 +564,7 @@ export const TemplatesView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
         drawerOnMobile
       />
       <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
-    </div>
+    </>
   );
 };
 

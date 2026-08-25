@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Check, ChevronDown, RefreshCw, Search, ShieldCheck, X } from 'lucide-react';
-import { Badge, Button, Card, useToast } from '../ui/Common';
+import { Badge, Button, Card, EmptyState, useToast } from '../ui/Common';
 import { usePermissions } from '../../hooks/usePermissions';
 import {
   PermissionCatalogItem,
@@ -141,13 +141,6 @@ function groupPermissions(items: PermissionCatalogItem[]): { category: string; i
       return a.category.localeCompare(b.category, undefined, { sensitivity: 'base' });
     });
 }
-
-const EmptyState: React.FC<{ title: string; body: string }> = ({ title, body }) => (
-  <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
-    <p className="text-sm font-semibold text-slate-700">{title}</p>
-    <p className="mt-1 text-sm text-slate-500">{body}</p>
-  </div>
-);
 
 export const AccessConfigView: React.FC = () => {
   const { isAdmin } = usePermissions();

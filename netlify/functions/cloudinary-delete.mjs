@@ -29,6 +29,7 @@ if (!getApps().length) {
 }
 
 const ALLOWED_ORIGINS = ['https://app.jcikl.cc', 'http://localhost:3000', 'http://localhost:3001'];
+const ALLOWED_PUBLIC_ID_PREFIXES = ['jciklconnect/', 'jci-kl/', 'JCIKL/'];
 
 export default async (req, context) => {
   const requestOrigin = req.headers.get('origin') ?? '';
@@ -76,6 +77,14 @@ export default async (req, context) => {
   if (!publicId || typeof publicId !== 'string' || publicId.trim() === '') {
     return Response.json({ error: 'publicId is required' }, { status: 400, headers: cors });
   }
+  const normalizedPublicId = publicId.trim();
+  if (
+    normalizedPublicId.includes('..') ||
+    normalizedPublicId.startsWith('/') ||
+    !ALLOWED_PUBLIC_ID_PREFIXES.some(prefix => normalizedPublicId.startsWith(prefix))
+  ) {
+    return Response.json({ error: 'publicId is outside the allowed asset scope' }, { status: 403, headers: cors });
+  }
 
   const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
   const apiKey = process.env.CLOUDINARY_API_KEY;
@@ -89,7 +98,7 @@ export default async (req, context) => {
   try {
     cloudinary.config({ cloud_name: cloudName, api_key: apiKey, api_secret: apiSecret });
 
-    const result = await cloudinary.uploader.destroy(publicId.trim());
+    const result = await cloudinary.uploader.destroy(normalizedPublicId);
 
     if (result.result === 'ok' || result.result === 'not found') {
       return Response.json({ success: true, result: result.result }, { headers: cors });

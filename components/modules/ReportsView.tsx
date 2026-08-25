@@ -3,9 +3,8 @@ import {
   Users, Calendar, DollarSign,
   Download, Plus, Activity, Target, FileText,
 } from 'lucide-react';
-import { Card, Button, Modal, useToast, Tabs, StatCard, StatCardsContainer } from '../ui/Common';
+import { Card, Button, Modal, useToast, PageScaffold, StatCard, StatCardsContainer } from '../ui/Common';
 import { Input, Select } from '../ui/Form';
-import { LoadingState } from '../ui/Loading';
 import { ReportService, ReportData, ReportOptions, MykdRow, MYKD_COLUMNS } from '../../services/reportService';
 import { useMembers } from '../../hooks/useMembers';
 import { useEvents } from '../../hooks/useEvents';
@@ -70,6 +69,15 @@ const NON_MEMBER_REPORT_CARDS = [
     title: 'Custom Report',
     description: 'Build a tailored report by choosing type, date range, and filters.',
   },
+];
+
+const REPORT_TABS = [
+  { id: 'dashboard', label: 'Dashboard' },
+  { id: 'financial', label: 'Financial' },
+  { id: 'membership', label: 'Membership' },
+  { id: 'engagement', label: 'Engagement' },
+  { id: 'projects', label: 'Projects' },
+  { id: 'custom', label: 'Custom' },
 ];
 
 export const ReportsView: React.FC = () => {
@@ -571,39 +579,30 @@ export const ReportsView: React.FC = () => {
     );
   };
 
-  const TAB_IDS: ReportTab[] = ['dashboard', 'financial', 'membership', 'engagement', 'projects', 'custom'];
-  const TAB_LABELS = ['Dashboard', 'Financial', 'Membership', 'Engagement', 'Projects', 'Custom'];
-
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-slate-900">Reports</h2>
-          <p className="text-sm text-slate-500 hidden sm:block">Generate and analyze organizational reports</p>
-        </div>
-        <Button onClick={() => setIsCreateModalOpen(true)} size="sm" className="flex items-center gap-1.5 shrink-0" disabled={dataLoading}>
-          <Plus size={14} />Generate Report
-        </Button>
-      </div>
-
-      <Card noPadding>
-        <div className="px-4 pt-4">
-          <Tabs
-            tabs={TAB_IDS.map((id, i) => ({ id, label: TAB_LABELS[i] }))}
-            activeTab={activeTab}
-            onTabChange={(tab) => setActiveTab(tab as ReportTab)}
-          />
-        </div>
-        <div className="p-4">
-          <LoadingState loading={loading} error={null}>
-            {activeTab === 'dashboard'  && renderDashboard()}
-            {activeTab === 'membership' && renderMembership()}
-            {NON_MEMBER_REPORT_CARDS.map(card =>
-              activeTab === card.id ? <div key={card.id}>{renderReportCard(card)}</div> : null
-            )}
-          </LoadingState>
-        </div>
-      </Card>
+    <>
+      <PageScaffold
+        title="Reports"
+        description="Generate and analyze organizational reports"
+        actions={
+          <Button onClick={() => setIsCreateModalOpen(true)} size="sm" className="flex items-center gap-1.5 shrink-0" disabled={dataLoading}>
+            <Plus size={14} />Generate Report
+          </Button>
+        }
+        tabs={{
+          items: REPORT_TABS,
+          activeTab,
+          onTabChange: (tab) => setActiveTab(tab as ReportTab),
+        }}
+        loading={loading}
+        error={null}
+      >
+        {activeTab === 'dashboard'  && renderDashboard()}
+        {activeTab === 'membership' && renderMembership()}
+        {NON_MEMBER_REPORT_CARDS.map(card =>
+          activeTab === card.id ? <div key={card.id}>{renderReportCard(card)}</div> : null
+        )}
+      </PageScaffold>
 
       {/* Generic Generate Modal */}
       <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Generate Report" size="md" drawerOnMobile>
@@ -692,6 +691,6 @@ export const ReportsView: React.FC = () => {
           </div>
         </div>
       </Modal>
-    </div>
+    </>
   );
 };
