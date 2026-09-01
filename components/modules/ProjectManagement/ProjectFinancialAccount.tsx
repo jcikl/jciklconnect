@@ -151,6 +151,34 @@ const EntryForm: React.FC<{
   </div>
 );
 
+const CategoryForm: React.FC<{
+  name: string;
+  amount: string | number;
+  description: string;
+  onNameChange: (v: string) => void;
+  onAmountChange: (v: string) => void;
+  onDescriptionChange: (v: string) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  isSaving: boolean;
+}> = ({ name, amount, description, onNameChange, onAmountChange, onDescriptionChange, onSave, onCancel, isSaving }) => (
+  <div className="space-y-1.5">
+    <LabelRow label="Name">
+      <Forms.Input value={name} onChange={e => onNameChange(e.target.value)} placeholder="e.g. Marketing" autoFocus />
+    </LabelRow>
+    <LabelRow label="Amount (RM)">
+      <Forms.Input type="number" value={amount} onChange={e => onAmountChange(e.target.value)} placeholder="0.00" />
+    </LabelRow>
+    <LabelRow label="Description">
+      <Forms.Input value={description} onChange={e => onDescriptionChange(e.target.value)} placeholder="What this category covers" />
+    </LabelRow>
+    <div className="flex gap-2 justify-end pt-1">
+      <Button size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
+      <Button size="sm" onClick={onSave} disabled={isSaving || !name.trim()}>{isSaving ? 'Saving…' : 'Save'}</Button>
+    </div>
+  </div>
+);
+
 const SummaryStats: React.FC<{ items: Transaction[] }> = ({ items }) => {
   const { income, expense, net } = calcStats(items);
   return (
@@ -803,6 +831,23 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
                 ))}
               </div>
 
+              {/* New category form */}
+              {showNewCat && (
+                <div className="rounded-xl border border-jci-blue/20 bg-blue-50/30 shadow-sm px-4 py-3">
+                  <CategoryForm
+                    name={newCatDraft.name}
+                    amount={newCatDraft.allocatedAmount || ''}
+                    description={newCatDraft.description}
+                    onNameChange={v => setNewCatDraft(p => ({ ...p, name: v }))}
+                    onAmountChange={v => setNewCatDraft(p => ({ ...p, allocatedAmount: parseFloat(v) || 0 }))}
+                    onDescriptionChange={v => setNewCatDraft(p => ({ ...p, description: v }))}
+                    onSave={handleAddCategory}
+                    onCancel={() => { setShowNewCat(false); setNewCatDraft({ name: '', description: '', allocatedAmount: 0 }); }}
+                    isSaving={isAddingCat}
+                  />
+                </div>
+              )}
+
               {/* Categories */}
               <div className="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden">
                 <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
@@ -875,37 +920,13 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
                     })}
                   </div>
                 )}
-                {/* new category inline row */}
-                {showNewCat ? (
-                  <div className="px-4 py-3 border-t border-slate-50">
-                    <div className="space-y-2">
-                      <div className="grid grid-cols-2 gap-2">
-                        <Forms.Input label="Name" value={newCatDraft.name} autoFocus
-                          onChange={e => setNewCatDraft(p => ({ ...p, name: e.target.value }))}
-                          placeholder="e.g. Marketing" />
-                        <Forms.Input label="Amount (RM)" type="number" value={newCatDraft.allocatedAmount || ''}
-                          onChange={e => setNewCatDraft(p => ({ ...p, allocatedAmount: parseFloat(e.target.value) || 0 }))} />
-                      </div>
-                      <Forms.Input label="Description" value={newCatDraft.description}
-                        onChange={e => setNewCatDraft(p => ({ ...p, description: e.target.value }))}
-                        placeholder="What this category covers" />
-                      <div className="flex gap-2 justify-end">
-                        <Button size="sm" variant="ghost" onClick={() => { setShowNewCat(false); setNewCatDraft({ name: '', description: '', allocatedAmount: 0 }); }}>Cancel</Button>
-                        <Button size="sm" onClick={handleAddCategory} disabled={isAddingCat || !newCatDraft.name.trim()}>
-                          {isAddingCat ? 'Adding…' : 'Save'}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="px-4 py-2">
-                    <button
-                      onClick={() => { setShowNewCat(true); setEditingCatId(null); }}
-                      className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-slate-200 text-xs text-slate-400 hover:text-jci-blue hover:border-jci-blue/40 hover:bg-blue-50/30 transition-colors">
-                      <Plus size={13} />Add category
-                    </button>
-                  </div>
-                )}
+                <div className="px-4 py-2">
+                  <button
+                    onClick={() => { setShowNewCat(true); setEditingCatId(null); }}
+                    className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-slate-200 text-xs text-slate-400 hover:text-jci-blue hover:border-jci-blue/40 hover:bg-blue-50/30 transition-colors">
+                    <Plus size={13} />Add category
+                  </button>
+                </div>
               </div>
             </div>
           );
