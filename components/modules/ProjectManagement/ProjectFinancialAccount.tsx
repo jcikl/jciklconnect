@@ -814,94 +814,98 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
                     </Button>
                   )}
                 </div>
-                <div className="divide-y divide-slate-50">
-                  {account.budgetCategories.map((cat: BudgetCategory) => {
-                    const isEditing = editingCatId === cat.id;
-                    const spent = cat.spentAmount || 0;
-                    const pct = cat.allocatedAmount > 0 ? (spent / cat.allocatedAmount) * 100 : 0;
-                    return (
-                      <div key={cat.id} className="px-4 py-3">
-                        {isEditing ? (
-                          <div className="space-y-2">
-                            <div className="grid grid-cols-2 gap-2">
-                              <Forms.Input label="Name" value={catDraft.name}
-                                onChange={e => setCatDraft(p => ({ ...p, name: e.target.value }))} />
-                              <Forms.Input label="Amount (RM)" type="number" value={catDraft.allocatedAmount}
-                                onChange={e => setCatDraft(p => ({ ...p, allocatedAmount: parseFloat(e.target.value) || 0 }))} />
+                {account.budgetCategories.length > 0 && (
+                  <div className="divide-y divide-slate-50">
+                    {account.budgetCategories.map((cat: BudgetCategory) => {
+                      const isEditing = editingCatId === cat.id;
+                      const spent = cat.spentAmount || 0;
+                      const pct = cat.allocatedAmount > 0 ? (spent / cat.allocatedAmount) * 100 : 0;
+                      return (
+                        <div key={cat.id} className="px-4 py-3">
+                          {isEditing ? (
+                            <div className="space-y-2">
+                              <div className="grid grid-cols-2 gap-2">
+                                <Forms.Input label="Name" value={catDraft.name}
+                                  onChange={e => setCatDraft(p => ({ ...p, name: e.target.value }))} />
+                                <Forms.Input label="Amount (RM)" type="number" value={catDraft.allocatedAmount}
+                                  onChange={e => setCatDraft(p => ({ ...p, allocatedAmount: parseFloat(e.target.value) || 0 }))} />
+                              </div>
+                              <Forms.Input label="Description" value={catDraft.description}
+                                onChange={e => setCatDraft(p => ({ ...p, description: e.target.value }))}
+                                placeholder="What this category covers" />
+                              <div className="flex gap-2 justify-end">
+                                <Button size="sm" variant="ghost" onClick={() => setEditingCatId(null)}>Cancel</Button>
+                                <Button size="sm" onClick={handleSaveCat} disabled={isSavingCat}>
+                                  {isSavingCat ? 'Saving…' : 'Save'}
+                                </Button>
+                              </div>
                             </div>
-                            <Forms.Input label="Description" value={catDraft.description}
-                              onChange={e => setCatDraft(p => ({ ...p, description: e.target.value }))}
-                              placeholder="What this category covers" />
-                            <div className="flex gap-2 justify-end">
-                              <Button size="sm" variant="ghost" onClick={() => setEditingCatId(null)}>Cancel</Button>
-                              <Button size="sm" onClick={handleSaveCat} disabled={isSavingCat}>
-                                {isSavingCat ? 'Saving…' : 'Save'}
-                              </Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-start gap-3">
-                            <span className="w-2.5 h-2.5 rounded-full shrink-0 mt-1"
-                              style={{ backgroundColor: cat.color || '#6B7280' }} />
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between gap-2">
-                                <p className="text-xs font-semibold text-slate-700">{cat.name}</p>
-                                <div className="flex items-center gap-2 shrink-0">
-                                  <span className={`text-xs font-bold tabular-nums ${utilizationColor(pct)}`}>
-                                    {fmt(cat.allocatedAmount)}
-                                  </span>
-                                  <button
-                                    onClick={() => { setEditingCatId(cat.id); setCatDraft({ name: cat.name, description: cat.description || '', allocatedAmount: cat.allocatedAmount }); }}
-                                    className="text-slate-300 hover:text-slate-500 transition-colors">
-                                    <Edit3 size={12} />
-                                  </button>
+                          ) : (
+                            <div className="flex items-start gap-3">
+                              <span className="w-2.5 h-2.5 rounded-full shrink-0 mt-1"
+                                style={{ backgroundColor: cat.color || '#6B7280' }} />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="text-xs font-semibold text-slate-700">{cat.name}</p>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <span className={`text-xs font-bold tabular-nums ${utilizationColor(pct)}`}>
+                                      {fmt(cat.allocatedAmount)}
+                                    </span>
+                                    <button
+                                      onClick={() => { setEditingCatId(cat.id); setCatDraft({ name: cat.name, description: cat.description || '', allocatedAmount: cat.allocatedAmount }); }}
+                                      className="text-slate-300 hover:text-slate-500 transition-colors">
+                                      <Edit3 size={12} />
+                                    </button>
+                                  </div>
+                                </div>
+                                {cat.description && <p className="text-[10px] text-slate-400 mt-0.5">{cat.description}</p>}
+                                <div className="mt-1.5 w-full h-1 bg-slate-100 rounded-full overflow-hidden">
+                                  <div className={`h-1 rounded-full ${progressBg(pct)}`}
+                                    style={{ width: `${Math.min(pct, 100)}%` }} />
+                                </div>
+                                <div className="flex justify-between mt-0.5 text-[10px] text-slate-400">
+                                  <span>Spent: {fmt(spent)}</span>
+                                  <span>Left: {fmt(cat.allocatedAmount - spent)}</span>
                                 </div>
                               </div>
-                              {cat.description && <p className="text-[10px] text-slate-400 mt-0.5">{cat.description}</p>}
-                              <div className="mt-1.5 w-full h-1 bg-slate-100 rounded-full overflow-hidden">
-                                <div className={`h-1 rounded-full ${progressBg(pct)}`}
-                                  style={{ width: `${Math.min(pct, 100)}%` }} />
-                              </div>
-                              <div className="flex justify-between mt-0.5 text-[10px] text-slate-400">
-                                <span>Spent: {fmt(spent)}</span>
-                                <span>Left: {fmt(cat.allocatedAmount - spent)}</span>
-                              </div>
                             </div>
-                          </div>
-                        )}
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {/* new category inline row */}
+                {showNewCat ? (
+                  <div className="px-4 py-3 border-t border-slate-50">
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <Forms.Input label="Name" value={newCatDraft.name} autoFocus
+                          onChange={e => setNewCatDraft(p => ({ ...p, name: e.target.value }))}
+                          placeholder="e.g. Marketing" />
+                        <Forms.Input label="Amount (RM)" type="number" value={newCatDraft.allocatedAmount || ''}
+                          onChange={e => setNewCatDraft(p => ({ ...p, allocatedAmount: parseFloat(e.target.value) || 0 }))} />
                       </div>
-                    );
-                  })}
-                  {/* new category inline row */}
-                  {showNewCat ? (
-                    <div className="px-4 py-3">
-                      <div className="space-y-2">
-                        <div className="grid grid-cols-2 gap-2">
-                          <Forms.Input label="Name" value={newCatDraft.name} autoFocus
-                            onChange={e => setNewCatDraft(p => ({ ...p, name: e.target.value }))}
-                            placeholder="e.g. Marketing" />
-                          <Forms.Input label="Amount (RM)" type="number" value={newCatDraft.allocatedAmount || ''}
-                            onChange={e => setNewCatDraft(p => ({ ...p, allocatedAmount: parseFloat(e.target.value) || 0 }))} />
-                        </div>
-                        <Forms.Input label="Description" value={newCatDraft.description}
-                          onChange={e => setNewCatDraft(p => ({ ...p, description: e.target.value }))}
-                          placeholder="What this category covers" />
-                        <div className="flex gap-2 justify-end">
-                          <Button size="sm" variant="ghost" onClick={() => { setShowNewCat(false); setNewCatDraft({ name: '', description: '', allocatedAmount: 0 }); }}>Cancel</Button>
-                          <Button size="sm" onClick={handleAddCategory} disabled={isAddingCat || !newCatDraft.name.trim()}>
-                            {isAddingCat ? 'Adding…' : 'Save'}
-                          </Button>
-                        </div>
+                      <Forms.Input label="Description" value={newCatDraft.description}
+                        onChange={e => setNewCatDraft(p => ({ ...p, description: e.target.value }))}
+                        placeholder="What this category covers" />
+                      <div className="flex gap-2 justify-end">
+                        <Button size="sm" variant="ghost" onClick={() => { setShowNewCat(false); setNewCatDraft({ name: '', description: '', allocatedAmount: 0 }); }}>Cancel</Button>
+                        <Button size="sm" onClick={handleAddCategory} disabled={isAddingCat || !newCatDraft.name.trim()}>
+                          {isAddingCat ? 'Adding…' : 'Save'}
+                        </Button>
                       </div>
                     </div>
-                  ) : (
+                  </div>
+                ) : (
+                  <div className="px-4 py-2">
                     <button
                       onClick={() => { setShowNewCat(true); setEditingCatId(null); }}
-                      className="w-full px-4 py-2.5 flex items-center gap-1.5 text-xs text-slate-400 hover:text-jci-blue hover:bg-slate-50 transition-colors text-left">
-                      <Plus size={11} />Add category
+                      className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-slate-200 text-xs text-slate-400 hover:text-jci-blue hover:border-jci-blue/40 hover:bg-blue-50/30 transition-colors">
+                      <Plus size={13} />Add category
                     </button>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           );
