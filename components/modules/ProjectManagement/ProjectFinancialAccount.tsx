@@ -831,8 +831,8 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
                 ))}
               </div>
 
-              {/* New category form */}
-              {showNewCat && (
+              {/* Add category trigger / form — always at top */}
+              {showNewCat ? (
                 <div className="rounded-xl border border-jci-blue/20 bg-blue-50/30 shadow-sm px-4 py-3">
                   <CategoryForm
                     name={newCatDraft.name}
@@ -846,20 +846,26 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
                     isSaving={isAddingCat}
                   />
                 </div>
+              ) : (
+                <button
+                  onClick={() => { setShowNewCat(true); setEditingCatId(null); }}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-slate-200 text-xs text-slate-400 hover:text-jci-blue hover:border-jci-blue/40 hover:bg-blue-50/30 transition-colors">
+                  <Plus size={13} />Add category
+                </button>
               )}
 
               {/* Categories */}
-              <div className="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden">
-                <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-                  <p className="text-xs font-semibold text-slate-900">Budget Categories</p>
-                  {onUpdateProject && (
-                    <Button size="sm" variant="outline"
-                      onClick={() => { setBudgetDraft(budgetAmt); setShowBudgetDrawer(true); }}>
-                      <Edit3 size={12} className="mr-1" />Total Budget
-                    </Button>
-                  )}
-                </div>
-                {account.budgetCategories.length > 0 && (
+              {account.budgetCategories.length > 0 && (
+                <div className="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+                  <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                    <p className="text-xs font-semibold text-slate-900">Budget Categories</p>
+                    {onUpdateProject && (
+                      <Button size="sm" variant="outline"
+                        onClick={() => { setBudgetDraft(budgetAmt); setShowBudgetDrawer(true); }}>
+                        <Edit3 size={12} className="mr-1" />Total Budget
+                      </Button>
+                    )}
+                  </div>
                   <div className="divide-y divide-slate-50">
                     {account.budgetCategories.map((cat: BudgetCategory) => {
                       const isEditing = editingCatId === cat.id;
@@ -919,15 +925,8 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
                       );
                     })}
                   </div>
-                )}
-                <div className="px-4 py-2">
-                  <button
-                    onClick={() => { setShowNewCat(true); setEditingCatId(null); }}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-slate-200 text-xs text-slate-400 hover:text-jci-blue hover:border-jci-blue/40 hover:bg-blue-50/30 transition-colors">
-                    <Plus size={13} />Add category
-                  </button>
                 </div>
-              </div>
+              )}
             </div>
           );
         })()}
