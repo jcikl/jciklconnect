@@ -7,7 +7,7 @@ const getInitialsSvg = (name: string, size = 64): string => {
   return `data:image/svg+xml;base64,${btoa(svg)}`;
 };
 import { Sparkles } from 'lucide-react';
-import { Modal, Button } from '../../ui/Common';
+import { Modal, Button, useToast } from '../../ui/Common';
 import { Input, Select } from '../../ui/Form';
 import { IntroducerSelector } from '../../ui/IntroducerSelector';
 import { UserRole, MemberTier, type MemberCreateInput, type Member, type Project } from '../../../types';
@@ -47,6 +47,7 @@ export const MemberCreateModal: React.FC<MemberCreateModalProps> = ({
   // FORM-009: per-field error state for custom validation (e.g. duplicate email)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [selectedLoId, setSelectedLoId] = useState<string>(chapterOptions?.[0]?.value ?? 'jcikl');
+  const { showToast } = useToast();
 
   const handleClose = () => {
     setHobbies([]);
@@ -60,11 +61,17 @@ export const MemberCreateModal: React.FC<MemberCreateModalProps> = ({
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (isSubmitting) return;
-    setIsSubmitting(true);
     const formData = new FormData(e.currentTarget);
     const firstName = formData.get('firstName') as string;
     const lastName = formData.get('lastName') as string;
     const name = `${firstName} ${lastName}`.trim();
+
+    if (!name) {
+      setFieldErrors(prev => ({ ...prev, firstName: 'First name is required' }));
+      return;
+    }
+
+    setIsSubmitting(true);
 
     const skillsInput = formData.get('skills') as string;
     const skills = skillsInput ? skillsInput.split(',').map(s => s.trim()).filter(s => s.length > 0) : [];
@@ -113,7 +120,7 @@ export const MemberCreateModal: React.FC<MemberCreateModalProps> = ({
       if (err?.message?.toLowerCase().includes('email')) {
         setFieldErrors(prev => ({ ...prev, email: err.message }));
       } else {
-        throw err;
+        showToast(err?.message || 'Failed to create member', 'error');
       }
     } finally {
       setIsSubmitting(false);
@@ -164,7 +171,7 @@ export const MemberCreateModal: React.FC<MemberCreateModalProps> = ({
             <section>
               <h3 className="text-sm font-bold text-slate-900 border-b pb-2 mb-4">Identity & Account</h3>
               <div className="grid grid-cols-2 gap-4">
-                <Input name="firstName" label="First Name" placeholder="John" required autoComplete="given-name" />
+                <Input name="firstName" label="First Name" placeholder="John" required autoComplete="given-name" error={fieldErrors.firstName} onChange={() => setFieldErrors(prev => ({ ...prev, firstName: '' }))} />
                 <Input name="lastName" label="Last Name" placeholder="Doe" required autoComplete="family-name" />
                 <Input name="email" label="Email Address" type="email" placeholder="john@example.com" required autoComplete="email" error={fieldErrors.email} onChange={() => setFieldErrors(prev => ({ ...prev, email: '' }))} />
                 <Input name="phone" label="Phone" type="tel" placeholder="+60..." autoComplete="tel" />

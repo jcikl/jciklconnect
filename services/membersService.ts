@@ -402,6 +402,8 @@ export class MembersService {
     }
     if (data.business?.connections !== undefined) business.connections = data.business?.connections;
     if (data.business?.levelOfManagement !== undefined) business.levelOfManagement = data.business?.levelOfManagement;
+    else if (data['business.levelOfManagement'] !== undefined) business.levelOfManagement = data['business.levelOfManagement'];
+    else if (data.levelOfManagement !== undefined) business.levelOfManagement = data.levelOfManagement;
     if (data.business?.interestedIndustries !== undefined) business.interestedIndustries = data.business?.interestedIndustries;
     if (data.business?.idealReferralTypes !== undefined) business.idealReferralTypes = data.business?.idealReferralTypes;
 
@@ -429,8 +431,11 @@ export class MembersService {
     else if (data.introducer !== undefined) jciCareer.introducer = data.introducer;
 
     if (data.jciCareer?.senatorship?.senatorNumber !== undefined) jciCareer.senatorship.senatorNumber = data.jciCareer?.senatorship?.senatorNumber;
+    else if (data.senatorshipId !== undefined) jciCareer.senatorship.senatorNumber = data.senatorshipId;
     if (data.jciCareer?.senatorship?.certified !== undefined) jciCareer.senatorship.certified = data.jciCareer?.senatorship?.certified;
+    else if (data.senatorCertified !== undefined) jciCareer.senatorship.certified = data.senatorCertified;
     if (data.jciCareer?.senatorship?.boardValidated !== undefined) jciCareer.senatorship.boardValidated = data.jciCareer?.senatorship?.boardValidated;
+    else if (data.senatorshipBoardValidated !== undefined) jciCareer.senatorship.boardValidated = data.senatorshipBoardValidated;
 
     if (data.jciCareer?.currentBoardYear !== undefined) jciCareer.currentBoardYear = data.jciCareer?.currentBoardYear;
     else if ((data as any).currentBoardYear !== undefined) jciCareer.currentBoardYear = (data as any).currentBoardYear;
@@ -528,17 +533,19 @@ export class MembersService {
     }
 
     try {
-      if (!memberData.general?.name?.trim()) throw new Error('Member name is required');
-      if (!memberData.contact?.email?.trim()) throw new Error('Member email is required');
+      const _name = memberData.general?.name ?? (memberData as any).name;
+      if (!_name?.trim()) throw new Error('Member name is required');
+      const _email = memberData.contact?.email ?? (memberData as any).email;
+      if (!_email?.trim()) throw new Error('Member email is required');
       const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!EMAIL_RE.test(memberData.contact?.email)) throw new Error('Invalid email format');
+      if (!EMAIL_RE.test(_email)) throw new Error('Invalid email format');
       if (memberData.general?.idNumber && !/^\d{12}$/.test(memberData.general?.idNumber)) throw new Error('IC number must be 12 digits');
 
       // P0 Fix: Claim email slot AND create the member document inside the same
       // runTransaction so there is no window where the email slot exists but the
       // member document does not (or vice-versa). Two concurrent calls with the
       // same email both attempt to set the same emailSlot doc — only the first wins.
-      const sanitizedEmail = memberData.contact?.email.toLowerCase().replace(/[^a-z0-9@.]/g, '_');
+      const sanitizedEmail = _email.toLowerCase().replace(/[^a-z0-9@.]/g, '_');
       const emailSlotRef = doc(db, COLLECTIONS.MEMBER_EMAILS, sanitizedEmail);
 
       const payload = {

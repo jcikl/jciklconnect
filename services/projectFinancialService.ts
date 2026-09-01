@@ -23,7 +23,11 @@ import {
   query,
   where,
   orderBy,
-  limit
+  limit,
+  doc,
+  getDoc,
+  updateDoc,
+  arrayUnion,
 } from 'firebase/firestore';
 
 function chunkArray<T>(arr: T[], size: number): T[][] {
@@ -380,7 +384,6 @@ class ProjectFinancialService {
       () => Array.from(this.accounts.values()).find(acc => acc.projectId === projectId) || null,
       async () => {
     try {
-      const { doc, getDoc } = await import('firebase/firestore');
       const projectRef = doc(db, COLLECTIONS.PROJECTS, projectId);
       const projectSnap = await getDoc(projectRef);
       if (!projectSnap.exists()) return null;
@@ -412,7 +415,7 @@ class ProjectFinancialService {
         currentBalance: budget + totalIncome - totalExpenses,
         totalIncome,
         totalExpenses,
-        budgetCategories: [],
+        budgetCategories: (projectData.budgetCategories || []) as BudgetCategory[],
         alertThresholds: [],
         createdAt: project.createdAt || new Date().toISOString(),
         updatedAt: project.updatedAt || new Date().toISOString(),
@@ -481,26 +484,26 @@ class ProjectFinancialService {
     categoryId: string,
     updates: Partial<Pick<BudgetCategory, 'name' | 'allocatedAmount' | 'description' | 'color'>>
   ): Promise<BudgetCategory> {
-    if (!isDevMode()) throw new Error('[ProjectFinancialService] This method is not implemented for production. Data will not persist. Please use Firestore directly or contact the development team.');
-    const account = this.accounts.get(financialAccountId);
-    if (!account) {
-      throw new Error('Project financial account not found');
+    if (isDevMode()) {
+      const account = this.accounts.get(financialAccountId);
+      if (!account) throw new Error('Project financial account not found');
+      const idx = account.budgetCategories.findIndex(cat => cat.id === categoryId);
+      if (idx === -1) throw new Error('Budget category not found');
+      account.budgetCategories[idx] = { ...account.budgetCategories[idx], ...updates };
+      account.updatedAt = new Date().toISOString();
+      this.accounts.set(financialAccountId, account);
+      return account.budgetCategories[idx];
     }
-
-    const categoryIndex = account.budgetCategories.findIndex(cat => cat.id === categoryId);
-    if (categoryIndex === -1) {
-      throw new Error('Budget category not found');
-    }
-
-    account.budgetCategories[categoryIndex] = {
-      ...account.budgetCategories[categoryIndex],
-      ...updates,
-    };
-
-    account.updatedAt = new Date().toISOString();
-    this.accounts.set(financialAccountId, account);
-
-    return account.budgetCategories[categoryIndex];
+    const projectId = financialAccountId.replace(/^proj_acc_/, '');
+    const projectRef = doc(db, COLLECTIONS.PROJECTS, projectId);
+    const snap = await getDoc(projectRef);
+    if (!snap.exists()) throw new Error('Project not found');
+    const existing: BudgetCategory[] = snap.data().budgetCategories || [];
+    const idx = existing.findIndex(c => c.id === categoryId);
+    if (idx === -1) throw new Error('Budget category not found');
+    existing[idx] = { ...existing[idx], ...updates };
+    await updateDoc(projectRef, { budgetCategories: existing, updatedAt: new Date().toISOString() });
+    return existing[idx];
   }
 
   /**
@@ -510,22 +513,25 @@ class ProjectFinancialService {
     financialAccountId: string,
     categoryData: Omit<BudgetCategory, 'id' | 'spentAmount'>
   ): Promise<BudgetCategory> {
-    if (!isDevMode()) throw new Error('[ProjectFinancialService] This method is not implemented for production. Data will not persist. Please use Firestore directly or contact the development team.');
-    const account = this.accounts.get(financialAccountId);
-    if (!account) {
-      throw new Error('Project financial account not found');
-    }
-
     const newCategory: BudgetCategory = {
       ...categoryData,
       id: `cat_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
       spentAmount: 0,
     };
-
-    account.budgetCategories.push(newCategory);
-    account.updatedAt = new Date().toISOString();
-    this.accounts.set(financialAccountId, account);
-
+    if (isDevMode()) {
+      const account = this.accounts.get(financialAccountId);
+      if (!account) throw new Error('Project financial account not found');
+      account.budgetCategories.push(newCategory);
+      account.updatedAt = new Date().toISOString();
+      this.accounts.set(financialAccountId, account);
+      return newCategory;
+    }
+    const projectId = financialAccountId.replace(/^proj_acc_/, '');
+    const projectRef = doc(db, COLLECTIONS.PROJECTS, projectId);
+    await updateDoc(projectRef, {
+      budgetCategories: arrayUnion(newCategory),
+      updatedAt: new Date().toISOString(),
+    });
     return newCategory;
   }
 
