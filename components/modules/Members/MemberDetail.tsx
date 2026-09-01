@@ -5,7 +5,7 @@ import {
   Award, Clock, Briefcase, GraduationCap, UserPlus,
   Zap, Coins, ArrowUpRight, Shield, UserCheck, AlertCircle, CheckCircle, MapPin,
   Linkedin, Facebook, Instagram, MessageCircle, CalendarCheck, UserCog,
-  Target, Calendar
+  Target, Calendar, Pencil
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button, Card, Badge, Modal, useToast, Tabs } from '../../ui/Common';
@@ -154,6 +154,11 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
     "Social Etiquette", "Social Service", "Travelling", "Women Empowerment", "Yoga"
   ];
 
+  useEffect(() => {
+    document.body.classList.add('member-detail-open');
+    return () => document.body.classList.remove('member-detail-open');
+  }, []);
+
   const resolveIntroducerDisplay = useCallback((introVal?: string) => {
     if (!introVal) return 'Direct Join';
     const foundMember = members.find(m => m.id === introVal);
@@ -236,6 +241,12 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
     });
     setActiveInlineEditCard(card);
     setIsEditMode(true);
+  };
+
+  const cancelInlineEdit = () => {
+    setIsEditMode(false);
+    setActiveInlineEditCard(null);
+    setInlineValues(null);
   };
 
   const handleInlineAvatarUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -833,7 +844,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
   }, [radarData]);
 
   return (
-    <div className="space-y-6 animate-in slide-in-from-right duration-300 pb-20 md:pb-0">
+    <div className={`space-y-6 animate-in slide-in-from-right duration-300 ${isEditMode ? 'pb-32' : 'pb-20'} md:pb-0`}>
       {/* Header Card */}
       <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-md group">
 
@@ -864,6 +875,17 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-white font-black text-xl leading-tight">{member.general?.name}</h1>
+                {!isEditMode && (canEditMembers || isSelfView) && (
+                  <button
+                    type="button"
+                    aria-label="Edit profile"
+                    title="Edit profile"
+                    onClick={() => startInlineEdit('basic')}
+                    className="w-8 h-8 rounded-full bg-transparent backdrop-blur-sm border border-white/0 flex items-center justify-center text-white/80 hover:bg-white/30 hover:text-white active:scale-95 transition-all"
+                  >
+                    <Pencil size={14} />
+                  </button>
+                )}
               </div>
               {(member.companyName || member.business?.departmentAndPosition) && (
                 <p className="text-white/70 text-xs mt-0.5 truncate">
@@ -907,17 +929,14 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
                 : <MessageCircle size={13} className="text-slate-400" />}
             </span>
           </div>
-          <div className="flex gap-2">
+          <div className="hidden md:flex gap-2">
             {isEditMode ? (
               <>
                 <Button variant="primary" size="sm" onClick={handleGlobalSave} disabled={isSaving} className="flex-1 h-9 font-bold">Save Changes</Button>
-                <Button variant="outline" size="sm" onClick={() => { setIsEditMode(false); setActiveInlineEditCard(null); setInlineValues(null); }} className="flex-1 h-9 font-bold">Cancel</Button>
+                <Button variant="outline" size="sm" onClick={cancelInlineEdit} className="flex-1 h-9 font-bold">Cancel</Button>
               </>
             ) : (
               <>
-                {(canEditMembers || isSelfView) && (
-                  <Button variant="outline" size="sm" onClick={() => startInlineEdit('basic')} className="flex-1 h-9 font-bold">Edit Profile</Button>
-                )}
                 {(isAdmin || isDeveloper) && !isSelfView && (
                   <Button
                     variant="outline"
@@ -964,6 +983,17 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
             <div className="absolute bottom-4 left-0 right-0 px-6 pl-52 flex flex-col justify-end gap-1">
               <div className="flex flex-row items-center gap-2 flex-wrap">
                 <h1 className="text-2xl font-black text-white tracking-tight leading-tight break-words drop-shadow">{member.general?.name}</h1>
+                {!isEditMode && (canEditMembers || isSelfView) && (
+                  <button
+                    type="button"
+                    aria-label="Edit profile"
+                    title="Edit profile"
+                    onClick={() => startInlineEdit('basic')}
+                    className="w-9 h-9 rounded-full bg-transparent backdrop-blur-sm border border-white/0 flex items-center justify-center text-white/80 hover:bg-white/30 hover:text-white active:scale-95 transition-all"
+                  >
+                    <Pencil size={14} />
+                  </button>
+                )}
               </div>
               {(member.companyName || member.business?.departmentAndPosition) && (
                 <p className="text-sm font-semibold text-white/70 flex items-center gap-1.5">
@@ -1032,13 +1062,10 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
               {isEditMode ? (
                 <>
                   <Button variant="primary" size="sm" onClick={handleGlobalSave} disabled={isSaving} className="flex-none h-10 px-6 font-bold">Save Changes</Button>
-                  <Button variant="outline" size="sm" onClick={() => { setIsEditMode(false); setActiveInlineEditCard(null); setInlineValues(null); }} className="flex-none h-10 px-6 font-bold">Cancel</Button>
+                  <Button variant="outline" size="sm" onClick={cancelInlineEdit} className="flex-none h-10 px-6 font-bold">Cancel</Button>
                 </>
               ) : (
                 <>
-                  {(canEditMembers || isSelfView) && (
-                    <Button variant="outline" size="sm" onClick={() => startInlineEdit('basic')} className="flex-none h-10 px-6 font-bold">Edit Profile</Button>
-                  )}
                   {(isAdmin || isDeveloper) && !isSelfView && (
                     <Button
                       variant="outline"
@@ -1210,6 +1237,29 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
           />
         </AsyncErrorBoundary>
       )}
+
+      {isEditMode && (
+        <div className="md:hidden fixed bottom-5 left-4 right-4 z-[60] h-[66px] rounded-3xl bg-white/95 backdrop-blur-xl border border-slate-200 shadow-xl px-2 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-3 duration-200">
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleGlobalSave}
+            disabled={isSaving}
+            className="flex-1 h-11 min-h-0 rounded-2xl font-bold"
+          >
+            Save Changes
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={cancelInlineEdit}
+            className="flex-1 h-11 min-h-0 rounded-2xl bg-white font-bold"
+          >
+            Cancel
+          </Button>
+        </div>
+      )}
+
       {showAssessmentModal && (
         <Modal
           isOpen={showAssessmentModal}

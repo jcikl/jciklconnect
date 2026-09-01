@@ -73,14 +73,28 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
               </div>
               <div>
                 <label className="text-slate-500 block text-xs uppercase font-medium mb-1">WhatsApp Group Added</label>
-                <select
-                  value={inlineValues.whatsappGroup ? 'Yes' : 'No'}
-                  onChange={e => setInlineValues({ ...inlineValues, whatsappGroup: e.target.value === 'Yes' })}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
-                >
-                  <option value="No">No</option>
-                  <option value="Yes">Yes</option>
-                </select>
+                <div className="grid grid-cols-2 gap-1 rounded-lg border border-slate-300 bg-white p-1">
+                  {[
+                    { label: 'No', value: false },
+                    { label: 'Yes', value: true },
+                  ].map(option => {
+                    const isSelected = inlineValues.whatsappGroup === option.value;
+                    return (
+                      <button
+                        key={option.label}
+                        type="button"
+                        onClick={() => setInlineValues({ ...inlineValues, whatsappGroup: option.value })}
+                        className={`h-8 rounded-md text-sm font-medium transition-colors ${
+                          isSelected
+                            ? 'bg-jci-blue text-white shadow-sm'
+                            : 'text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
               <div className="col-span-2">
                 <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Address</label>
@@ -99,7 +113,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
 
             <div className="border-t pt-3">
               <h4 className="text-xs font-bold text-slate-400 uppercase border-b pb-1 mb-3">Emergency Contact</h4>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div>
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Name</label>
                   <input
@@ -118,7 +132,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                   />
                 </div>
-                <div>
+                <div className="col-span-2 md:col-span-1">
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Phone</label>
                   <input
                     type="text"

@@ -1,73 +1,39 @@
-﻿﻿import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-const uuidv4 = () => crypto.randomUUID();
-import { Settings, Zap, Layout, Kanban, Plus, UserCircle, FileText, Calendar, DollarSign, CheckCircle, XCircle, Clock, Edit, Trash2, Eye, GitBranch, BarChart3, RefreshCw, Download, Search, Copy, MapPin, Users, ChevronDown, ChevronUp, Send, Check, X, Globe, Lock, Layers, Image, MoreVertical, Info, Tag, ExternalLink } from 'lucide-react';
-import { Button, Card, Badge, ProgressBar, Modal, useToast, Tabs, Drawer, PageHeader, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useToast, PageHeader, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
 import type { ConfirmState } from '../ui/Common';
-import { Input, Select, Textarea, Checkbox } from '../ui/Form';
-import { Combobox } from '../ui/Combobox';
-import { MultiSelectDropdown } from '../ui/MultiSelectDropdown';
-import { LoadingState } from '../ui/Loading';
-import { MemberSelector } from '../ui/MemberSelector';
 import { useProjects } from '../../hooks/useProjects';
 import { useTemplates } from '../../hooks/useTemplates';
 import { useAuth } from '../../hooks/useAuth';
-import { useMembers } from '../../hooks/useMembers';
 import { usePermissions } from '../../hooks/usePermissions';
-import { formatCurrency } from '../../utils/formatUtils';
-import { formatDate, toDate } from '../../utils/dateUtils';
-import { Project, Task, ProjectCommitteeMember, BankAccount, ProjectLevel, ProjectPillar, ProjectType } from '../../types';
-import { PROJECT_LEVELS, PROJECT_PILLARS, PROJECT_TYPES, PROJECT_CATEGORIES_BY_TYPE, PROJECT_TYPE_LABELS } from '../../config/constants';
+import { Project } from '../../types';
 import { BatchImportModal } from '../shared/batchImport/BatchImportModal';
 import { projectImportConfig } from './Projects/config/projectImportConfig';
 import { EventTemplate } from '../../services/templatesService';
-// ProjectTransactionModal removed Header: Title and Due Date
-import { FinanceService } from '../../services/financeService';
-import { ReconciliationService } from '../../services/reconciliationService';
-import { Transaction } from '../../types';
 import type { ProjectFinancialAccount as ProjectFinancialAccountType, ProjectTransaction } from '../../types';
 import { useBatchMode } from '../../contexts/BatchModeContext';
 import { projectFinancialService } from '../../services/projectFinancialService';
-import { SubmitPaymentRequestModal } from './PaymentRequests/SubmitPaymentRequestModal';
-import { PENDING_USE_TEMPLATE_KEY, fetchRoadmapEventDetails } from '../../utils/roadmapUtils';
-import { ProjectGrid } from './Projects/ProjectGrid';
+import { PENDING_USE_TEMPLATE_KEY } from '../../utils/roadmapUtils';
 import { ProjectDetailTabs } from './Projects/ProjectDetailTabs';
-import { AsyncErrorBoundary } from '../ui/AsyncErrorBoundary';
 import { TemplatePreviewModal } from './Projects/TemplatePreviewModal';
+import { ProjectsBatchActions } from './Projects/ProjectsBatchActions';
+import { ProjectsCreateDrawer } from './Projects/ProjectsCreateDrawer';
+import { ProjectsTemplateModal } from './Projects/ProjectsTemplateModal';
+import { ProjectsDetailHeader } from './Projects/ProjectsDetailHeader';
+import { ProjectsListShell } from './Projects/ProjectsListShell';
+import { useProjectCreateForm } from './Projects/useProjectCreateForm';
 
-// fetchRoadmapEventDetails, RoadmapEventDetails, PENDING_USE_TEMPLATE_KEY extracted to utils/roadmapUtils.ts
+// Roadmap template bridge extracted to utils/roadmapUtils.ts
 // All sub-components extracted to Projects/ subdirectory
 
 export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searchQuery?: string; initialSelectedProjectId?: string | null; onClearSelection?: () => void }> = ({ onNavigate, searchQuery, initialSelectedProjectId, onClearSelection }) => {
   const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(initialSelectedProjectId ?? null);
-  const [isProposalModalOpen, setProposalModalOpen] = useState(false);
-  const [createProjectStep, setCreateProjectStep] = useState<1 | 2>(1);
-  const [newRoadmapUrl, setNewRoadmapUrl] = useState('');
-  const [newLogoUrl, setNewLogoUrl] = useState('');
-  const [isFetchingPoster, setIsFetchingPoster] = useState(false);
   const [activeTab, setActiveTab] = useState<'projects' | 'past-projects' | 'templates'>('projects');
   const [isTemplateModalOpen, setTemplateModalOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<EventTemplate | null>(null);
-  const [fabOpen, setFabOpen] = useState(false);
   const [previewTemplate, setPreviewTemplate] = useState<EventTemplate | null>(null);
   const [templateSearchTerm, setTemplateSearchTerm] = useState('');
   const [templateFilterType, setTemplateFilterType] = useState<string>('all');
-
-  // States for Create Project Form
-  const [newTitle, setNewTitle] = useState('');
-  const [newDescription, setNewDescription] = useState('');
-  const [newLevel, setNewLevel] = useState<ProjectLevel | ''>('');
-  const [newPillar, setNewPillar] = useState<ProjectPillar | ''>('');
-  const [projectType, setProjectType] = useState<string>('');
-  const [newCategory, setNewCategory] = useState('');
-  const [newProposedDate, setNewProposedDate] = useState('');
-  const [newEventStartDate, setNewEventStartDate] = useState('');
-  const [newEventEndDate, setNewEventEndDate] = useState('');
-  const [newEventStartTime, setNewEventStartTime] = useState('');
-  const [newEventEndTime, setNewEventEndTime] = useState('');
-  const [newPriceMin, setNewPriceMin] = useState('');
-  const [newPriceMax, setNewPriceMax] = useState('');
-  const [newGalleryUrl, setNewGalleryUrl] = useState('');
 
   const { projects, loading, error, createProject, updateProject, deleteProject } = useProjects();
   const { eventTemplates, loading: templatesLoading, error: templatesError, createEventTemplate, updateEventTemplate, deleteEventTemplate } = useTemplates();
@@ -75,60 +41,11 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
   const { isBoard, isAdmin, isDeveloper } = usePermissions();
   const isPrivileged = isBoard || isAdmin || isDeveloper;
   const { showToast } = useToast();
-
-  useEffect(() => {
-    if (isProposalModalOpen) {
-      setNewRoadmapUrl('');
-      setNewLogoUrl('');
-      setNewTitle('');
-      setNewDescription('');
-      setNewLevel('');
-      setNewPillar('');
-      setProjectType('');
-      setNewCategory('');
-      setNewProposedDate('');
-      setNewEventStartDate('');
-      setNewEventEndDate('');
-      setNewEventStartTime('');
-      setNewEventEndTime('');
-      setNewPriceMin('');
-      setNewPriceMax('');
-      setNewGalleryUrl('');
-    }
-  }, [isProposalModalOpen]);
-
-  const handleFetchPosterForCreate = async () => {
-    if (!newRoadmapUrl) {
-      showToast('Please enter a Roadmap Event URL or ID', 'warning');
-      return;
-    }
-    setIsFetchingPoster(true);
-    try {
-      const details = await fetchRoadmapEventDetails(newRoadmapUrl);
-      setNewLogoUrl(details.logoUrl);
-      if (details.title) setNewTitle(details.title);
-      if (details.description) setNewDescription(details.description);
-      if (details.level) setNewLevel(details.level);
-      if (details.pillar) setNewPillar(details.pillar);
-      if (details.type) setProjectType(details.type);
-      if (details.category) setNewCategory(details.category);
-      if (details.eventStartDate) {
-        setNewEventStartDate(details.eventStartDate);
-        setNewProposedDate(details.eventStartDate);
-      }
-      if (details.eventEndDate) setNewEventEndDate(details.eventEndDate);
-      if (details.eventStartTime) setNewEventStartTime(details.eventStartTime);
-      if (details.eventEndTime) setNewEventEndTime(details.eventEndTime);
-      if (details.priceMin != null) setNewPriceMin(String(details.priceMin));
-      if (details.priceMax != null) setNewPriceMax(String(details.priceMax));
-
-      showToast('Successfully synchronized event details!', 'success');
-    } catch (err: any) {
-      showToast(err.message || 'Failed to sync event details', 'error');
-    } finally {
-      setIsFetchingPoster(false);
-    }
-  };
+  const { drawerProps: createDrawerProps, open: handleNewProposal } = useProjectCreateForm({
+    member,
+    createProject,
+    showToast,
+  });
   const [isStatusUpdating, setIsStatusUpdating] = useState(false);
   const [isImportModalOpen, setImportModalOpen] = useState(false);
   const [selectedProjectIds, setSelectedProjectIds] = useState<Set<string>>(new Set());
@@ -300,11 +217,6 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
     setSelectedProjectIds(new Set(allIds));
   }, [displayedProjects]);
 
-  const handleNewProposal = useCallback(() => {
-    setCreateProjectStep(1);
-    setProposalModalOpen(true);
-  }, []);
-
   const handleImport = useCallback(() => setImportModalOpen(true), []);
 
   const handleToggleSelection = useCallback((id: string) => {
@@ -367,77 +279,6 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
     return (isCreator || isCommittee) ? proj : undefined;
   }, [projects, selectedProjectId, isPrivileged, member]);
 
-  const handleCreateProject = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!member) {
-      showToast('Please login to create projects', 'error');
-      return;
-    }
-
-    // FORM-002: JS validation for Select fields that browser won't validate via hidden inputs
-    if (!newLevel || !newPillar || !projectType || !newCategory) {
-      showToast('Please fill in all required classification fields (Level, Pillar, Type, Category)', 'error');
-      return;
-    }
-
-    // FORM-007: Cross-field date validation
-    if (newEventEndDate && newEventStartDate && newEventEndDate < newEventStartDate) {
-      showToast('End date must be on or after start date', 'error');
-      return;
-    }
-
-    const formData = new FormData(e.currentTarget);
-    try {
-      // Create new project with Activity Plan fields
-      // Initialize default committee with Ex-Officio and Organising Chairperson roles
-      const defaultCommittee: ProjectCommitteeMember[] = [
-        {
-          role: 'Ex-Officio',
-          memberId: '',
-          tasks: [{ title: '', dueDate: '' }],
-        },
-        {
-          role: 'Organising Chairperson',
-          memberId: '',
-          tasks: [{ title: '', dueDate: '' }],
-        },
-      ];
-
-      const projectId = await createProject({
-        name: formData.get('title') as string,
-        title: formData.get('title') as string,
-        description: formData.get('description') as string || '',
-        level: (formData.get('level') as any) || undefined,
-        pillar: (formData.get('pillar') as any) || undefined,
-        type: (formData.get('type') as any) || undefined,
-        category: (formData.get('category') as string) || undefined,
-        proposedDate: formData.get('proposedDate') as string,
-        objectives: formData.get('objectives') as string,
-        expectedImpact: formData.get('expectedImpact') as string || '',
-        eventStartDate: (formData.get('eventStartDate') as string) || undefined,
-        eventEndDate: (formData.get('eventEndDate') as string) || undefined,
-        eventStartTime: (formData.get('eventStartTime') as string) || undefined,
-        eventEndTime: (formData.get('eventEndTime') as string) || undefined,
-        status: 'Planning',
-        submittedBy: member.id,
-        committee: defaultCommittee,
-        logoUrl: newLogoUrl || undefined,
-        roadmapUrl: newRoadmapUrl || undefined,
-        galleryUrls: newGalleryUrl ? [newGalleryUrl] : undefined,
-        priceMin: newPriceMin !== '' ? Number(newPriceMin) : undefined,
-        priceMax: newPriceMax !== '' ? Number(newPriceMax) : undefined,
-      });
-
-      // Activity Plan will be created/managed in the Project Detail page's Activity Plan tab
-
-      setProposalModalOpen(false);
-      e.currentTarget.reset();
-      showToast('Project created successfully', 'success');
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Failed to create project', 'error');
-    }
-  };
-
   const handleCreateTemplate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -480,92 +321,14 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
 
   return (
     <div className="space-y-2">
-      {selectedProject && (
-        <button onClick={() => setSelectedProjectId(null)} className="text-xs text-slate-400 hover:text-jci-blue font-semibold transition-colors">← Events Management</button>
-      )}
       {selectedProject ? (
-        <div className="flex flex-row justify-between items-center gap-2">
-          <div className="min-w-0 flex-1">
-            <h2 className="text-lg md:text-2xl font-bold text-slate-900 truncate leading-tight">{selectedProject.name ?? selectedProject.title ?? 'Project'}</h2>
-          </div>
-          <div className="flex gap-2 shrink-0">
-          {selectedProject && (
-            <>
-              {/* Desktop: show all workflow buttons */}
-              <div className="hidden md:flex gap-2">
-                {(selectedProject.status === 'Planning' || selectedProject.status === 'Draft') && (
-                  <>
-                    <Button variant="ghost" onClick={() => handleStatusUpdate('Planning')} disabled={isStatusUpdating}>Save Draft</Button>
-                    <Button onClick={() => handleStatusUpdate('Under Review')} disabled={isStatusUpdating}><Send size={16} className="mr-2" />Submit</Button>
-                  </>
-                )}
-                {selectedProject.status === 'Under Review' && !isPrivileged && (
-                  <Button disabled variant="outline"><Clock size={16} className="mr-2" />Under Review</Button>
-                )}
-                {selectedProject.status === 'Under Review' && isPrivileged && (
-                  <>
-                    <div className="flex items-center px-3 bg-slate-100 rounded-lg text-slate-600 text-sm font-medium"><Clock size={14} className="mr-1" />Under Review</div>
-                    <Button variant="danger" onClick={() => handleStatusUpdate('Planning')} disabled={isStatusUpdating}><X size={16} className="mr-2" />Reject</Button>
-                    <Button variant="primary" onClick={() => handleStatusUpdate('Approved')} disabled={isStatusUpdating}><Check size={16} className="mr-2" />Approve</Button>
-                  </>
-                )}
-                {selectedProject.status === 'Approved' && (
-                  <Button onClick={() => handleStatusUpdate('Active')} disabled={isStatusUpdating}><Globe size={16} className="mr-2" />Publish</Button>
-                )}
-                {selectedProject.status === 'Active' && (
-                  <>
-                    <Badge variant="success" className="h-10 px-4"><Globe size={14} className="mr-1" />Published</Badge>
-                    <Button variant="danger" onClick={() => handleStatusUpdate('Approved')} disabled={isStatusUpdating}><Lock size={16} className="mr-2" />Unpublish</Button>
-                  </>
-                )}
-              </div>
-
-              {/* Mobile: primary CTA + kebab overflow */}
-              <div className="flex md:hidden items-center gap-2">
-                {/* Primary action only */}
-                {(selectedProject.status === 'Planning' || selectedProject.status === 'Draft') && (
-                  <Button size="sm" onClick={() => handleStatusUpdate('Under Review')} disabled={isStatusUpdating}><Send size={14} className="mr-1" />Submit</Button>
-                )}
-                {selectedProject.status === 'Under Review' && !isPrivileged && (
-                  <Badge variant="neutral" className="h-8 px-3 text-xs"><Clock size={12} className="mr-1" />Reviewing</Badge>
-                )}
-                {selectedProject.status === 'Under Review' && isPrivileged && (
-                  <Button size="sm" variant="primary" onClick={() => handleStatusUpdate('Approved')} disabled={isStatusUpdating}><Check size={14} className="mr-1" />Approve</Button>
-                )}
-                {selectedProject.status === 'Approved' && (
-                  <Button size="sm" onClick={() => handleStatusUpdate('Active')} disabled={isStatusUpdating}><Globe size={14} className="mr-1" />Publish</Button>
-                )}
-                {selectedProject.status === 'Active' && (
-                  <Badge variant="success" className="h-8 px-3 text-xs"><Globe size={12} className="mr-1" />Published</Badge>
-                )}
-                {/* Kebab for secondary actions */}
-                <div className="relative group">
-                  <button className="w-8 h-8 rounded-lg border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:border-slate-300 hover:bg-slate-50 transition-all">
-                    <MoreVertical size={16} />
-                  </button>
-                  <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-xl shadow-lg border border-slate-100 py-1 z-50 hidden group-focus-within:block">
-                    {(selectedProject.status === 'Planning' || selectedProject.status === 'Draft') && (
-                      <button onClick={() => handleStatusUpdate('Planning')} className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
-                        <FileText size={14} />Save Draft
-                      </button>
-                    )}
-                    {selectedProject.status === 'Under Review' && isPrivileged && (
-                      <button onClick={() => handleStatusUpdate('Planning')} className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
-                        <X size={14} />Reject
-                      </button>
-                    )}
-                    {selectedProject.status === 'Active' && (
-                      <button onClick={() => handleStatusUpdate('Approved')} className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
-                        <Lock size={14} />Unpublish
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-        </div>
+        <ProjectsDetailHeader
+          project={selectedProject}
+          isPrivileged={isPrivileged}
+          isStatusUpdating={isStatusUpdating}
+          onBack={() => setSelectedProjectId(null)}
+          onStatusUpdate={handleStatusUpdate}
+        />
       ) : (
         <PageHeader
           title="Events Management"
@@ -574,257 +337,41 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
       )}
 
       {!selectedProject ? (
-        <div className="space-y-2">
-          {/* Mobile: segmented control + year filter standalone */}
-          <div className="md:hidden p-1.5 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center gap-2">
-            <Tabs
-              fullWidth
-              tabs={['Ongoing', 'Past', 'Templates']}
-              activeTab={activeTab === 'projects' ? 'Ongoing' : activeTab === 'past-projects' ? 'Past' : 'Templates'}
-              onTabChange={(tab) => {
-                if (tab === 'Ongoing') setActiveTab('projects');
-                else if (tab === 'Past') setActiveTab('past-projects');
-                else setActiveTab('templates');
-                setSelectedProjectId(null);
-              }}
-            />
-            {activeTab !== 'templates' && (
-              <select
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(Number(e.target.value))}
-                className="shrink-0 text-xs font-bold border border-slate-200 rounded-lg px-2 py-1.5 focus:ring-jci-blue focus:border-jci-blue bg-white outline-none transition-all cursor-pointer"
-              >
-                {availableYears.map(year => (
-                  <option key={year} value={year}>{year}</option>
-                ))}
-              </select>
-            )}
-          </div>
-
-          {/* Mobile: content without card wrapper */}
-          <div className="md:hidden">
-            {(activeTab === 'projects' || activeTab === 'past-projects') ? (
-              <AsyncErrorBoundary>
-                <ProjectGrid
-                  projects={displayedProjects}
-                  loading={loading}
-                  error={error}
-                  onSelect={setSelectedProjectId}
-                  onNewProposal={handleNewProposal}
-                  onImport={handleImport}
-                  isAdminOrBoard={isBoard || isAdmin}
-                  selectedIds={selectedProjectIds}
-                  onToggleSelection={handleToggleSelection}
-                  onSelectAll={handleSelectAll}
-                  projectAccounts={projectAccounts}
-                  projectTrackerTransactions={projectTrackerTransactions}
-                />
-              </AsyncErrorBoundary>
-            ) : (
-              <div className="space-y-2">
-                <div className="flex gap-3">
-                  <div className="flex-1 relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
-                    <input
-                      type="text"
-                      placeholder="Search templates..."
-                      value={templateSearchTerm}
-                      onChange={(e) => setTemplateSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-jci-blue"
-                    />
-                  </div>
-                  <Select
-                    value={templateFilterType}
-                    onChange={(e) => setTemplateFilterType(e.target.value)}
-                    options={[
-                      { label: 'All Types', value: 'all' },
-                      { label: 'Meeting', value: 'Meeting' },
-                      { label: 'Training', value: 'Training' },
-                      { label: 'Social', value: 'Social' },
-                      { label: 'Project', value: 'Project' },
-                      { label: 'International', value: 'International' },
-                    ]}
-                    className="w-48"
-                  />
-                </div>
-                <LoadingState loading={templatesLoading} error={templatesError} empty={eventTemplates.filter(t => (!templateSearchTerm || t.name.toLowerCase().includes(templateSearchTerm.toLowerCase()) || (t.description?.toLowerCase().includes(templateSearchTerm.toLowerCase()) ?? false)) && (templateFilterType === 'all' || t.type === templateFilterType)).length === 0} emptyMessage="No templates found. Create your first template to get started.">
-                  <div className="divide-y divide-slate-100">
-                    {(isBoard || isAdmin) && (
-                      <div onClick={() => { setSelectedTemplate(null); setTemplateModalOpen(true); }}
-                        className="flex items-center gap-3 px-1 py-3 text-slate-400 hover:text-jci-blue transition-colors cursor-pointer group">
-                        <div className="w-9 h-9 rounded-lg border-2 border-dashed border-current flex items-center justify-center shrink-0">
-                          <Plus size={16} />
-                        </div>
-                        <span className="text-sm font-semibold">New Template</span>
-                      </div>
-                    )}
-                    {eventTemplates
-                      .filter(template => {
-                        const matchesSearch = !templateSearchTerm ||
-                          template.name.toLowerCase().includes(templateSearchTerm.toLowerCase()) ||
-                          (template.description?.toLowerCase().includes(templateSearchTerm.toLowerCase()) ?? false);
-                        const matchesType = templateFilterType === 'all' || template.type === templateFilterType;
-                        return matchesSearch && matchesType;
-                      })
-                      .map(template => (
-                        <div key={template.id} className="flex items-center gap-3 py-3 px-1">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className="font-semibold text-slate-900 text-sm">{template.name}</p>
-                              <Badge variant="neutral">{template.type}</Badge>
-                            </div>
-                            {template.description && <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">{template.description}</p>}
-                            <div className="flex items-center gap-2 mt-1 flex-wrap">
-                              {template.estimatedDuration && <span className="inline-flex items-center gap-0.5 text-[10px] text-slate-500"><Clock size={9} />{template.estimatedDuration}h</span>}
-                              {template.defaultBudget && <span className="inline-flex items-center gap-0.5 text-[10px] text-slate-500"><DollarSign size={9} />{formatCurrency(template.defaultBudget)}</span>}
-                              {template.checklist?.length > 0 && <span className="inline-flex items-center gap-0.5 text-[10px] text-slate-500"><CheckCircle size={9} />{template.checklist.length} tasks</span>}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-0.5 shrink-0">
-                            <Button variant="ghost" size="sm" onClick={() => setPreviewTemplate(template)} title="Preview"><Eye size={14} /></Button>
-                            <Button variant="ghost" size="sm" onClick={() => handleUseTemplate(template)} title="Use"><Copy size={14} /></Button>
-                            <Button variant="ghost" size="sm" onClick={() => { setSelectedTemplate(template); setTemplateModalOpen(true); }} title="Edit"><Edit size={14} /></Button>
-                            <Button variant="ghost" size="sm" onClick={() => setConfirmState({ open: true, title: 'Delete Template', message: 'Delete this template?', variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await deleteEventTemplate(template.id!); } })} className="text-red-500 hover:text-red-700" title="Delete"><Trash2 size={14} /></Button>
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </LoadingState>
-              </div>
-            )}
-          </div>
-
-          {/* Desktop: card with underline tabs + content */}
-          <Card noPadding className="hidden md:block">
-            <div className="px-6 pt-4 flex flex-row justify-between items-end gap-3 border-b border-slate-100">
-              <div className="flex-1 min-w-0">
-                <Tabs
-                  tabs={['Ongoing Events', 'Past Events', 'Templates']}
-                  activeTab={activeTab === 'projects' ? 'Ongoing Events' : activeTab === 'past-projects' ? 'Past Events' : 'Templates'}
-                  onTabChange={(tab) => {
-                    if (tab === 'Ongoing Events') setActiveTab('projects');
-                    else if (tab === 'Past Events') setActiveTab('past-projects');
-                    else setActiveTab('templates');
-                    setSelectedProjectId(null);
-                  }}
-                  className="border-b-0"
-                />
-              </div>
-              {activeTab !== 'templates' && (
-                <div className="flex items-center gap-2 pb-2">
-                  <span className="text-xs font-semibold text-slate-500">Year:</span>
-                  <select
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(Number(e.target.value))}
-                    className="text-xs font-bold border border-slate-200 rounded-lg px-2.5 py-1.5 focus:ring-jci-blue focus:border-jci-blue bg-white shadow-sm outline-none transition-all cursor-pointer"
-                  >
-                    {availableYears.map(year => (
-                      <option key={year} value={year}>{year}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-            <div className="p-6">
-              {(activeTab === 'projects' || activeTab === 'past-projects') ? (
-                <AsyncErrorBoundary>
-                  <ProjectGrid
-                    projects={displayedProjects}
-                    loading={loading}
-                    error={error}
-                    onSelect={setSelectedProjectId}
-                    onNewProposal={() => { setCreateProjectStep(1); setProposalModalOpen(true); }}
-                    onImport={() => setImportModalOpen(true)}
-                    isAdminOrBoard={isBoard || isAdmin}
-                    selectedIds={selectedProjectIds}
-                    onToggleSelection={(id) => {
-                      setSelectedProjectIds(prev => {
-                        const next = new Set(prev);
-                        if (next.has(id)) next.delete(id);
-                        else next.add(id);
-                        return next;
-                      });
-                    }}
-                    onSelectAll={handleSelectAll}
-                    projectAccounts={projectAccounts}
-                    projectTrackerTransactions={projectTrackerTransactions}
-                  />
-                </AsyncErrorBoundary>
-              ) : (
-                <div className="space-y-2">
-                  <div className="flex gap-3">
-                    <div className="flex-1 relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
-                      <input
-                        type="text"
-                        placeholder="Search templates..."
-                        value={templateSearchTerm}
-                        onChange={(e) => setTemplateSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-jci-blue"
-                      />
-                    </div>
-                    <Select
-                      value={templateFilterType}
-                      onChange={(e) => setTemplateFilterType(e.target.value)}
-                      options={[
-                        { label: 'All Types', value: 'all' },
-                        { label: 'Meeting', value: 'Meeting' },
-                        { label: 'Training', value: 'Training' },
-                        { label: 'Social', value: 'Social' },
-                        { label: 'Project', value: 'Project' },
-                        { label: 'International', value: 'International' },
-                      ]}
-                      className="w-48"
-                    />
-                  </div>
-                  <LoadingState loading={templatesLoading} error={templatesError} empty={eventTemplates.filter(t => (!templateSearchTerm || t.name.toLowerCase().includes(templateSearchTerm.toLowerCase()) || (t.description?.toLowerCase().includes(templateSearchTerm.toLowerCase()) ?? false)) && (templateFilterType === 'all' || t.type === templateFilterType)).length === 0} emptyMessage="No templates found. Create your first template to get started.">
-                    <div className="divide-y divide-slate-100">
-                      {(isBoard || isAdmin) && (
-                        <div onClick={() => { setSelectedTemplate(null); setTemplateModalOpen(true); }}
-                          className="flex items-center gap-3 px-2 py-3 text-slate-400 hover:text-jci-blue transition-colors cursor-pointer group">
-                          <div className="w-9 h-9 rounded-lg border-2 border-dashed border-current flex items-center justify-center shrink-0">
-                            <Plus size={16} />
-                          </div>
-                          <span className="text-sm font-semibold">New Template</span>
-                        </div>
-                      )}
-                      {eventTemplates
-                        .filter(template => {
-                          const matchesSearch = !templateSearchTerm ||
-                            template.name.toLowerCase().includes(templateSearchTerm.toLowerCase()) ||
-                            (template.description?.toLowerCase().includes(templateSearchTerm.toLowerCase()) ?? false);
-                          const matchesType = templateFilterType === 'all' || template.type === templateFilterType;
-                          return matchesSearch && matchesType;
-                        })
-                        .map(template => (
-                          <div key={template.id} className="flex items-center gap-4 px-2 py-3 hover:bg-slate-50/50 transition-colors group">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <p className="font-semibold text-slate-900 group-hover:text-jci-blue transition-colors text-sm">{template.name}</p>
-                                <Badge variant="neutral">{template.type}</Badge>
-                              </div>
-                              <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                                {template.description && <span className="text-xs text-slate-400 line-clamp-1 max-w-xs">{template.description}</span>}
-                                {template.estimatedDuration && <span className="inline-flex items-center gap-0.5 text-[11px] text-slate-400"><Clock size={10} />{template.estimatedDuration}h</span>}
-                                {template.defaultBudget && <span className="inline-flex items-center gap-0.5 text-[11px] text-slate-400"><DollarSign size={10} />{formatCurrency(template.defaultBudget)}</span>}
-                                {template.checklist?.length > 0 && <span className="inline-flex items-center gap-0.5 text-[11px] text-slate-400"><CheckCircle size={10} />{template.checklist.length} tasks</span>}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Button variant="ghost" size="sm" onClick={() => setPreviewTemplate(template)} title="Preview"><Eye size={14} /></Button>
-                              <Button variant="ghost" size="sm" onClick={() => handleUseTemplate(template)} title="Use"><Copy size={14} /></Button>
-                              <Button variant="ghost" size="sm" onClick={() => { setSelectedTemplate(template); setTemplateModalOpen(true); }} title="Edit"><Edit size={14} /></Button>
-                              <Button variant="ghost" size="sm" onClick={() => setConfirmState({ open: true, title: 'Delete Template', message: 'Delete this template?', variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await deleteEventTemplate(template.id!); } })} className="text-red-500 hover:text-red-700" title="Delete"><Trash2 size={14} /></Button>
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  </LoadingState>
-                </div>
-              )}
-            </div>
-          </Card>
-        </div>
+        <ProjectsListShell
+          activeTab={activeTab}
+          availableYears={availableYears}
+          selectedYear={selectedYear}
+          projects={displayedProjects}
+          loading={loading}
+          error={error}
+          templates={eventTemplates}
+          templatesLoading={templatesLoading}
+          templatesError={templatesError}
+          templateSearchTerm={templateSearchTerm}
+          templateFilterType={templateFilterType}
+          canManageTemplates={isBoard || isAdmin}
+          isAdminOrBoard={isBoard || isAdmin}
+          selectedProjectIds={selectedProjectIds}
+          projectAccounts={projectAccounts}
+          projectTrackerTransactions={projectTrackerTransactions}
+          onActiveTabChange={(tab) => {
+            setActiveTab(tab);
+            setSelectedProjectId(null);
+          }}
+          onYearChange={setSelectedYear}
+          onSelectProject={setSelectedProjectId}
+          onNewProposal={handleNewProposal}
+          onImport={handleImport}
+          onToggleSelection={handleToggleSelection}
+          onSelectAll={handleSelectAll}
+          onTemplateSearchTermChange={setTemplateSearchTerm}
+          onTemplateFilterTypeChange={setTemplateFilterType}
+          onCreateTemplate={() => { setSelectedTemplate(null); setTemplateModalOpen(true); }}
+          onPreviewTemplate={setPreviewTemplate}
+          onUseTemplate={handleUseTemplate}
+          onEditTemplate={(template) => { setSelectedTemplate(template); setTemplateModalOpen(true); }}
+          onDeleteTemplate={(template) => setConfirmState({ open: true, title: 'Delete Template', message: 'Delete this template?', variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await deleteEventTemplate(template.id!); } })}
+        />
       ) : (
         <>
           <ProjectDetailTabs
@@ -839,246 +386,28 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
         </>
       )}
 
-      {/* Floating Batch Action Bar */}
-      {(activeTab === 'projects' || activeTab === 'past-projects') && !selectedProjectId && displayedProjects.length > 0 && selectedProjectIds.size > 1 && (
-        <div className="fixed bottom-6 left-6 right-6 md:left-1/2 md:right-auto md:-translate-x-1/2 z-[60] animate-in slide-in-from-bottom-4 duration-300">
-          <div className="bg-slate-900 text-white px-2 md:px-6 py-3 md:py-4 rounded-[40px] md:rounded-2xl shadow-2xl flex items-center justify-around md:justify-start gap-0 md:gap-6 border border-white/10 backdrop-blur-md h-20 md:h-auto">
-            <div className="flex flex-col md:flex-row items-center gap-1 md:gap-3 md:pr-4 md:border-r border-white/20 min-w-[70px] md:min-w-0">
-              <Layers size={20} className="text-blue-400 md:w-4 md:h-4" />
-              <span className="text-[9px] md:text-sm font-bold md:font-medium tracking-widest md:tracking-tight uppercase md:capitalize whitespace-nowrap">{selectedProjectIds.size} Selected</span>
-            </div>
-
-            {batchOperationProgress ? (
-              <div className="flex-1 max-w-[150px] md:w-48 h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
-                <div
-                  className="h-full bg-blue-500 transition-all duration-300 ease-out"
-                  style={{ width: `${(batchOperationProgress.current / batchOperationProgress.total) * 100}%` }}
-                />
-              </div>
-            ) : (
-              <>
-                <button
-                  onClick={() => setIsBatchStatusModalOpen(true)}
-                  className="flex flex-col md:flex-row items-center gap-1 md:gap-2 text-blue-400 hover:text-blue-300 transition-all min-w-[70px] md:min-w-0"
-                >
-                  <div className="p-2 md:p-0 rounded-2xl md:rounded-none bg-white/5 md:bg-transparent">
-                    <Settings size={20} className="md:w-4 md:h-4" />
-                  </div>
-                  <span className="text-[9px] md:text-sm font-bold tracking-widest md:tracking-normal uppercase md:capitalize">Status</span>
-                </button>
-                <button
-                  onClick={handleBatchDelete}
-                  className="flex flex-col md:flex-row items-center gap-1 md:gap-2 text-red-400 hover:text-red-300 transition-all min-w-[70px] md:min-w-0"
-                >
-                  <div className="p-2 md:p-0 rounded-2xl md:rounded-none bg-white/5 md:bg-transparent">
-                    <Trash2 size={20} className="md:w-4 md:h-4" />
-                  </div>
-                  <span className="text-[9px] md:text-sm font-bold tracking-widest md:tracking-normal uppercase md:capitalize">Delete</span>
-                </button>
-                <button
-                  onClick={() => setSelectedProjectIds(new Set())}
-                  className="flex flex-col md:flex-row items-center gap-1 md:gap-2 text-slate-400 hover:text-white transition-all min-w-[70px] md:min-w-0"
-                >
-                  <div className="p-2 md:p-0 rounded-2xl md:rounded-none bg-white/5 md:bg-transparent">
-                    <X size={20} className="md:w-4 md:h-4" />
-                  </div>
-                  <span className="text-[9px] md:text-sm font-bold tracking-widest md:tracking-normal uppercase md:capitalize">Clear</span>
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      <ProjectsBatchActions
+        visible={(activeTab === 'projects' || activeTab === 'past-projects') && !selectedProjectId && displayedProjects.length > 0 && selectedProjectIds.size > 1}
+        selectedCount={selectedProjectIds.size}
+        progress={batchOperationProgress}
+        isStatusModalOpen={isBatchStatusModalOpen}
+        onOpenStatusModal={() => setIsBatchStatusModalOpen(true)}
+        onCloseStatusModal={() => setIsBatchStatusModalOpen(false)}
+        onDelete={handleBatchDelete}
+        onClearSelection={() => setSelectedProjectIds(new Set())}
+        onStatusUpdate={handleBatchStatusUpdate}
+      />
 
 
-      {/* Project Creation Drawer */}
-      {(() => {
-        const CREATE_STEPS: { s: 1 | 2; label: string }[] = [
-          { s: 1, label: 'Basics & Media' },
-          { s: 2, label: 'Classification & Schedule' },
-        ];
-        return (
-          <Drawer
-            isOpen={isProposalModalOpen}
-            onClose={() => { setProposalModalOpen(false); setCreateProjectStep(1); }}
-            title={createProjectStep === 1 ? 'New Activity " Basics & Media' : 'New Activity " Classification & Schedule'}
-            position="bottom"
-            size="xl"
-            footer={
-              <div className="flex items-center justify-between">
-                <Button variant="ghost" type="button" onClick={() => {
-                  if (createProjectStep === 1) { setProposalModalOpen(false); setCreateProjectStep(1); }
-                  else setCreateProjectStep(1);
-                }}>
-                  {createProjectStep === 1 ? 'Cancel' : '← Back'}
-                </Button>
-                {createProjectStep === 1 ? (
-                  <Button key="next" type="button" onClick={() => {
-                    if (!newTitle.trim()) { showToast('Project title is required', 'error'); return; }
-                    setCreateProjectStep(2);
-                  }}>Next →</Button>
-                ) : (
-                  <Button key="create" type="submit" form="create-project-form">Create Project</Button>
-                )}
-              </div>
-            }
-          >
-            {/* Stepper */}
-            <div className="flex items-center gap-2 mb-4">
-              {CREATE_STEPS.map(({ s, label }, i) => (
-                <React.Fragment key={s}>
-                  <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all ${s < createProjectStep ? 'bg-jci-blue/10 text-jci-blue' :
-                    s === createProjectStep ? 'bg-jci-blue text-white shadow-sm' :
-                      'bg-slate-100 text-slate-400'
-                    }`}>
-                    <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 bg-white/30">
-                      {s < createProjectStep ? '✓' : s}
-                    </span>
-                    <span className="hidden sm:inline">{label}</span>
-                    <span className="sm:hidden">{s === 1 ? 'Media' : 'Details'}</span>
-                  </div>
-                  {i === 0 && <div className={`flex-1 h-px max-w-[24px] ${createProjectStep > 1 ? 'bg-jci-blue' : 'bg-slate-200'}`} />}
-                </React.Fragment>
-              ))}
-            </div>
-
-            <form id="create-project-form" onSubmit={handleCreateProject} className="space-y-4">
-              {/* Step 1: Basics & Media */}
-              {createProjectStep === 1 && (
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l-4 border-jci-blue/40 pl-2 mb-3">Project Info</p>
-                    <div className="space-y-3">
-                      <Input name="title" label="Title *" placeholder="e.g. Summer Leadership Summit"
-                        value={newTitle} onChange={(e) => setNewTitle(e.target.value)}
-                        icon={<FileText size={16} />} required />
-                      <Textarea name="description" label="Description" placeholder="Brief description of the project..."
-                        value={newDescription} onChange={(e) => setNewDescription(e.target.value)} rows={3} />
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l-4 border-jci-blue/40 pl-2 mb-3">Media</p>
-                    <div className="md:grid md:grid-cols-2 md:gap-4 space-y-3 md:space-y-0">
-                      <div className="space-y-2">
-                        <div>
-                          <p className="text-[11px] font-semibold text-slate-500 mb-1.5">JCI Roadmap Sync</p>
-                          <div className="flex gap-2 items-end">
-                            <div className="flex-1">
-                              <Input name="roadmapUrl" label="" placeholder="Roadmap URL or Event ID (e.g. 6274)"
-                                value={newRoadmapUrl} onChange={(e) => setNewRoadmapUrl(e.target.value)} icon={<Globe size={16} />} />
-                            </div>
-                            <Button type="button" variant="outline" onClick={handleFetchPosterForCreate} disabled={isFetchingPoster}
-                              className="h-10 shrink-0 flex items-center gap-1.5 border-jci-blue text-jci-blue hover:bg-sky-50 mb-px">
-                              {isFetchingPoster ? <RefreshCw size={13} className="animate-spin" /> : <Download size={13} />}
-                              <span className="text-xs">{isFetchingPoster ? 'Syncing' : 'Sync'}</span>
-                            </Button>
-                          </div>
-                        </div>
-                        <Input name="logoUrl" label="Poster / Logo URL" placeholder="https://example.com/poster.png"
-                          value={newLogoUrl} onChange={(e) => setNewLogoUrl(e.target.value)} icon={<Image size={16} />} />
-                        {newLogoUrl && (
-                          <div className="rounded-xl border border-slate-200 bg-slate-50 overflow-hidden flex justify-center p-2">
-                            <img src={newLogoUrl} alt="Preview" className="max-h-36 object-contain rounded-lg" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="space-y-1.5 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                        <p className="text-[11px] font-semibold text-slate-500">Activity Photo Gallery</p>
-                        <p className="text-[11px] text-slate-400 leading-relaxed">Paste a Google Drive <strong>folder</strong> link shared as "Anyone with the link"</p>
-                        <Input label="" placeholder="https://drive.google.com/drive/folders/"
-                          value={newGalleryUrl} onChange={(e) => setNewGalleryUrl(e.target.value)} />
-                        {newGalleryUrl && (
-                          <p className="text-[11px] text-green-700 font-medium flex items-center gap-1">
-                            <Check size={11} />Folder linked
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 2: Classification & Schedule */}
-              {createProjectStep === 2 && (
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l-4 border-jci-blue/40 pl-2 mb-2">Classification</p>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                      <Select name="level" label="Level *" required value={newLevel}
-                        onChange={(e) => setNewLevel(e.target.value as any)}
-                        options={[{ label: '" Select "', value: '' }, ...PROJECT_LEVELS.map(l => ({ label: l, value: l }))]} />
-                      <Select name="pillar" label="Pillar *" required value={newPillar}
-                        onChange={(e) => setNewPillar(e.target.value as any)}
-                        options={[{ label: '" Select "', value: '' }, ...PROJECT_PILLARS.map(p => ({ label: p, value: p }))]} />
-                      <Select name="type" label="Type *" required value={projectType}
-                        onChange={(e) => { setProjectType(e.target.value); setNewCategory(''); }}
-                        options={[{ label: '" Select "', value: '' }, ...PROJECT_TYPES.map(c => ({ label: PROJECT_TYPE_LABELS[c] || c, value: c }))]} />
-                      <Select name="category" label="Category *" required value={newCategory}
-                        onChange={(e) => setNewCategory(e.target.value)}
-                        options={[{ label: '" Select "', value: '' }, ...(projectType ? (PROJECT_CATEGORIES_BY_TYPE[projectType] ?? []) : []).map(t => ({ label: t, value: t }))]} />
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l-4 border-jci-blue/40 pl-2 mb-2">Schedule</p>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                      <Input name="proposedDate" label="Proposed *" type="date" value={newProposedDate}
-                        onChange={(e) => setNewProposedDate(e.target.value)} icon={<Calendar size={16} />} required min={new Date().toISOString().split('T')[0]} />
-                      <Input name="eventStartDate" label="Start Date *" type="date" value={newEventStartDate}
-                        onChange={(e) => setNewEventStartDate(e.target.value)} icon={<Calendar size={16} />} required min={new Date().toISOString().split('T')[0]} />
-                      <Input name="eventEndDate" label="End Date" type="date" value={newEventEndDate}
-                        onChange={(e) => setNewEventEndDate(e.target.value)} icon={<Calendar size={16} />} min={newEventStartDate || new Date().toISOString().split('T')[0]} />
-                      <div />
-                      <Input name="eventStartTime" label="Start Time" type="time" value={newEventStartTime}
-                        onChange={(e) => setNewEventStartTime(e.target.value)} icon={<Clock size={16} />} />
-                      <Input name="eventEndTime" label="End Time" type="time" value={newEventEndTime}
-                        onChange={(e) => setNewEventEndTime(e.target.value)} icon={<Clock size={16} />} />
-                      <Input name="priceMin" label="Min Price (RM)" type="number" min="0" placeholder="0"
-                        value={newPriceMin} onChange={(e) => setNewPriceMin(e.target.value)} icon={<DollarSign size={16} />} />
-                      <Input name="priceMax" label="Max Price (RM)" type="number" min="0" placeholder="e.g. 150"
-                        value={newPriceMax} onChange={(e) => setNewPriceMax(e.target.value)} icon={<DollarSign size={16} />} />
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l-4 border-jci-blue/40 pl-2 mb-2">Goals</p>
-                    <div className="md:grid md:grid-cols-2 md:gap-3 space-y-2 md:space-y-0">
-                      <Textarea name="objectives" label="Objectives & Goals" placeholder="Goals and expected community impact..." rows={2} />
-                      <Textarea name="expectedImpact" label="Expected Impact" placeholder="Expected outcomes and impact..." rows={2} />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </form>
-          </Drawer>
-        );
-      })()}
+      <ProjectsCreateDrawer {...createDrawerProps} />
 
 
-      {/* Create/Edit Event Template Modal */}
-      <Modal
+      <ProjectsTemplateModal
         isOpen={isTemplateModalOpen}
+        selectedTemplate={selectedTemplate}
         onClose={() => { setTemplateModalOpen(false); setSelectedTemplate(null); }}
-        title={selectedTemplate ? "Edit Template" : "Create Event Template"}
-        size="lg"
-        drawerOnMobile
-        footer={
-          <div className="flex gap-3 w-full">
-            <Button className="flex-1" type="submit" form="create-template-form">{selectedTemplate ? 'Update Template' : 'Create Template'}</Button>
-            <Button variant="ghost" type="button" onClick={() => { setTemplateModalOpen(false); setSelectedTemplate(null); }}>Cancel</Button>
-          </div>
-        }
-      >
-        <form id="create-template-form" onSubmit={handleCreateTemplate} className="space-y-4">
-          <Input name="name" label="Template Name" placeholder="e.g. Monthly Networking Event" defaultValue={selectedTemplate?.name} required />
-          <Textarea name="description" label="Description" placeholder="Template description..." defaultValue={selectedTemplate?.description} rows={3} />
-          <Select name="type" label="Event Type" options={[{ label: 'Meeting', value: 'Meeting' }, { label: 'Training', value: 'Training' }, { label: 'Social', value: 'Social' }, { label: 'Project', value: 'Project' }, { label: 'International', value: 'International' }]} defaultValue={selectedTemplate?.type} required />
-          <div className="grid grid-cols-2 gap-4">
-            <Input name="defaultBudget" label="Default Budget (RM)" type="number" step="0.01" defaultValue={selectedTemplate?.defaultBudget?.toString()} />
-            <Input name="estimatedDuration" label="Estimated Duration (hours)" type="number" step="0.5" defaultValue={selectedTemplate?.estimatedDuration?.toString()} />
-          </div>
-          <Textarea name="checklist" label="Checklist (one item per line)" placeholder={`Venue booking\nCatering\nRegistration setup`} defaultValue={selectedTemplate?.checklist?.join('\n')} rows={4} helperText="Enter each checklist item on a new line" />
-          <Textarea name="resources" label="Required Resources (one item per line)" placeholder={`Projector\nSound system\nTables`} defaultValue={selectedTemplate?.requiredResources?.join('\n')} rows={3} helperText="Enter each resource on a new line" />
-        </form>
-      </Modal>
+        onSubmit={handleCreateTemplate}
+      />
 
       {/* Template Preview Modal */}
       {
@@ -1103,39 +432,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
         }}
       />
 
-      {/* Batch Status Update Modal */}
-      <Modal
-        isOpen={isBatchStatusModalOpen}
-        onClose={() => setIsBatchStatusModalOpen(false)}
-        title="Batch Update Status"
-        size="md"
-        drawerOnMobile
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-slate-500">
-            Apply a new status to the {selectedProjectIds.size} selected events.
-          </p>
-          <div className="grid grid-cols-1 gap-2">
-            {(['Planning', 'Draft', 'Under Review', 'Approved', 'Active', 'Completed', 'Cancelled'] as Project['status'][]).map((status) => (
-              <Button
-                key={status}
-                variant="outline"
-                className="justify-start"
-                onClick={() => handleBatchStatusUpdate(status)}
-              >
-                {status === 'Active' ? 'Published' : status === 'Planning' ? 'Draft / Unpublished' : status}
-              </Button>
-            ))}
-          </div>
-          <div className="pt-2">
-            <Button variant="ghost" className="w-full" onClick={() => setIsBatchStatusModalOpen(false)}>
-              Cancel
-            </Button>
-          </div>
-        </div>
-      </Modal>
       <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
     </div >
   )
 }
-

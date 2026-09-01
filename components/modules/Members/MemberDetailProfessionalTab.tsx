@@ -9,6 +9,13 @@ import { uploadMemberOfferLogoToCloudinary, uploadMemberOfferBannerToCloudinary 
 
 const EMPTY_OFFER: SpecialOffer = { description: '', terms: '', expiryDate: '', status: 'Active' };
 
+const toExternalWebsiteUrl = (url?: string) => {
+  const trimmed = url?.trim();
+  if (!trimmed) return '';
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+};
+
 interface MemberDetailProfessionalTabProps {
   member: Member;
   isEditMode: boolean;
@@ -99,7 +106,7 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                 <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">🌐 Intl Business</span>
               )}
               {member.business?.companyWebsite && (
-                <a href={member.business?.companyWebsite} target="_blank" rel="noreferrer" className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-bold border border-slate-200 hover:bg-slate-200 transition-colors flex items-center gap-1">
+                <a href={toExternalWebsiteUrl(member.business?.companyWebsite)} target="_blank" rel="noreferrer" className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-bold border border-slate-200 hover:bg-slate-200 transition-colors flex items-center gap-1">
                   <ArrowUpRight size={11} /> Website
                 </a>
               )}
@@ -253,7 +260,7 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                 <span className="text-slate-500 text-xs uppercase font-medium">Company Name</span>
                 <p className="font-bold text-slate-900 leading-tight mt-0.5">{member.companyName || 'Freelance / Not Provided'}</p>
                 {member.business?.companyWebsite && (
-                  <a href={member.business?.companyWebsite.startsWith('http') ? member.business?.companyWebsite : `https://${member.business?.companyWebsite}`} target="_blank" rel="noopener noreferrer" className="text-xs text-jci-blue hover:underline block mt-1">
+                  <a href={toExternalWebsiteUrl(member.business?.companyWebsite)} target="_blank" rel="noopener noreferrer" className="text-xs text-jci-blue hover:underline block mt-1">
                     {member.business?.companyWebsite}
                   </a>
                 )}

@@ -768,7 +768,7 @@ export const JCIKLApp: React.FC = () => {
       {
         (isMember || isGuest || isBoard || isAdmin || isDeveloper) && !isBatchMode && (
           <>
-            <div className={`md:hidden fixed bottom-5 left-4 right-4 ${'bg-slate-900/95 border-slate-700/50'} backdrop-blur-xl rounded-3xl shadow-xl border flex items-center h-[66px] px-1 z-50`}>
+            <div className={`mobile-bottom-nav md:hidden fixed bottom-5 left-4 right-4 ${'bg-slate-900/95 border-slate-700/50'} backdrop-blur-xl rounded-3xl shadow-xl border flex items-center h-[66px] px-1 z-50`}>
               {/* Dashboard */}
               <button
                 onClick={() => handleViewChange('DASHBOARD')}

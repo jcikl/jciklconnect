@@ -354,6 +354,26 @@
 - [x] `ToyyibView.tsx` 从约 1470 行降到约 1457 行，Toyyib 试点开始建立模块目录。
 - [x] 已新增 `components/modules/Toyyib/ToyyibCategoriesTab.tsx`，将 Categories tab 的移动卡片、桌面表格、inline create row、refresh/import/link/details/remove 展示从 `ToyyibView.tsx` 中抽离。
 - [x] `ToyyibView.tsx` 进一步降到约 1233 行，Toyyib category 管理展示已独立；下一步重点拆分 Bills tab 和 Settings/Test Payment 面板。
+- [x] 已新增 `components/modules/Toyyib/ToyyibBillsTab.tsx`，将 Bills tab 的统计条、Manual Bill 折叠表单、状态筛选 chips、移动 bills cards 和桌面 bills table 从 `ToyyibView.tsx` 中抽离。
+- [x] `ToyyibView.tsx` 进一步降到约 963 行，Toyyib bills 展示和手动 bill 创建入口已独立；下一步重点拆分 Settings/Test Payment 面板和底部 category/link/import modals。
+- [x] 已新增 `components/modules/Toyyib/ToyyibCategoryModals.tsx`，将 Import Existing Category、Category Details 和 Link Category 三个底部弹窗从 `ToyyibView.tsx` 中抽离。
+- [x] `ToyyibView.tsx` 进一步降到约 885 行，Toyyib category 相关弹窗展示已独立；剩余主要体量集中在 Settings/Test Payment 面板。
+- [x] 已新增 `components/modules/Toyyib/ToyyibSettingsPanel.tsx`，将 Settings、Webhook Setup 和 Test Payment 面板从 `ToyyibView.tsx` 中整体抽离，父组件继续保留 Toyyib 模式、测试会员和确认弹窗状态编排。
+- [x] `ToyyibView.tsx` 已降到约 380 行，进入阶段 3 的 300-500 行验收范围；`ToyyibView.tsx` 阶段 3 试点完成。
+- [x] 已启动 `ProjectsView.tsx` 拆分，先新增 `components/modules/Projects/ProjectsTemplatesTab.tsx`，将 Templates tab 的搜索筛选、移动/桌面模板列表和模板行内操作从 `ProjectsView.tsx` 中抽离。
+- [x] `ProjectsView.tsx` 从约 1141 行降到约 1032 行，Projects 试点开始收口重复模板列表展示。
+- [x] 已新增 `components/modules/Projects/ProjectsBatchActions.tsx`，将浮动批量操作条和 Batch Update Status modal 从 `ProjectsView.tsx` 中抽离。
+- [x] `ProjectsView.tsx` 进一步降到约 961 行，批量操作展示已独立；下一步重点拆分新建活动 drawer 或模板编辑 modal。
+- [x] 已新增 `components/modules/Projects/ProjectsCreateDrawer.tsx`，将新建活动两步 drawer、Roadmap Sync 字段、媒体预览、分类和日程字段从 `ProjectsView.tsx` 中抽离。
+- [x] `ProjectsView.tsx` 进一步降到约 850 行，新建活动表单展示已独立；下一步拆分模板编辑 modal 和页面列表外壳。
+- [x] 已新增 `components/modules/Projects/ProjectsTemplateModal.tsx`，将 Create/Edit Event Template modal 表单从 `ProjectsView.tsx` 中抽离。
+- [x] `ProjectsView.tsx` 进一步降到约 827 行，模板列表和模板编辑弹窗均已独立；下一步拆分项目详情顶部状态操作区和页面列表外壳。
+- [x] 已新增 `components/modules/Projects/ProjectsDetailHeader.tsx`，将项目详情返回链接、标题和桌面/移动状态工作流按钮从 `ProjectsView.tsx` 中抽离。
+- [x] `ProjectsView.tsx` 进一步降到约 749 行，项目详情顶部状态操作区已独立；下一步重点拆分项目列表页外壳。
+- [x] 已新增 `components/modules/Projects/ProjectsListShell.tsx`，将移动/桌面 tabs、年份筛选、Projects/Templates 内容分派和列表错误边界从 `ProjectsView.tsx` 中抽离。
+- [x] `ProjectsView.tsx` 进一步降到约 631 行，列表页外壳已独立；下一步重点抽离新建项目表单状态与提交逻辑。
+- [x] 已新增 `components/modules/Projects/useProjectCreateForm.ts`，将新建活动 drawer 的打开/关闭、step 流转、Roadmap 同步、字段状态和 create submit payload 从 `ProjectsView.tsx` 中抽离。
+- [x] `ProjectsView.tsx` 已降到约 438 行，进入阶段 3 的 300-500 行验收范围；`ProjectsView.tsx` 阶段 3 试点完成。
 
 ### 推荐顺序
 
@@ -366,6 +386,7 @@
 7. `PaymentRequestsView.tsx`
 8. `SocialMediaView.tsx`
 9. `ToyyibView.tsx`
+10. `ProjectsView.tsx`
 
 ### 每个模块的拆分模板
 
@@ -391,6 +412,7 @@
   - `useBusinessBookmarks.ts` 已先行抽离 Business Directory 商家收藏状态和乐观更新逻辑。
   - `useBusinessInquiry.ts` 已先行抽离 Business Directory 商家询盘表单状态和提交逻辑。
   - `useSisterChapterFilters.ts` 已先行抽离 Business Directory sister chapter 筛选状态和计数。
+  - `useProjectCreateForm.ts` 已先行抽离 Projects 新建活动 drawer 的字段状态、Roadmap 同步和提交逻辑。
 - [ ] `XxxToolbar.tsx`
   - 搜索、筛选、导入导出、主操作。
   - `EventsHeader.tsx` 已先行抽离活动页标题和 list/calendar 视图切换操作区。
@@ -429,6 +451,15 @@
   - `SocialKanbanView.tsx` 已先行抽离 Social Media Kanban 列表视图。
   - `SocialCalendarView.tsx` 已先行抽离 Social Media Calendar 列表视图。
   - `ToyyibCategoriesTab.tsx` 已先行抽离 Toyyib Categories tab 的移动卡片、桌面表格和 inline create row。
+  - `ToyyibBillsTab.tsx` 已先行抽离 Toyyib Bills tab 的统计、筛选和列表/表格展示。
+  - `ToyyibCategoryModals.tsx` 已先行抽离 Toyyib category import、details 和 link 弹窗展示。
+  - `ToyyibSettingsPanel.tsx` 已先行抽离 Toyyib Settings、Webhook Setup 和 Test Payment 面板展示。
+  - `ProjectsTemplatesTab.tsx` 已先行抽离 Projects Templates tab 的搜索筛选、移动/桌面模板列表和模板操作。
+  - `ProjectsBatchActions.tsx` 已先行抽离 Projects 浮动批量操作条和批量状态更新 modal。
+  - `ProjectsCreateDrawer.tsx` 已先行抽离 Projects 新建活动 drawer 的 stepper、媒体同步字段和分类/日程表单展示。
+  - `ProjectsTemplateModal.tsx` 已先行抽离 Projects Create/Edit Event Template modal 表单展示。
+  - `ProjectsDetailHeader.tsx` 已先行抽离 Projects 详情页标题和状态工作流操作区。
+  - `ProjectsListShell.tsx` 已先行抽离 Projects 列表页移动/桌面 tabs、年份筛选和内容分派外壳。
 - [x] 模块内纯展示组件
   - `socialPostFormParts.tsx` 已先行抽离 Social Media 表单字段、只读字段、mockup preview 和 reference material 工具。
   - `InventoryStatsStrip.tsx` 已先行抽离库存 KPI 展示。
