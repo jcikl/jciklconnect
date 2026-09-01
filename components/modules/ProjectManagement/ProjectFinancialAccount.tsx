@@ -18,6 +18,7 @@ import {
   RecordTransactionData,
 } from '../../../services/projectFinancialService';
 import { FinanceService } from '../../../services/financeService';
+import { ProjectsService } from '../../../services/projectsService';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../../config/firebase';
 import { COLLECTIONS } from '../../../config/constants';
@@ -41,6 +42,134 @@ const EXPENSE_CATEGORIES = [
   { id: 'overhead',  name: 'Overhead & Admin',        color: '#6B7280' },
   { id: 'other',     name: 'Other Expenses',          color: '#EC4899' },
 ];
+
+// ── Module-level pure helpers ─────────────────────────────────────────────────
+const fmt = (n: number) =>
+  new Intl.NumberFormat('en-MY', { style: 'currency', currency: 'MYR' }).format(n);
+
+const fmtDate = (d: string) =>
+  d ? new Date(d).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+
+const utilizationColor = (pct: number) =>
+  pct >= 100 ? 'text-red-600' : pct >= 80 ? 'text-orange-500' : pct >= 60 ? 'text-yellow-600' : 'text-emerald-600';
+
+const progressBg = (pct: number) =>
+  pct >= 100 ? 'bg-red-500' : pct >= 80 ? 'bg-orange-500' : 'bg-emerald-500';
+
+const getAlertIcon = (severity: ProjectFinancialAlert['severity']) => {
+  if (severity === 'critical') return <XCircle size={14} className="text-red-500 shrink-0" />;
+  if (severity === 'high') return <AlertTriangle size={14} className="text-orange-500 shrink-0" />;
+  if (severity === 'medium') return <Clock size={14} className="text-yellow-500 shrink-0" />;
+  return <CheckCircle size={14} className="text-blue-500 shrink-0" />;
+};
+
+const calcStats = (items: Transaction[]) => {
+  const income  = items.filter(t => t.type === 'Income').reduce((s, t) => s + Math.abs(t.amount || 0), 0);
+  const expense = items.filter(t => t.type === 'Expense').reduce((s, t) => s + Math.abs(t.amount || 0), 0);
+  return { income, expense, net: income - expense };
+};
+
+// ── Module-level sub-components ───────────────────────────────────────────────
+const TxIcon: React.FC<{ type: string }> = ({ type }) => (
+  <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
+    type === 'Income' ? 'bg-emerald-50' : 'bg-red-50'
+  }`}>
+    {type === 'Income'
+      ? <ArrowUpRight size={13} className="text-emerald-500" />
+      : <ArrowDownRight size={13} className="text-red-500" />}
+  </div>
+);
+
+const TypeFilter: React.FC<{
+  value: 'all' | 'Income' | 'Expense';
+  onChange: (v: 'all' | 'Income' | 'Expense') => void;
+}> = ({ value, onChange }) => (
+  <div className="flex items-center gap-1">
+    {(['all', 'Income', 'Expense'] as const).map(f => (
+      <button key={f} onClick={() => onChange(f)}
+        className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition-colors ${
+          value === f
+            ? f === 'Income'  ? 'bg-emerald-500 text-white border-emerald-500'
+            : f === 'Expense' ? 'bg-red-500 text-white border-red-500'
+            : 'bg-jci-blue text-white border-jci-blue'
+            : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
+        }`}>
+        {f === 'all' ? 'All' : f}
+      </button>
+    ))}
+  </div>
+);
+
+const LabelRow: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+  <div className="flex items-center gap-3">
+    <span className="text-xs font-medium text-slate-500 w-20 shrink-0">{label}</span>
+    <div className="flex-1 min-w-0">{children}</div>
+  </div>
+);
+
+const EntryForm: React.FC<{
+  type: 'Income' | 'Expense';
+  description: string;
+  purpose: string;
+  amount: string | number;
+  onTypeChange: (t: 'Income' | 'Expense') => void;
+  onDescriptionChange: (v: string) => void;
+  onPurposeChange: (v: string) => void;
+  onAmountChange: (v: string) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  isSaving: boolean;
+}> = ({ type, description, purpose, amount, onTypeChange, onDescriptionChange, onPurposeChange, onAmountChange, onSave, onCancel, isSaving }) => (
+  <div className="space-y-1.5">
+    <LabelRow label="Type">
+      <div className="flex rounded-lg border border-slate-200 overflow-hidden bg-slate-50 p-0.5 gap-0.5">
+        {(['Expense', 'Income'] as const).map(t => (
+          <button key={t} type="button" onClick={() => onTypeChange(t)}
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-all ${
+              type === t
+                ? t === 'Expense' ? 'bg-red-500 text-white shadow-sm' : 'bg-emerald-500 text-white shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}>
+            {t}
+          </button>
+        ))}
+      </div>
+    </LabelRow>
+    <LabelRow label="Description">
+      <Forms.Input value={description} onChange={e => onDescriptionChange(e.target.value)} placeholder="What is this for?" />
+    </LabelRow>
+    <LabelRow label="Purpose">
+      <Forms.Input value={purpose} onChange={e => onPurposeChange(e.target.value)} placeholder="Purpose of this entry" />
+    </LabelRow>
+    <LabelRow label="Amount">
+      <Forms.Input type="number" value={amount} onChange={e => onAmountChange(e.target.value)} placeholder="0.00" />
+    </LabelRow>
+    <div className="flex gap-2 justify-end pt-1">
+      <Button size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
+      <Button size="sm" onClick={onSave} disabled={isSaving}>{isSaving ? 'Saving…' : 'Save'}</Button>
+    </div>
+  </div>
+);
+
+const SummaryStats: React.FC<{ items: Transaction[] }> = ({ items }) => {
+  const { income, expense, net } = calcStats(items);
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      {[
+        { label: 'Income',  val: income,  c: 'text-emerald-600', bg: 'bg-emerald-50' },
+        { label: 'Expense', val: expense, c: 'text-red-600',     bg: 'bg-red-50' },
+        { label: net >= 0 ? 'Surplus' : 'Deficit', val: Math.abs(net),
+          c: net >= 0 ? 'text-jci-blue' : 'text-orange-600',
+          bg: net >= 0 ? 'bg-blue-50' : 'bg-orange-50' },
+      ].map(s => (
+        <div key={s.label} className={`rounded-xl ${s.bg} px-3 py-2.5`}>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-0.5">{s.label}</p>
+          <p className={`text-sm font-bold tabular-nums ${s.c}`}>{fmt(s.val)}</p>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps> = ({
   project,
@@ -73,10 +202,12 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
 
   // ── Add transaction (project entry) ───────────────────────────────────────────
   const [showAddTx, setShowAddTx] = useState(false);
+  const [showInlineNewEntry, setShowInlineNewEntry] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [newTxData, setNewTxData] = useState<Partial<RecordTransactionData>>({
     type: 'expense', amount: 0, description: '', date: new Date().toISOString().split('T')[0],
   });
+  const [newEntryPurpose, setNewEntryPurpose] = useState('');
 
   // ── Budget editing ────────────────────────────────────────────────────────────
   const [showBudgetDrawer, setShowBudgetDrawer] = useState(false);
@@ -90,13 +221,17 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
 
   // ── Project entry inline edit ─────────────────────────────────────────────────
   const [editingPrjId, setEditingPrjId] = useState<string | null>(null);
-  const [prjDraft, setPrjDraft] = useState({ description: '', purpose: '', amount: '' });
+  const [prjDraft, setPrjDraft] = useState<{ description: string; purpose: string; amount: string; type: 'Income' | 'Expense' }>({ description: '', purpose: '', amount: '', type: 'Expense' });
   const [isSavingPrj, setIsSavingPrj] = useState(false);
 
-  // ── Bank purpose inline edit ──────────────────────────────────────────────────
-  const [editingBankPurposeId, setEditingBankPurposeId] = useState<string | null>(null);
-  const [purposeDraft, setPurposeDraft] = useState('');
-  const [isSavingPurpose, setIsSavingPurpose] = useState(false);
+  // ── Bank tx inline edit ───────────────────────────────────────────────────────
+  // ── Bank tx inline edit ───────────────────────────────────────────────────────
+  const [editingBankTxId, setEditingBankTxId] = useState<string | null>(null);
+  const [bankTxDraft, setBankTxDraft] = useState<{
+    category: Transaction['category']; projectId: string; year: number;
+  }>({ category: 'Projects & Activities', projectId: '', year: new Date().getFullYear() });
+  const [isSavingBankTx, setIsSavingBankTx] = useState(false);
+  const [allProjects, setAllProjects] = useState<Project[]>([]);
 
   // ── Matching (project entry ↔ bank tx) ───────────────────────────────────────
   const [matchingPrjTxId, setMatchingPrjTxId] = useState<string | null>(null);
@@ -114,10 +249,11 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
   const loadData = async () => {
     setLoading(true);
     try {
-      const [details, projectTxs, bankTxs] = await Promise.all([
+      const [details, projectTxs, bankTxs, accounts] = await Promise.all([
         projectFinancialService.getFullProjectFinancialDetails(project),
         FinanceService.getProjectTransactions(project.id).catch(() => [] as Transaction[]),
         FinanceService.getBankTransactionsByProject(project.id).catch(() => [] as Transaction[]),
+        ProjectsService.getAllProjects().catch(() => [] as Project[]),
       ]);
       if (details) {
         setAccount(details.account);
@@ -128,6 +264,7 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
       }
       setProjectTrxList(projectTxs);
       setBankTxList(bankTxs);
+      setAllProjects(accounts);
     } catch {
       showToast('Failed to load financial data', 'error');
     } finally {
@@ -135,38 +272,17 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
     }
   };
 
-  // ── Formatters ────────────────────────────────────────────────────────────────
-  const fmt = (n: number) =>
-    new Intl.NumberFormat('en-MY', { style: 'currency', currency: 'MYR' }).format(n);
-
-  const fmtDate = (d: string) =>
-    d ? new Date(d).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: '2-digit' }) : '—';
-
-  const utilizationColor = (pct: number) =>
-    pct >= 100 ? 'text-red-600' : pct >= 80 ? 'text-orange-500' : pct >= 60 ? 'text-yellow-600' : 'text-emerald-600';
-
-  const progressBg = (pct: number) =>
-    pct >= 100 ? 'bg-red-500' : pct >= 80 ? 'bg-orange-500' : 'bg-emerald-500';
-
-  const getAlertIcon = (severity: ProjectFinancialAlert['severity']) => {
-    if (severity === 'critical') return <XCircle size={14} className="text-red-500 shrink-0" />;
-    if (severity === 'high') return <AlertTriangle size={14} className="text-orange-500 shrink-0" />;
-    if (severity === 'medium') return <Clock size={14} className="text-yellow-500 shrink-0" />;
-    return <CheckCircle size={14} className="text-blue-500 shrink-0" />;
-  };
-
-  // ── Helpers ───────────────────────────────────────────────────────────────────
-  const calcStats = (items: Transaction[]) => {
-    const income  = items.filter(t => t.type === 'Income').reduce((s, t) => s + Math.abs(t.amount || 0), 0);
-    const expense = items.filter(t => t.type === 'Expense').reduce((s, t) => s + Math.abs(t.amount || 0), 0);
-    return { income, expense, net: income - expense };
-  };
-
   const filteredPrjTx = useMemo(() =>
     projectTrxList.filter(tx => {
       const mt = prjTypeFilter === 'all' || tx.type === prjTypeFilter;
-      const ms = !prjSearch || (tx.description || '').toLowerCase().includes(prjSearch.toLowerCase())
-                            || (tx.purpose   || '').toLowerCase().includes(prjSearch.toLowerCase());
+      if (!prjSearch) return mt;
+      const desc = (tx.description || '').toLowerCase();
+      const purp = (tx.purpose || '').toLowerCase();
+      const date = fmtDate(tx.date).toLowerCase();
+      const amt  = String(Math.abs(tx.amount || 0));
+      const ms = prjSearch.trim().toLowerCase().split(/\s+/).every(
+        token => desc.includes(token) || purp.includes(token) || date.includes(token) || amt.includes(token)
+      );
       return mt && ms;
     }),
   [projectTrxList, prjTypeFilter, prjSearch]);
@@ -174,7 +290,13 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
   const filteredBankTx = useMemo(() =>
     bankTxList.filter(tx => {
       const mt = bankTypeFilter === 'all' || tx.type === bankTypeFilter;
-      const ms = !bankSearch || (tx.description || '').toLowerCase().includes(bankSearch.toLowerCase());
+      if (!bankSearch) return mt;
+      const desc = (tx.description || '').toLowerCase();
+      const date = fmtDate(tx.date).toLowerCase();
+      const amt  = String(Math.abs(tx.amount || 0));
+      const ms = bankSearch.trim().toLowerCase().split(/\s+/).every(
+        token => desc.includes(token) || date.includes(token) || amt.includes(token)
+      );
       return mt && ms;
     }),
   [bankTxList, bankTypeFilter, bankSearch]);
@@ -251,6 +373,33 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
     }
   };
 
+  const handleInlineAddEntry = async () => {
+    setIsSubmitting(true);
+    try {
+      const txType = (newTxData.type === 'income' ? 'Income' : 'Expense') as 'Income' | 'Expense';
+      await FinanceService.createProjectTransaction({
+        projectId: project.id,
+        type: txType,
+        amount: newTxData.amount || 0,
+        description: newTxData.description || '',
+        date: '',
+        purpose: newEntryPurpose || null,
+        category: 'Projects & Activities',
+        status: 'Pending',
+        bankAccountId: undefined,
+      });
+      await loadData();
+      setShowInlineNewEntry(false);
+      setNewTxData({ type: 'expense', amount: 0, description: '', date: new Date().toISOString().split('T')[0] });
+      setNewEntryPurpose('');
+      showToast('Entry added', 'success');
+    } catch {
+      showToast('Failed to add entry', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleSaveBudget = async () => {
     if (!onUpdateProject) return;
     setIsSavingBudget(true);
@@ -294,10 +443,10 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
     try {
       const amount = Math.abs(parseFloat(prjDraft.amount) || 0);
       await FinanceService.updateProjectTransaction(editingPrjId, {
-        description: prjDraft.description, purpose: prjDraft.purpose, amount,
+        description: prjDraft.description, purpose: prjDraft.purpose, amount, type: prjDraft.type,
       });
       setProjectTrxList(prev => prev.map(t =>
-        t.id === editingPrjId ? { ...t, description: prjDraft.description, purpose: prjDraft.purpose, amount } : t
+        t.id === editingPrjId ? { ...t, description: prjDraft.description, purpose: prjDraft.purpose, amount, type: prjDraft.type } : t
       ));
       setEditingPrjId(null);
       showToast('Entry updated', 'success');
@@ -313,18 +462,22 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
     setIsSavingMatch(true);
     try {
       const entry = projectTrxList.find(t => t.id === matchingPrjTxId);
+      const bankTx = bankTxList.find(t => t.id === bankTxId);
       // Set the link via direct write
       await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, bankTxId), { projectTransactionId: matchingPrjTxId });
-      // Sync purpose from entry separately via service
+      // Sync purpose from entry to bank tx
       if (entry?.purpose) {
-        try {
-          await FinanceService.updateTransaction(bankTxId, { purpose: entry.purpose });
-        } catch {
-          // Purpose sync failed silently — match still succeeds
-        }
+        try { await FinanceService.updateTransaction(bankTxId, { purpose: entry.purpose }); } catch {}
+      }
+      // Sync date from bank tx to project entry
+      if (bankTx?.date) {
+        try { await FinanceService.updateTransaction(matchingPrjTxId, { date: bankTx.date }); } catch {}
       }
       setBankTxList(prev => prev.map(t =>
         t.id === bankTxId ? { ...t, projectTransactionId: matchingPrjTxId, ...(entry?.purpose ? { purpose: entry.purpose } : {}) } : t
+      ));
+      setProjectTrxList(prev => prev.map(t =>
+        t.id === matchingPrjTxId ? { ...t, date: bankTx?.date || t.date } : t
       ));
       setMatchingPrjTxId(null);
       setMatchSearch('');
@@ -340,13 +493,17 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
     try {
       const bankTx = bankTxList.find(t => t.id === bankTxId);
       const originalPurpose = bankTx?.originalPurpose ?? null;
+      const prjTxId = bankTx?.projectTransactionId ?? null;
       // Clear the link via direct write (bypasses reconciliation check)
       await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, bankTxId), { projectTransactionId: null });
-      // Revert purpose separately via service (may be no-op if purpose unchanged)
-      try {
-        await FinanceService.updateTransaction(bankTxId, { purpose: originalPurpose });
-      } catch {
-        // Purpose revert failed silently — unlink still succeeds
+      // Revert purpose separately via service
+      try { await FinanceService.updateTransaction(bankTxId, { purpose: originalPurpose }); } catch {}
+      // Revert project entry date to null
+      if (prjTxId) {
+        try { await FinanceService.updateTransaction(prjTxId, { date: '' }); } catch {}
+        setProjectTrxList(prev => prev.map(t =>
+          t.id === prjTxId ? { ...t, date: '' } : t
+        ));
       }
       setBankTxList(prev => prev.map(t =>
         t.id === bankTxId ? { ...t, projectTransactionId: null, purpose: originalPurpose } : t
@@ -357,18 +514,31 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
     }
   };
 
-  const handleSaveBankPurpose = async () => {
-    if (!editingBankPurposeId) return;
-    setIsSavingPurpose(true);
+  const handleSaveBankTx = async () => {
+    if (!editingBankTxId) return;
+    setIsSavingBankTx(true);
     try {
-      await FinanceService.updateTransaction(editingBankPurposeId, { purpose: purposeDraft });
-      setBankTxList(prev => prev.map(t => t.id === editingBankPurposeId ? { ...t, purpose: purposeDraft } : t));
-      setEditingBankPurposeId(null);
-      showToast('Purpose updated', 'success');
+      const bankTx = bankTxList.find(t => t.id === editingBankTxId);
+      const projectChanged = bankTx && (bankTxDraft.projectId || '') !== (bankTx.projectId || '');
+      if (projectChanged && bankTx?.projectTransactionId) {
+        await handleUnmatchBank(editingBankTxId);
+      }
+      await FinanceService.updateTransaction(editingBankTxId, {
+        category: bankTxDraft.category,
+        projectId: bankTxDraft.projectId || null,
+        year: bankTxDraft.year,
+      });
+      setBankTxList(prev => prev.map(t =>
+        t.id === editingBankTxId
+          ? { ...t, category: bankTxDraft.category, projectId: bankTxDraft.projectId || null, year: bankTxDraft.year }
+          : t
+      ));
+      setEditingBankTxId(null);
+      showToast('Transaction updated', 'success');
     } catch (e: any) {
-      showToast(e?.message || 'Failed to update purpose', 'error');
+      showToast(e?.message || 'Failed to update transaction', 'error');
     } finally {
-      setIsSavingPurpose(false);
+      setIsSavingBankTx(false);
     }
   };
 
@@ -384,66 +554,6 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
     }
   };
 
-  const handleRevertBankPurpose = async (bankTx: Transaction) => {
-    const original = bankTx.originalPurpose || null;
-    try {
-      await FinanceService.updateTransaction(bankTx.id, { purpose: original });
-      setBankTxList(prev => prev.map(t => t.id === bankTx.id ? { ...t, purpose: original } : t));
-      showToast('Purpose reverted', 'success');
-    } catch (e: any) {
-      showToast(e?.message || 'Failed to revert', 'error');
-    }
-  };
-
-  // ── UI helpers ────────────────────────────────────────────────────────────────
-  const SummaryStats = ({ items }: { items: Transaction[] }) => {
-    const { income, expense, net } = calcStats(items);
-    return (
-      <div className="grid grid-cols-3 gap-2">
-        {[
-          { label: 'Income',  val: income,  c: 'text-emerald-600', bg: 'bg-emerald-50' },
-          { label: 'Expense', val: expense, c: 'text-red-600',     bg: 'bg-red-50' },
-          { label: net >= 0 ? 'Surplus' : 'Deficit', val: Math.abs(net),
-            c: net >= 0 ? 'text-jci-blue' : 'text-orange-600',
-            bg: net >= 0 ? 'bg-blue-50' : 'bg-orange-50' },
-        ].map(s => (
-          <div key={s.label} className={`rounded-xl ${s.bg} px-3 py-2.5`}>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-0.5">{s.label}</p>
-            <p className={`text-sm font-bold tabular-nums ${s.c}`}>{fmt(s.val)}</p>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
-  const TypeFilter = ({
-    value, onChange,
-  }: { value: 'all' | 'Income' | 'Expense'; onChange: (v: 'all' | 'Income' | 'Expense') => void }) => (
-    <div className="flex items-center gap-1">
-      {(['all', 'Income', 'Expense'] as const).map(f => (
-        <button key={f} onClick={() => onChange(f)}
-          className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition-colors ${
-            value === f
-              ? f === 'Income'  ? 'bg-emerald-500 text-white border-emerald-500'
-              : f === 'Expense' ? 'bg-red-500 text-white border-red-500'
-              : 'bg-jci-blue text-white border-jci-blue'
-              : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
-          }`}>
-          {f === 'all' ? 'All' : f}
-        </button>
-      ))}
-    </div>
-  );
-
-  const TxIcon = ({ type }: { type: string }) => (
-    <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
-      type === 'Income' ? 'bg-emerald-50' : 'bg-red-50'
-    }`}>
-      {type === 'Income'
-        ? <ArrowUpRight size={13} className="text-emerald-500" />
-        : <ArrowDownRight size={13} className="text-red-500" />}
-    </div>
-  );
 
   // ── Loading ───────────────────────────────────────────────────────────────────
   if (loading) {
@@ -775,11 +885,41 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
               <TypeFilter value={prjTypeFilter} onChange={setPrjTypeFilter} />
             </div>
 
-            {groupedByPurpose.length === 0 ? (
-              <p className="text-xs text-slate-400 py-6 text-center">No project entries found.</p>
-            ) : (
-              <div className="space-y-3">
-                {groupedByPurpose.map(([purpose, txs]) => {
+            <div className="space-y-3">
+              {/* Inline new entry row */}
+              {showInlineNewEntry ? (
+                  <div className="rounded-xl border border-jci-blue/20 bg-blue-50/30 shadow-sm px-4 py-3">
+                    <EntryForm
+                      type={(newTxData.type === 'income' ? 'Income' : 'Expense') as 'Income' | 'Expense'}
+                      description={newTxData.description || ''}
+                      purpose={newEntryPurpose}
+                      amount={newTxData.amount || ''}
+                      onTypeChange={t => setNewTxData(p => ({ ...p, type: t === 'Income' ? 'income' : 'expense' }))}
+                      onDescriptionChange={v => setNewTxData(p => ({ ...p, description: v }))}
+                      onPurposeChange={setNewEntryPurpose}
+                      onAmountChange={v => setNewTxData(p => ({ ...p, amount: parseFloat(v) || 0 }))}
+                      onSave={handleInlineAddEntry}
+                      onCancel={() => {
+                        setShowInlineNewEntry(false);
+                        setNewTxData({ type: 'expense', amount: 0, description: '', date: new Date().toISOString().split('T')[0] });
+                        setNewEntryPurpose('');
+                      }}
+                      isSaving={isSubmitting}
+                    />
+                  </div>
+              ) : (
+                <button
+                  onClick={() => setShowInlineNewEntry(true)}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-slate-200 text-xs text-slate-400 hover:text-jci-blue hover:border-jci-blue/40 hover:bg-blue-50/30 transition-colors">
+                  <Plus size={13} />New Entry
+                </button>
+              )}
+
+              {groupedByPurpose.length === 0 && !showInlineNewEntry && (
+                <p className="text-xs text-slate-400 py-4 text-center">No project entries found.</p>
+              )}
+
+              {groupedByPurpose.map(([purpose, txs]) => {
                   const { income, expense, net } = calcStats(txs);
                   return (
                     <div key={purpose || '__none'} className="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden">
@@ -805,23 +945,19 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
                           return (
                             <div key={tx.id} className="px-4 py-3">
                               {isEditing ? (
-                                <div className="space-y-2">
-                                  <div className="grid grid-cols-2 gap-2">
-                                    <Forms.Input label="Description" value={prjDraft.description}
-                                      onChange={e => setPrjDraft(p => ({ ...p, description: e.target.value }))} />
-                                    <Forms.Input label="Amount (RM)" type="number" value={prjDraft.amount}
-                                      onChange={e => setPrjDraft(p => ({ ...p, amount: e.target.value }))} />
-                                  </div>
-                                  <Forms.Input label="Purpose" value={prjDraft.purpose}
-                                    onChange={e => setPrjDraft(p => ({ ...p, purpose: e.target.value }))}
-                                    placeholder="Purpose of this transaction" />
-                                  <div className="flex gap-2 justify-end">
-                                    <Button size="sm" variant="ghost" onClick={() => setEditingPrjId(null)}>Cancel</Button>
-                                    <Button size="sm" onClick={handleSavePrj} disabled={isSavingPrj}>
-                                      {isSavingPrj ? 'Saving…' : 'Save'}
-                                    </Button>
-                                  </div>
-                                </div>
+                                <EntryForm
+                                  type={prjDraft.type}
+                                  description={prjDraft.description}
+                                  purpose={prjDraft.purpose}
+                                  amount={prjDraft.amount}
+                                  onTypeChange={t => setPrjDraft(p => ({ ...p, type: t }))}
+                                  onDescriptionChange={v => setPrjDraft(p => ({ ...p, description: v }))}
+                                  onPurposeChange={v => setPrjDraft(p => ({ ...p, purpose: v }))}
+                                  onAmountChange={v => setPrjDraft(p => ({ ...p, amount: v }))}
+                                  onSave={handleSavePrj}
+                                  onCancel={() => setEditingPrjId(null)}
+                                  isSaving={isSavingPrj}
+                                />
                               ) : (
                                 <div className="flex items-start gap-3">
                                   <TxIcon type={tx.type} />
@@ -855,7 +991,7 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
                                         </button>
                                       )}
                                       <button
-                                        onClick={() => { setEditingPrjId(tx.id); setPrjDraft({ description: tx.description || '', purpose: tx.purpose || '', amount: String(Math.abs(tx.amount || 0)) }); }}
+                                        onClick={() => { setEditingPrjId(tx.id); setPrjDraft({ description: tx.description || '', purpose: tx.purpose || '', amount: String(Math.abs(tx.amount || 0)), type: tx.type as 'Income' | 'Expense' || 'Expense' }); }}
                                         className="text-slate-300 hover:text-slate-500 transition-colors ml-auto">
                                         <Edit3 size={12} />
                                       </button>
@@ -870,8 +1006,7 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
                     </div>
                   );
                 })}
-              </div>
-            )}
+            </div>
           </div>
         )}
 
@@ -919,7 +1054,7 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
                           const matchedEntry = tx.projectTransactionId
                             ? projectTrxList.find(p => p.id === tx.projectTransactionId)
                             : null;
-                          const isEditingPurpose = editingBankPurposeId === tx.id;
+                          const isEditing = editingBankTxId === tx.id;
                           return (
                             <div key={tx.id} className="px-4 py-3">
                               <div className="flex items-start gap-3">
@@ -938,22 +1073,45 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
                                     </span>
                                   </div>
 
-                                  {/* Row 2: purpose edit form OR match status + edit button */}
-                                  {isEditingPurpose ? (
-                                    <div className="flex items-center gap-2 mt-1.5">
-                                      <input value={purposeDraft} onChange={e => setPurposeDraft(e.target.value)}
-                                        placeholder="Enter purpose…"
-                                        className="flex-1 px-2 py-1 text-xs border border-slate-200 rounded bg-slate-50 focus:outline-none focus:ring-1 focus:ring-jci-blue/30" />
-                                      <button onClick={handleSaveBankPurpose} disabled={isSavingPurpose}
-                                        className="text-emerald-500 hover:text-emerald-600 transition-colors">
-                                        <Check size={14} />
-                                      </button>
-                                      <button onClick={() => setEditingBankPurposeId(null)}
-                                        className="text-slate-300 hover:text-slate-500 transition-colors">
-                                        <X size={14} />
-                                      </button>
+                                  {/* Inline edit form */}
+                                  {isEditing ? (
+                                    <div className="mt-2 space-y-1.5">
+                                      <LabelRow label="Category">
+                                        <Forms.Select value={bankTxDraft.category}
+                                          onChange={e => setBankTxDraft(p => ({
+                                            ...p,
+                                            category: e.target.value as Transaction['category'],
+                                            projectId: e.target.value === 'Projects & Activities' ? p.projectId : '',
+                                          }))}
+                                          options={[
+                                            { value: 'Projects & Activities', label: 'Projects & Activities' },
+                                            { value: 'Membership', label: 'Membership' },
+                                            { value: 'Administrative', label: 'Administrative' },
+                                          ]} />
+                                      </LabelRow>
+                                      {bankTxDraft.category === 'Projects & Activities' && (
+                                        <LabelRow label="Project">
+                                          <Forms.Select value={bankTxDraft.projectId}
+                                            onChange={e => setBankTxDraft(p => ({ ...p, projectId: e.target.value }))}
+                                            options={[
+                                              { value: '', label: 'No Project' },
+                                              ...allProjects.map(pr => ({ value: pr.id, label: pr.name ?? pr.title ?? pr.id })),
+                                            ]} />
+                                        </LabelRow>
+                                      )}
+                                      <LabelRow label="Year">
+                                        <Forms.Input type="number" value={bankTxDraft.year}
+                                          onChange={e => setBankTxDraft(p => ({ ...p, year: parseInt(e.target.value) || new Date().getFullYear() }))} />
+                                      </LabelRow>
+                                      <div className="flex gap-2 justify-end">
+                                        <Button size="sm" variant="ghost" onClick={() => setEditingBankTxId(null)}>Cancel</Button>
+                                        <Button size="sm" onClick={handleSaveBankTx} disabled={isSavingBankTx}>
+                                          {isSavingBankTx ? 'Saving…' : 'Save'}
+                                        </Button>
+                                      </div>
                                     </div>
                                   ) : (
+                                    /* Row 2: match status + edit button */
                                     <div className="flex items-center gap-2 mt-1.5">
                                       {matchedEntry ? (
                                         <>
@@ -965,12 +1123,7 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
                                               Set purpose
                                             </button>
                                           )}
-                                          {tx.purpose && tx.purpose !== tx.originalPurpose && (
-                                            <button onClick={() => handleRevertBankPurpose(tx)}
-                                              className="text-[10px] font-semibold text-orange-500 hover:underline shrink-0">
-                                              Revert
-                                            </button>
-                                          )}
+
                                           <button onClick={() => handleUnmatchBank(tx.id)}
                                             className="text-slate-300 hover:text-red-500 transition-colors shrink-0" title="Remove match">
                                             <Link2Off size={11} />
@@ -980,8 +1133,15 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
                                         <span className="text-[10px] text-slate-300 flex-1">Unmatched</span>
                                       )}
                                       <button
-                                        onClick={() => { setEditingBankPurposeId(tx.id); setPurposeDraft(tx.purpose || ''); }}
-                                        className="text-slate-300 hover:text-slate-500 transition-colors ml-auto" title="Edit purpose">
+                                        onClick={() => {
+                                          setEditingBankTxId(tx.id);
+                                          setBankTxDraft({
+                                            category: tx.category || 'Projects & Activities',
+                                            projectId: tx.projectId || '',
+                                            year: tx.year || new Date().getFullYear(),
+                                          });
+                                        }}
+                                        className="text-slate-300 hover:text-slate-500 transition-colors ml-auto" title="Edit transaction">
                                         <Edit3 size={12} />
                                       </button>
                                     </div>
@@ -1055,7 +1215,14 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
         const entry = projectTrxList.find(t => t.id === matchingPrjTxId);
         const candidates = bankTxList.filter(t =>
           (!t.projectTransactionId || t.projectTransactionId === matchingPrjTxId) &&
-          (!matchSearch || (t.description || '').toLowerCase().includes(matchSearch.toLowerCase()))
+          (!matchSearch || (() => {
+            const desc = (t.description || '').toLowerCase();
+            const date = fmtDate(t.date).toLowerCase();
+            const amt  = String(Math.abs(t.amount || 0));
+            return matchSearch.trim().toLowerCase().split(/\s+/).every(
+              token => desc.includes(token) || date.includes(token) || amt.includes(token)
+            );
+          })())
         );
         return (
           <Modal isOpen onClose={() => { setMatchingPrjTxId(null); setMatchSearch(''); }}
