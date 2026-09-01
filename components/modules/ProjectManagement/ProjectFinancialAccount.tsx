@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
 import {
   DollarSign, TrendingDown, AlertTriangle, Plus, Target, CheckCircle, XCircle, Clock,
-  BarChart3, ArrowUpRight, ArrowDownRight, Edit3, Search, Link2, Link2Off, X, Check,
+  BarChart3, ArrowUpRight, ArrowDownRight, Edit3, Search, Link2, Link2Off, X, Check, Trash2,
 } from 'lucide-react';
 import type {
   ProjectFinancialAccount,
@@ -118,8 +118,9 @@ const EntryForm: React.FC<{
   onAmountChange: (v: string) => void;
   onSave: () => void;
   onCancel: () => void;
+  onDelete?: () => void;
   isSaving: boolean;
-}> = ({ type, description, purpose, amount, onTypeChange, onDescriptionChange, onPurposeChange, onAmountChange, onSave, onCancel, isSaving }) => (
+}> = ({ type, description, purpose, amount, onTypeChange, onDescriptionChange, onPurposeChange, onAmountChange, onSave, onCancel, onDelete, isSaving }) => (
   <div className="space-y-1.5">
     <LabelRow label="Type">
       <div className="flex rounded-lg border border-slate-200 overflow-hidden bg-slate-50 p-0.5 gap-0.5">
@@ -135,49 +136,27 @@ const EntryForm: React.FC<{
         ))}
       </div>
     </LabelRow>
-    <LabelRow label="Description">
-      <Forms.Input value={description} onChange={e => onDescriptionChange(e.target.value)} placeholder="What is this for?" />
-    </LabelRow>
     <LabelRow label="Purpose">
       <Forms.Input value={purpose} onChange={e => onPurposeChange(e.target.value)} placeholder="Purpose of this entry" />
+    </LabelRow>
+    <LabelRow label="Description">
+      <Forms.Input value={description} onChange={e => onDescriptionChange(e.target.value)} placeholder="What is this for?" />
     </LabelRow>
     <LabelRow label="Amount">
       <Forms.Input type="number" value={amount} onChange={e => onAmountChange(e.target.value)} placeholder="0.00" />
     </LabelRow>
-    <div className="flex gap-2 justify-end pt-1">
-      <Button size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
-      <Button size="sm" onClick={onSave} disabled={isSaving}>{isSaving ? 'Saving…' : 'Save'}</Button>
+    <div className="flex items-center justify-between pt-1">
+      {onDelete
+        ? <Button size="sm" variant="ghost" onClick={onDelete} className="text-red-400 hover:text-red-600 hover:bg-red-50"><Trash2 size={13} /></Button>
+        : <span />}
+      <div className="flex gap-2">
+        <Button size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
+        <Button size="sm" onClick={onSave} disabled={isSaving}>{isSaving ? 'Saving…' : 'Save'}</Button>
+      </div>
     </div>
   </div>
 );
 
-const CategoryForm: React.FC<{
-  name: string;
-  amount: string | number;
-  description: string;
-  onNameChange: (v: string) => void;
-  onAmountChange: (v: string) => void;
-  onDescriptionChange: (v: string) => void;
-  onSave: () => void;
-  onCancel: () => void;
-  isSaving: boolean;
-}> = ({ name, amount, description, onNameChange, onAmountChange, onDescriptionChange, onSave, onCancel, isSaving }) => (
-  <div className="space-y-1.5">
-    <LabelRow label="Name">
-      <Forms.Input value={name} onChange={e => onNameChange(e.target.value)} placeholder="e.g. Marketing" autoFocus />
-    </LabelRow>
-    <LabelRow label="Amount (RM)">
-      <Forms.Input type="number" value={amount} onChange={e => onAmountChange(e.target.value)} placeholder="0.00" />
-    </LabelRow>
-    <LabelRow label="Description">
-      <Forms.Input value={description} onChange={e => onDescriptionChange(e.target.value)} placeholder="What this category covers" />
-    </LabelRow>
-    <div className="flex gap-2 justify-end pt-1">
-      <Button size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
-      <Button size="sm" onClick={onSave} disabled={isSaving || !name.trim()}>{isSaving ? 'Saving…' : 'Save'}</Button>
-    </div>
-  </div>
-);
 
 const SummaryStats: React.FC<{ items: Transaction[] }> = ({ items }) => {
   const { income, expense, net } = calcStats(items);
@@ -244,12 +223,16 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
 
   // ── Budget category inline edit (Budgeting tab) ───────────────────────────────
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
-  const [catDraft, setCatDraft] = useState({ name: '', description: '', allocatedAmount: 0 });
+  const [catDraft, setCatDraft] = useState<{ name: string; description: string; allocatedAmount: number; type: 'income' | 'expense' }>({ name: '', description: '', allocatedAmount: 0, type: 'expense' });
   const [isSavingCat, setIsSavingCat] = useState(false);
+
+  // ── Budget category search + filter ──────────────────────────────────────────
+  const [budgetSearch, setBudgetSearch] = useState('');
+  const [budgetTypeFilter, setBudgetTypeFilter] = useState<'all' | 'Income' | 'Expense'>('all');
 
   // ── Budget category new row ───────────────────────────────────────────────────
   const [showNewCat, setShowNewCat] = useState(false);
-  const [newCatDraft, setNewCatDraft] = useState({ name: '', description: '', allocatedAmount: 0 });
+  const [newCatDraft, setNewCatDraft] = useState<{ name: string; description: string; allocatedAmount: number; type: 'income' | 'expense' }>({ name: '', description: '', allocatedAmount: 0, type: 'expense' });
   const [isAddingCat, setIsAddingCat] = useState(false);
 
   // ── Project entry inline edit ─────────────────────────────────────────────────
@@ -453,7 +436,7 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
     setIsSavingCat(true);
     try {
       await projectFinancialService.updateBudgetCategory(account.id, editingCatId, {
-        name: catDraft.name, description: catDraft.description, allocatedAmount: catDraft.allocatedAmount,
+        name: catDraft.name, description: catDraft.description, allocatedAmount: catDraft.allocatedAmount, type: catDraft.type,
       });
       setAccount(prev => prev ? {
         ...prev,
@@ -470,6 +453,21 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
     }
   };
 
+  const handleDeleteCategory = async (categoryId: string) => {
+    if (!account) return;
+    try {
+      await projectFinancialService.deleteBudgetCategory(account.id, categoryId);
+      setAccount(prev => prev ? {
+        ...prev,
+        budgetCategories: prev.budgetCategories.filter(c => c.id !== categoryId),
+      } : prev);
+      setEditingCatId(null);
+      showToast('Category deleted', 'success');
+    } catch {
+      showToast('Failed to delete category', 'error');
+    }
+  };
+
   const handleAddCategory = async () => {
     if (!account || !newCatDraft.name.trim()) return;
     setIsAddingCat(true);
@@ -478,7 +476,8 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
         name: newCatDraft.name.trim(),
         description: newCatDraft.description.trim(),
         allocatedAmount: newCatDraft.allocatedAmount,
-        color: '#6B7280',
+        type: newCatDraft.type,
+        color: newCatDraft.type === 'income' ? '#10B981' : '#6B7280',
       });
       setAccount(prev => prev ? { ...prev, budgetCategories: [...prev.budgetCategories, added] } : prev);
       setNewCatDraft({ name: '', description: '', allocatedAmount: 0 });
@@ -488,6 +487,17 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
       showToast('Failed to add category', 'error');
     } finally {
       setIsAddingCat(false);
+    }
+  };
+
+  const handleDeletePrj = async (txId: string) => {
+    try {
+      await FinanceService.deleteProjectTransaction(txId);
+      setProjectTrxList(prev => prev.filter(t => t.id !== txId));
+      setEditingPrjId(null);
+      showToast('Entry deleted', 'success');
+    } catch {
+      showToast('Failed to delete entry', 'error');
     }
   };
 
@@ -809,20 +819,92 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
 
         {/* ── BUDGETING ──────────────────────────────────────────────────────── */}
         {activeTab === 'budgeting' && (() => {
-          const totalAllocated = account.budgetCategories.reduce((s, c) => s + (c.allocatedAmount || 0), 0);
-          const budgetAmt = project.budget || summary.totalAllocated;
-          const unallocated = budgetAmt - totalAllocated;
+          const q = budgetSearch.toLowerCase();
+          const incomeCategories = account.budgetCategories.filter(c =>
+            c.type === 'income' &&
+            (budgetTypeFilter === 'all' || budgetTypeFilter === 'Income') &&
+            (!q || c.name.toLowerCase().includes(q) || (c.description || '').toLowerCase().includes(q))
+          );
+          const expenseCategories = account.budgetCategories.filter(c =>
+            (c.type === 'expense' || !c.type) &&
+            (budgetTypeFilter === 'all' || budgetTypeFilter === 'Expense') &&
+            (!q || c.name.toLowerCase().includes(q) || (c.description || '').toLowerCase().includes(q))
+          );
+          const totalIncomeBudget = incomeCategories.reduce((s, c) => s + (c.allocatedAmount || 0), 0);
+          const totalExpenseBudget = expenseCategories.reduce((s, c) => s + (c.allocatedAmount || 0), 0);
+          const net = totalIncomeBudget - totalExpenseBudget;
+
+          const renderCategoryCard = (cat: BudgetCategory) => {
+            const isEditing = editingCatId === cat.id;
+            const spent = cat.spentAmount || 0;
+            const pct = cat.allocatedAmount > 0 ? (spent / cat.allocatedAmount) * 100 : 0;
+            const isIncome = cat.type === 'income';
+            return (
+              <div key={cat.id} className="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden px-4 py-3">
+                {isEditing ? (
+                  <EntryForm
+                    type={catDraft.type === 'income' ? 'Income' : 'Expense'}
+                    description={catDraft.description}
+                    purpose={catDraft.name}
+                    amount={catDraft.allocatedAmount}
+                    onTypeChange={t => setCatDraft(p => ({ ...p, type: t === 'Income' ? 'income' : 'expense' }))}
+                    onDescriptionChange={v => setCatDraft(p => ({ ...p, description: v }))}
+                    onPurposeChange={v => setCatDraft(p => ({ ...p, name: v }))}
+                    onAmountChange={v => setCatDraft(p => ({ ...p, allocatedAmount: parseFloat(v) || 0 }))}
+                    onSave={handleSaveCat}
+                    onCancel={() => setEditingCatId(null)}
+                    onDelete={() => handleDeleteCategory(cat.id)}
+                    isSaving={isSavingCat}
+                  />
+                ) : (
+                  <div className="flex items-start gap-3">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0 mt-1"
+                      style={{ backgroundColor: cat.color || (isIncome ? '#10B981' : '#6B7280') }} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-semibold text-slate-700">{cat.name}</p>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className={`text-xs font-bold tabular-nums ${isIncome ? 'text-emerald-600' : utilizationColor(pct)}`}>
+                            {fmt(cat.allocatedAmount)}
+                          </span>
+                          <button
+                            onClick={() => { setEditingCatId(cat.id); setCatDraft({ name: cat.name, description: cat.description || '', allocatedAmount: cat.allocatedAmount, type: cat.type || 'expense' }); }}
+                            className="text-slate-300 hover:text-slate-500 transition-colors">
+                            <Edit3 size={12} />
+                          </button>
+                        </div>
+                      </div>
+                      {cat.description && <p className="text-[10px] text-slate-400 mt-0.5">{cat.description}</p>}
+                      {!isIncome && (
+                        <>
+                          <div className="mt-1.5 w-full h-1 bg-slate-100 rounded-full overflow-hidden">
+                            <div className={`h-1 rounded-full ${progressBg(pct)}`}
+                              style={{ width: `${Math.min(pct, 100)}%` }} />
+                          </div>
+                          <div className="flex justify-between mt-0.5 text-[10px] text-slate-400">
+                            <span>Spent: {fmt(spent)}</span>
+                            <span>Left: {fmt(cat.allocatedAmount - spent)}</span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          };
+
           return (
             <div className="space-y-4">
               {/* Summary */}
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  { label: 'Budget',    val: budgetAmt,        c: 'text-jci-blue',    bg: 'bg-blue-50' },
-                  { label: 'Allocated', val: totalAllocated,   c: 'text-red-600',     bg: 'bg-red-50' },
-                  { label: unallocated >= 0 ? 'Unallocated' : 'Over Budget',
-                    val: Math.abs(unallocated),
-                    c: unallocated >= 0 ? 'text-emerald-600' : 'text-orange-600',
-                    bg: unallocated >= 0 ? 'bg-emerald-50' : 'bg-orange-50' },
+                  { label: 'Income',  val: totalIncomeBudget,   c: 'text-emerald-600', bg: 'bg-emerald-50' },
+                  { label: 'Expense', val: totalExpenseBudget,  c: 'text-red-600',     bg: 'bg-red-50' },
+                  { label: net >= 0 ? 'Net' : 'Deficit',
+                    val: Math.abs(net),
+                    c: net >= 0 ? 'text-jci-blue' : 'text-orange-600',
+                    bg: net >= 0 ? 'bg-blue-50' : 'bg-orange-50' },
                 ].map(s => (
                   <div key={s.label} className={`rounded-xl ${s.bg} px-3 py-2.5`}>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-0.5">{s.label}</p>
@@ -831,102 +913,69 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
                 ))}
               </div>
 
-              {/* Add category trigger / form — always at top */}
-              {showNewCat ? (
-                <div className="rounded-xl border border-jci-blue/20 bg-blue-50/30 shadow-sm px-4 py-3">
-                  <CategoryForm
-                    name={newCatDraft.name}
-                    amount={newCatDraft.allocatedAmount || ''}
-                    description={newCatDraft.description}
-                    onNameChange={v => setNewCatDraft(p => ({ ...p, name: v }))}
-                    onAmountChange={v => setNewCatDraft(p => ({ ...p, allocatedAmount: parseFloat(v) || 0 }))}
-                    onDescriptionChange={v => setNewCatDraft(p => ({ ...p, description: v }))}
-                    onSave={handleAddCategory}
-                    onCancel={() => { setShowNewCat(false); setNewCatDraft({ name: '', description: '', allocatedAmount: 0 }); }}
-                    isSaving={isAddingCat}
+              {/* Controls */}
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+                  <input
+                    placeholder="Search categories…"
+                    value={budgetSearch}
+                    onChange={e => setBudgetSearch(e.target.value)}
+                    className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-2 focus:ring-jci-blue/30 focus:border-jci-blue placeholder-slate-400"
                   />
                 </div>
-              ) : (
-                <button
-                  onClick={() => { setShowNewCat(true); setEditingCatId(null); }}
-                  className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-slate-200 text-xs text-slate-400 hover:text-jci-blue hover:border-jci-blue/40 hover:bg-blue-50/30 transition-colors">
-                  <Plus size={13} />Add category
-                </button>
-              )}
+                <TypeFilter value={budgetTypeFilter} onChange={setBudgetTypeFilter} />
+              </div>
 
-              {/* Categories */}
-              {account.budgetCategories.length > 0 && (
-                <div className="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden">
-                  <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-                    <p className="text-xs font-semibold text-slate-900">Budget Categories</p>
-                    {onUpdateProject && (
-                      <Button size="sm" variant="outline"
-                        onClick={() => { setBudgetDraft(budgetAmt); setShowBudgetDrawer(true); }}>
-                        <Edit3 size={12} className="mr-1" />Total Budget
-                      </Button>
-                    )}
+              <div className="space-y-3">
+                {/* Add category form / trigger */}
+                {showNewCat ? (
+                  <div className="rounded-xl border border-jci-blue/20 bg-blue-50/30 shadow-sm px-4 py-3">
+                    <EntryForm
+                      type={newCatDraft.type === 'income' ? 'Income' : 'Expense'}
+                      description={newCatDraft.description}
+                      purpose={newCatDraft.name}
+                      amount={newCatDraft.allocatedAmount || ''}
+                      onTypeChange={t => setNewCatDraft(p => ({ ...p, type: t === 'Income' ? 'income' : 'expense' }))}
+                      onDescriptionChange={v => setNewCatDraft(p => ({ ...p, description: v }))}
+                      onPurposeChange={v => setNewCatDraft(p => ({ ...p, name: v }))}
+                      onAmountChange={v => setNewCatDraft(p => ({ ...p, allocatedAmount: parseFloat(v) || 0 }))}
+                      onSave={handleAddCategory}
+                      onCancel={() => { setShowNewCat(false); setNewCatDraft({ name: '', description: '', allocatedAmount: 0, type: 'expense' }); }}
+                      isSaving={isAddingCat}
+                    />
                   </div>
-                  <div className="divide-y divide-slate-50">
-                    {account.budgetCategories.map((cat: BudgetCategory) => {
-                      const isEditing = editingCatId === cat.id;
-                      const spent = cat.spentAmount || 0;
-                      const pct = cat.allocatedAmount > 0 ? (spent / cat.allocatedAmount) * 100 : 0;
-                      return (
-                        <div key={cat.id} className="px-4 py-3">
-                          {isEditing ? (
-                            <div className="space-y-2">
-                              <div className="grid grid-cols-2 gap-2">
-                                <Forms.Input label="Name" value={catDraft.name}
-                                  onChange={e => setCatDraft(p => ({ ...p, name: e.target.value }))} />
-                                <Forms.Input label="Amount (RM)" type="number" value={catDraft.allocatedAmount}
-                                  onChange={e => setCatDraft(p => ({ ...p, allocatedAmount: parseFloat(e.target.value) || 0 }))} />
-                              </div>
-                              <Forms.Input label="Description" value={catDraft.description}
-                                onChange={e => setCatDraft(p => ({ ...p, description: e.target.value }))}
-                                placeholder="What this category covers" />
-                              <div className="flex gap-2 justify-end">
-                                <Button size="sm" variant="ghost" onClick={() => setEditingCatId(null)}>Cancel</Button>
-                                <Button size="sm" onClick={handleSaveCat} disabled={isSavingCat}>
-                                  {isSavingCat ? 'Saving…' : 'Save'}
-                                </Button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex items-start gap-3">
-                              <span className="w-2.5 h-2.5 rounded-full shrink-0 mt-1"
-                                style={{ backgroundColor: cat.color || '#6B7280' }} />
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between gap-2">
-                                  <p className="text-xs font-semibold text-slate-700">{cat.name}</p>
-                                  <div className="flex items-center gap-2 shrink-0">
-                                    <span className={`text-xs font-bold tabular-nums ${utilizationColor(pct)}`}>
-                                      {fmt(cat.allocatedAmount)}
-                                    </span>
-                                    <button
-                                      onClick={() => { setEditingCatId(cat.id); setCatDraft({ name: cat.name, description: cat.description || '', allocatedAmount: cat.allocatedAmount }); }}
-                                      className="text-slate-300 hover:text-slate-500 transition-colors">
-                                      <Edit3 size={12} />
-                                    </button>
-                                  </div>
-                                </div>
-                                {cat.description && <p className="text-[10px] text-slate-400 mt-0.5">{cat.description}</p>}
-                                <div className="mt-1.5 w-full h-1 bg-slate-100 rounded-full overflow-hidden">
-                                  <div className={`h-1 rounded-full ${progressBg(pct)}`}
-                                    style={{ width: `${Math.min(pct, 100)}%` }} />
-                                </div>
-                                <div className="flex justify-between mt-0.5 text-[10px] text-slate-400">
-                                  <span>Spent: {fmt(spent)}</span>
-                                  <span>Left: {fmt(cat.allocatedAmount - spent)}</span>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+                ) : (
+                  <button
+                    onClick={() => { setShowNewCat(true); setEditingCatId(null); }}
+                    className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-slate-200 text-xs text-slate-400 hover:text-jci-blue hover:border-jci-blue/40 hover:bg-blue-50/30 transition-colors">
+                    <Plus size={13} />Add category
+                  </button>
+                )}
+
+                {account.budgetCategories.length === 0 && !showNewCat && (
+                  <p className="text-xs text-slate-400 py-4 text-center">No budget categories.</p>
+                )}
+                {account.budgetCategories.length > 0 && incomeCategories.length === 0 && expenseCategories.length === 0 && !showNewCat && (
+                  <p className="text-xs text-slate-400 py-4 text-center">No categories match.</p>
+                )}
+
+                {/* Income categories */}
+                {incomeCategories.length > 0 && (
+                  <>
+                    <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wide px-1">Income</p>
+                    {incomeCategories.map(renderCategoryCard)}
+                  </>
+                )}
+
+                {/* Expense categories */}
+                {expenseCategories.length > 0 && (
+                  <>
+                    <p className="text-[10px] font-bold text-red-500 uppercase tracking-wide px-1 pt-1">Expense</p>
+                    {expenseCategories.map(renderCategoryCard)}
+                  </>
+                )}
+              </div>
             </div>
           );
         })()}
@@ -1018,6 +1067,7 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
                                   onAmountChange={v => setPrjDraft(p => ({ ...p, amount: v }))}
                                   onSave={handleSavePrj}
                                   onCancel={() => setEditingPrjId(null)}
+                                  onDelete={() => handleDeletePrj(tx.id)}
                                   isSaving={isSavingPrj}
                                 />
                               ) : (

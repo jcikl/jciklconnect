@@ -397,11 +397,13 @@ service cloud.firestore {
       allow list: if isAuthenticated() && (isAdmin() || isBoard() ||
         (canAccessFinance() && getMyLoId() != null));
       // E1 fix: add hasOnly to prevent arbitrary fields being written on create
-      allow create: if isFinanceOperator() &&
+      // PT-C1: expanded from isFinanceOperator() to isBoard()||isAdmin() — project committee members
+      //        need to log entries for their own projects; purpose+category added to whitelist
+      allow create: if (isBoard() || isAdmin()) &&
         request.resource.data.keys().hasAll(['projectId', 'amount', 'type']) &&
         request.resource.data.keys().hasOnly([
           'projectId', 'amount', 'type', 'description', 'date', 'createdBy', 'createdAt',
-          'bankAccountId', 'loId', 'currency', 'status', 'updatedAt'
+          'bankAccountId', 'loId', 'currency', 'status', 'updatedAt', 'purpose', 'category'
         ]);
       // PT-update/delete: block modifications to already-reconciled project transactions; PT-U2: add hasOnly
       allow update: if isFinanceOperator() &&
@@ -409,7 +411,7 @@ service cloud.firestore {
         (isAdmin() ||
          // E2 fix: removed 'status' from non-admin hasOnly — regular finance users must not set status=Reconciled
          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-           'description', 'amount', 'type', 'date', 'category', 'notes',
+           'description', 'amount', 'type', 'date', 'category', 'purpose', 'notes',
            'reference', 'attachments', 'updatedAt', 'updatedBy', 'approvedBy', 'approvedAt',
            'rejectedBy', 'rejectedAt', 'rejectionReason'
          ]));
@@ -910,7 +912,8 @@ service cloud.firestore {
       allow update: if isBoard() &&
                        request.resource.data.diff(resource.data).affectedKeys()
                          .hasOnly(['role', 'displayRole', 'term', 'startDate', 'endDate',
-                                   'updatedAt', 'photoUrl', 'description', 'isActive']);
+                                   'updatedAt', 'photoUrl', 'description', 'isActive',
+                                   'memberName', 'avatarUrl', 'companyName']);
     }
     match /boardTransitions/{docId} {
       allow read: if true;
@@ -1123,8 +1126,8 @@ service cloud.firestore {
       allow write: if isBoard() || isAdmin();
     }
 
-    // Radar Contributions collection
-    match /RadarContributions/{contributionId} {
+    // Registration History collection (formerly RadarContributions)
+    match /RegistrationHistory/{entryId} {
       allow read: if isAuthenticated();
       allow create, update, delete: if isBoard();
     }

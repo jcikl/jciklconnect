@@ -253,7 +253,7 @@ class ProjectFinancialService {
         currentBalance: budget + totalIncome - totalExpenses,
         totalIncome,
         totalExpenses,
-        budgetCategories: [],
+        budgetCategories: (await getDoc(doc(db, COLLECTIONS.PROJECTS, project.id))).data()?.budgetCategories || [],
         alertThresholds: [],
         createdAt: project.createdAt || new Date().toISOString(),
         updatedAt: project.updatedAt || new Date().toISOString(),
@@ -533,6 +533,27 @@ class ProjectFinancialService {
       updatedAt: new Date().toISOString(),
     });
     return newCategory;
+  }
+
+  /**
+   * Delete budget category
+   */
+  async deleteBudgetCategory(financialAccountId: string, categoryId: string): Promise<void> {
+    if (isDevMode()) {
+      const account = this.accounts.get(financialAccountId);
+      if (!account) throw new Error('Project financial account not found');
+      account.budgetCategories = account.budgetCategories.filter(c => c.id !== categoryId);
+      return;
+    }
+    const projectId = financialAccountId.replace(/^proj_acc_/, '');
+    const projectRef = doc(db, COLLECTIONS.PROJECTS, projectId);
+    const snap = await getDoc(projectRef);
+    if (!snap.exists()) throw new Error('Project not found');
+    const existing: BudgetCategory[] = snap.data().budgetCategories || [];
+    await updateDoc(projectRef, {
+      budgetCategories: existing.filter(c => c.id !== categoryId),
+      updatedAt: new Date().toISOString(),
+    });
   }
 
   /**

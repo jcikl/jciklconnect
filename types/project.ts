@@ -122,6 +122,7 @@ export interface ProjectFinancialAccount {
 export interface BudgetCategory {
   id: string;
   name: string;
+  type: 'income' | 'expense';
   allocatedAmount: number;
   spentAmount: number;
   description?: string;
