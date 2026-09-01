@@ -653,20 +653,7 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
     <>
       <div className="space-y-4">
         {/* Header */}
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="text-base font-semibold text-slate-900">Financial Account</h3>
-          <div className="flex items-center gap-2">
-            {onUpdateProject && (
-              <Button size="sm" variant="outline"
-                onClick={() => { setBudgetDraft(project.budget || summary.totalAllocated); setShowBudgetDrawer(true); }}>
-                <Edit3 size={12} className="mr-1" />Budget
-              </Button>
-            )}
-            <Button size="sm" onClick={() => setShowAddTx(true)}>
-              <Plus size={13} className="mr-1" />Add
-            </Button>
-          </div>
-        </div>
+        <h3 className="text-base font-semibold text-slate-900">Financial Account</h3>
 
         {/* Tab pills */}
         <div className="flex gap-1.5 flex-wrap">
