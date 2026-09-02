@@ -2332,11 +2332,18 @@ export class FinanceService {
       () => {},
       async () => {
     try {
-      // 1. Parse year from projectId (e.g., "2026 membership")
+      // 1. Parse year from projectId (e.g., "2026 membership"); fall back to transaction date year
       const yearMatch = projectId?.match(/^(\d+)/);
-      if (!yearMatch) return;
-      const year = yearMatch[1];
-      const yearNum = parseInt(year, 10);
+      let year: string;
+      let yearNum: number;
+      if (yearMatch) {
+        year = yearMatch[1];
+        yearNum = parseInt(year, 10);
+      } else {
+        const fallbackDate = options?.includeTransactions?.[0]?.date;
+        yearNum = fallbackDate ? new Date(fallbackDate).getFullYear() : new Date().getFullYear();
+        year = String(yearNum);
+      }
       const canonicalProjectId = this.getMembershipProjectIdFromYear(yearNum) || projectId;
 
       // 2. Fetch membership transactions for member (filter by year in memory — resilient to projectId variants)
