@@ -438,7 +438,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
     { id: 'statistics', label: 'Statistics', short: 'Stats', icon: BarChart3 },
     { id: 'board-of-directors', label: 'Board', short: 'Board', icon: Shield },
     { id: 'mentorship', label: 'Mentorship', short: 'Mentors', icon: BookOpen },
-    { id: 'promotion-tracking', label: 'Promotions', short: 'Promotions', icon: TrendingUp },
+    { id: 'promotion-tracking', label: 'Foundation Pathway', short: 'Foundation', icon: TrendingUp },
     { id: 'senatorship', label: 'Senatorship', short: 'Senators', icon: Trophy },
     { id: 'introducer', label: 'Introducer', short: 'Introducers', icon: Network },
     { id: 'duplicates', label: 'Duplicates', short: 'Duplicates', icon: AlertCircle },
