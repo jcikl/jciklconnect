@@ -1795,12 +1795,13 @@ export function useFinanceData(searchQuery?: string) {
       setEditingMembershipMemberId('');
       setEditingMembershipYear(new Date().getFullYear());
       await loadData(reportYear, undefined, true);
+      if (category === 'Membership') await loadMembers();
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to update transaction', 'error');
     } finally {
       isUpdatingTransactionRef.current = false;
     }
-  }, [editingTransaction, editingMembershipYear, editingAdministrativeYear, editingAdministrativePurposeBase, showToast, loadData]);
+  }, [editingTransaction, editingMembershipYear, editingAdministrativeYear, editingAdministrativePurposeBase, showToast, loadData, loadMembers]);
 
   // ── Return all state + computed + handlers ────────────────────────────────
 
