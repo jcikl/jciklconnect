@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Bookmark, CheckSquare, Gift, Globe, Lock, Search, Send, SlidersHorizontal } from 'lucide-react';
 import type { BusinessProfile, Member } from '../../../types';
 import { Button } from '../../ui/Common';
@@ -60,6 +60,14 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
   onShowDealsOnlyChange,
   getBizScore,
 }) => {
+  const [quickFilter, setQuickFilter] = useState<'all' | 'bookmarked' | 'ideal'>('all');
+
+  const mobileDisplayBusinesses = isGuest ? filteredBusinesses : quickFilter === 'bookmarked'
+    ? filteredBusinesses.filter(b => bookmarkedIds.has(b.id))
+    : quickFilter === 'ideal'
+      ? filteredBusinesses.filter(b => getBizScore(b) === 1)
+      : filteredBusinesses;
+
   const resetFilters = () => {
     onSelectedIndustriesChange(new Set());
     onSelectedIntlBizChange('All');
@@ -116,10 +124,39 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
             )}
           </Button>
         </div>
-        <LoadingState loading={loading} error={error} empty={filteredBusinesses.length === 0} emptyMessage="No businesses found matching this category">
+        {!isGuest && (
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-0.5">
+            {(['all', 'bookmarked', 'ideal'] as const).map(f => {
+              const labels = { all: 'All', bookmarked: 'Bookmarked', ideal: 'Ideal' };
+              const icons = {
+                all: null,
+                bookmarked: <Bookmark size={11} className={quickFilter === 'bookmarked' ? 'fill-jci-blue text-jci-blue' : 'text-slate-400'} />,
+                ideal: <span className="text-[10px]">✦</span>,
+              };
+              const counts = {
+                all: filteredBusinesses.length,
+                bookmarked: filteredBusinesses.filter(b => bookmarkedIds.has(b.id)).length,
+                ideal: filteredBusinesses.filter(b => getBizScore(b) === 1).length,
+              };
+              const active = quickFilter === f;
+              return (
+                <button
+                  key={f}
+                  onClick={() => setQuickFilter(f)}
+                  className={`flex items-center gap-1 shrink-0 px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${active ? 'bg-jci-blue text-white border-jci-blue shadow-sm' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'}`}
+                >
+                  {icons[f]}
+                  {labels[f]}
+                  <span className={`text-[10px] font-black ml-0.5 ${active ? 'text-white/80' : 'text-slate-400'}`}>{counts[f]}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <LoadingState loading={loading} error={error} empty={mobileDisplayBusinesses.length === 0} emptyMessage="No businesses found matching this category">
           <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white overflow-hidden">
-            {filteredBusinesses.map((biz, idx) => {
-              const prevMobileScore = idx > 0 ? getBizScore(filteredBusinesses[idx - 1]) : -1;
+            {mobileDisplayBusinesses.map((biz, idx) => {
+              const prevMobileScore = idx > 0 ? getBizScore(mobileDisplayBusinesses[idx - 1]) : -1;
               const thisMobileScore = getBizScore(biz);
               const showMobileDivider = !isGuest && idx > 0 && thisMobileScore > prevMobileScore;
               const mobileDividerLabel = thisMobileScore === 1 ? 'Suggested for You' : 'All Businesses';
