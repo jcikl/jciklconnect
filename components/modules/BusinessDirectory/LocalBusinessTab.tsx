@@ -66,7 +66,7 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
     ? filteredBusinesses.filter(b => bookmarkedIds.has(b.id))
     : quickFilter === 'ideal'
       ? filteredBusinesses.filter(b => getBizScore(b) === 1)
-      : filteredBusinesses;
+      : filteredBusinesses.filter(b => !bookmarkedIds.has(b.id) && getBizScore(b) !== 1);
 
   const resetFilters = () => {
     onSelectedIndustriesChange(new Set());
@@ -132,7 +132,7 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
             { id: 'ideal' as const, label: 'Ideal', Icon: Star },
           ];
           const counts = {
-            all: filteredBusinesses.length,
+            all: filteredBusinesses.filter(b => !bookmarkedIds.has(b.id) && getBizScore(b) !== 1).length,
             bookmarked: filteredBusinesses.filter(b => bookmarkedIds.has(b.id)).length,
             ideal: filteredBusinesses.filter(b => getBizScore(b) === 1).length,
           };
