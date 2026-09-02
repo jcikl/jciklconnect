@@ -106,13 +106,13 @@ export const Drawer: React.FC<DrawerProps> = ({
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity duration-300" onClick={onClose} aria-hidden="true" />
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[54] transition-opacity duration-300" onClick={onClose} aria-hidden="true" />
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`fixed top-0 bottom-0 z-50 w-full ${sizeClasses[size]} bg-white shadow-2xl transition-transform duration-300 ease-in-out ${position === 'right' ? 'right-0' : 'left-0'} ${isOpen ? 'translate-x-0' : (position === 'right' ? 'translate-x-full' : '-translate-x-full')}`}
+        className={`fixed top-0 bottom-0 z-[55] w-full ${sizeClasses[size]} bg-white shadow-2xl transition-transform duration-300 ease-in-out ${position === 'right' ? 'right-0' : 'left-0'} ${isOpen ? 'translate-x-0' : (position === 'right' ? 'translate-x-full' : '-translate-x-full')}`}
       >
         <div className="h-full flex flex-col">
           <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
