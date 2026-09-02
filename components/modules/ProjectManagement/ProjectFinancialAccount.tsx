@@ -160,18 +160,20 @@ const EntryForm: React.FC<{
 
 const SummaryStats: React.FC<{ items: Transaction[] }> = ({ items }) => {
   const { income, expense, net } = calcStats(items);
+  const rows = [
+    { label: 'Income',  val: income,       icon: <ArrowUpRight   className="w-4 h-4 text-emerald-500" />, c: 'text-emerald-600' },
+    { label: 'Expense', val: expense,      icon: <ArrowDownRight className="w-4 h-4 text-red-500" />,     c: 'text-red-600' },
+    { label: net >= 0 ? 'Surplus' : 'Deficit', val: Math.abs(net),
+      icon: <DollarSign className={`w-4 h-4 ${net >= 0 ? 'text-jci-blue' : 'text-orange-500'}`} />,
+      c: net >= 0 ? 'text-jci-blue' : 'text-orange-600' },
+  ];
   return (
-    <div className="grid grid-cols-3 gap-2">
-      {[
-        { label: 'Income',  val: income,  c: 'text-emerald-600', bg: 'bg-emerald-50' },
-        { label: 'Expense', val: expense, c: 'text-red-600',     bg: 'bg-red-50' },
-        { label: net >= 0 ? 'Surplus' : 'Deficit', val: Math.abs(net),
-          c: net >= 0 ? 'text-jci-blue' : 'text-orange-600',
-          bg: net >= 0 ? 'bg-blue-50' : 'bg-orange-50' },
-      ].map(s => (
-        <div key={s.label} className={`rounded-xl ${s.bg} px-3 py-2.5`}>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-0.5">{s.label}</p>
-          <p className={`text-sm font-bold tabular-nums ${s.c}`}>{fmt(s.val)}</p>
+    <div className="rounded-xl border border-slate-100 bg-white shadow-sm px-4 py-3 space-y-1">
+      {rows.map(s => (
+        <div key={s.label} className="flex items-center gap-2">
+          {s.icon}
+          <span className="text-xs text-slate-500 flex-1">{s.label}</span>
+          <span className={`text-sm font-bold tabular-nums ${s.c}`}>{fmt(s.val)}</span>
         </div>
       ))}
     </div>
@@ -727,21 +729,37 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
             )}
 
             {/* KPI cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-              {[
-                { label: 'Budget',    value: fmt(summary.totalAllocated), icon: <Target size={14} className="text-jci-blue" /> },
-                { label: 'Spent',     value: fmt(summary.totalSpent),     icon: <TrendingDown size={14} className="text-red-500" /> },
-                { label: 'Remaining', value: fmt(summary.remainingFunds), icon: <DollarSign size={14} className="text-emerald-500" /> },
-                { label: 'Used',      value: `${summary.budgetUtilization.toFixed(1)}%`, icon: <BarChart3 size={14} className="text-purple-500" /> },
-              ].map(k => (
-                <div key={k.label} className="rounded-xl border border-slate-100 bg-white shadow-sm px-3.5 py-3">
-                  <div className="flex items-center gap-1.5 mb-1">{k.icon}
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{k.label}</span>
-                  </div>
-                  <p className="text-base font-bold text-slate-800 tabular-nums leading-tight">{k.value}</p>
+            {(() => {
+              const kpis = [
+                { label: 'Budget',    value: fmt(summary.totalAllocated),                    icon: <Target      className="w-4 h-4 text-jci-blue" />,     valueColor: 'text-jci-blue' },
+                { label: 'Spent',     value: fmt(summary.totalSpent),                         icon: <TrendingDown className="w-4 h-4 text-red-500" />,      valueColor: 'text-red-600' },
+                { label: 'Remaining', value: fmt(summary.remainingFunds),                     icon: <DollarSign  className="w-4 h-4 text-emerald-500" />,   valueColor: 'text-emerald-700' },
+                { label: 'Used',      value: `${summary.budgetUtilization.toFixed(1)}%`,      icon: <BarChart3   className="w-4 h-4 text-purple-500" />,    valueColor: 'text-purple-700' },
+              ];
+              return (<>
+                {/* Mobile: single merged card, 4 rows — matches Gantt Chart stat card style */}
+                <div className="md:hidden rounded-xl border border-slate-100 bg-white shadow-sm px-4 py-3 space-y-1">
+                  {kpis.map(k => (
+                    <div key={k.label} className="flex items-center gap-2">
+                      {k.icon}
+                      <span className="text-xs text-slate-500 flex-1">{k.label}</span>
+                      <span className={`text-sm font-bold tabular-nums ${k.valueColor}`}>{k.value}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+                {/* Desktop: 4 separate cards */}
+                <div className="hidden md:grid md:grid-cols-4 gap-2.5">
+                  {kpis.map(k => (
+                    <div key={k.label} className="rounded-xl border border-slate-100 bg-white shadow-sm px-3.5 py-3">
+                      <div className="flex items-center gap-1.5 mb-1">{k.icon}
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{k.label}</span>
+                      </div>
+                      <p className="text-base font-bold text-slate-800 tabular-nums leading-tight">{k.value}</p>
+                    </div>
+                  ))}
+                </div>
+              </>);
+            })()}
 
             {/* Budget utilization */}
             <div className="rounded-xl border border-slate-100 bg-white shadow-sm px-4 py-3 space-y-2">
@@ -901,18 +919,19 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
           return (
             <div className="space-y-4">
               {/* Summary */}
-              <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-xl border border-slate-100 bg-white shadow-sm px-4 py-3 space-y-1">
                 {[
-                  { label: 'Income',  val: totalIncomeBudget,   c: 'text-emerald-600', bg: 'bg-emerald-50' },
-                  { label: 'Expense', val: totalExpenseBudget,  c: 'text-red-600',     bg: 'bg-red-50' },
+                  { label: 'Income',  val: totalIncomeBudget, icon: <ArrowUpRight  className="w-4 h-4 text-emerald-500" />, c: 'text-emerald-600' },
+                  { label: 'Expense', val: totalExpenseBudget, icon: <ArrowDownRight className="w-4 h-4 text-red-500" />,   c: 'text-red-600' },
                   { label: net >= 0 ? 'Net' : 'Deficit',
                     val: Math.abs(net),
-                    c: net >= 0 ? 'text-jci-blue' : 'text-orange-600',
-                    bg: net >= 0 ? 'bg-blue-50' : 'bg-orange-50' },
+                    icon: <DollarSign className={`w-4 h-4 ${net >= 0 ? 'text-jci-blue' : 'text-orange-500'}`} />,
+                    c: net >= 0 ? 'text-jci-blue' : 'text-orange-600' },
                 ].map(s => (
-                  <div key={s.label} className={`rounded-xl ${s.bg} px-3 py-2.5`}>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-0.5">{s.label}</p>
-                    <p className={`text-sm font-bold tabular-nums ${s.c}`}>{fmt(s.val)}</p>
+                  <div key={s.label} className="flex items-center gap-2">
+                    {s.icon}
+                    <span className="text-xs text-slate-500 flex-1">{s.label}</span>
+                    <span className={`text-sm font-bold tabular-nums ${s.c}`}>{fmt(s.val)}</span>
                   </div>
                 ))}
               </div>

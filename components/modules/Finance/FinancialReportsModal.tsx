@@ -11,6 +11,7 @@ export interface FinancialReportsModalProps {
   onClose: () => void;
   transactions: Transaction[];
   accounts: BankAccount[];
+  projects?: Array<{ id: string; name: string }>;
   summary: {
     totalIncome: number;
     totalExpenses: number;
@@ -30,6 +31,7 @@ export const FinancialReportsModal: React.FC<FinancialReportsModalProps> = ({
   onClose,
   transactions,
   accounts,
+  projects = [],
   summary,
   reportYear,
   reportMonth,
@@ -38,17 +40,25 @@ export const FinancialReportsModal: React.FC<FinancialReportsModalProps> = ({
   onMonthChange,
   onFiscalYearStartChange,
 }) => {
+  const projectNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    projects.forEach(p => { map[p.id] = p.name; });
+    return map;
+  }, [projects]);
   const [activeTab, setActiveTab] = useState<'income' | 'expense' | 'balance' | 'cashflow'>('income');
   const { showToast } = useToast();
 
   const filteredTransactions = useMemo(() => {
+    // Fiscal year window: [fiscalYearStart month of reportYear, same month of reportYear+1)
+    const fiscalStart = new Date(reportYear, fiscalYearStart, 1);
+    const fiscalEnd   = new Date(reportYear + 1, fiscalYearStart, 1);
     return transactions.filter(t => {
       const txDate = new Date(t.date);
-      const matchesYear = txDate.getFullYear() === reportYear;
+      const inFiscalYear = txDate >= fiscalStart && txDate < fiscalEnd;
       const matchesMonth = reportMonth === null || txDate.getMonth() === reportMonth;
-      return matchesYear && matchesMonth;
+      return inFiscalYear && matchesMonth;
     });
-  }, [transactions, reportYear, reportMonth]);
+  }, [transactions, reportYear, reportMonth, fiscalYearStart]);
 
   const incomeTransactions = useMemo(() => {
     return filteredTransactions.filter(t => t.type === 'Income');
@@ -74,10 +84,42 @@ export const FinancialReportsModal: React.FC<FinancialReportsModalProps> = ({
     return breakdown;
   }, [filteredTransactions]);
 
+  // Sub-breakdown per category:
+  // "Projects & Activities" → by projectId (mapped to project name)
+  // "Membership" / "Administrative" / others → by purpose (fallback: description)
+  const subBreakdown = useMemo(() => {
+    const result: Record<string, Record<string, { income: number; expenses: number }>> = {};
+    filteredTransactions.forEach(t => {
+      const cat = t.category || '';
+      if (!result[cat]) result[cat] = {};
+      let key: string;
+      if (cat === 'Projects & Activities' && t.projectId) {
+        key = projectNameMap[t.projectId] || t.projectId;
+      } else {
+        key = (t.purpose?.trim() || t.description?.trim() || 'Other');
+      }
+      if (!result[cat][key]) result[cat][key] = { income: 0, expenses: 0 };
+      if (t.type === 'Income') result[cat][key].income += t.amount;
+      else result[cat][key].expenses += Math.abs(t.amount);
+    });
+    return result;
+  }, [filteredTransactions, projectNameMap]);
+
   const totalCash = accounts.reduce((sum, acc) => sum + acc.balance, 0);
-  const totalIncome = incomeTransactions.reduce((sum, t) => sum + t.amount, 0);
-  const totalExpenses = expenseTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
-  const netBalance = totalIncome - totalExpenses;
+  const netBalance = incomeTransactions.reduce((sum, t) => sum + t.amount, 0)
+    - expenseTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+  // Net-display categories: shown as (income − expenses) under Income; excluded from Expenses.
+  // Re-derive displayed totals so breakdown items sum to the headline figures.
+  const NET_DISPLAY_CATS = new Set(['Projects & Activities', 'Membership']);
+  const displayedIncome = Object.entries(categoryBreakdown).reduce((sum, [cat, data]) => {
+    if (NET_DISPLAY_CATS.has(cat)) return sum + Math.max(0, data.income - data.expenses);
+    return sum + data.income;
+  }, 0);
+  const displayedExpenses = Object.entries(categoryBreakdown).reduce((sum, [cat, data]) => {
+    if (NET_DISPLAY_CATS.has(cat)) return sum + Math.max(0, data.expenses - data.income);
+    return sum + data.expenses;
+  }, 0);
 
   const handleExport = async () => {
     try {
@@ -233,33 +275,89 @@ export const FinancialReportsModal: React.FC<FinancialReportsModalProps> = ({
                     </div>
                   </div>
 
+                  {/* Categories shown as net in Income section (can be negative); excluded from Expenses */}
+                  {(() => {
+                    const NET_CATS = NET_DISPLAY_CATS;
+                    const renderNetRow = (cat: string) => {
+                      const data = categoryBreakdown[cat];
+                      if (!data) return null;
+                      const net = data.income - data.expenses;
+                      return (
+                        <React.Fragment key={cat}>
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-slate-600">{cat}</span>
+                            <span className={net >= 0 ? 'text-green-600' : 'text-red-600'}>
+                              {net < 0 ? '-' : ''}{formatCurrency(Math.abs(net))}
+                            </span>
+                          </div>
+                          {Object.entries(subBreakdown[cat] ?? {})
+                            .map(([key, sd]) => ({ key, net: sd.income - sd.expenses }))
+                            .sort((a, b) => a.key.localeCompare(b.key))
+                            .map(({ key, net: sNet }) => (
+                              <div key={key} className="flex justify-between items-center text-xs pl-4 text-slate-400">
+                                <span className="truncate max-w-[60%]">{key}</span>
+                                <span className={sNet >= 0 ? 'text-green-500' : 'text-red-400'}>
+                                  {sNet < 0 ? '-' : ''}{formatCurrency(Math.abs(sNet))}
+                                </span>
+                              </div>
+                            ))}
+                        </React.Fragment>
+                      );
+                    };
+                    return (
                   <div className="space-y-3">
                     <div className="flex justify-between items-center py-2">
                       <span className="text-slate-700">Total Income</span>
-                      <span className="font-bold text-green-600">{formatCurrency(totalIncome)}</span>
+                      <span className="font-bold text-green-600">{formatCurrency(displayedIncome)}</span>
                     </div>
                     <div className="space-y-2 pl-4 border-l-2 border-slate-200">
+                      {/* Net categories first (P&A, Membership) */}
+                      {['Projects & Activities', 'Membership'].map(cat => renderNetRow(cat))}
+                      {/* Remaining categories: income only */}
                       {Object.entries(categoryBreakdown)
-                        .filter(([_, data]) => data.income > 0)
+                        .filter(([cat, data]) => !NET_CATS.has(cat) && data.income > 0)
                         .map(([category, data]) => (
-                          <div key={category} className="flex justify-between items-center text-sm">
-                            <span className="text-slate-600">{category}</span>
-                            <span className="text-green-600">{formatCurrency(data.income)}</span>
-                          </div>
+                          <React.Fragment key={category || '__uncategorised'}>
+                            <div className="flex justify-between items-center text-sm">
+                              <span className="text-slate-600">{category || 'Uncategorised'}</span>
+                              <span className="text-green-600">{formatCurrency(data.income)}</span>
+                            </div>
+                            {Object.entries(subBreakdown[category] ?? {})
+                              .filter(([_, sd]) => sd.income > 0)
+                              .sort(([a], [b]) => a.localeCompare(b))
+                              .map(([key, sd]) => (
+                                <div key={key} className="flex justify-between items-center text-xs pl-4 text-slate-400">
+                                  <span className="truncate max-w-[60%]">{key}</span>
+                                  <span className="text-green-500">{formatCurrency(sd.income)}</span>
+                                </div>
+                              ))}
+                          </React.Fragment>
                         ))}
                     </div>
                     <div className="flex justify-between items-center py-2 border-t">
                       <span className="text-slate-700">Total Expenses</span>
-                      <span className="font-bold text-red-600">-{formatCurrency(totalExpenses)}</span>
+                      <span className="font-bold text-red-600">-{formatCurrency(displayedExpenses)}</span>
                     </div>
                     <div className="space-y-2 pl-4 border-l-2 border-slate-200">
+                      {/* Net categories excluded from expenses section */}
                       {Object.entries(categoryBreakdown)
-                        .filter(([_, data]) => data.expenses > 0)
+                        .filter(([cat, data]) => !NET_CATS.has(cat) && data.expenses > 0)
                         .map(([category, data]) => (
-                          <div key={category} className="flex justify-between items-center text-sm">
-                            <span className="text-slate-600">{category}</span>
-                            <span className="text-red-600">-{formatCurrency(data.expenses)}</span>
-                          </div>
+                          <React.Fragment key={category || '__uncategorised'}>
+                            <div className="flex justify-between items-center text-sm">
+                              <span className="text-slate-600">{category || 'Uncategorised'}</span>
+                              <span className="text-red-600">-{formatCurrency(data.expenses)}</span>
+                            </div>
+                            {Object.entries(subBreakdown[category] ?? {})
+                              .filter(([_, sd]) => sd.expenses > 0)
+                              .sort(([a], [b]) => a.localeCompare(b))
+                              .map(([key, sd]) => (
+                                <div key={key} className="flex justify-between items-center text-xs pl-4 text-slate-400">
+                                  <span className="truncate max-w-[60%]">{key}</span>
+                                  <span className="text-red-400">-{formatCurrency(sd.expenses)}</span>
+                                </div>
+                              ))}
+                          </React.Fragment>
                         ))}
                     </div>
                     <div className="flex justify-between items-center py-3 border-t-2 border-slate-300 font-bold text-lg">
@@ -269,6 +367,8 @@ export const FinancialReportsModal: React.FC<FinancialReportsModalProps> = ({
                       </span>
                     </div>
                   </div>
+                    );
+                  })()}
                 </div>
               </Card>
             </div>
@@ -286,9 +386,9 @@ export const FinancialReportsModal: React.FC<FinancialReportsModalProps> = ({
                       .map(([category, data]) => {
                         const percentage = (data.expenses / totalExpenses) * 100;
                         return (
-                          <div key={category} className="space-y-2">
+                          <div key={category || '__uncategorised'} className="space-y-2">
                             <div className="flex justify-between items-center">
-                              <span className="font-medium text-slate-900">{category}</span>
+                              <span className="font-medium text-slate-900">{category || 'Uncategorised'}</span>
                               <div className="text-right">
                                 <span className="font-bold text-slate-900">{formatCurrency(data.expenses)}</span>
                                 <span className="text-sm text-slate-500 ml-2">({percentage.toFixed(1)}%)</span>

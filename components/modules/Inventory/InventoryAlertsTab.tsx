@@ -84,23 +84,17 @@ export const InventoryAlertsTab: React.FC<InventoryAlertsTabProps> = ({
         )}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
+      <div className="rounded-xl border border-slate-100 bg-white shadow-sm px-4 py-3 space-y-1">
         {[
-          { label: 'Active Alerts', value: String(activeAlerts.length), icon: <AlertCircle size={16} />, color: activeAlerts.length > 0 ? 'red' : 'slate' },
-          { label: 'Critical', value: String(criticalCount), icon: <AlertCircle size={16} />, color: criticalCount > 0 ? 'red' : 'slate' },
-          { label: 'High', value: String(highCount), icon: <AlertCircle size={16} />, color: highCount > 0 ? 'orange' : 'slate' },
-          { label: 'Acknowledged', value: String(ackCount), icon: <CheckCircle size={16} />, color: 'green' },
-        ].map(({ label, value, icon, color }) => (
-          <div key={label} className="bg-white rounded-xl border border-slate-100 shadow-sm p-2.5 md:p-3.5">
-            <div className="flex items-center gap-2 md:gap-3">
-              <div className={`w-8 h-8 md:w-9 md:h-9 rounded-lg bg-${color}-50 border border-${color}-100 flex items-center justify-center text-${color}-600 shrink-0`}>
-                {icon}
-              </div>
-              <div className="min-w-0">
-                <p className="text-[9px] md:text-[10px] text-slate-500 font-semibold uppercase tracking-wide leading-none">{label}</p>
-                <p className="text-lg md:text-xl font-bold text-slate-900 leading-tight mt-0.5 tabular-nums">{value}</p>
-              </div>
-            </div>
+          { label: 'Active Alerts', value: activeAlerts.length, icon: <AlertCircle className={`w-4 h-4 ${activeAlerts.length > 0 ? 'text-red-500' : 'text-slate-400'}`} />, c: activeAlerts.length > 0 ? 'text-red-600' : 'text-slate-600' },
+          { label: 'Critical',      value: criticalCount,       icon: <AlertCircle className={`w-4 h-4 ${criticalCount > 0 ? 'text-red-500' : 'text-slate-400'}`} />,         c: criticalCount > 0 ? 'text-red-600' : 'text-slate-600' },
+          { label: 'High',          value: highCount,           icon: <AlertCircle className={`w-4 h-4 ${highCount > 0 ? 'text-orange-500' : 'text-slate-400'}`} />,          c: highCount > 0 ? 'text-orange-600' : 'text-slate-600' },
+          { label: 'Acknowledged',  value: ackCount,            icon: <CheckCircle className="w-4 h-4 text-emerald-500" />,                                                   c: 'text-emerald-700' },
+        ].map(({ label, value, icon, c }) => (
+          <div key={label} className="flex items-center gap-2">
+            {icon}
+            <span className="text-xs text-slate-500 flex-1">{label}</span>
+            <span className={`text-sm font-bold tabular-nums ${c}`}>{value}</span>
           </div>
         ))}
       </div>

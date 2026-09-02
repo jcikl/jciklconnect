@@ -128,6 +128,7 @@ export const FinanceAuxiliaryModals: React.FC<FinanceAuxiliaryModalsProps> = ({
         onClose={onCloseReports}
         transactions={transactions}
         accounts={accounts}
+        projects={projects.map(toProjectOption)}
         summary={summary}
         reportYear={reportYear}
         reportMonth={reportMonth}

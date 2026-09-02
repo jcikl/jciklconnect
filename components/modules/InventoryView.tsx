@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Plus } from 'lucide-react';
-import { Button, useToast, Tabs, PageHeader } from '../ui/Common';
+import { AlertCircle, BarChart2, Bell, LayoutList, Plus, Receipt, Wrench } from 'lucide-react';
+import { Button, useToast, PageHeader } from '../ui/Common';
 import { LoadingState } from '../ui/Loading';
 import { useInventory } from '../../hooks/useInventory';
 import { useMembers } from '../../hooks/useMembers';
@@ -177,16 +177,38 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
       <LoadingState loading={loading} error={error}>
         <InventoryStatsStrip stats={stats} />
 
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-          <div className="px-4 md:px-6 pt-4 border-b border-slate-100">
-            <Tabs
-              tabs={INVENTORY_TAB_ITEMS}
-              activeTab={activeTab}
-              onTabChange={(tab) => setActiveTab(tab as InventoryTabId)}
-            />
+        {(() => {
+          const TAB_CONFIG: { id: InventoryTabId; label: string; Icon: React.FC<{ size?: number; className?: string }> }[] = [
+            { id: 'items',       label: 'Items',            Icon: LayoutList },
+            { id: 'maintenance', label: 'Maintenance',      Icon: Wrench },
+            { id: 'alerts',      label: 'Alerts',           Icon: Bell },
+            { id: 'depreciation',label: 'Depreciation',     Icon: BarChart2 },
+            { id: 'finance',     label: 'Financial History', Icon: Receipt },
+          ];
+          return (
+        <div className="flex rounded-2xl border border-slate-100 shadow-sm overflow-hidden bg-white">
+          {/* Left icon sidebar */}
+          <div className="w-12 bg-slate-50 border-r border-slate-100 flex flex-col">
+            {TAB_CONFIG.map(({ id, label, Icon }) => (
+              <button
+                key={id}
+                type="button"
+                title={label}
+                onClick={() => setActiveTab(id)}
+                className={`relative flex items-center justify-center py-5 w-full transition-all border-t border-slate-200 ${
+                  activeTab === id ? 'bg-white text-jci-blue' : 'text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                {activeTab === id && (
+                  <span className="absolute left-0 top-0 bottom-0 w-0.5 bg-jci-blue" />
+                )}
+                <Icon size={18} />
+              </button>
+            ))}
           </div>
 
-          <div className="p-4 md:p-6">
+          {/* Content panel */}
+          <div className="flex-1 p-4 md:p-6 min-w-0">
             {activeTab === 'items' && (
               <InventoryItemsTab
                 searchTerm={searchTerm}
@@ -263,6 +285,8 @@ export const InventoryView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
             )}
           </div>
         </div>
+          );
+        })()}
       </LoadingState>
 
       <InventoryStockAdjustmentModal
