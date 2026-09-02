@@ -1075,11 +1075,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
         <div className={`lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden ${mobilePanel !== 'members' ? 'hidden md:block' : ''}`}>
           {/* Card header */}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 pt-3.5 pb-3 border-b border-slate-100 gap-2">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <span className="text-[11px] font-semibold text-slate-400 bg-slate-100 rounded-full px-2 py-0.5 shrink-0">
-                {displayRenewals.length}
-              </span>
-            </div>
+            <div className="flex items-center gap-2.5 min-w-0" />
             <div className="flex items-center gap-1.5 shrink-0">
               <select
                 value={year}
@@ -1341,9 +1337,6 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
           {/* Card header */}
           <div className="flex items-center justify-between px-4 pt-3.5 pb-3 border-b border-slate-100 shrink-0">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-7 h-7 rounded-lg bg-green-50 border border-green-100 flex items-center justify-center shrink-0">
-                <DollarSign className="w-3.5 h-3.5 text-green-500" />
-              </div>
               <div className="min-w-0">
                 <span className="text-sm font-bold text-slate-800 block">Membership Payments</span>
                 <span className="text-[10px] text-slate-400">{year}</span>
