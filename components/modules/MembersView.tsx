@@ -514,6 +514,12 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
 
             {/* Content panel */}
             <div className="flex-1 md:flex-none min-w-0">
+              {/* Active tab title — mobile only */}
+              <div className="md:hidden px-4 py-2.5 border-b border-slate-100 bg-white">
+                <span className="text-sm font-bold text-slate-700">
+                  {TAB_CONFIG.find(t => t.id === activeTab)?.label}
+                </span>
+              </div>
           <div>
             {activeTab === 'directory' && (
               <LoadingState loading={loading} error={error} empty={sortedMembers.length === 0 && roleFilters.length === 0 && membershipTypeFilters.length === 0 && !searchQuery} emptyMessage="No members found">
