@@ -29,12 +29,12 @@ export const FinanceHeader: React.FC<FinanceHeaderProps> = ({
   onOpenTransaction,
 }) => (
   <>
-    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900">Financial Management</h2>
-        <p className="text-slate-500 text-sm">{'Bookkeeping \u00b7 dues collection \u00b7 budgeting'}</p>
+    <div className="flex flex-row items-center justify-between gap-2">
+      <div className="min-w-0">
+        <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">Financial Management</h2>
+        <p className="text-slate-500 text-xs sm:text-sm truncate">{'Bookkeeping \u00b7 dues collection \u00b7 budgeting'}</p>
       </div>
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 shrink-0">
         <div className="w-20 shrink-0">
           <Select
             value={reportYear.toString()}
