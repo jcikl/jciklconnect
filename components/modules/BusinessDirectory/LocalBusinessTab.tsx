@@ -201,7 +201,6 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
                       <div className="flex items-center gap-1.5">
                         <span className="text-sm font-bold text-slate-900 truncate">{biz.ownerName}</span>
                         {chineseName && <span className="text-xs text-slate-400 font-medium truncate hidden sm:inline">({chineseName})</span>}
-                        {!isGuest && getBizScore(biz) === 1 && <span className="ml-auto text-[10px] font-bold bg-violet-50 text-violet-600 border border-violet-200 px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shrink-0">✦ Ideal</span>}
                       </div>
                       <p className="text-xs text-slate-500 truncate">{position} · {biz.companyName}</p>
                       <div className="flex items-center gap-1.5 mt-1 flex-wrap">
@@ -210,22 +209,6 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
                         {(intlStatus === 'Yes' || intlStatus === true) && <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Globe size={9} /> Intl</span>}
                       </div>
                     </div>
-                    {isGuest
-                      ? <Lock size={13} className="text-slate-300 flex-shrink-0" />
-                      : (
-                        <button
-                          type="button"
-                          className="flex-shrink-0 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
-                          onClick={(e) => onBookmarkToggle(e, biz.id)}
-                          aria-label={bookmarkedIds.has(biz.id) ? 'Remove bookmark' : 'Bookmark'}
-                        >
-                          <Bookmark
-                            size={16}
-                            className={bookmarkedIds.has(biz.id) ? 'text-jci-blue fill-jci-blue' : 'text-slate-300'}
-                          />
-                        </button>
-                      )
-                    }
                   </div>
                 </React.Fragment>
               );
