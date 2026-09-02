@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Building2, Globe } from 'lucide-react';
 
 import { useToast } from '../ui/Common';
 import { MembersOnlyOverlay } from '../ui/MembersOnlyOverlay';
@@ -111,8 +112,44 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
 
       <BusinessDirectoryHeader activeTab={activeTab} onTabChange={setActiveTab} />
 
-      <div>
-        <div className="bg-transparent">
+      {/* Member-profile-style icon sidebar on mobile */}
+      <div className="flex md:block rounded-xl md:rounded-none border border-slate-200 md:border-0 overflow-hidden md:overflow-visible shadow-sm md:shadow-none">
+        {/* Left icon column (mobile only) */}
+        <div className="md:hidden flex flex-col border-r border-slate-200 bg-slate-50 w-12 shrink-0">
+          {([
+            { id: 'local', label: 'Local Businesses', icon: Building2 },
+            { id: 'international', label: 'International', icon: Globe },
+          ] as const).map((tab, i) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                title={tab.label}
+                onClick={() => setActiveTab(tab.id)}
+                className={`relative flex items-center justify-center py-5 w-full transition-all ${i > 0 ? 'border-t border-slate-200' : ''} ${isActive ? 'bg-white text-jci-blue' : 'text-slate-400 hover:text-slate-600 hover:bg-white/60'}`}
+              >
+                {isActive && (
+                  <>
+                    <span className="absolute left-0 top-0 bottom-0 w-0.5 bg-jci-blue" />
+                    <span className="absolute right-0 top-0 bottom-0 w-px bg-white" />
+                  </>
+                )}
+                <Icon size={16} className="shrink-0" />
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Content panel */}
+        <div className="flex-1 md:flex-none min-w-0">
+          {/* Active tab title (mobile only) */}
+          <div className="md:hidden px-4 py-2.5 border-b border-slate-100 bg-white">
+            <span className="text-sm font-bold text-slate-700">
+              {activeTab === 'local' ? 'Local Businesses' : 'International Network'}
+            </span>
+          </div>
+          <div className="p-4 md:p-0 bg-transparent">
           {activeTab === 'local' ? (
             <LocalBusinessTab
               businesses={businesses}
@@ -151,10 +188,9 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
               }}
             />
           )}
-        </div>
-      </div>
-
-
+          </div>{/* end p-4 wrapper */}
+        </div>{/* end content panel */}
+      </div>{/* end outer card wrapper */}
 
       <BusinessDetailModal
         isOpen={isDetailOpen}

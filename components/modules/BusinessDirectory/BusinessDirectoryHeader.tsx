@@ -20,17 +20,16 @@ export const BusinessDirectoryHeader: React.FC<BusinessDirectoryHeaderProps> = (
       </div>
     </div>
 
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+    {/* Desktop-only tab bar */}
+    <div className="hidden md:flex flex-col sm:flex-row sm:items-center justify-between gap-2">
       <div className="flex-shrink-0">
         <Tabs
           tabs={[{ id: 'local', label: 'Local Businesses' }, { id: 'international', label: 'International Network' }]}
           activeTab={activeTab}
           onTabChange={(tab) => onTabChange(tab as BusinessDirectoryTab)}
-          mobileFallback="pill"
           className="border-none"
         />
       </div>
-
       <div className="flex items-center gap-3 justify-end" />
     </div>
   </>
