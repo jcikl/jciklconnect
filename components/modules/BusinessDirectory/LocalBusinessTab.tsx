@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { Bookmark, CheckSquare, Gift, Globe, LayoutList, Lock, Search, Send, SlidersHorizontal, Star } from 'lucide-react';
+import { Bookmark, CheckSquare, Gift, Globe, LayoutList, Lock, Network, Search, Send, SlidersHorizontal, Star } from 'lucide-react';
 import type { BusinessProfile, Member } from '../../../types';
-import { Button } from '../../ui/Common';
+import { Button, Modal } from '../../ui/Common';
 import { LoadingState } from '../../ui/Loading';
 import { getInitialsSvg } from './businessDirectoryUtils';
+import { useSisterChapterMembers } from '../../../hooks/useSisterChapterMembers';
+import { hasSpecialOffer, getSpecialOfferSummary } from '../../../types/member';
 
 interface LocalBusinessTabProps {
   businesses: BusinessProfile[];
@@ -60,7 +62,25 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
   onShowDealsOnlyChange,
   getBizScore,
 }) => {
-  const [quickFilter, setQuickFilter] = useState<'all' | 'bookmarked' | 'ideal'>('all');
+  const [quickFilter, setQuickFilter] = useState<'all' | 'bookmarked' | 'ideal' | 'international'>('all');
+  const [intlDetail, setIntlDetail] = useState<{ name: string; chineseName?: string; avatarUrl: string; position: string; companyName: string; jciChapter: string; country: string; industry: string; businessCategory: string; email: string; description: string; specialOffer: string | undefined } | null>(null);
+
+  const { members: rawIntlMembers, loading: intlLoading } = useSisterChapterMembers();
+  const intlViews = rawIntlMembers.map(m => ({
+    id: m.id,
+    name: m.general?.name ?? '',
+    chineseName: m.general?.chineseName,
+    avatarUrl: m.general?.avatarUrl ?? getInitialsSvg(m.general?.name ?? ''),
+    position: m.business?.position ?? '',
+    companyName: m.business?.companyName ?? '',
+    jciChapter: m.sisterChapter?.name ?? '',
+    country: m.sisterChapter?.country ?? '',
+    industry: m.business?.industry ?? '',
+    businessCategory: (m.business?.businessCategory ?? []).join(', '),
+    email: m.contact?.email ?? '',
+    description: m.business?.companyDescription ?? '',
+    specialOffer: getSpecialOfferSummary(m.business?.specialOffer),
+  }));
 
   const mobileDisplayBusinesses = isGuest ? filteredBusinesses : quickFilter === 'bookmarked'
     ? filteredBusinesses.filter(b => bookmarkedIds.has(b.id))
@@ -130,11 +150,13 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
             { id: 'all' as const, label: 'All', Icon: LayoutList },
             { id: 'bookmarked' as const, label: 'Bookmarked', Icon: Bookmark },
             { id: 'ideal' as const, label: 'Ideal', Icon: Star },
+            { id: 'international' as const, label: 'International', Icon: Network },
           ];
           const counts = {
             all: filteredBusinesses.filter(b => !bookmarkedIds.has(b.id) && getBizScore(b) !== 1).length,
             bookmarked: filteredBusinesses.filter(b => bookmarkedIds.has(b.id)).length,
             ideal: filteredBusinesses.filter(b => getBizScore(b) === 1).length,
+            international: intlViews.length,
           };
           const activeLabel = TAB_CONFIG.find(t => t.id === quickFilter)?.label ?? 'All';
           const tabs = isGuest ? TAB_CONFIG.slice(0, 1) : TAB_CONFIG;
@@ -172,6 +194,32 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
                     <span className="text-xs font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{counts[quickFilter]}</span>
                   </div>
                 )}
+                {quickFilter === 'international' ? (
+                  <LoadingState loading={intlLoading} error={null} empty={intlViews.length === 0} emptyMessage="No international members found">
+                    <div className="divide-y divide-slate-100 bg-white">
+                      {intlViews.map(member => (
+                        <button key={member.id} type="button"
+                          className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors"
+                          onClick={() => setIntlDetail(member)}>
+                          <img src={member.avatarUrl} alt={member.name} className="w-11 h-11 rounded-full object-cover border border-slate-200 flex-shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-sm font-bold text-slate-900 truncate">{member.name}</span>
+                              {member.chineseName && member.chineseName !== member.name && <span className="text-xs text-slate-400 font-medium truncate hidden sm:inline">({member.chineseName})</span>}
+                            </div>
+                            <p className="text-xs text-slate-500 truncate">{member.position} · {member.companyName}</p>
+                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                              {member.businessCategory && <span className="text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-100 px-1.5 py-0.5 rounded-full">{member.businessCategory}</span>}
+                              {member.specialOffer && <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Gift size={9} /> Deal</span>}
+                              <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 px-1.5 py-0.5 rounded-full">{member.country}</span>
+                            </div>
+                          </div>
+                          <svg className="w-4 h-4 text-slate-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                        </button>
+                      ))}
+                    </div>
+                  </LoadingState>
+                ) : (
                 <LoadingState loading={loading} error={error} empty={mobileDisplayBusinesses.length === 0} emptyMessage="No businesses found matching this category">
                   <div className="divide-y divide-slate-100 bg-white">
                     {mobileDisplayBusinesses.map((biz, idx) => {
@@ -232,6 +280,7 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
             })}
                   </div>
                 </LoadingState>
+                )}
               </div>{/* end content panel */}
             </div>
           );
@@ -406,6 +455,39 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
           </LoadingState>
         </div>
       </div>
+
+      {/* International member detail modal */}
+      {intlDetail && (
+        <Modal isOpen={!!intlDetail} onClose={() => setIntlDetail(null)} title={intlDetail.companyName} drawerOnMobile>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <img src={intlDetail.avatarUrl} alt={intlDetail.name} className="w-14 h-14 rounded-full object-cover border border-slate-200 flex-shrink-0" />
+              <div>
+                <div className="font-bold text-slate-900">{intlDetail.name}{intlDetail.chineseName && intlDetail.chineseName !== intlDetail.name && <span className="text-sm text-slate-500 font-normal ml-1">({intlDetail.chineseName})</span>}</div>
+                <div className="text-sm text-slate-500">{intlDetail.position} · {intlDetail.companyName}</div>
+                <div className="text-xs text-jci-blue font-bold mt-0.5">{intlDetail.jciChapter} · {intlDetail.country}</div>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {intlDetail.businessCategory && <span className="text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-100 px-2 py-1 rounded-full">{intlDetail.businessCategory}</span>}
+              {intlDetail.specialOffer && <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 px-2 py-1 rounded-full flex items-center gap-0.5"><Gift size={9} /> Deal</span>}
+            </div>
+            {intlDetail.description && <p className="text-sm text-slate-600 leading-relaxed">{intlDetail.description}</p>}
+            {intlDetail.specialOffer && (
+              <div className="bg-amber-50 p-3 rounded-xl border border-amber-100">
+                <span className="text-[10px] font-black text-amber-700 uppercase tracking-wider flex items-center gap-1 mb-1"><Gift size={11} /> Sister Deal</span>
+                <p className="text-sm font-semibold text-amber-900 leading-snug">{intlDetail.specialOffer}</p>
+              </div>
+            )}
+          </div>
+          <div className="flex gap-2 pt-4 border-t border-slate-100 mt-4">
+            <Button variant="outline" size="sm" className="flex-1"
+              onClick={() => window.open(`mailto:${intlDetail.email}?subject=JCI KL Collaboration Inquiry`, '_blank')}>
+              <Globe size={14} className="mr-2" /> Email
+            </Button>
+          </div>
+        </Modal>
+      )}
     </>
   );
 };
