@@ -56,7 +56,7 @@ export const FinanceHeader: React.FC<FinanceHeaderProps> = ({
       </div>
     </div>
 
-    <div className="px-4 md:px-6">
+    <div>
       <Tabs
         tabs={FINANCE_TABS}
         activeTab={activeTab}
