@@ -28,7 +28,7 @@ export const FinanceHeader: React.FC<FinanceHeaderProps> = ({
   onOpenImport,
   onOpenTransaction,
 }) => (
-  <>
+  <div className="space-y-3">
     <div className="flex flex-row items-center justify-between gap-2">
       <div className="min-w-0">
         <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">Financial Management</h2>
@@ -51,12 +51,10 @@ export const FinanceHeader: React.FC<FinanceHeaderProps> = ({
       </div>
     </div>
 
-    <div>
-      <Tabs
-        tabs={FINANCE_TABS}
-        activeTab={activeTab}
-        onTabChange={onTabChange}
-      />
-    </div>
-  </>
+    <Tabs
+      tabs={FINANCE_TABS}
+      activeTab={activeTab}
+      onTabChange={onTabChange}
+    />
+  </div>
 );

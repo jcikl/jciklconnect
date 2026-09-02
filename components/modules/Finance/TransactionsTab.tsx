@@ -144,7 +144,6 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
     txStatusFilter !== 'All',
     txCategoryFilter !== 'All',
     bankAccountFilter !== 'All',
-    reportYear !== 0,
   ].filter(Boolean).length;
 
   // Flatten grouped transactions into a single array for virtual rendering (desktop)
@@ -529,40 +528,42 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
     <div className="space-y-4">
       <div>
         <div className="mb-3 space-y-2">
-          {/* Search */}
-          <Input
-            type="text"
-            placeholder="Search date, description, ref no…"
-            value={txSearchTerm}
-            onChange={(e) => setTxSearchTerm(e.target.value)}
-            icon={<Search size={16} />}
-            className="w-full"
-          />
-
-          {/* Mobile: Filters button */}
-          <div className="md:hidden flex items-center gap-2">
-            <Button
-              variant={activeFilterCount > 0 ? 'secondary' : 'outline'}
-              size="sm"
-              className="flex items-center gap-2 !min-h-0 py-2 px-4 rounded-lg font-medium text-xs shadow-sm bg-white border-slate-200 shrink-0"
-              onClick={() => setFilterDrawerOpen(true)}
-            >
-              <SlidersHorizontal size={14} className={activeFilterCount > 0 ? 'text-sky-600' : 'text-slate-500'} />
-              <span>Filters</span>
-              {activeFilterCount > 0 && (
-                <span className="flex items-center justify-center bg-jci-blue text-white text-[10px] font-bold rounded-full w-5 h-5 ml-1">
-                  {activeFilterCount}
-                </span>
-              )}
-            </Button>
-            {activeFilterCount > 0 && (
-              <button
-                onClick={() => { setTxTypeFilter('All'); setTxStatusFilter('All'); setTxCategoryFilter('All'); setBankAccountFilter('All'); setReportYear(new Date().getFullYear()); }}
-                className="text-xs text-blue-500 hover:text-blue-700 font-medium"
+          {/* Search + Mobile Filters on same row */}
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <Input
+                type="text"
+                placeholder="Search date, description, ref no…"
+                value={txSearchTerm}
+                onChange={(e) => setTxSearchTerm(e.target.value)}
+                icon={<Search size={16} />}
+                className="w-full"
+              />
+            </div>
+            <div className="md:hidden flex items-center gap-2 shrink-0">
+              <Button
+                variant={activeFilterCount > 0 ? 'secondary' : 'outline'}
+                size="sm"
+                className="flex items-center gap-2 !min-h-0 py-2 px-3 rounded-lg font-medium text-xs shadow-sm bg-white border-slate-200 shrink-0"
+                onClick={() => setFilterDrawerOpen(true)}
               >
-                Clear all
-              </button>
-            )}
+                <SlidersHorizontal size={14} className={activeFilterCount > 0 ? 'text-sky-600' : 'text-slate-500'} />
+                <span className="hidden sm:inline">Filters</span>
+                {activeFilterCount > 0 && (
+                  <span className="flex items-center justify-center bg-jci-blue text-white text-[10px] font-bold rounded-full w-5 h-5">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </Button>
+              {activeFilterCount > 0 && (
+                <button
+                  onClick={() => { setTxTypeFilter('All'); setTxStatusFilter('All'); setTxCategoryFilter('All'); setBankAccountFilter('All'); setReportYear(new Date().getFullYear()); }}
+                  className="text-xs text-blue-500 hover:text-blue-700 font-medium whitespace-nowrap"
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Desktop: inline filters */}
@@ -625,29 +626,6 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
           </div>
         </div>
 
-        {/* Summary strip */}
-        {visibleTransactions.length > 0 && (() => {
-          const incomeTotal = visibleTransactions.filter(t => t.type === 'Income').reduce((s, t) => s + t.amount, 0);
-          const expenseTotal = visibleTransactions.filter(t => t.type === 'Expense').reduce((s, t) => s + t.amount, 0);
-          const pendingCount = visibleTransactions.filter(t => t.status === 'Pending').length;
-          return (
-            <div className="flex items-center gap-2 px-1 pb-3 border-b border-slate-100 overflow-x-auto no-scrollbar">
-              <span className="text-xs text-slate-500 font-medium whitespace-nowrap shrink-0">{visibleTransactions.length} txns</span>
-              <span className="w-px h-3.5 bg-slate-200 shrink-0" />
-              <span className="text-xs font-mono font-semibold text-green-600 whitespace-nowrap shrink-0">+{formatCurrency(incomeTotal)}</span>
-              <span className="text-xs font-mono font-semibold text-red-500 whitespace-nowrap shrink-0">−{formatCurrency(expenseTotal)}</span>
-              {pendingCount > 0 && (
-                <>
-                  <span className="w-px h-3.5 bg-slate-200 shrink-0" />
-                  <span className="flex items-center gap-1 text-xs font-semibold text-amber-600 whitespace-nowrap shrink-0">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
-                    {pendingCount} pending
-                  </span>
-                </>
-              )}
-            </div>
-          );
-        })()}
 
         {canOperateFinance && (onOpenTransaction || onOpenImport) && (
           <div className="flex gap-2 mb-3">
