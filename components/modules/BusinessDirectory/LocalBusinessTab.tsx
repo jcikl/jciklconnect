@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bookmark, CheckSquare, Gift, Globe, LayoutList, Lock, Network, Search, Send, SlidersHorizontal, Star } from 'lucide-react';
+import { Bookmark, CheckSquare, Gift, Globe, Globe2, LayoutList, Lock, Search, Send, SlidersHorizontal, Star } from 'lucide-react';
 import type { BusinessProfile, Member } from '../../../types';
 import { Button, Modal } from '../../ui/Common';
 import { LoadingState } from '../../ui/Loading';
@@ -150,7 +150,7 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
             { id: 'all' as const, label: 'All', Icon: LayoutList },
             { id: 'bookmarked' as const, label: 'Bookmarked', Icon: Bookmark },
             { id: 'ideal' as const, label: 'Ideal', Icon: Star },
-            { id: 'international' as const, label: 'International', Icon: Network },
+            { id: 'international' as const, label: 'International', Icon: Globe2 },
           ];
           const counts = {
             all: filteredBusinesses.filter(b => !bookmarkedIds.has(b.id) && getBizScore(b) !== 1).length,
