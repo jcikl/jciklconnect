@@ -568,53 +568,69 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
             )}
 
             {activeTab === 'guest' && (
-              <AsyncErrorBoundary>
-                <GuestManagementView searchQuery={searchQuery} onSelect={setSelectedMemberId} />
-              </AsyncErrorBoundary>
+              <div className="p-4 md:p-0">
+                <AsyncErrorBoundary>
+                  <GuestManagementView searchQuery={searchQuery} onSelect={setSelectedMemberId} />
+                </AsyncErrorBoundary>
+              </div>
             )}
 
             {activeTab === 'statistics' && (
-              <AsyncErrorBoundary>
-                <MemberStatisticsView statistics={statistics} loading={loadingStats} members={members} />
-              </AsyncErrorBoundary>
+              <div className="p-4 md:p-0">
+                <AsyncErrorBoundary>
+                  <MemberStatisticsView statistics={statistics} loading={loadingStats} members={members} />
+                </AsyncErrorBoundary>
+              </div>
             )}
 
             {activeTab === 'board-of-directors' && (
-              <BoardOfDirectorsSection members={members} canManage={canManageMembers} />
+              <div className="p-4 md:p-0">
+                <BoardOfDirectorsSection members={members} canManage={canManageMembers} />
+              </div>
             )}
 
             {activeTab === 'mentorship' && (
-              <MentorMatching searchQuery={searchQuery} />
+              <div className="p-4 md:p-0">
+                <MentorMatching searchQuery={searchQuery} />
+              </div>
             )}
 
             {activeTab === 'promotion-tracking' && (
-              <PromotionTracking searchQuery={searchQuery} />
+              <div className="p-4 md:p-0">
+                <PromotionTracking searchQuery={searchQuery} />
+              </div>
             )}
 
             {activeTab === 'senatorship' && (
-              <SenatorshipManagement
-                members={members}
-                canValidate={canManageMembers}
-                canRevoke={canManageMembers}
-                searchQuery={searchQuery}
-                onMembersChanged={loadMembers}
-              />
+              <div className="p-4 md:p-0">
+                <SenatorshipManagement
+                  members={members}
+                  canValidate={canManageMembers}
+                  canRevoke={canManageMembers}
+                  searchQuery={searchQuery}
+                  onMembersChanged={loadMembers}
+                />
+              </div>
             )}
 
             {activeTab === 'introducer' && (
-              <IntroducerManagement
-                members={members}
-                allProjects={allProjects}
-                onUpdateMember={updateMember}
-                onBatchUpdateMembers={batchUpdateMembers}
-              />
+              <div className="p-4 md:p-0">
+                <IntroducerManagement
+                  members={members}
+                  allProjects={allProjects}
+                  onUpdateMember={updateMember}
+                  onBatchUpdateMembers={batchUpdateMembers}
+                />
+              </div>
             )}
 
             {activeTab === 'duplicates' && (
-              <DuplicateMembersView
-                members={members}
-                onMembersChanged={loadMembers}
-              />
+              <div className="p-4 md:p-0">
+                <DuplicateMembersView
+                  members={members}
+                  onMembersChanged={loadMembers}
+                />
+              </div>
             )}
           </div>
             </div>{/* end content panel */}

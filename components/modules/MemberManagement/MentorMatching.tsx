@@ -201,57 +201,57 @@ export const MentorMatching: React.FC<MentorMatchingProps> = ({
 
       {/* Stats Cards */}
       {mentorshipStats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-          <div className="bg-white rounded-lg shadow p-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div className="bg-white rounded-lg shadow p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Users className="w-6 h-6 text-jci-blue" />
+              <div className="p-2 bg-blue-100 rounded-lg shrink-0">
+                <Users className="w-5 h-5 text-jci-blue" />
               </div>
-              <div>
-                <p className="text-sm text-slate-600">Active Mentorships</p>
-                <p className="text-2xl font-bold text-slate-900">
+              <div className="min-w-0">
+                <p className="text-xs text-slate-600 leading-tight">Active Mentorships</p>
+                <p className="text-xl font-bold text-slate-900">
                   {mentorshipStats.totalMentorships}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-white rounded-lg shadow p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <UserCheck className="w-6 h-6 text-green-600" />
+              <div className="p-2 bg-green-100 rounded-lg shrink-0">
+                <UserCheck className="w-5 h-5 text-green-600" />
               </div>
-              <div>
-                <p className="text-sm text-slate-600">Active Mentors</p>
-                <p className="text-2xl font-bold text-slate-900">
+              <div className="min-w-0">
+                <p className="text-xs text-slate-600 leading-tight">Active Mentors</p>
+                <p className="text-xl font-bold text-slate-900">
                   {mentorshipStats.activeMentors}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-white rounded-lg shadow p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-orange-100 rounded-lg">
-                <Clock className="w-6 h-6 text-orange-600" />
+              <div className="p-2 bg-orange-100 rounded-lg shrink-0">
+                <Clock className="w-5 h-5 text-orange-600" />
               </div>
-              <div>
-                <p className="text-sm text-slate-600">Unassigned Mentees</p>
-                <p className="text-2xl font-bold text-slate-900">
+              <div className="min-w-0">
+                <p className="text-xs text-slate-600 leading-tight">Unassigned Mentees</p>
+                <p className="text-xl font-bold text-slate-900">
                   {mentorshipStats.unassignedMentees}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-white rounded-lg shadow p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <TrendingUp className="w-6 h-6 text-purple-600" />
+              <div className="p-2 bg-purple-100 rounded-lg shrink-0">
+                <TrendingUp className="w-5 h-5 text-purple-600" />
               </div>
-              <div>
-                <p className="text-sm text-slate-600">Success Rate</p>
-                <p className="text-2xl font-bold text-slate-900">
+              <div className="min-w-0">
+                <p className="text-xs text-slate-600 leading-tight">Success Rate</p>
+                <p className="text-xl font-bold text-slate-900">
                   {mentorshipStats.successRate}%
                 </p>
               </div>

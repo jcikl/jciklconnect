@@ -424,7 +424,7 @@ export const IntroducerManagement: React.FC<Props> = ({
       </div>
 
       {/* 2. Sub Tabs Toggle */}
-      <div className="flex border-b border-slate-200 gap-6">
+      <div className="flex border-b border-slate-200 gap-6 overflow-x-auto no-scrollbar">
         <button
           onClick={() => setActiveSubTab('overview')}
           className={`pb-3 font-bold text-sm transition-all border-b-2 px-2 -mb-[2px] flex items-center gap-2 ${
