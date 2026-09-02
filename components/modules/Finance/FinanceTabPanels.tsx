@@ -1,4 +1,4 @@
-import React, { lazy, Suspense } from 'react';
+import React, { lazy, Suspense, useState, useEffect } from 'react';
 import type { BankAccount } from '../../../types';
 import type { useFinanceData } from '../../../hooks/useFinanceData';
 import { usePermissions } from '../../../hooks/usePermissions';
@@ -35,6 +35,8 @@ export const FinanceTabPanels: React.FC<FinanceTabPanelsProps> = ({
   onHelpClick,
 }) => {
   const { isAdmin } = usePermissions();
+  const [membershipYear, setMembershipYear] = useState(financeData.detailYear);
+  useEffect(() => { setMembershipYear(financeData.detailYear); }, [financeData.detailYear]);
 
   const {
     accounts,
@@ -147,7 +149,7 @@ export const FinanceTabPanels: React.FC<FinanceTabPanelsProps> = ({
 
       {moduleTab === 'Membership' && hasPermission('canViewFinance') && (
         <FinanceMembershipTab
-          year={financeData.detailYear}
+          year={membershipYear}
           membershipTransactions={membershipTransactions}
           members={members}
           canOperateFinance={canOperateFinance}
@@ -159,6 +161,7 @@ export const FinanceTabPanels: React.FC<FinanceTabPanelsProps> = ({
           onOpenEditModal={onOpenEditModal}
           onMembershipDataChanged={loadData}
           onInitiateRenewal={onOpenDuesRenewal}
+          onYearChange={(y) => { setMembershipYear(y); loadData(y); }}
         />
       )}
 

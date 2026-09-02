@@ -29,6 +29,7 @@ interface FinanceMembershipTabProps {
   onOpenEditModal: () => void;
   onMembershipDataChanged: () => void | Promise<void>;
   onInitiateRenewal: () => void;
+  onYearChange?: (year: number) => void;
 }
 
 export const FinanceMembershipTab: React.FC<FinanceMembershipTabProps> = ({
@@ -44,6 +45,7 @@ export const FinanceMembershipTab: React.FC<FinanceMembershipTabProps> = ({
   onOpenEditModal,
   onMembershipDataChanged,
   onInitiateRenewal,
+  onYearChange,
 }) => (
   <Suspense fallback={<div className="py-12 text-center text-slate-400 text-sm">Loading...</div>}>
     <DuesRenewalDashboard
@@ -64,6 +66,7 @@ export const FinanceMembershipTab: React.FC<FinanceMembershipTabProps> = ({
       onMembershipDataChanged={onMembershipDataChanged}
       members={members}
       onInitiateRenewal={onInitiateRenewal}
+      onYearChange={onYearChange}
     />
   </Suspense>
 );

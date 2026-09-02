@@ -130,6 +130,8 @@ interface DuesRenewalDashboardProps {
   onMembershipDataChanged?: () => void | Promise<void>;
   /** 手动触发年度续费（Cloud Function 自动跑，此为备用入口） */
   onInitiateRenewal?: () => void;
+  /** 年份切换回调，让父层重新加载对应年份的交易数据 */
+  onYearChange?: (year: number) => void;
   /** 会员列表，用于显示 memberId 对应的姓名 */
   members?: Array<{
     id: string;
@@ -157,9 +159,8 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
   onMembershipDataChanged,
   members = [],
   onInitiateRenewal,
+  onYearChange,
 }) => {
-  const [selectedYear, setSelectedYear] = useState(year);
-  useEffect(() => { setSelectedYear(year); }, [year]);
   const { showToast } = useToast();
   const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
   const [filterType, setFilterType] = useState<MembershipType | 'all'>('all');
@@ -183,7 +184,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
       const filteredByYear = membershipTransactions.filter((tx) => {
         const yearFromProjectId = tx.projectId?.match(/^(\d+)\s+membership$/)?.[1];
         const txYear = yearFromProjectId ? parseInt(yearFromProjectId, 10) : new Date(tx.date).getFullYear();
-        return txYear === selectedYear;
+        return txYear === year;
       });
 
       const unlinked = filteredByYear.filter(tx => !tx.memberId);
@@ -197,7 +198,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
           const catFields = buildCategoryFields({
             category: 'Membership',
             amount: tx.amount,
-            year: selectedYear,
+            year: year,
             memberId: member.id,
             rules,
           });
@@ -248,12 +249,12 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
   };
 
   const handleBatchSyncMembershipTypes = () => {
-    setConfirmState({ open: true, title: 'Confirm', message: `根据 ${selectedYear} 年会费记录、角色与 Membership Config，批量推断并写入 members.membershipType？\n\n不会修改 membership 字段。建议先确保 membership 数据准确，或之后执行「同步 membership」。`, variant: 'warning', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await _doBatchSyncMembershipTypes(); } });
+    setConfirmState({ open: true, title: 'Confirm', message: `根据 ${year} 年会费记录、角色与 Membership Config，批量推断并写入 members.membershipType？\n\n不会修改 membership 字段。建议先确保 membership 数据准确，或之后执行「同步 membership」。`, variant: 'warning', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await _doBatchSyncMembershipTypes(); } });
   };
   const _doBatchSyncMembershipTypes = async () => {
     setSyncingMembershipTypes(true);
     try {
-      const result = await MembersService.batchSyncMembershipTypes({ year: selectedYear });
+      const result = await MembersService.batchSyncMembershipTypes({ year: year });
       showToast(
         `membershipType 同步完成（${result.year} 年）：扫描 ${result.scanned}，更新 ${result.updated}${result.errors.length > 0 ? `，失败 ${result.errors.length}（见控制台）` : ''}`,
         result.errors.length > 0 ? 'warning' : 'success'
@@ -270,13 +271,13 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
   };
 
   const handleBatchSyncMembershipRecords = () => {
-    setConfirmState({ open: true, title: 'Confirm', message: `根据每位会员的 membershipType 与 Membership Config，批量更新 ${selectedYear} 年的 members.membership？\n\n将写入 dues / status 等；可为符合条件会员新建该年记录。不会修改 membershipType。`, variant: 'warning', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await _doBatchSyncMembershipRecords(); } });
+    setConfirmState({ open: true, title: 'Confirm', message: `根据每位会员的 membershipType 与 Membership Config，批量更新 ${year} 年的 members.membership？\n\n将写入 dues / status 等；可为符合条件会员新建该年记录。不会修改 membershipType。`, variant: 'warning', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await _doBatchSyncMembershipRecords(); } });
   };
   const _doBatchSyncMembershipRecords = async () => {
     setSyncingMembershipRecords(true);
     try {
       const result = await MembersService.batchSyncMembershipRecords({
-        year: selectedYear,
+        year: year,
         membershipTransactions,
         onlyExistingRecords: false,
       });
@@ -396,7 +397,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
       const targetDues = (renewal as any).targetDues ?? renewal.amount ?? 0;
       const paidAmt = renewal.amount ?? 0;
       const outstanding = Math.max(0, targetDues - paidAmt);
-      const ok = sendWhatsAppDuesReminder(m.name, m.phone, selectedYear, outstanding);
+      const ok = sendWhatsAppDuesReminder(m.name, m.phone, year, outstanding);
       if (ok) {
         sent++;
         // Small delay so browser doesn't block rapid popup opens
@@ -418,7 +419,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
         }
       }
 
-      if (!m.joinDate) return selectedYear;
+      if (!m.joinDate) return year;
       const date = new Date(m.joinDate);
       const calendarYear = date.getFullYear();
       const month = date.getMonth(); // 0-indexed: 9 = Oct
@@ -436,18 +437,18 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
       if (m.membershipType === 'Guest') return false;
       if (!m.joinDate && calculationMode === 'calendar') return false;
       const effYear = getEffectiveJoinYear(m);
-      return effYear <= selectedYear;
+      return effYear <= year;
     });
 
     const merged = yearMembers.map(m => {
-      const membershipData = m.membership?.[String(selectedYear)];
+      const membershipData = m.membership?.[String(year)];
       const rules = membershipRules || DEFAULT_MEMBERSHIP_RULES;
 
       const joinYear = getEffectiveJoinYear(m);
       // Probation members always pay renewal dues (RM300) — they already paid the
       // one-time RM350 entry fee as a Guest. Never treat them as "first year".
       const rawMembershipType = m.membershipType || 'Probation';
-      const isFirstYear = joinYear === selectedYear && rawMembershipType !== 'Probation';
+      const isFirstYear = joinYear === year && rawMembershipType !== 'Probation';
 
       const getTargetDues = (mType: MembershipType) =>
         getTargetDuesForMembershipType(mType, isFirstYear, rules);
@@ -461,20 +462,20 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
         : getTargetDues(rawType);
       const resolvedType = resolveTypeFromDues(duesVal, rawType);
       return {
-        id: `summary-${m.id}-${selectedYear}`,
+        id: `summary-${m.id}-${year}`,
         memberId: m.id,
         membershipType: resolvedType,
-        duesYear: selectedYear,
+        duesYear: year,
         amount: membershipData?.amount,
         targetDues: duesVal,
         status: membershipData?.status ?? 'pending',
-        dueDate: new Date(selectedYear, 2, 31).toISOString(),
+        dueDate: new Date(year, 2, 31).toISOString(),
         isRenewal: !isFirstYear,
       } as RenewalWithTargetDues;
     });
 
     return merged.filter((r): r is RenewalWithTargetDues => r !== null);
-  }, [members, selectedYear, membershipRules, calculationMode, membershipTransactions]);
+  }, [members, year, membershipRules, calculationMode, membershipTransactions]);
 
   const summary = React.useMemo((): DuesRenewalSummary | null => {
     if (!mergedRenewals.length) return null;
@@ -503,14 +504,14 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
       }
     });
     return {
-      year: selectedYear,
+      year: year,
       totalMembers: mergedRenewals.length,
       renewalMembers: mergedRenewals.filter(r => r.isRenewal).length,
       newMembers: mergedRenewals.filter(r => !r.isRenewal).length,
       byMembershipType,
       overallStats: { totalAmount, paidAmount, pendingAmount, overdueAmount, collectionRate: totalAmount > 0 ? Math.round((paidAmount / totalAmount) * 1000) / 10 : 0 },
     };
-  }, [mergedRenewals, selectedYear]);
+  }, [mergedRenewals, year]);
 
   const newMembershipBreakdown = React.useMemo(() => {
     const stats = { total: 0, paid: 0, pending: 0, overdue: 0 };
@@ -542,7 +543,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
       .filter(renewal => {
         if (filterType !== 'all' && renewal.membershipType !== filterType) return false;
         if (filterPrevYearPaid) {
-          const prevYearRec = members.find(m => m.id === renewal.memberId)?.membership?.[String(selectedYear - 1)];
+          const prevYearRec = members.find(m => m.id === renewal.memberId)?.membership?.[String(year - 1)];
           const prevStatus = prevYearRec?.status ?? '';
           if (prevStatus !== 'paid' && prevStatus !== 'over paid') return false;
         }
@@ -607,7 +608,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
 
     const storedYears = m.membership ? Object.keys(m.membership).map(Number) : [];
     const earliestStored = storedYears.length > 0 ? Math.min(...storedYears) : null;
-    const startYear = joinCalendarYear ?? earliestStored ?? selectedYear;
+    const startYear = joinCalendarYear ?? earliestStored ?? year;
     const endYear = new Date().getFullYear();
 
     if (startYear > endYear) {
@@ -648,7 +649,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
         </thead>
         <tbody className="divide-y divide-slate-50">
           {years.map(yr => {
-            const isSelectedYear = yr === selectedYear;
+            const isSelectedYear = yr === year;
 
             // Join year for late-year joiners (Oct+): no dues obligation.
             // The entry fee is attributed to effectiveJoinYear (next calendar year).
@@ -965,7 +966,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                 <Users className="w-3.5 h-3.5 text-blue-500" />
               </div>
               <span className="text-sm font-bold text-slate-800">
-                Membership Breakdown · {selectedYear}
+                Membership Breakdown · {year}
               </span>
             </div>
           </div>
@@ -1085,8 +1086,8 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
               <select
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                value={year}
+                onChange={(e) => onYearChange?.(Number(e.target.value))}
                 className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-jci-blue/30 focus:border-jci-blue"
               >
                 {Array.from({ length: new Date().getFullYear() - 2018 }, (_, i) => new Date().getFullYear() - i).map(y => (
@@ -1135,7 +1136,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                 title={`${filterPrevYearPaid ? '取消' : '仅显示'}上一年已缴费会员（续费会员）`}
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                <span>{selectedYear - 1} 已缴</span>
+                <span>{year - 1} 已缴</span>
               </button>
             </div>
           </div>
@@ -1212,7 +1213,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                               {canWhatsApp && (
                                 <button
                                   type="button"
-                                  onClick={() => sendWhatsAppDuesReminder(m!.name, m!.phone, selectedYear, Math.max(0, outstanding))}
+                                  onClick={() => sendWhatsAppDuesReminder(m!.name, m!.phone, year, Math.max(0, outstanding))}
                                   className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-green-50 text-green-600 border border-green-200 hover:bg-green-100 transition-colors"
                                   title={`WhatsApp 提醒 ${m?.name}`}
                                 >
@@ -1224,11 +1225,11 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                                 <PaymentButton
                                   type="membership"
                                   member={m as any}
-                                  year={selectedYear}
+                                  year={year}
                                   size="sm"
                                   label="Pay"
-                                  existingPaymentUrl={(m as any).membership?.[String(selectedYear)]?.toyyibPaymentUrl}
-                                  existingBillStatus={(m as any).membership?.[String(selectedYear)]?.toyyibPaymentStatus}
+                                  existingPaymentUrl={(m as any).membership?.[String(year)]?.toyyibPaymentUrl}
+                                  existingBillStatus={(m as any).membership?.[String(year)]?.toyyibPaymentStatus}
                                 />
                               )}
                             </div>
@@ -1306,7 +1307,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                     {m?.phone && (renewal.status === 'overdue' || renewal.status === 'pending' || renewal.status === 'partial') && (
                       <button
                         type="button"
-                        onClick={() => sendWhatsAppDuesReminder(m.name, m.phone, selectedYear, Math.max(0, outstanding))}
+                        onClick={() => sendWhatsAppDuesReminder(m.name, m.phone, year, Math.max(0, outstanding))}
                         className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 transition-colors text-[10px] font-semibold"
                         title={`WhatsApp 提醒 ${m.name}`}
                       >
@@ -1318,11 +1319,11 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                       <PaymentButton
                         type="membership"
                         member={m as any}
-                        year={selectedYear}
+                        year={year}
                         size="sm"
                         label="Pay"
-                        existingPaymentUrl={(m as any).membership?.[String(selectedYear)]?.toyyibPaymentUrl}
-                        existingBillStatus={(m as any).membership?.[String(selectedYear)]?.toyyibPaymentStatus}
+                        existingPaymentUrl={(m as any).membership?.[String(year)]?.toyyibPaymentUrl}
+                        existingBillStatus={(m as any).membership?.[String(year)]?.toyyibPaymentStatus}
                       />
                     )}
                   </div>
@@ -1349,7 +1350,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
               </div>
               <div className="min-w-0">
                 <span className="text-sm font-bold text-slate-800 block">Membership Payments</span>
-                <span className="text-[10px] text-slate-400">{selectedYear}</span>
+                <span className="text-[10px] text-slate-400">{year}</span>
               </div>
             </div>
             {hasEditPermission && (
@@ -1372,14 +1373,14 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
               const filteredByYear = membershipTransactions.filter((tx) => {
                 const yearFromProjectId = tx.projectId?.match(/^(\d+)\s+membership$/)?.[1];
                 const txYear = yearFromProjectId ? parseInt(yearFromProjectId, 10) : new Date(tx.date).getFullYear();
-                return txYear === selectedYear;
+                return txYear === year;
               });
 
               if (filteredByYear.length === 0) {
                 return (
                   <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
                     <DollarSign className="w-10 h-10 text-slate-300 mb-3" />
-                    <p className="text-slate-400 text-sm">No payments for {selectedYear}</p>
+                    <p className="text-slate-400 text-sm">No payments for {year}</p>
                   </div>
                 );
               }
@@ -1429,7 +1430,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                                 {hasEditPermission && (
                                   <button
                                     type="button"
-                                    onClick={() => onEditMembershipTransaction?.(tx, selectedYear)}
+                                    onClick={() => onEditMembershipTransaction?.(tx, year)}
                                     className="inline-flex items-center gap-0.5 mt-0.5 text-[10px] font-bold text-slate-400 hover:text-jci-blue transition-colors uppercase tracking-wider"
                                   >
                                     <Edit size={10} /> Edit
@@ -1473,7 +1474,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                               {hasEditPermission && (
                                 <button
                                   type="button"
-                                  onClick={() => onEditMembershipTransaction?.(tx, selectedYear)}
+                                  onClick={() => onEditMembershipTransaction?.(tx, year)}
                                   className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-semibold bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 transition-colors"
                                 >
                                   <Edit size={10} /> Edit
