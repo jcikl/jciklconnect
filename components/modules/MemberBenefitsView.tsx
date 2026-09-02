@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Gift, Users, Calendar, CheckCircle, Clock, Sparkles, Star } from 'lucide-react';
-import { Button, Card, Badge, Modal, useToast } from '../ui/Common';
+import { Gift, Users, Calendar, CheckCircle, Clock, Sparkles, Star, Plus, Upload } from 'lucide-react';
+import { Button, Card, Badge, Modal, Drawer, useToast } from '../ui/Common';
 import { MembersOnlyOverlay } from '../ui/MembersOnlyOverlay';
 import { LoadingState } from '../ui/Loading';
 import { useAdvertisements } from '../../hooks/useAdvertisements';
@@ -10,6 +10,9 @@ import { Advertisement, BenefitUsage } from '../../services/advertisementService
 import { formatDate, toDate } from '../../utils/dateUtils';
 import { PartnershipDetailModal } from '../dashboard/PartnershipDetailModal';
 import { hasSpecialOffer, getSpecialOfferSummary, SpecialOffer } from '../../types/member';
+import { uploadMemberOfferLogoToCloudinary, uploadMemberOfferBannerToCloudinary } from '../../services/cloudinaryService';
+
+const EMPTY_OFFER: SpecialOffer = { description: '', terms: '', expiryDate: '', status: 'Active' };
 
 type BenefitItem = Advertisement & { _isMemberOffer?: boolean; _memberId?: string; _memberName?: string; _isSelf?: boolean };
 
@@ -37,8 +40,73 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
   const [recordedImpressions, setRecordedImpressions] = useState<Set<string>>(new Set());
   const { advertisements, loading, error, recordClick, recordImpression, getBenefitUsageHistory } = useAdvertisements();
   const { member } = useAuth();
-  const { members } = useMembers();
+  const { members, updateMember } = useMembers();
   const { showToast } = useToast();
+
+  // ── Special offer drawer (current user's own offer) ──
+  const [offerDrawerOpen, setOfferDrawerOpen] = useState(false);
+  const [offerEditingIndex, setOfferEditingIndex] = useState<number | null>(null);
+  const [draftOffer, setDraftOffer] = useState<SpecialOffer>({ ...EMPTY_OFFER });
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [savingOffer, setSavingOffer] = useState(false);
+
+  const selfMember = useMemo(() => members.find(m => m.id === member?.id), [members, member?.id]);
+  const selfOffers: SpecialOffer[] = useMemo(
+    () => (selfMember?.business?.specialOffers ?? []).filter((o: SpecialOffer) => o.description?.trim()),
+    [selfMember]
+  );
+
+  useEffect(() => {
+    if (!offerDrawerOpen) return;
+    if (offerEditingIndex !== null) {
+      const src = selfOffers[offerEditingIndex];
+      if (src) setDraftOffer({ ...src });
+    } else {
+      setDraftOffer({ ...EMPTY_OFFER });
+    }
+  }, [offerDrawerOpen, offerEditingIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const updateDraft = (patch: Partial<SpecialOffer>) => setDraftOffer(prev => ({ ...prev, ...patch }));
+
+  const handleOfferLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !member?.id) return;
+    setUploadingLogo(true);
+    try { updateDraft({ logoUrl: await uploadMemberOfferLogoToCloudinary(file, member.id) }); }
+    catch { showToast('Failed to upload logo', 'error'); }
+    finally { setUploadingLogo(false); }
+  };
+
+  const handleOfferBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !member?.id) return;
+    setUploadingBanner(true);
+    try { updateDraft({ imageUrl: await uploadMemberOfferBannerToCloudinary(file, member.id) }); }
+    catch { showToast('Failed to upload banner', 'error'); }
+    finally { setUploadingBanner(false); }
+  };
+
+  const saveOfferDrawer = async () => {
+    if (!draftOffer.description.trim() || !member?.id) return;
+    const next = [...selfOffers];
+    if (offerEditingIndex === null) next.push(draftOffer); else next[offerEditingIndex] = draftOffer;
+    setSavingOffer(true);
+    try {
+      await updateMember(member.id, {
+        specialOffers: next,
+        specialOffer: next[0] ?? undefined,
+      } as any);
+      showToast('Special offer saved', 'success');
+      setOfferDrawerOpen(false);
+    } catch {
+      showToast('Failed to save offer', 'error');
+    } finally {
+      setSavingOffer(false);
+    }
+  };
 
   const memberOffers = useMemo((): BenefitItem[] => {
     return members
@@ -206,8 +274,27 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
       )}
 
       {/* Grid */}
-      <LoadingState loading={loading} error={error} empty={displayBenefits.length === 0} emptyMessage="No benefits match this filter">
+      <LoadingState loading={loading} error={error} empty={displayBenefits.length === 0 && isGuest} emptyMessage="No benefits match this filter">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+          {/* Add Special Offer card — visible to non-guests */}
+          {!isGuest && (
+            <div
+              onClick={() => { setOfferEditingIndex(null); setOfferDrawerOpen(true); }}
+              className="relative bg-white rounded-xl border-2 border-dashed border-slate-200 overflow-hidden cursor-pointer hover:border-jci-blue hover:shadow-md transition-all flex flex-col group"
+            >
+              <div className="relative aspect-[4/3] bg-slate-50 flex items-center justify-center group-hover:bg-blue-50 transition-colors">
+                <div className="flex flex-col items-center gap-2">
+                  <div className="w-10 h-10 rounded-full bg-slate-100 group-hover:bg-jci-blue/10 transition-colors flex items-center justify-center">
+                    <Plus size={20} className="text-slate-400 group-hover:text-jci-blue transition-colors" />
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-col flex-1 p-3">
+                <h3 className="font-bold text-sm text-slate-400 group-hover:text-jci-blue transition-colors leading-snug">New Special Offer</h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">Share an exclusive deal with JCI KL members</p>
+              </div>
+            </div>
+          )}
           {displayBenefits.map(benefit => {
             const b = benefit as BenefitItem;
             const claimed = claimedBenefitIds.has(b.id!);
@@ -320,6 +407,94 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
           getUsageHistory={getBenefitUsageHistory}
         />
       )}
+
+      {/* ── New / Edit Special Offer Drawer ── */}
+      <Drawer
+        isOpen={offerDrawerOpen}
+        onClose={() => setOfferDrawerOpen(false)}
+        title={offerEditingIndex === null ? 'Add Special Offer' : 'Edit Offer'}
+        position="bottom"
+        size="xl"
+        footer={
+          <div className="flex gap-3">
+            <button type="button" onClick={() => setOfferDrawerOpen(false)} className="flex-1 h-10 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
+            <button type="button" onClick={saveOfferDrawer} disabled={!draftOffer.description.trim() || savingOffer} className="flex-1 h-10 rounded-xl bg-jci-blue text-white text-sm font-bold disabled:opacity-40 hover:bg-blue-600 transition-colors">
+              {savingOffer ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4 text-sm p-1">
+          <div>
+            <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Offer Description *</label>
+            <input
+              type="text"
+              placeholder="e.g. 10% off first order for JCI KL members"
+              value={draftOffer.description}
+              onChange={e => updateDraft({ description: e.target.value })}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-jci-blue focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Terms & Conditions</label>
+            <textarea
+              rows={3}
+              placeholder="Terms & conditions (optional)"
+              value={draftOffer.terms ?? ''}
+              onChange={e => updateDraft({ terms: e.target.value })}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-jci-blue focus:outline-none resize-none"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <p className="text-xs text-slate-500 font-medium">Company Logo</p>
+              <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 aspect-square flex items-center justify-center overflow-hidden">
+                {draftOffer.logoUrl ? <img src={draftOffer.logoUrl} alt="Logo" className="w-full h-full object-contain p-1" /> : <Upload size={18} className="text-slate-300" />}
+              </div>
+              <div className="flex items-center gap-1.5">
+                <label className={`flex-1 inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${uploadingLogo ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' : 'bg-white text-slate-700 border-slate-300 hover:border-jci-blue hover:text-jci-blue'}`}>
+                  <Upload size={11} />{uploadingLogo ? 'Uploading…' : 'Upload'}
+                  <input type="file" accept="image/*" className="hidden" disabled={uploadingLogo} onChange={handleOfferLogoUpload} />
+                </label>
+                {draftOffer.logoUrl && <button type="button" onClick={() => updateDraft({ logoUrl: '' })} className="text-xs text-slate-400 hover:text-red-500">Remove</button>}
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <p className="text-xs text-slate-500 font-medium">Ad Banner</p>
+              <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 aspect-square flex items-center justify-center overflow-hidden">
+                {draftOffer.imageUrl ? <img src={draftOffer.imageUrl} alt="Banner" className="w-full h-full object-cover" /> : <Upload size={18} className="text-slate-300" />}
+              </div>
+              <div className="flex items-center gap-1.5">
+                <label className={`flex-1 inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${uploadingBanner ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' : 'bg-white text-slate-700 border-slate-300 hover:border-jci-blue hover:text-jci-blue'}`}>
+                  <Upload size={11} />{uploadingBanner ? 'Uploading…' : 'Upload'}
+                  <input type="file" accept="image/*" className="hidden" disabled={uploadingBanner} onChange={handleOfferBannerUpload} />
+                </label>
+                {draftOffer.imageUrl && <button type="button" onClick={() => updateDraft({ imageUrl: '' })} className="text-xs text-slate-400 hover:text-red-500">Remove</button>}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 pt-1">
+            <label className="text-xs text-slate-500 whitespace-nowrap">Status</label>
+            <div className="flex gap-2">
+              {(['Active', 'Paused'] as const).map(s => (
+                <button key={s} type="button" onClick={() => updateDraft({ status: s })}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
+                    (draftOffer.status ?? 'Active') === s
+                      ? s === 'Active' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-slate-400 text-white border-slate-400'
+                      : 'bg-white text-slate-500 border-slate-300 hover:border-slate-400'
+                  }`}>{s}</button>
+              ))}
+            </div>
+            <label className="text-xs text-slate-500 whitespace-nowrap ml-auto">Expiry</label>
+            <input
+              type="date"
+              value={draftOffer.expiryDate ?? ''}
+              onChange={e => updateDraft({ expiryDate: e.target.value })}
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:outline-none"
+            />
+          </div>
+        </div>
+      </Drawer>
     </div>
   );
 };

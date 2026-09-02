@@ -546,15 +546,13 @@ export const JCIKLApp: React.FC = () => {
                       className="h-9 flex items-center justify-center shrink-0 transition-all duration-200 hover:opacity-80"
                     >
                       <picture><source type="image/webp" srcSet="/mascot/JCIKL-Mascot.webp" /><img src="/mascot/JCIKL-Mascot.png" alt="JCI KL" className="h-7 w-auto" /></picture>
-                      <span className={`ml-1.5 h-7 flex items-center text-[20px] leading-7 font-black tracking-tight whitespace-nowrap ${showBoardDashboard ? 'text-amber-300' : 'text-white'}`}>JCI KL Connect</span>
                     </button>
                   ) : (
                     <div className="h-9 flex items-center justify-center shrink-0">
                       <picture><source type="image/webp" srcSet="/mascot/JCIKL-Mascot.webp" /><img src="/mascot/JCIKL-Mascot.png" alt="JCI KL" className="h-7 w-auto" /></picture>
-                      <span className="ml-1.5 h-7 flex items-center text-[20px] leading-7 font-black tracking-tight whitespace-nowrap text-white">JCI KL Connect</span>
                     </div>
                   )}
-                  <div className="hidden sm:flex flex-col leading-none gap-0.5 min-w-0">
+                  <div className="flex flex-col leading-none gap-0.5 min-w-0">
                     <span className="text-[10px] font-bold text-white/55 uppercase tracking-widest">Kuala Lumpur</span>
                     <span className="text-sm font-semibold text-white truncate">
                       {getShortViewTitle(view)}
@@ -628,7 +626,7 @@ export const JCIKLApp: React.FC = () => {
                   <div
                     className={`flex items-center ml-1 rounded-xl border ${headerSearchActive ? 'bg-white/15 border-white/25' : 'border-transparent'}`}
                     style={{
-                      width: headerSearchActive ? 'min(280px, 52vw)' : '34px',
+                      width: headerSearchActive ? 'min(224px, 42vw)' : '34px',
                       overflow: 'hidden',
                       transition: 'width 0.28s cubic-bezier(0.4,0,0.2,1)',
                     }}
