@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Bookmark, CheckSquare, Gift, Globe, LayoutList, Lock, Search, Send, SlidersHorizontal, Star } from 'lucide-react';
+import React from 'react';
+import { Bookmark, CheckSquare, Gift, Globe, Lock, Search, Send, SlidersHorizontal } from 'lucide-react';
 import type { BusinessProfile, Member } from '../../../types';
 import { Button } from '../../ui/Common';
 import { LoadingState } from '../../ui/Loading';
@@ -60,14 +60,6 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
   onShowDealsOnlyChange,
   getBizScore,
 }) => {
-  const [quickFilter, setQuickFilter] = useState<'all' | 'bookmarked' | 'ideal'>('all');
-
-  const mobileDisplayBusinesses = isGuest ? filteredBusinesses : quickFilter === 'bookmarked'
-    ? filteredBusinesses.filter(b => bookmarkedIds.has(b.id))
-    : quickFilter === 'ideal'
-      ? filteredBusinesses.filter(b => getBizScore(b) === 1)
-      : filteredBusinesses;
-
   const resetFilters = () => {
     onSelectedIndustriesChange(new Set());
     onSelectedIntlBizChange('All');
@@ -124,58 +116,11 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
             )}
           </Button>
         </div>
-        {/* Vertical icon sidebar + content panel */}
-        {(() => {
-          const TAB_CONFIG = [
-            { id: 'all' as const, label: 'All', Icon: LayoutList },
-            { id: 'bookmarked' as const, label: 'Bookmarked', Icon: Bookmark },
-            { id: 'ideal' as const, label: 'Ideal', Icon: Star },
-          ];
-          const counts = {
-            all: filteredBusinesses.length,
-            bookmarked: filteredBusinesses.filter(b => bookmarkedIds.has(b.id)).length,
-            ideal: filteredBusinesses.filter(b => getBizScore(b) === 1).length,
-          };
-          const activeLabel = TAB_CONFIG.find(t => t.id === quickFilter)?.label ?? 'All';
-          const tabs = isGuest ? TAB_CONFIG.slice(0, 1) : TAB_CONFIG;
-          return (
-            <div className="flex rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-              {/* Left icon column */}
-              {!isGuest && (
-                <div className="flex flex-col border-r border-slate-200 bg-slate-50 w-12 shrink-0">
-                  {tabs.map((tab, i) => {
-                    const isActive = quickFilter === tab.id;
-                    return (
-                      <button
-                        key={tab.id}
-                        title={tab.label}
-                        onClick={() => setQuickFilter(tab.id)}
-                        className={`relative flex items-center justify-center py-5 w-full transition-all ${i > 0 ? 'border-t border-slate-200' : ''} ${isActive ? 'bg-white text-jci-blue' : 'text-slate-400 hover:text-slate-600 hover:bg-white/60'}`}
-                      >
-                        {isActive && (
-                          <>
-                            <span className="absolute left-0 top-0 bottom-0 w-0.5 bg-jci-blue" />
-                            <span className="absolute right-0 top-0 bottom-0 w-px bg-white" />
-                          </>
-                        )}
-                        <tab.Icon size={15} className="shrink-0" />
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-              {/* Content panel */}
-              <div className="flex-1 min-w-0">
-                {!isGuest && (
-                  <div className="px-4 py-2.5 border-b border-slate-100 bg-white flex items-center justify-between">
-                    <span className="text-sm font-bold text-slate-700">{activeLabel}</span>
-                    <span className="text-xs font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{counts[quickFilter]}</span>
-                  </div>
-                )}
-                <LoadingState loading={loading} error={error} empty={mobileDisplayBusinesses.length === 0} emptyMessage="No businesses found matching this category">
-                  <div className="divide-y divide-slate-100 bg-white">
-                    {mobileDisplayBusinesses.map((biz, idx) => {
-              const prevMobileScore = idx > 0 ? getBizScore(mobileDisplayBusinesses[idx - 1]) : -1;
+        <div className="rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+          <LoadingState loading={loading} error={error} empty={filteredBusinesses.length === 0} emptyMessage="No businesses found matching this category">
+            <div className="divide-y divide-slate-100 bg-white">
+              {filteredBusinesses.map((biz, idx) => {
+              const prevMobileScore = idx > 0 ? getBizScore(filteredBusinesses[idx - 1]) : -1;
               const thisMobileScore = getBizScore(biz);
               const showMobileDivider = !isGuest && idx > 0 && thisMobileScore > prevMobileScore;
               const mobileDividerLabel = thisMobileScore === 1 ? 'Suggested for You' : 'All Businesses';
@@ -201,6 +146,7 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
                       <div className="flex items-center gap-1.5">
                         <span className="text-sm font-bold text-slate-900 truncate">{biz.ownerName}</span>
                         {chineseName && <span className="text-xs text-slate-400 font-medium truncate hidden sm:inline">({chineseName})</span>}
+                        {!isGuest && getBizScore(biz) === 1 && <span className="ml-auto text-[10px] font-bold bg-violet-50 text-violet-600 border border-violet-200 px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shrink-0">✦ Ideal</span>}
                       </div>
                       <p className="text-xs text-slate-500 truncate">{position} · {biz.companyName}</p>
                       <div className="flex items-center gap-1.5 mt-1 flex-wrap">
@@ -209,16 +155,29 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
                         {(intlStatus === 'Yes' || intlStatus === true) && <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Globe size={9} /> Intl</span>}
                       </div>
                     </div>
+                    {isGuest
+                      ? <Lock size={13} className="text-slate-300 flex-shrink-0" />
+                      : (
+                        <button
+                          type="button"
+                          className="flex-shrink-0 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+                          onClick={(e) => onBookmarkToggle(e, biz.id)}
+                          aria-label={bookmarkedIds.has(biz.id) ? 'Remove bookmark' : 'Bookmark'}
+                        >
+                          <Bookmark
+                            size={16}
+                            className={bookmarkedIds.has(biz.id) ? 'text-jci-blue fill-jci-blue' : 'text-slate-300'}
+                          />
+                        </button>
+                      )
+                    }
                   </div>
                 </React.Fragment>
               );
             })}
-                  </div>
-                </LoadingState>
-              </div>{/* end content panel */}
             </div>
-          );
-        })()}
+          </LoadingState>
+        </div>
       </div>{/* end md:hidden */}
 
       <div className="hidden md:flex gap-6 pt-2 items-start">
