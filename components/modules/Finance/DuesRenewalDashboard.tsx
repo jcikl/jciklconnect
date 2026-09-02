@@ -1338,8 +1338,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
           <div className="flex items-center justify-between px-4 pt-3.5 pb-3 border-b border-slate-100 shrink-0">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="min-w-0">
-                <span className="text-sm font-bold text-slate-800 block">Membership Payments</span>
-                <span className="text-[10px] text-slate-400">{year}</span>
+                <span className="text-sm font-bold text-slate-800">{year} Membership Payments</span>
               </div>
             </div>
             {hasEditPermission && (
