@@ -8,19 +8,17 @@ import { BusinessProfile } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { BusinessDetailModal } from './BusinessDirectory/BusinessDetailModal';
 import { BusinessDirectoryFilterDrawer } from './BusinessDirectory/BusinessDirectoryFilterDrawer';
-import { BusinessDirectoryHeader, type BusinessDirectoryTab } from './BusinessDirectory/BusinessDirectoryHeader';
+import { BusinessDirectoryHeader } from './BusinessDirectory/BusinessDirectoryHeader';
 import { BusinessInquiryModal } from './BusinessDirectory/BusinessInquiryModal';
 import { MOCK_SISTER_CHAPTER_MEMBERS } from './BusinessDirectory/businessDirectoryMocks';
 import { useBusinessBookmarks } from './BusinessDirectory/useBusinessBookmarks';
 import { useBusinessDirectoryFilters } from './BusinessDirectory/useBusinessDirectoryFilters';
 import { useBusinessInquiry } from './BusinessDirectory/useBusinessInquiry';
-import { InternationalNetworkTab } from './BusinessDirectory/InternationalNetworkTab';
 import { LocalBusinessTab } from './BusinessDirectory/LocalBusinessTab';
 import { useSisterChapterFilters } from './BusinessDirectory/useSisterChapterFilters';
 
 export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSelectedBusinessId?: string | null; onClearSelection?: () => void; isGuest?: boolean; onGuestCta?: () => void }> = ({ searchQuery, initialSelectedBusinessId, onClearSelection, isGuest = false, onGuestCta }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<BusinessDirectoryTab>('local');
   const [selectedIndustries, setSelectedIndustries] = useState<Set<string>>(new Set());
   const [selectedInterestedIndustry, setSelectedInterestedIndustry] = useState<string>('All');
   const [selectedIntlBiz, setSelectedIntlBiz] = useState<string>('All');
@@ -109,50 +107,38 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
         />
       )}
 
-      <BusinessDirectoryHeader activeTab={activeTab} onTabChange={setActiveTab} />
+      <BusinessDirectoryHeader />
 
-      <div>
-        <div className="bg-transparent">
-          {activeTab === 'local' ? (
-            <LocalBusinessTab
-              businesses={businesses}
-              filteredBusinesses={filteredBusinesses}
-              members={members}
-              loading={loading}
-              error={error}
-              isGuest={isGuest}
-              searchTerm={searchTerm}
-              activeFiltersCount={activeFiltersCount}
-              selectedIndustries={selectedIndustries}
-              selectedIntlBiz={selectedIntlBiz}
-              showDealsOnly={showDealsOnly}
-              uniqueIndustries={uniqueIndustries}
-              bookmarkedIds={bookmarkedIds}
-              onSearchTermChange={setSearchTerm}
-              onFilterDrawerOpen={() => setIsFilterDrawerOpen(true)}
-              onBusinessOpen={(biz) => {
-                setDetailBiz(biz);
-                setIsDetailOpen(true);
-              }}
-              onGuestCta={onGuestCta}
-              onBookmarkToggle={toggleBookmark}
-              onSelectedIndustriesChange={setSelectedIndustries}
-              onSelectedInterestedIndustryChange={setSelectedInterestedIndustry}
-              onSelectedIntlBizChange={setSelectedIntlBiz}
-              onSelectedCategoriesChange={setSelectedCategories}
-              onSelectedIdealReferralChange={setSelectedIdealReferral}
-              onShowDealsOnlyChange={setShowDealsOnly}
-              getBizScore={getBizScore}
-            />
-          ) : (
-            <InternationalNetworkTab
-              onContact={(biz) => {
-                openInquiryForBusiness(biz);
-              }}
-            />
-          )}
-        </div>
-      </div>
+      <LocalBusinessTab
+        businesses={businesses}
+        filteredBusinesses={filteredBusinesses}
+        members={members}
+        loading={loading}
+        error={error}
+        isGuest={isGuest}
+        searchTerm={searchTerm}
+        activeFiltersCount={activeFiltersCount}
+        selectedIndustries={selectedIndustries}
+        selectedIntlBiz={selectedIntlBiz}
+        showDealsOnly={showDealsOnly}
+        uniqueIndustries={uniqueIndustries}
+        bookmarkedIds={bookmarkedIds}
+        onSearchTermChange={setSearchTerm}
+        onFilterDrawerOpen={() => setIsFilterDrawerOpen(true)}
+        onBusinessOpen={(biz) => {
+          setDetailBiz(biz);
+          setIsDetailOpen(true);
+        }}
+        onGuestCta={onGuestCta}
+        onBookmarkToggle={toggleBookmark}
+        onSelectedIndustriesChange={setSelectedIndustries}
+        onSelectedInterestedIndustryChange={setSelectedInterestedIndustry}
+        onSelectedIntlBizChange={setSelectedIntlBiz}
+        onSelectedCategoriesChange={setSelectedCategories}
+        onSelectedIdealReferralChange={setSelectedIdealReferral}
+        onShowDealsOnlyChange={setShowDealsOnly}
+        getBizScore={getBizScore}
+      />
 
 
 
@@ -180,7 +166,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
       />
       <BusinessDirectoryFilterDrawer
         isOpen={isFilterDrawerOpen}
-        activeTab={activeTab}
+        activeTab="local"
         businesses={businesses}
         filteredBusinessCount={filteredBusinesses.length}
         activeFiltersCount={activeFiltersCount}
