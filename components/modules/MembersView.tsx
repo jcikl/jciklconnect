@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Trash2, Settings, X, Sparkles, ArrowLeft, Phone, Mail,
-  Award, Clock, Briefcase, GraduationCap, UserPlus, Search, Users,
+  Award, Clock, Briefcase, GraduationCap, Search, Users,
   TrendingUp, Zap, Download, Upload, BarChart3, FileText, RefreshCw,
   Calendar, Shield, UserCheck, AlertCircle, CheckCircle, MapPin,
   Linkedin, Facebook, Instagram, MessageCircle, CalendarCheck, UserCog,
@@ -475,60 +475,19 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
           ) : undefined}
         >
 
-          {/* TAB NAVIGATION + mobile overflow menu */}
-          <div className="flex gap-2 mb-4">
-            <Tabs
-              tabs={memberTabItems}
-              activeTab={activeTab}
-              onTabChange={(id) => setActiveTab(id as typeof activeTab)}
-              mobileFallback="select"
-              className="flex-1 min-w-0"
-            />
-            {canManageMembers && (
-              <div className="relative sm:hidden shrink-0">
-                <button
-                  onClick={() => setShowActionsMenu(v => !v)}
-                  className="h-10 w-10 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 transition-colors"
-                >
-                  <MoreHorizontal size={16} />
-                </button>
-                {showActionsMenu && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setShowActionsMenu(false)} />
-                    <div className="absolute right-0 top-10 z-50 bg-white rounded-2xl shadow-xl border border-slate-100 py-1.5 min-w-[180px]">
-                      {activeTab === 'directory' && (
-                        <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-jci-blue font-semibold hover:bg-blue-50"
-                          onClick={() => { setAddModalOpen(true); setShowActionsMenu(false); }}>
-                          <UserPlus size={15} className="text-jci-blue" /> Add New
-                        </button>
-                      )}
-                      <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
-                        onClick={() => { setIsExportModalOpen(true); setShowActionsMenu(false); }}>
-                        <Download size={15} className="text-slate-400" /> Export
-                      </button>
-                      <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
-                        onClick={() => { setIsImportModalOpen(true); setShowActionsMenu(false); }}>
-                        <Upload size={15} className="text-slate-400" /> Import
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
+          {/* TAB NAVIGATION + CONTENT — merged card on mobile, stacked on desktop */}
+          <div className="max-md:rounded-2xl max-md:border max-md:border-slate-200 max-md:shadow-sm max-md:overflow-hidden max-md:bg-white">
+            <div className="flex gap-2 md:mb-4">
+              <Tabs
+                tabs={memberTabItems}
+                activeTab={activeTab}
+                onTabChange={(id) => setActiveTab(id as typeof activeTab)}
+                mobileFallback="vertical"
+                className="flex-1 min-w-0"
+              />
+            </div>
 
-          <div>
-            {activeTab === 'directory' && canManageMembers && (
-              <button
-                onClick={() => setAddModalOpen(true)}
-                className="hidden sm:flex w-full items-center gap-3 px-4 py-3 mb-3 rounded-2xl border border-dashed border-slate-200 bg-white text-slate-500 hover:border-jci-blue hover:text-jci-blue hover:bg-blue-50/40 transition-all text-sm font-semibold"
-              >
-                <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
-                  <UserPlus size={14} />
-                </div>
-                Add new
-              </button>
-            )}
+          <div className="max-md:border-t max-md:border-slate-100">
             {activeTab === 'directory' && (
               <LoadingState loading={loading} error={error} empty={sortedMembers.length === 0 && roleFilters.length === 0 && membershipTypeFilters.length === 0 && !searchQuery} emptyMessage="No members found">
                 <MemberTable
@@ -545,6 +504,9 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
                   getDisplayMembershipType={getMemberDisplayMembershipType}
                   membershipTypeCounts={membershipTypeCounts}
                   roleCounts={roleCounts}
+                  onAddNew={canManageMembers ? () => setAddModalOpen(true) : undefined}
+                  onImport={canManageMembers ? () => setIsImportModalOpen(true) : undefined}
+                  cardClassName="max-md:rounded-none max-md:border-0 max-md:shadow-none"
                 />
                 {sortedMembers.length === 0 && (roleFilters.length > 0 || membershipTypeFilters.length > 0 || searchQuery) && (
                   <div className="flex flex-col items-center gap-3 py-12 text-center text-slate-400 text-sm">
@@ -622,6 +584,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
               />
             )}
           </div>
+          </div>{/* end merged card wrapper */}
         </PageScaffold>
       ) : (
         <MemberDetail member={selectedMember} onBack={() => setSelectedMemberId(null)} isSelfView={selectedMember?.id === currentMember?.id} />

@@ -9,7 +9,7 @@ interface TabsProps {
   onTabChange: (tab: string) => void;
   className?: string;
   fullWidth?: boolean;
-  mobileFallback?: 'scroll' | 'select' | 'pill';
+  mobileFallback?: 'scroll' | 'select' | 'pill' | 'vertical';
 }
 
 function normalizeTab(tab: TabItem): { id: string; label: string; icon?: React.ReactNode; badge?: React.ReactNode; shortLabel?: string } {
@@ -85,20 +85,41 @@ export const Tabs: React.FC<TabsProps> = ({
         ))}
       </div>
     </div>
+  ) : mobileFallback === 'vertical' ? (
+    <nav role="tablist" className="md:hidden" aria-label="Tabs">
+      {normalized.map((tab, i) => (
+        <button
+          key={tab.id}
+          type="button"
+          role="tab"
+          aria-selected={activeTab === tab.id}
+          onClick={() => onTabChange(tab.id)}
+          className={`relative w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold transition-all border-b border-slate-100 last:border-b-0 ${activeTab === tab.id ? 'bg-jci-blue/5 text-jci-blue' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+        >
+          {activeTab === tab.id && <span className="absolute left-0 top-0 bottom-0 w-0.5 bg-jci-blue rounded-r" />}
+          {tab.icon && <span className="shrink-0 opacity-80">{tab.icon}</span>}
+          <span className="flex-1 text-left">{tab.shortLabel ?? tab.label}</span>
+          {tab.badge && <span className="ml-auto">{tab.badge}</span>}
+          {activeTab === tab.id && <ChevronRight size={14} className="shrink-0 text-jci-blue/60" />}
+        </button>
+      ))}
+    </nav>
   ) : null;
+
+  const isNonScrollFallback = mobileFallback === 'select' || mobileFallback === 'pill' || mobileFallback === 'vertical';
 
   return (
     <div className={`relative ${fullWidth ? 'flex-1 min-w-0' : ''} ${className}`}>
       {mobileSelect}
       {showLeftArrow && (
-        <button onClick={scrollLeft} className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-white/90 backdrop-blur-sm p-1 shadow-md rounded-full text-slate-600 hover:text-jci-blue transition-colors border border-slate-100 ${mobileFallback === 'select' || mobileFallback === 'pill' ? 'hidden md:flex' : ''}`} aria-label="Scroll left">
+        <button onClick={scrollLeft} className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-white/90 backdrop-blur-sm p-1 shadow-md rounded-full text-slate-600 hover:text-jci-blue transition-colors border border-slate-100 ${isNonScrollFallback ? 'hidden md:flex' : ''}`} aria-label="Scroll left">
           <ChevronLeft size={16} />
         </button>
       )}
       <div
         ref={fullWidth ? undefined : scrollContainerRef}
         onScroll={fullWidth ? undefined : checkScroll}
-        className={`${mobileFallback === 'select' || mobileFallback === 'pill' ? 'hidden md:block' : ''} ${fullWidth ? 'py-1' : 'overflow-x-auto no-scrollbar scroll-smooth py-1'}`}
+        className={`${isNonScrollFallback ? 'hidden md:block' : ''} ${fullWidth ? 'py-1' : 'overflow-x-auto no-scrollbar scroll-smooth py-1'}`}
       >
         <nav role="tablist" className={`flex space-x-1.5 p-1 bg-slate-100 border border-slate-200/50 rounded-xl ${fullWidth ? 'w-full' : 'w-max'}`} aria-label="Tabs">
           {normalized.map((tab) => (
@@ -123,7 +144,7 @@ export const Tabs: React.FC<TabsProps> = ({
         </nav>
       </div>
       {showRightArrow && (
-        <button onClick={scrollRight} className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-white/90 backdrop-blur-sm p-1 shadow-md rounded-full text-slate-600 hover:text-jci-blue transition-colors border border-slate-100 ${mobileFallback === 'select' || mobileFallback === 'pill' ? 'hidden md:flex' : ''}`} aria-label="Scroll right">
+        <button onClick={scrollRight} className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-white/90 backdrop-blur-sm p-1 shadow-md rounded-full text-slate-600 hover:text-jci-blue transition-colors border border-slate-100 ${isNonScrollFallback ? 'hidden md:flex' : ''}`} aria-label="Scroll right">
           <ChevronRight size={16} />
         </button>
       )}

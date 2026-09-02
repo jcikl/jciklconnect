@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, UserPlus, Upload } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Button, Card, Badge, ProgressBar } from '../../ui/Common';
 import { ColumnFilterHeader } from '../../ui/ColumnFilterHeader';
@@ -242,6 +242,9 @@ const MemberTableBase: React.FC<{
   getDisplayMembershipType: (member: Member) => MembershipType,
   membershipTypeCounts?: Partial<Record<MembershipType, number>>,
   roleCounts?: Partial<Record<UserRole, number>>,
+  onAddNew?: () => void,
+  onImport?: () => void,
+  cardClassName?: string,
 }> = ({
   members,
   onSelect,
@@ -256,6 +259,9 @@ const MemberTableBase: React.FC<{
   getDisplayMembershipType,
   membershipTypeCounts,
   roleCounts,
+  onAddNew,
+  onImport,
+  cardClassName = '',
 }) => {
     const desktopScrollRef = React.useRef<HTMLDivElement>(null);
     const mobileScrollRef = React.useRef<HTMLDivElement>(null);
@@ -275,7 +281,7 @@ const MemberTableBase: React.FC<{
     });
 
     return (
-      <Card noPadding>
+      <Card noPadding className={cardClassName}>
         {/* Desktop View */}
         <div className="hidden md:block overflow-x-auto">
           {/* Sticky header */}
@@ -312,6 +318,21 @@ const MemberTableBase: React.FC<{
               <div className="px-6 py-4 flex-none text-sm font-semibold text-slate-500" style={{ width: 80 }}>Action</div>
             </div>
 
+            {/* Desktop: Add New row */}
+            {onAddNew && (
+              <div className="px-3 py-2 border-b border-slate-100">
+                <button
+                  onClick={onAddNew}
+                  className="flex w-full items-center gap-3 px-4 py-2.5 rounded-xl border border-dashed border-slate-200 bg-white text-slate-500 hover:border-jci-blue hover:text-jci-blue hover:bg-blue-50/40 transition-all text-sm font-semibold"
+                >
+                  <div className="w-6 h-6 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                    <UserPlus size={13} />
+                  </div>
+                  New Member
+                </button>
+              </div>
+            )}
+
             {/* Virtualized body */}
             <div
               ref={desktopScrollRef}
@@ -345,7 +366,7 @@ const MemberTableBase: React.FC<{
         </div>
 
         {/* Mobile filters */}
-        <div className="md:hidden border-b border-slate-100 px-4 py-3 flex gap-2 bg-slate-50/50">
+        <div className="md:hidden border-b border-slate-100 px-4 py-3 flex items-center gap-2 bg-slate-50/50">
           <ColumnFilterHeader
             label="Role"
             options={roleCounts ? ROLE_FILTER_OPTIONS.map(o => ({ ...o, count: roleCounts[o.value] ?? 0 })) : ROLE_FILTER_OPTIONS}
@@ -359,7 +380,31 @@ const MemberTableBase: React.FC<{
             onChange={(vals) => onMembershipTypeFiltersChange(vals as MembershipType[])}
             align="right"
           />
+          {onImport && (
+            <button
+              onClick={onImport}
+              className="ml-auto flex items-center gap-1 text-slate-400 hover:text-jci-blue text-xs font-semibold px-2 py-1 rounded-lg hover:bg-blue-50/40 transition-colors shrink-0"
+            >
+              <Upload size={12} />
+              Import
+            </button>
+          )}
         </div>
+
+        {/* Mobile: Add New row */}
+        {onAddNew && (
+          <div className="md:hidden px-3 pt-3 pb-1">
+            <button
+              onClick={onAddNew}
+              className="flex w-full items-center gap-3 px-4 py-3 rounded-2xl border border-dashed border-slate-200 bg-white text-slate-500 hover:border-jci-blue hover:text-jci-blue hover:bg-blue-50/40 transition-all text-sm font-semibold"
+            >
+              <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                <UserPlus size={14} />
+              </div>
+              New Member
+            </button>
+          </div>
+        )}
 
         {/* Mobile virtualized list */}
         <div
