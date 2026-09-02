@@ -171,13 +171,13 @@ export function useFinanceData(searchQuery?: string) {
 
   // RC-003: accepts an optional stale-response guard so the reportYear useEffect
   // can abort a slow response that arrived after a newer year was selected.
-  const loadData = useCallback(async (targetYear: number = reportYear, getIgnore?: () => boolean) => {
+  const loadData = useCallback(async (targetYear: number = reportYear, getIgnore?: () => boolean, forceServer = false) => {
     const stale = () => getIgnore?.() ?? false;
     try {
       setLoading(true);
       setError(null);
       const [txs, accts, summ, inventory, projList, histFlows, allYears] = await Promise.all([
-        FinanceService.getAllTransactions(targetYear),
+        FinanceService.getAllTransactions(targetYear, forceServer),
         FinanceService.getAllBankAccounts(),
         FinanceService.getFinancialSummary(targetYear),
         InventoryService.getAllItems(),
@@ -205,7 +205,7 @@ export function useFinanceData(searchQuery?: string) {
         if (!stale()) showToast('Failed to load project accounts', 'error');
       }
 
-      const allSplits = await FinanceService.getAllTransactionSplits(targetYear);
+      const allSplits = await FinanceService.getAllTransactionSplits(targetYear, forceServer);
       if (stale()) return;
       const splitsMap: Record<string, TransactionSplit[]> = {};
       const txIdsSet = new Set(txs.map(t => t.id));
@@ -1304,7 +1304,7 @@ export function useFinanceData(searchQuery?: string) {
 
       showToast('Transaction recorded successfully', 'success');
       setIsModalOpen(false);
-      await loadData();
+      await loadData(reportYear, undefined, true);
     } catch (err: any) {
       const code = err?.code ?? '';
       if (code === 'permission-denied') {
@@ -1382,7 +1382,7 @@ export function useFinanceData(searchQuery?: string) {
       await batch.commit();
 
       showToast('Transaction deleted successfully', 'success');
-      await loadData();
+      await loadData(reportYear, undefined, true);
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to delete transaction', 'error');
     } finally {
@@ -1782,14 +1782,19 @@ export function useFinanceData(searchQuery?: string) {
     };
 
     try {
-      await FinanceService.updateTransaction(editingTransaction.id, updatedTransaction);
+      if ((editingTransaction as any).isSplitChild) {
+        // Split child records live in transactionSplits, not transactions
+        await FinanceService.updateTransactionSplit(editingTransaction.id, updatedTransaction);
+      } else {
+        await FinanceService.updateTransaction(editingTransaction.id, updatedTransaction);
+      }
       showToast('Transaction updated successfully', 'success');
       setIsEditModalOpen(false);
       setEditingTransaction(null);
       setEditingMembershipFilterYear(null);
       setEditingMembershipMemberId('');
       setEditingMembershipYear(new Date().getFullYear());
-      await loadData();
+      await loadData(reportYear, undefined, true);
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to update transaction', 'error');
     } finally {

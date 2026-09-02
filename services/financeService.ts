@@ -3,7 +3,9 @@ import {
   collection,
   doc,
   getDoc,
+  getDocFromServer,
   getDocs,
+  getDocsFromServer,
   addDoc,
   updateDoc,
   deleteDoc,
@@ -129,7 +131,7 @@ const saveMockTransactions = () => {
 
 export class FinanceService {
   // Get all transactions
-  static async getAllTransactions(year?: number): Promise<Transaction[]> {
+  static async getAllTransactions(year?: number, forceServer = false): Promise<Transaction[]> {
     return withDevMode(
       () => {
         if (year) {
@@ -160,7 +162,10 @@ export class FinanceService {
               );
             }
 
-            const snapshot = await getDocs(q);
+            // forceServer bypasses the Firestore SDK's collection-query IndexedDB cache.
+            // Required after writes — writeBatch updates the document-level cache immediately
+            // but the collection-query cache can return a stale snapshot on the next getDocs.
+            const snapshot = await (forceServer ? getDocsFromServer(q) : getDocs(q));
             let transactions = snapshot.docs.map(doc => {
               const data = doc.data() as RawTransactionDoc;
               return {
@@ -1013,7 +1018,7 @@ export class FinanceService {
   }
 
   // Get ALL transaction splits in bulk
-  static async getAllTransactionSplits(year?: number): Promise<TransactionSplit[]> {
+  static async getAllTransactionSplits(year?: number, forceServer = false): Promise<TransactionSplit[]> {
     return withDevMode(
       () => {
         if (year) {
@@ -1032,7 +1037,7 @@ export class FinanceService {
           } else {
             q = collection(db, COLLECTIONS.TRANSACTION_SPLITS);
           }
-          const snapshot = await getDocs(q);
+          const snapshot = await (forceServer ? getDocsFromServer(q) : getDocs(q));
           return snapshot.docs.map(doc => {
             const data = doc.data() as RawTransactionDoc;
             return {
@@ -1091,35 +1096,34 @@ export class FinanceService {
             }
           }
 
-          let currentSplit: TransactionSplit;
-          await runTransaction(db, async (tx) => {
-            const freshSnap = await tx.get(splitRef);
-            if (!freshSnap.exists()) throw new Error('Split not found');
-            currentSplit = freshSnap.data() as TransactionSplit;
+          // getDocFromServer bypasses the local IndexedDB cache — avoids stale "not found"
+          // after 429 storms. Single-document write: updateDoc is sufficient; runTransaction's
+          // 5× retry-on-contention is not worth the cost when Firestore quota is tight.
+          const freshSnap = await getDocFromServer(splitRef);
+          if (!freshSnap.exists()) throw new Error('Split not found');
+          const currentSplit = freshSnap.data() as TransactionSplit;
 
-            if (updates.amount !== undefined) {
-              // Read each sibling atomically inside the transaction (part of the read set)
-              const siblingDocs = await Promise.all(siblingRefs.map(ref => tx.get(ref)));
-              const siblingTotal = siblingDocs
-                .filter(d => d.exists())
-                .reduce((sum, d) => sum + ((d.data()?.amount as number) ?? 0), 0);
+          if (updates.amount !== undefined) {
+            const siblingDocs = await Promise.all(siblingRefs.map(ref => getDoc(ref)));
+            const siblingTotal = siblingDocs
+              .filter(d => d.exists())
+              .reduce((sum, d) => sum + ((d.data()?.amount as number) ?? 0), 0);
 
-              const parentDoc = await tx.get(doc(db, COLLECTIONS.TRANSACTIONS, currentSplit.parentTransactionId));
-              if (parentDoc.exists()) {
-                const parentAmount = parentDoc.data().amount as number;
-                const newTotal = siblingTotal + updates.amount!;
-                if (Math.abs(newTotal - parentAmount) > 0.01) {
-                  throw new Error(
-                    `Split amounts (${newTotal}) must equal parent transaction amount (${parentAmount})`
-                  );
-                }
+            const parentDoc = await getDoc(doc(db, COLLECTIONS.TRANSACTIONS, currentSplit.parentTransactionId));
+            if (parentDoc.exists()) {
+              const parentAmount = parentDoc.data().amount as number;
+              const newTotal = siblingTotal + updates.amount!;
+              if (Math.abs(newTotal - parentAmount) > 0.01) {
+                throw new Error(
+                  `Split amounts (${newTotal}) must equal parent transaction amount (${parentAmount})`
+                );
               }
             }
+          }
 
-            tx.update(splitRef, {
-              ...removeUndefined(updates),
-              updatedAt: Timestamp.now(),
-            });
+          await updateDoc(splitRef, {
+            ...removeUndefined(updates),
+            updatedAt: Timestamp.now(),
           });
 
           // TS-E3: invalidate cache after every split update so reads reflect the change
@@ -1353,63 +1357,57 @@ export class FinanceService {
       }
       const transactionRef = doc(db, COLLECTIONS.TRANSACTIONS, transactionId);
 
-      // Fix 18: wrap status-check read and the main write in a runTransaction so the guard
-      // and the mutation are atomic — two concurrent callers can't both pass the status check.
-      let currentTransaction!: Transaction;
-      await runTransaction(db, async (txn) => {
-        const currentDoc = await txn.get(transactionRef);
-        if (!currentDoc.exists()) throw new Error('Transaction not found');
-        currentTransaction = currentDoc.data() as Transaction;
+      // getDocFromServer bypasses the local IndexedDB cache — required after 429 storms that
+      // can leave the SDK cache in a stale "not found" state for documents that do exist.
+      const currentDoc = await getDocFromServer(transactionRef);
+      if (!currentDoc.exists()) throw new Error(`Transaction not found (id: ${transactionId})`);
+      let currentTransaction = currentDoc.data() as Transaction;
 
-        if (currentTransaction.status === 'Reconciled' || currentTransaction.status === 'Partially Reconciled') {
-          throw new Error(`Cannot edit a ${currentTransaction.status} transaction. Unmatch it first before making changes.`);
+      if (currentTransaction.status === 'Reconciled' || currentTransaction.status === 'Partially Reconciled') {
+        throw new Error(`Cannot edit a ${currentTransaction.status} transaction. Unmatch it first before making changes.`);
+      }
+
+      const updateData: Record<string, unknown> = {
+        ...removeUndefined(updates),
+        updatedAt: Timestamp.now(),
+      };
+      if (updates.date) {
+        updateData.date = Timestamp.fromDate(new Date(updates.date));
+      }
+
+      const batch = writeBatch(db);
+      batch.update(transactionRef, updateData as Partial<Transaction>);
+
+      // SYNC-005: adjust bankAccount.currentBalance by the delta.
+      // increment() is a server-side atomic field transform — no transaction needed.
+      const amountChanged = updates.amount !== undefined && updates.amount !== currentTransaction.amount;
+      const typeChanged = updates.type !== undefined && updates.type !== currentTransaction.type;
+      const notVoided = currentTransaction.status !== 'Voided';
+      const bankAccountId = updates.bankAccountId ?? currentTransaction.bankAccountId;
+      if (notVoided && bankAccountId && (amountChanged || typeChanged)) {
+        const oldType = currentTransaction.type as string;
+        const newType = (updates.type ?? currentTransaction.type) as string;
+        const oldAmount = currentTransaction.amount ?? 0;
+        const newAmount = updates.amount ?? currentTransaction.amount ?? 0;
+        const oldDelta = oldType === 'Income' ? oldAmount : -Math.abs(oldAmount);
+        const newDelta = newType === 'Income' ? newAmount : -Math.abs(newAmount);
+        const balanceAdjustment = newDelta - oldDelta;
+        if (balanceAdjustment !== 0) {
+          const baRef = doc(db, COLLECTIONS.BANK_ACCOUNTS, bankAccountId);
+          batch.update(baRef, { currentBalance: increment(balanceAdjustment) });
         }
+      }
 
-        const updateData: Record<string, unknown> = {
-          ...removeUndefined(updates),
-          updatedAt: Timestamp.now(),
-        };
-        if (updates.date) {
-          updateData.date = Timestamp.fromDate(new Date(updates.date));
+      // Propagate type change to child splits in the same batch (no re-read needed).
+      if (updates.type) {
+        const splitIds: string[] = (currentTransaction.splitIds as string[]) ?? [];
+        for (const splitId of splitIds) {
+          const splitRef = doc(db, COLLECTIONS.TRANSACTION_SPLITS, splitId);
+          batch.update(splitRef, { type: updates.type, updatedAt: Timestamp.now() });
         }
+      }
 
-        // SYNC-005: if amount or type changed (and transaction is not Voided), adjust
-        // bankAccount.currentBalance by the delta so the stored balance stays accurate.
-        const amountChanged = updates.amount !== undefined && updates.amount !== currentTransaction.amount;
-        const typeChanged = updates.type !== undefined && updates.type !== currentTransaction.type;
-        const notVoided = currentTransaction.status !== 'Voided';
-        const bankAccountId = updates.bankAccountId ?? currentTransaction.bankAccountId;
-        if (notVoided && bankAccountId && (amountChanged || typeChanged)) {
-          const oldType = currentTransaction.type as string;
-          const newType = (updates.type ?? currentTransaction.type) as string;
-          const oldAmount = currentTransaction.amount ?? 0;
-          const newAmount = updates.amount ?? currentTransaction.amount ?? 0;
-          const oldDelta = oldType === 'Income' ? oldAmount : -Math.abs(oldAmount);
-          const newDelta = newType === 'Income' ? newAmount : -Math.abs(newAmount);
-          const balanceAdjustment = newDelta - oldDelta;
-          if (balanceAdjustment !== 0) {
-            const baRef = doc(db, COLLECTIONS.BANK_ACCOUNTS, bankAccountId);
-            txn.update(baRef, { currentBalance: increment(balanceAdjustment) });
-          }
-        }
-
-        txn.update(transactionRef, updateData as Partial<Transaction>);
-
-        // P1-fix: propagate type change to child splits INSIDE the same runTransaction so
-        // the parent type and all split types are updated atomically. We use the splitIds
-        // already available on currentTransaction (read above) to get document refs;
-        // each split is re-read with txn.get() to include it in the atomic read set.
-        if (updates.type) {
-          const splitIds: string[] = (currentTransaction.splitIds as string[]) ?? [];
-          for (const splitId of splitIds) {
-            const splitRef = doc(db, COLLECTIONS.TRANSACTION_SPLITS, splitId);
-            const splitSnap = await txn.get(splitRef);
-            if (splitSnap.exists()) {
-              txn.update(splitRef, { type: updates.type, updatedAt: Timestamp.now() });
-            }
-          }
-        }
-      });
+      await batch.commit();
 
       invalidateFinanceCache();
 
@@ -2412,13 +2410,12 @@ export class FinanceService {
 
       const allMembershipTransactions = [...transactions, ...splitTransactions];
 
-      // 3. Calculate total amount — only money that has actually cleared/reconciled counts.
-      // A Pending transaction (e.g. just created by initiateDuesRenewal, not yet paid) must
-      // NOT count toward "paid", or the member shows as paid before any money moves.
-      const clearedMembershipTransactions = allMembershipTransactions.filter(
-        (tx) => tx.status === 'Cleared' || tx.status === 'Reconciled' || tx.status === 'Partially Reconciled'
-      );
-      const totalAmount = clearedMembershipTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+      // 3. Calculate total amount — all transactions in the transactions collection represent
+      // real bank movements (actual money in/out). Status only reflects reconciliation progress,
+      // not whether money was received. Only Voided transactions are excluded (reversed/cancelled).
+      const totalAmount = allMembershipTransactions
+        .filter((tx) => tx.status !== 'Voided')
+        .reduce((sum, tx) => sum + (tx.amount || 0), 0);
       const latestTx = [...allMembershipTransactions].sort(
         (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
       )[0];
@@ -2428,16 +2425,18 @@ export class FinanceService {
         : undefined;
       const paymentDate = latestTx ? latestTx.date : undefined;
 
-      // 4-7. Fetch member + compute updates + write — wrapped in runTransaction so two
-      // concurrent syncMemberMembership calls for the same member cannot clobber each other
-      // with a last-write-wins overwrite of the membership[year] sub-object.
+      // 4-7. Fetch member + compute updates + write.
+      // getDocFromServer bypasses cache (avoids stale "not found" after 429 storms).
+      // Single-document write: updateDoc is sufficient; runTransaction's retry-on-contention
+      // is not worth the 5× retry cost when Firestore quota is tight.
       const memberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
       const configRules = await MembershipConfigService.getRules();
 
       let memberUpdated = false;
-      await runTransaction(db, async (memberTxn) => {
-        const memberDoc = await memberTxn.get(memberRef);
-        if (!memberDoc.exists()) return;
+      let status: MembershipStatus = 'pending';
+
+      const memberDoc = await getDocFromServer(memberRef);
+      if (memberDoc.exists()) {
         const member = memberDoc.data() as any;
         const currentMembership = member.jciCareer?.membershipDuesHistory || {};
         const yearStr = year;
@@ -2448,10 +2447,7 @@ export class FinanceService {
         // No linked membership transactions for this member/year:
         // rollback linkage-derived fields and reset to pending summary.
         // Exception: Inactive members retain their historical dues record (情景 L).
-        if (allMembershipTransactions.length === 0 && member.role === 'INACTIVE') {
-          return;
-        }
-        if (allMembershipTransactions.length === 0) {
+        if (allMembershipTransactions.length === 0 && member.role !== 'INACTIVE') {
           currentMembership[yearStr] = {
             year: yearNum,
             dues: duesAmount,
@@ -2476,7 +2472,7 @@ export class FinanceService {
           // Revert to Guest only when: promoted via approval flow AND entry fee not yet confirmed paid.
           // If hasPaidInitiationFee=true the RM350 was already collected — deleting a renewal tx
           // must never strip their Probation status.
-          const hasPaidFee = member.jciCareer?.hasPaidInitiationFee ?? member.jciCareer?.hasPaidInitiationFee ?? false;
+          const hasPaidFee = member.jciCareer?.hasPaidInitiationFee ?? false;
           if (member.jciCareer?.membershipType === 'Probation'
               && member.role === 'MEMBER'
               && member.probationApprovedAt
@@ -2487,63 +2483,61 @@ export class FinanceService {
             zeroTxUpdates.probationApprovedAt = null;
           }
 
-          memberTxn.update(memberRef, zeroTxUpdates);
+          await updateDoc(memberRef, zeroTxUpdates);
           memberUpdated = true;
-          return;
-        }
+        } else if (allMembershipTransactions.length > 0) {
+          // 5. Determine status based on amount - dues
+          const balance = totalAmount - duesAmount;
 
-        // 5. Determine status based on amount - dues
-        let status: MembershipStatus = 'pending';
-        const balance = totalAmount - duesAmount;
-
-        if (totalAmount === 0) {
-          status = 'pending';
-        } else if (balance === 0) {
-          status = 'paid';
-        } else if (balance > 0) {
-          status = 'over paid';
-        } else {
-          status = 'partial';
-        }
-
-        // 6. Update member.jciCareer?.membershipDuesHistory[year]
-        currentMembership[yearStr] = {
-          year: yearNum,
-          dues: duesAmount,
-          amount: totalAmount,
-          status: status,
-          transactionId: transactionIds,
-          purpose: membershipPurpose,
-          paymentDate: paymentDate ?? null,
-        };
-
-        const duesHistoryRecord = {
-          year: yearNum,
-          dues: duesAmount,
-          amount: totalAmount,
-          status: status,
-          transactionId: transactionIds,
-          purpose: membershipPurpose,
-          paymentDate: paymentDate ?? null,
-        };
-        const updates: Record<string, unknown> = {
-          membership: currentMembership,
-          [`jciCareer.membershipDuesHistory.${yearStr}`]: duesHistoryRecord,
-          updatedAt: Timestamp.now()
-        };
-
-        // 7. Mark entry fee paid when Guest's payment clears — promotion to Probation
-        //    requires explicit board approval (President / Secretary / Honorary Treasurer)
-        //    via GuestManagementView. Do NOT auto-promote here.
-        if (status === 'paid' || status === 'over paid') {
-          if (!(member.jciCareer?.hasPaidInitiationFee ?? member.jciCareer?.hasPaidInitiationFee)) {
-            updates['jciCareer.hasPaidInitiationFee'] = true;
+          if (totalAmount === 0) {
+            status = 'pending';
+          } else if (balance === 0) {
+            status = 'paid';
+          } else if (balance > 0) {
+            status = 'over paid';
+          } else {
+            status = 'partial';
           }
-        }
 
-        memberTxn.update(memberRef, updates);
-        memberUpdated = true;
-      });
+          // 6. Update member.jciCareer?.membershipDuesHistory[year]
+          currentMembership[yearStr] = {
+            year: yearNum,
+            dues: duesAmount,
+            amount: totalAmount,
+            status: status,
+            transactionId: transactionIds,
+            purpose: membershipPurpose,
+            paymentDate: paymentDate ?? null,
+          };
+
+          const duesHistoryRecord = {
+            year: yearNum,
+            dues: duesAmount,
+            amount: totalAmount,
+            status: status,
+            transactionId: transactionIds,
+            purpose: membershipPurpose,
+            paymentDate: paymentDate ?? null,
+          };
+          const updates: Record<string, unknown> = {
+            membership: currentMembership,
+            [`jciCareer.membershipDuesHistory.${yearStr}`]: duesHistoryRecord,
+            updatedAt: Timestamp.now()
+          };
+
+          // 7. Mark entry fee paid when Guest's payment clears — promotion to Probation
+          //    requires explicit board approval (President / Secretary / Honorary Treasurer)
+          //    via GuestManagementView. Do NOT auto-promote here.
+          if (status === 'paid' || status === 'over paid') {
+            if (!(member.jciCareer?.hasPaidInitiationFee)) {
+              updates['jciCareer.hasPaidInitiationFee'] = true;
+            }
+          }
+
+          await updateDoc(memberRef, updates);
+          memberUpdated = true;
+        }
+      }
 
       // E4: invalidate members cache so UI reflects the updated dues status immediately
       if (memberUpdated) MembersService.invalidateMembersCache();

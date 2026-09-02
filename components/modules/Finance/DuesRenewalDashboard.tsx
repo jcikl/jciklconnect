@@ -8,7 +8,9 @@ import {
   Clock,
   RefreshCw,
   Edit,
-  MessageCircle
+  MessageCircle,
+  ChevronDown,
+  MoreHorizontal,
 } from 'lucide-react';
 import { FinanceService } from '../../../services/financeService';
 import { MembersService } from '../../../services/membersService';
@@ -120,6 +122,8 @@ interface DuesRenewalDashboardProps {
   onEditMembershipTransaction?: (tx: Transaction, filterYear: number) => void;
   onDeleteMembershipTransaction?: (txId: string) => void;
   hasEditPermission?: boolean;
+  /** 仅 ADMIN / SUPER_ADMIN 可见的管理按钮 */
+  isAdminUser?: boolean;
   formatCurrency?: (amount: number) => string;
   formatDate?: (date: string) => string;
   /** 批量修复会员首次会费后刷新父级数据 */
@@ -147,13 +151,15 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
   onEditMembershipTransaction,
   onDeleteMembershipTransaction,
   hasEditPermission = false,
+  isAdminUser = false,
   formatCurrency: fmtCurrency = (n) => n.toLocaleString('en-MY', { style: 'currency', currency: 'MYR' }),
   formatDate: fmtDate = (d) => new Date(d).toLocaleDateString(),
   onMembershipDataChanged,
   members = [],
   onInitiateRenewal,
 }) => {
-  const selectedYear = year;
+  const [selectedYear, setSelectedYear] = useState(year);
+  useEffect(() => { setSelectedYear(year); }, [year]);
   const { showToast } = useToast();
   const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
   const [filterType, setFilterType] = useState<MembershipType | 'all'>('all');
@@ -163,8 +169,11 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
   const [fixingFirstDues, setFixingFirstDues] = useState(false);
   const [syncingMembershipTypes, setSyncingMembershipTypes] = useState(false);
   const [syncingMembershipRecords, setSyncingMembershipRecords] = useState(false);
+  const [syncingAll, setSyncingAll] = useState(false);
+  const [showAdvancedMenu, setShowAdvancedMenu] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<'members' | 'payments'>('members');
   const [mobileStatPanel, setMobileStatPanel] = useState<'stats' | 'breakdown'>('stats');
+  const [expandedMemberId, setExpandedMemberId] = useState<string | null>(null);
 
   /** One-click: fuzzy-match all unlinked membership transactions and persist memberId to Firestore */
   const handleAutoMatchMembers = async () => {
@@ -283,6 +292,38 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
       showToast(`membership 同步失败: ${err instanceof Error ? err.message : '未知错误'}`, 'error');
     } finally {
       setSyncingMembershipRecords(false);
+    }
+  };
+
+  const handleFullSync = () => {
+    const currentYear = new Date().getFullYear();
+    setConfirmState({ open: true, title: 'Full Membership Sync', message: `将根据所有会员的加入日期，分两步同步截至 ${currentYear} 年的会籍数据：\n1. 推断并写入 membershipType\n2. 从各会员入会年起，逐年同步 membership 记录至 ${currentYear} 年\n\n继续？`, variant: 'warning', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await _doFullSync(); } });
+  };
+  const _doFullSync = async () => {
+    setSyncingAll(true);
+    const currentYear = new Date().getFullYear();
+    try {
+      // Step 1: infer membershipType for each member based on current year
+      const typesResult = await MembersService.batchSyncMembershipTypes({ year: currentYear });
+      if (typesResult.errors.length > 0) console.error('batchSyncMembershipTypes errors:', typesResult.errors);
+      // Step 2: sync membership records for ALL years from each member's join year up to current year
+      const recordsResult = await MembersService.batchSyncMembershipRecords({
+        year: currentYear,
+        toYear: currentYear,
+        membershipTransactions,
+        onlyExistingRecords: false,
+      });
+      if (recordsResult.errors.length > 0) console.error('batchSyncMembershipRecords errors:', recordsResult.errors);
+      const hasErrors = typesResult.errors.length > 0 || recordsResult.errors.length > 0;
+      showToast(
+        `全量同步完成（截至 ${currentYear} 年）：类型更新 ${typesResult.updated}，记录更新 ${recordsResult.updated} / 新建 ${recordsResult.created}${hasErrors ? '，部分失败（见控制台）' : ''}`,
+        hasErrors ? 'warning' : 'success'
+      );
+      await onMembershipDataChanged?.();
+    } catch (err: unknown) {
+      showToast(`全量同步失败: ${err instanceof Error ? err.message : '未知错误'}`, 'error');
+    } finally {
+      setSyncingAll(false);
     }
   };
 
@@ -414,19 +455,19 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
       const resolveTypeFromDues = (amt: number, currentType: MembershipType) =>
         resolveMembershipTypeFromDues(amt, rules, currentType);
 
-      if (!membershipData) return null;
-
       const rawType = m.membershipType || 'Probation';
-      const duesVal = Number(membershipData.dues) || getTargetDues(rawType);
+      const duesVal = membershipData
+        ? (Number(membershipData.dues) || getTargetDues(rawType))
+        : getTargetDues(rawType);
       const resolvedType = resolveTypeFromDues(duesVal, rawType);
       return {
         id: `summary-${m.id}-${selectedYear}`,
         memberId: m.id,
         membershipType: resolvedType,
         duesYear: selectedYear,
-        amount: membershipData.amount,
+        amount: membershipData?.amount,
         targetDues: duesVal,
-        status: membershipData.status,
+        status: membershipData?.status ?? 'pending',
         dueDate: new Date(selectedYear, 2, 31).toISOString(),
         isRenewal: !isFirstYear,
       } as RenewalWithTargetDues;
@@ -548,6 +589,132 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
     'over paid': 'bg-purple-100 text-purple-800',
   };
 
+  const renderMembershipHistory = (m: typeof members[0] | undefined) => {
+    if (!m) return null;
+
+    // Calendar year the member physically joined
+    const joinDate = m.joinDate ? new Date(m.joinDate) : null;
+    const joinCalendarYear = joinDate ? joinDate.getFullYear() : null;
+
+    // Members joining Oct 1 or later get membership extended to Dec 31 of the NEXT year,
+    // so their first annual dues year is joinCalendarYear + 1.
+    // joinCalendarYear itself has no dues obligation (shown as "joined" row).
+    const joinMonth = joinDate ? joinDate.getMonth() : null; // 0-indexed; 9 = Oct
+    const isLateYearJoiner = joinMonth !== null && joinMonth >= 9;
+    const effectiveJoinYear = joinCalendarYear !== null
+      ? (isLateYearJoiner ? joinCalendarYear + 1 : joinCalendarYear)
+      : null;
+
+    const storedYears = m.membership ? Object.keys(m.membership).map(Number) : [];
+    const earliestStored = storedYears.length > 0 ? Math.min(...storedYears) : null;
+    const startYear = joinCalendarYear ?? earliestStored ?? selectedYear;
+    const endYear = new Date().getFullYear();
+
+    if (startYear > endYear) {
+      return <p className="text-xs text-slate-400 italic py-2">No membership history recorded.</p>;
+    }
+
+    const rules = membershipRules || DEFAULT_MEMBERSHIP_RULES;
+    const rawType = (m.membershipType || 'Probation') as MembershipType;
+
+    // Index membership transactions for this member by dues year.
+    // Year extracted from tx.projectId ("2024 membership"), tx.year field, or tx.date.
+    const txsByYear = new Map<number, typeof membershipTransactions>();
+    membershipTransactions.forEach(tx => {
+      if (tx.memberId !== m.id) return;
+      const yearFromProjectId = tx.projectId?.match(/^(\d{4})\s/)?.[1];
+      const txYear = yearFromProjectId
+        ? parseInt(yearFromProjectId, 10)
+        : ((tx as any).year ? Number((tx as any).year) : new Date(tx.date).getFullYear());
+      const bucket = txsByYear.get(txYear) ?? [];
+      bucket.push(tx);
+      txsByYear.set(txYear, bucket);
+    });
+
+    const years: number[] = [];
+    for (let y = endYear; y >= startYear; y--) years.push(y);
+
+    return (
+      <table className="w-full text-[11px] border-collapse">
+        <thead>
+          <tr className="border-b border-slate-100">
+            <th className="py-1.5 px-2 text-left font-semibold text-slate-500">Year</th>
+            <th className="py-1.5 px-2 text-right font-semibold text-slate-500">Dues</th>
+            <th className="py-1.5 px-2 text-right font-semibold text-slate-500">Paid</th>
+            <th className="py-1.5 px-2 text-right font-semibold text-slate-500">Outstanding</th>
+            <th className="py-1.5 px-2 text-center font-semibold text-slate-500">Status</th>
+            <th className="py-1.5 px-2 text-left font-semibold text-slate-500">Paid Date</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-50">
+          {years.map(yr => {
+            const isSelectedYear = yr === selectedYear;
+
+            // Join year for late-year joiners (Oct+): no dues obligation.
+            // The entry fee is attributed to effectiveJoinYear (next calendar year).
+            if (effectiveJoinYear !== null && yr < effectiveJoinYear) {
+              return (
+                <tr key={yr} className={isSelectedYear ? 'bg-indigo-50/60' : 'hover:bg-slate-50/60'}>
+                  <td className={`py-1.5 px-2 font-bold ${isSelectedYear ? 'text-indigo-700' : 'text-slate-400'}`}>{yr}</td>
+                  <td className="py-1.5 px-2 text-right text-slate-400">—</td>
+                  <td className="py-1.5 px-2 text-right text-slate-400">—</td>
+                  <td className="py-1.5 px-2 text-right text-slate-400">—</td>
+                  <td className="py-1.5 px-2 text-center">
+                    <span className="px-1.5 py-0 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500">joined</span>
+                  </td>
+                  <td className="py-1.5 px-2 text-slate-400">{joinDate ? fmtDate(m.joinDate!) : '—'}</td>
+                </tr>
+              );
+            }
+
+            const txsThisYear = txsByYear.get(yr) ?? [];
+            const paid = txsThisYear.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+            const paidDate = txsThisYear.length > 0
+              ? [...txsThisYear].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0].date
+              : null;
+
+            // Dues: prefer stored record value, then derive from config.
+            // First-year (entry fee RM350) applies to all types in their effectiveJoinYear.
+            const storedRec = m.membership?.[String(yr)] as MembershipRecord | undefined;
+            const isFirstYear = effectiveJoinYear !== null ? yr === effectiveJoinYear : false;
+            const dues = storedRec?.dues
+              ? Number(storedRec.dues)
+              : getTargetDuesForMembershipType(rawType, isFirstYear, rules);
+
+            const outstanding = dues - paid;
+            const isPast = yr < new Date().getFullYear();
+
+            let status: string;
+            if (dues > 0 && paid >= dues) {
+              status = 'paid';
+            } else if (paid > 0 && paid < dues) {
+              status = 'partial';
+            } else if (paid === 0 && isPast) {
+              status = 'overdue';
+            } else {
+              status = 'pending';
+            }
+
+            return (
+              <tr key={yr} className={isSelectedYear ? 'bg-indigo-50/60' : 'hover:bg-slate-50/60'}>
+                <td className={`py-1.5 px-2 font-bold ${isSelectedYear ? 'text-indigo-700' : 'text-slate-700'}`}>{yr}</td>
+                <td className="py-1.5 px-2 text-right text-slate-600">RM{dues.toLocaleString()}</td>
+                <td className="py-1.5 px-2 text-right text-green-600 font-semibold">RM{paid.toLocaleString()}</td>
+                <td className={`py-1.5 px-2 text-right font-bold ${outstanding < 0 ? 'text-purple-600' : outstanding === 0 ? 'text-green-600' : 'text-amber-700'}`}>
+                  {outstanding < 0 ? `-RM${Math.abs(outstanding).toLocaleString()}` : `RM${outstanding.toLocaleString()}`}
+                </td>
+                <td className="py-1.5 px-2 text-center">
+                  <span className={`px-1.5 py-0 rounded-full font-semibold ${statusColors[status] || 'bg-slate-100 text-slate-600'}`}>{status}</span>
+                </td>
+                <td className="py-1.5 px-2 text-slate-500">{paidDate ? fmtDate(paidDate) : '—'}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    );
+  };
+
   return (
     <div className="space-y-4">
 
@@ -591,38 +758,19 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
           <p className="text-xs text-slate-500 mt-0.5">Annual dues collection and renewal tracking</p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-          {/* Admin buttons (no Auto-match here) */}
-          {hasEditPermission && (
+          {/* Admin-only buttons */}
+          {isAdminUser && (
             <div className="flex flex-wrap items-center gap-1.5">
+              {/* Full Sync: step 1 infer membershipType, step 2 write membership[year] */}
               <button
                 type="button"
-                onClick={handleBatchSyncMembershipTypes}
-                disabled={syncingMembershipTypes || syncingMembershipRecords}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition-colors disabled:opacity-50"
-                title="从会费记录/角色推断并写入 membershipType"
+                onClick={handleFullSync}
+                disabled={syncingAll}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                title="推断 membershipType，再同步当年 membership 记录（两步连续执行）"
               >
-                {syncingMembershipTypes ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Users className="w-3.5 h-3.5" />}
-                {syncingMembershipTypes ? 'Syncing...' : 'Sync Types'}
-              </button>
-              <button
-                type="button"
-                onClick={handleBatchSyncMembershipRecords}
-                disabled={syncingMembershipTypes || syncingMembershipRecords}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 transition-colors disabled:opacity-50"
-                title="按 membershipType + Config 写入 membership[年份]"
-              >
-                {syncingMembershipRecords ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Calendar className="w-3.5 h-3.5" />}
-                {syncingMembershipRecords ? 'Syncing...' : 'Sync Records'}
-              </button>
-              <button
-                type="button"
-                onClick={handleFixFirstMembershipDues}
-                disabled={fixingFirstDues}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-200 hover:bg-violet-100 transition-colors disabled:opacity-50"
-                title="将每位会员 membership 中最早年份的 dues 设为 RM350"
-              >
-                {fixingFirstDues ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <DollarSign className="w-3.5 h-3.5" />}
-                {fixingFirstDues ? 'Fixing...' : 'Fix 1st Dues'}
+                {syncingAll ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                {syncingAll ? 'Syncing...' : 'Full Sync'}
               </button>
               {onInitiateRenewal && (
                 <button
@@ -635,6 +783,34 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                   Initiate Renewal
                 </button>
               )}
+              {/* Advanced overflow menu: Fix 1st Dues (one-time data repair) */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowAdvancedMenu(prev => !prev)}
+                  className="inline-flex items-center px-2 py-1.5 rounded-lg text-xs font-semibold bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100 transition-colors"
+                  title="高级操作"
+                >
+                  <MoreHorizontal className="w-3.5 h-3.5" />
+                </button>
+                {showAdvancedMenu && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setShowAdvancedMenu(false)} />
+                    <div className="absolute right-0 mt-1 w-44 bg-white border border-slate-200 rounded-lg shadow-lg z-20 py-1">
+                      <button
+                        type="button"
+                        onClick={() => { setShowAdvancedMenu(false); handleFixFirstMembershipDues(); }}
+                        disabled={fixingFirstDues}
+                        className="w-full text-left flex items-center gap-2 px-3 py-2 text-xs font-medium text-violet-700 hover:bg-violet-50 disabled:opacity-50"
+                        title="将每位会员 membership 中最早年份的 dues 设为 RM350"
+                      >
+                        {fixingFirstDues ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <DollarSign className="w-3.5 h-3.5" />}
+                        Fix 1st Dues
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -909,6 +1085,15 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
               <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-jci-blue/30 focus:border-jci-blue"
+              >
+                {Array.from({ length: new Date().getFullYear() - 2018 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+              <select
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value as MembershipType | 'all')}
                 className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-jci-blue/30 focus:border-jci-blue"
@@ -988,59 +1173,76 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                       renewal.status === 'partial' ? 'border-l-orange-400' :
                       'border-l-amber-400';
                     const canWhatsApp = m?.phone && (renewal.status === 'overdue' || renewal.status === 'pending' || renewal.status === 'partial');
+                    const isExpanded = expandedMemberId === renewal.memberId;
                     return (
-                      <tr key={renewal.id} className={`border-l-2 ${statusBarColor} hover:bg-slate-50/80 transition-colors`}>
-                        <td className="py-2.5 px-3 text-xs text-slate-400 font-mono">{index + 1}</td>
-                        <td className="py-2.5 px-3 text-xs font-semibold text-slate-800">
-                          {m?.name || renewal.memberId}
-                        </td>
-                        <td className="py-2.5 px-3">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${renewal.membershipType ? membershipTypeColors[renewal.membershipType] : 'bg-slate-100 text-slate-600'}`}>
-                            {renewal.membershipType ? renewal.membershipType.charAt(0).toUpperCase() + renewal.membershipType.slice(1) : 'Unknown'}
-                          </span>
-                        </td>
-                        <td
-                          className={`py-2.5 px-3 text-xs font-bold ${outstanding < 0 ? 'text-purple-600' : outstanding === 0 ? 'text-green-600' : 'text-slate-900'}`}
-                          title={`应缴: RM${targetDues} | 已付: RM${paidAmt}`}
+                      <React.Fragment key={renewal.id}>
+                        <tr
+                          className={`border-l-2 ${statusBarColor} hover:bg-slate-50/80 transition-colors cursor-pointer`}
+                          onClick={() => setExpandedMemberId(isExpanded ? null : renewal.memberId)}
                         >
-                          {outstanding < 0 ? `-RM${Math.abs(outstanding).toLocaleString()}` : `RM${outstanding.toLocaleString()}`}
-                        </td>
-                        <td className="py-2.5 px-3">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusColors[renewal.status]}`}>
-                            {renewal.status.charAt(0).toUpperCase() + renewal.status.slice(1)}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-xs text-slate-600">{fmtDate(renewal.dueDate)}</td>
-                        <td className="py-2.5 px-3 text-xs text-slate-500">
-                          {renewal.status === 'paid' && renewal.paidDate ? fmtDate(renewal.paidDate) : '—'}
-                        </td>
-                        <td className="py-2.5 px-3">
-                          <div className="flex items-center gap-1.5">
-                            {canWhatsApp && (
-                              <button
-                                type="button"
-                                onClick={() => sendWhatsAppDuesReminder(m!.name, m!.phone, selectedYear, Math.max(0, outstanding))}
-                                className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-green-50 text-green-600 border border-green-200 hover:bg-green-100 transition-colors"
-                                title={`WhatsApp 提醒 ${m?.name}`}
-                              >
-                                <MessageCircle className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                            {m && renewal.status !== 'paid' && renewal.status !== 'over paid' &&
-                              renewal.membershipType !== 'Honorary' && renewal.membershipType !== 'Senator' && (
-                              <PaymentButton
-                                type="membership"
-                                member={m as any}
-                                year={selectedYear}
-                                size="sm"
-                                label="Pay"
-                                existingPaymentUrl={(m as any).membership?.[String(selectedYear)]?.toyyibPaymentUrl}
-                                existingBillStatus={(m as any).membership?.[String(selectedYear)]?.toyyibPaymentStatus}
-                              />
-                            )}
-                          </div>
-                        </td>
-                      </tr>
+                          <td className="py-2.5 px-3 text-xs text-slate-400 font-mono">{index + 1}</td>
+                          <td className="py-2.5 px-3 text-xs font-semibold text-slate-800">
+                            <span className="flex items-center gap-1">
+                              <ChevronDown className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                              {m?.name || renewal.memberId}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${renewal.membershipType ? membershipTypeColors[renewal.membershipType] : 'bg-slate-100 text-slate-600'}`}>
+                              {renewal.membershipType ? renewal.membershipType.charAt(0).toUpperCase() + renewal.membershipType.slice(1) : 'Unknown'}
+                            </span>
+                          </td>
+                          <td
+                            className={`py-2.5 px-3 text-xs font-bold ${outstanding < 0 ? 'text-purple-600' : outstanding === 0 ? 'text-green-600' : 'text-slate-900'}`}
+                            title={`应缴: RM${targetDues} | 已付: RM${paidAmt}`}
+                          >
+                            {outstanding < 0 ? `-RM${Math.abs(outstanding).toLocaleString()}` : `RM${outstanding.toLocaleString()}`}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusColors[renewal.status]}`}>
+                              {renewal.status.charAt(0).toUpperCase() + renewal.status.slice(1)}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-xs text-slate-600">{fmtDate(renewal.dueDate)}</td>
+                          <td className="py-2.5 px-3 text-xs text-slate-500">
+                            {renewal.status === 'paid' && renewal.paidDate ? fmtDate(renewal.paidDate) : '—'}
+                          </td>
+                          <td className="py-2.5 px-3" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center gap-1.5">
+                              {canWhatsApp && (
+                                <button
+                                  type="button"
+                                  onClick={() => sendWhatsAppDuesReminder(m!.name, m!.phone, selectedYear, Math.max(0, outstanding))}
+                                  className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-green-50 text-green-600 border border-green-200 hover:bg-green-100 transition-colors"
+                                  title={`WhatsApp 提醒 ${m?.name}`}
+                                >
+                                  <MessageCircle className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {m && renewal.status !== 'paid' && renewal.status !== 'over paid' &&
+                                renewal.membershipType !== 'Honorary' && renewal.membershipType !== 'Senator' && (
+                                <PaymentButton
+                                  type="membership"
+                                  member={m as any}
+                                  year={selectedYear}
+                                  size="sm"
+                                  label="Pay"
+                                  existingPaymentUrl={(m as any).membership?.[String(selectedYear)]?.toyyibPaymentUrl}
+                                  existingBillStatus={(m as any).membership?.[String(selectedYear)]?.toyyibPaymentStatus}
+                                />
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr className="border-l-2 border-l-indigo-300 bg-slate-50/70">
+                            <td colSpan={8} className="px-6 py-3">
+                              <p className="text-[11px] font-semibold text-indigo-700 mb-1.5">Membership History</p>
+                              {renderMembershipHistory(m)}
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     );
                   })}
                 </tbody>
@@ -1064,16 +1266,22 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                 renewal.status === 'overdue' ? 'bg-red-400' :
                 renewal.status === 'partial' ? 'bg-orange-400' :
                 'bg-amber-400';
+              const isExpanded = expandedMemberId === renewal.memberId;
               return (
                 <div key={renewal.id} className="relative bg-white border border-slate-100 rounded-xl overflow-hidden shadow-sm">
                   <div className={`absolute left-0 top-0 bottom-0 w-1 ${barColor}`} />
-                  <div className="pl-4 pr-3 pt-2.5 pb-2.5">
+                  <button
+                    type="button"
+                    className="w-full text-left pl-4 pr-3 pt-2.5 pb-2.5 focus:outline-none"
+                    onClick={() => setExpandedMemberId(isExpanded ? null : renewal.memberId)}
+                  >
                     <div className="flex items-start justify-between gap-2 mb-1">
                       <div className="min-w-0">
-                        <span className="text-xs font-bold text-slate-800 block truncate">
+                        <span className="text-xs font-bold text-slate-800 flex items-center gap-1 truncate">
+                          <ChevronDown className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                           #{index + 1} {m?.name || renewal.memberId}
                         </span>
-                        <div className="flex items-center gap-1.5 mt-0.5">
+                        <div className="flex items-center gap-1.5 mt-0.5 ml-4">
                           <span className={`px-1.5 py-0 rounded-full text-[10px] font-semibold ${renewal.membershipType ? membershipTypeColors[renewal.membershipType] : 'bg-slate-100 text-slate-600'}`}>
                             {renewal.membershipType || 'Unknown'}
                           </span>
@@ -1088,35 +1296,43 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
                     </div>
                     <div className="flex items-center justify-between text-[10px] text-slate-500 mt-1">
                       <span>Due: <span className="font-medium text-slate-700">{fmtDate(renewal.dueDate)}</span></span>
-                      <div className="flex items-center gap-1.5">
-                        {renewal.status === 'paid' && renewal.paidDate && (
-                          <span className="text-green-600 font-medium">Paid: {fmtDate(renewal.paidDate)}</span>
-                        )}
-                        {m?.phone && (renewal.status === 'overdue' || renewal.status === 'pending' || renewal.status === 'partial') && (
-                          <button
-                            type="button"
-                            onClick={() => sendWhatsAppDuesReminder(m.name, m.phone, selectedYear, Math.max(0, outstanding))}
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 transition-colors text-[10px] font-semibold"
-                            title={`WhatsApp 提醒 ${m.name}`}
-                          >
-                            <MessageCircle className="w-3 h-3" /> WA
-                          </button>
-                        )}
-                        {m && renewal.status !== 'paid' && renewal.status !== 'over paid' &&
-                          renewal.membershipType !== 'Honorary' && renewal.membershipType !== 'Senator' && (
-                          <PaymentButton
-                            type="membership"
-                            member={m as any}
-                            year={selectedYear}
-                            size="sm"
-                            label="Pay"
-                            existingPaymentUrl={(m as any).membership?.[String(selectedYear)]?.toyyibPaymentUrl}
-                            existingBillStatus={(m as any).membership?.[String(selectedYear)]?.toyyibPaymentStatus}
-                          />
-                        )}
-                      </div>
                     </div>
+                  </button>
+                  {/* Action buttons row — stops click-through to expand toggle */}
+                  <div className="flex items-center justify-end gap-1.5 px-3 pb-2.5">
+                    {renewal.status === 'paid' && renewal.paidDate && (
+                      <span className="text-[10px] text-green-600 font-medium mr-auto">Paid: {fmtDate(renewal.paidDate)}</span>
+                    )}
+                    {m?.phone && (renewal.status === 'overdue' || renewal.status === 'pending' || renewal.status === 'partial') && (
+                      <button
+                        type="button"
+                        onClick={() => sendWhatsAppDuesReminder(m.name, m.phone, selectedYear, Math.max(0, outstanding))}
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 transition-colors text-[10px] font-semibold"
+                        title={`WhatsApp 提醒 ${m.name}`}
+                      >
+                        <MessageCircle className="w-3 h-3" /> WA
+                      </button>
+                    )}
+                    {m && renewal.status !== 'paid' && renewal.status !== 'over paid' &&
+                      renewal.membershipType !== 'Honorary' && renewal.membershipType !== 'Senator' && (
+                      <PaymentButton
+                        type="membership"
+                        member={m as any}
+                        year={selectedYear}
+                        size="sm"
+                        label="Pay"
+                        existingPaymentUrl={(m as any).membership?.[String(selectedYear)]?.toyyibPaymentUrl}
+                        existingBillStatus={(m as any).membership?.[String(selectedYear)]?.toyyibPaymentStatus}
+                      />
+                    )}
                   </div>
+                  {/* Expanded: full membership history */}
+                  {isExpanded && (
+                    <div className="border-t border-indigo-100 bg-indigo-50/40 px-4 py-3">
+                      <p className="text-[11px] font-semibold text-indigo-700 mb-2">Membership History</p>
+                      {renderMembershipHistory(m)}
+                    </div>
+                  )}
                 </div>
               );
             })}
