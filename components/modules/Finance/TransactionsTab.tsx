@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Search, ChevronDown, Edit, Trash2, Link2Off, Ban, Plus } from 'lucide-react';
+import { Search, ChevronDown, Edit, Trash2, Link2Off, Ban, Plus, SlidersHorizontal } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Button, Badge, ConfirmDialog, CONFIRM_CLOSED, useToast } from '../../ui/Common';
+import { Button, Badge, ConfirmDialog, CONFIRM_CLOSED, FilterDrawer, useToast } from '../../ui/Common';
 import type { ConfirmState } from '../../ui/Common';
 import { LoadingState } from '../../ui/Loading';
 import { Input } from '../../ui/Form';
@@ -121,6 +121,7 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
 }) => {
   const { showToast } = useToast();
   const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
 
   const requestDeleteTransaction = (id: string, description?: string) => {
     setConfirmState({
@@ -536,19 +537,41 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
             className="w-full"
           />
 
-          {/* Filter panel */}
-          <div className="flex flex-col md:flex-row md:items-center gap-2">
-            {/* Dropdowns – pill style */}
+          {/* Mobile: Filters button */}
+          <div className="md:hidden flex items-center gap-2">
+            <Button
+              variant={activeFilterCount > 0 ? 'secondary' : 'outline'}
+              size="sm"
+              className="flex items-center gap-2 !min-h-0 py-2 px-4 rounded-lg font-medium text-xs shadow-sm bg-white border-slate-200 shrink-0"
+              onClick={() => setFilterDrawerOpen(true)}
+            >
+              <SlidersHorizontal size={14} className={activeFilterCount > 0 ? 'text-sky-600' : 'text-slate-500'} />
+              <span>Filters</span>
+              {activeFilterCount > 0 && (
+                <span className="flex items-center justify-center bg-jci-blue text-white text-[10px] font-bold rounded-full w-5 h-5 ml-1">
+                  {activeFilterCount}
+                </span>
+              )}
+            </Button>
+            {activeFilterCount > 0 && (
+              <button
+                onClick={() => { setTxTypeFilter('All'); setTxStatusFilter('All'); setTxCategoryFilter('All'); setBankAccountFilter('All'); setReportYear(new Date().getFullYear()); }}
+                className="text-xs text-blue-500 hover:text-blue-700 font-medium"
+              >
+                Clear all
+              </button>
+            )}
+          </div>
+
+          {/* Desktop: inline filters */}
+          <div className="hidden md:flex flex-row items-center gap-2">
             <div className="flex gap-1.5">
               {/* Account */}
-              <div className="relative flex-1 md:flex-none md:shrink-0">
+              <div className="relative shrink-0">
                 <select
                   value={bankAccountFilter}
                   onChange={(e) => setBankAccountFilter(e.target.value)}
-                  className={`appearance-none cursor-pointer w-full pl-3 pr-6 py-1.5 rounded-full text-xs font-semibold outline-none border transition-colors ${bankAccountFilter !== 'All'
-                    ? 'bg-jci-blue text-white border-jci-blue'
-                    : 'bg-slate-100 text-slate-600 border-transparent hover:bg-slate-200'
-                    }`}
+                  className={`appearance-none cursor-pointer pl-3 pr-6 py-1.5 rounded-full text-xs font-semibold outline-none border transition-colors ${bankAccountFilter !== 'All' ? 'bg-jci-blue text-white border-jci-blue' : 'bg-slate-100 text-slate-600 border-transparent hover:bg-slate-200'}`}
                 >
                   <option value="All">All Accounts</option>
                   {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
@@ -556,14 +579,11 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
                 <ChevronDown size={11} className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${bankAccountFilter !== 'All' ? 'text-white' : 'text-slate-400'}`} />
               </div>
               {/* Category */}
-              <div className="relative flex-1 md:flex-none md:shrink-0">
+              <div className="relative shrink-0">
                 <select
                   value={txCategoryFilter}
                   onChange={(e) => setTxCategoryFilter(e.target.value)}
-                  className={`appearance-none cursor-pointer w-full pl-3 pr-6 py-1.5 rounded-full text-xs font-semibold outline-none border transition-colors ${txCategoryFilter !== 'All'
-                    ? 'bg-jci-blue text-white border-jci-blue'
-                    : 'bg-slate-100 text-slate-600 border-transparent hover:bg-slate-200'
-                    }`}
+                  className={`appearance-none cursor-pointer pl-3 pr-6 py-1.5 rounded-full text-xs font-semibold outline-none border transition-colors ${txCategoryFilter !== 'All' ? 'bg-jci-blue text-white border-jci-blue' : 'bg-slate-100 text-slate-600 border-transparent hover:bg-slate-200'}`}
                 >
                   <option value="All">All Categories</option>
                   <option value="Projects & Activities">Projects & Activities</option>
@@ -579,10 +599,7 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
               <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
                 {(['All', 'Income', 'Expense'] as const).map(t => (
                   <button key={t} onClick={() => setTxTypeFilter(t)}
-                    className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${txTypeFilter === t
-                      ? t === 'Income' ? 'bg-green-500 text-white' : t === 'Expense' ? 'bg-red-500 text-white' : 'bg-white text-slate-700 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700'
-                      }`}>
+                    className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${txTypeFilter === t ? t === 'Income' ? 'bg-green-500 text-white' : t === 'Expense' ? 'bg-red-500 text-white' : 'bg-white text-slate-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
                     {t === 'Income' ? '↑ Inc' : t === 'Expense' ? '↓ Exp' : 'All'}
                   </button>
                 ))}
@@ -591,10 +608,7 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
               <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
                 {(['All', 'Pending', 'Cleared'] as const).map(s => (
                   <button key={s} onClick={() => setTxStatusFilter(s)}
-                    className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${txStatusFilter === s
-                      ? s === 'Pending' ? 'bg-amber-500 text-white' : s === 'Cleared' ? 'bg-blue-500 text-white' : 'bg-white text-slate-700 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700'
-                      }`}>{s}</button>
+                    className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${txStatusFilter === s ? s === 'Pending' ? 'bg-amber-500 text-white' : s === 'Cleared' ? 'bg-blue-500 text-white' : 'bg-white text-slate-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>{s}</button>
                 ))}
               </div>
               {activeFilterCount > 0 && (
@@ -766,6 +780,76 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
         onConfirm={confirmState.onConfirm}
         onCancel={() => setConfirmState(CONFIRM_CLOSED)}
       />
+
+      {/* Mobile filter drawer */}
+      <FilterDrawer
+        isOpen={filterDrawerOpen}
+        onClose={() => setFilterDrawerOpen(false)}
+        title="Filters"
+        applyLabel={`Show ${visibleTransactions.length} transaction${visibleTransactions.length !== 1 ? 's' : ''}`}
+        showReset={activeFilterCount > 0}
+        resetLabel={`Reset ${activeFilterCount} filter${activeFilterCount !== 1 ? 's' : ''}`}
+        onReset={() => { setTxTypeFilter('All'); setTxStatusFilter('All'); setTxCategoryFilter('All'); setBankAccountFilter('All'); setReportYear(new Date().getFullYear()); }}
+      >
+        {/* Account */}
+        <div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Account</p>
+          <div className="flex flex-wrap gap-2">
+            {['All', ...accounts.map(a => a.id)].map(val => {
+              const label = val === 'All' ? 'All Accounts' : (accounts.find(a => a.id === val)?.name ?? val);
+              const active = bankAccountFilter === val;
+              return (
+                <button key={val} onClick={() => setBankAccountFilter(val)}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${active ? 'bg-jci-blue text-white border-jci-blue' : 'bg-white text-slate-600 border-slate-200'}`}>
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Category */}
+        <div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Category</p>
+          <div className="flex flex-wrap gap-2">
+            {(['All', 'Projects & Activities', 'Membership', 'Administrative', 'Uncategorized'] as const).map(val => {
+              const active = txCategoryFilter === val;
+              return (
+                <button key={val} onClick={() => setTxCategoryFilter(val)}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${active ? 'bg-jci-blue text-white border-jci-blue' : 'bg-white text-slate-600 border-slate-200'}`}>
+                  {val === 'All' ? 'All Categories' : val}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Type */}
+        <div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Type</p>
+          <div className="flex gap-2">
+            {(['All', 'Income', 'Expense'] as const).map(t => (
+              <button key={t} onClick={() => setTxTypeFilter(t)}
+                className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${txTypeFilter === t ? t === 'Income' ? 'bg-green-500 text-white border-green-500' : t === 'Expense' ? 'bg-red-500 text-white border-red-500' : 'bg-jci-blue text-white border-jci-blue' : 'bg-white text-slate-600 border-slate-200'}`}>
+                {t === 'Income' ? '↑ Income' : t === 'Expense' ? '↓ Expense' : 'All'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Status */}
+        <div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Status</p>
+          <div className="flex gap-2">
+            {(['All', 'Pending', 'Cleared'] as const).map(s => (
+              <button key={s} onClick={() => setTxStatusFilter(s)}
+                className={`px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${txStatusFilter === s ? s === 'Pending' ? 'bg-amber-500 text-white border-amber-500' : s === 'Cleared' ? 'bg-blue-500 text-white border-blue-500' : 'bg-jci-blue text-white border-jci-blue' : 'bg-white text-slate-600 border-slate-200'}`}>
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+      </FilterDrawer>
     </div>
   );
 };
