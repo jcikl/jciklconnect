@@ -475,19 +475,46 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
           ) : undefined}
         >
 
-          {/* TAB NAVIGATION + CONTENT — merged card on mobile, stacked on desktop */}
-          <div className="max-md:rounded-2xl max-md:border max-md:border-slate-200 max-md:shadow-sm max-md:overflow-hidden max-md:bg-white">
-            <div className="flex gap-2 md:mb-4">
-              <Tabs
-                tabs={memberTabItems}
-                activeTab={activeTab}
-                onTabChange={(id) => setActiveTab(id as typeof activeTab)}
-                mobileFallback="vertical"
-                className="flex-1 min-w-0"
-              />
+          {/* Desktop-only horizontal tab bar */}
+          <div className="hidden md:flex gap-2 mb-4">
+            <Tabs
+              tabs={memberTabItems}
+              activeTab={activeTab}
+              onTabChange={(id) => setActiveTab(id as typeof activeTab)}
+              className="flex-1 min-w-0"
+            />
+          </div>
+
+          {/* Member-profile-style layout: icon sidebar on mobile, plain on desktop */}
+          <div className="flex md:block rounded-xl md:rounded-none border border-slate-200 md:border-0 overflow-hidden md:overflow-visible shadow-sm md:shadow-none">
+
+            {/* Left icon-only tab column (mobile only) */}
+            <div className="md:hidden flex flex-col border-r border-slate-200 bg-slate-50 w-12 shrink-0">
+              {TAB_CONFIG.map((tab, i) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    title={tab.label}
+                    onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                    className={`relative flex items-center justify-center py-5 w-full transition-all ${i > 0 ? 'border-t border-slate-200' : ''} ${isActive ? 'bg-white text-jci-blue' : 'text-slate-400 hover:text-slate-600 hover:bg-white/60'}`}
+                  >
+                    {isActive && (
+                      <>
+                        <span className="absolute left-0 top-0 bottom-0 w-0.5 bg-jci-blue" />
+                        <span className="absolute right-0 top-0 bottom-0 w-px bg-white" />
+                      </>
+                    )}
+                    <Icon size={16} className="shrink-0" />
+                  </button>
+                );
+              })}
             </div>
 
-          <div className="max-md:border-t max-md:border-slate-100">
+            {/* Content panel */}
+            <div className="flex-1 md:flex-none min-w-0">
+          <div>
             {activeTab === 'directory' && (
               <LoadingState loading={loading} error={error} empty={sortedMembers.length === 0 && roleFilters.length === 0 && membershipTypeFilters.length === 0 && !searchQuery} emptyMessage="No members found">
                 <MemberTable
@@ -584,7 +611,8 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
               />
             )}
           </div>
-          </div>{/* end merged card wrapper */}
+            </div>{/* end content panel */}
+          </div>{/* end member-profile layout wrapper */}
         </PageScaffold>
       ) : (
         <MemberDetail member={selectedMember} onBack={() => setSelectedMemberId(null)} isSelfView={selectedMember?.id === currentMember?.id} />
