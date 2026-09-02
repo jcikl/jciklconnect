@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   TrendingUp, CheckCircle, Clock, Award, AlertCircle,
   Calendar, FileText, User, Users, RefreshCw, Check, X, Save, Edit3, ChevronDown, ChevronUp, Sparkles, Filter, Hourglass
@@ -764,9 +764,9 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
   }, [probationMembers, searchQuery]);
 
   const filteredEngagementMembers = React.useMemo(() => {
+    if (activeView === 'promotion' || activeView === 'requests') return [];
     const term = (searchQuery || '').toLowerCase();
     const yearScopedMembers = engagementMembers.filter((member) => {
-      if (activeView === 'promotion') return false;
       return getEngagementYearFromJoinDate(member.jciCareer?.joinDate) === activeView;
     });
     const filtered = term
@@ -780,7 +780,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
       : [...yearScopedMembers];
     const getName = (m: Member) => ((m.general?.fullName || m.general?.name) ?? '').toLowerCase();
     const hasPending = (m: Member) =>
-      PromotionService.buildEngagementProgress(m, activeView as EngagementYear)
+      PromotionService.buildEngagementProgress(m, activeView)
         .requirements.some(r => r.progress.pendingVerification);
     return filtered.sort((a, b) => {
       const aP = hasPending(a) ? 0 : 1;
@@ -800,16 +800,17 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
   }, [engagementMembers]);
 
   const displayedEngagementMembers = React.useMemo(() => {
+    if (activeView === 'promotion' || activeView === 'requests') return [];
     if (!pendingOnly) return filteredEngagementMembers;
     return filteredEngagementMembers.filter(m => {
-      const p = PromotionService.buildEngagementProgress(m, activeView as EngagementYear);
+      const p = PromotionService.buildEngagementProgress(m, activeView);
       return p.requirements.some(r => r.progress.pendingVerification);
     });
   }, [filteredEngagementMembers, pendingOnly, activeView]);
 
   const engagementStats = React.useMemo(() => {
-    if (activeView === 'promotion') return null;
-    const year = activeView as EngagementYear;
+    if (activeView === 'promotion' || activeView === 'requests') return null;
+    const year = activeView;
     const members = filteredEngagementMembers;
     const total = members.length;
     if (total === 0) return null;
@@ -1087,7 +1088,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
         </>
       )}
 
-      {activeView !== 'promotion' && engagementStats && (
+      {activeView !== 'promotion' && activeView !== 'requests' && engagementStats && (
         <Card>
           <div className="grid grid-cols-3 gap-2 mb-3">
             {[
@@ -1144,7 +1145,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
         </Card>
       )}
 
-      {activeView !== 'promotion' && (
+      {activeView !== 'promotion' && activeView !== 'requests' && (
         <Card>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
             <span className="font-bold text-slate-900">
@@ -1153,7 +1154,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
             </span>
             <div className="flex items-center gap-1.5">
               {/* Pending Only toggle */}
-              {(pendingCounts[activeView as EngagementYear] ?? 0) > 0 && (
+              {(pendingCounts[activeView] ?? 0) > 0 && (
                 <button
                   onClick={() => setPendingOnly(v => !v)}
                   className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-xl border transition-colors shadow-sm ${
@@ -1164,11 +1165,11 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
                 >
                   <Filter size={11} />
                   <span className="hidden sm:inline">Pending only</span>
-                  <span className="sm:hidden">{pendingCounts[activeView as EngagementYear]}</span>
+                  <span className="sm:hidden">{pendingCounts[activeView]}</span>
                 </button>
               )}
               <button
-                onClick={() => handleBulkEngagementAutoSuggest(activeView as EngagementYear)}
+                onClick={() => handleBulkEngagementAutoSuggest(activeView)}
                 disabled={bulkAutoSuggesting}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-50 transition-colors shadow-sm"
               >
