@@ -71,11 +71,11 @@ export function mapMemberToBusinessProfile(id: string, data: Record<string, unkn
       '',
     offerTerms: (() => {
       const raw = (data.specialOffer ?? business.specialOffer) as any;
-      return raw && typeof raw === 'object' ? (raw.terms as string | undefined) : undefined;
+      return (raw && typeof raw === 'object' ? (raw.terms as string | undefined) : undefined) ?? '';
     })(),
     offerExpiry: (() => {
       const raw = (data.specialOffer ?? business.specialOffer) as any;
-      return raw && typeof raw === 'object' ? (raw.expiryDate as string | undefined) : undefined;
+      return (raw && typeof raw === 'object' ? (raw.expiryDate as string | undefined) : undefined) ?? '';
     })(),
     logo:
       (data.companyLogoUrl as string | undefined) ||

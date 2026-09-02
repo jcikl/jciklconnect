@@ -41,9 +41,7 @@ import { PointsSourceRadarChart } from '../../dashboard/Analytics';
 import { getAttendanceDisplay } from './MemberTable';
 import { MentorMatchingModal } from './MentorMatchingModal';
 import { MemberDetailBasicTab } from './MemberDetailBasicTab';
-import { MemberDetailProfessionalTab } from './MemberDetailProfessionalTab';
 import { MemberDetailCareerTab } from './MemberDetailCareerTab';
-import { MemberDetailContactTab } from './MemberDetailContactTab';
 import { MemberDetailActivitiesTab } from './MemberDetailActivitiesTab';
 import { AsyncErrorBoundary } from '../../ui/AsyncErrorBoundary';
 // Generate an inline SVG data URI with initials — avoids external requests blocked by CSP
@@ -110,15 +108,15 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
   const [activitiesLoading, setActivitiesLoading] = useState(false);
   const [projectRoles, setProjectRoles] = useState<any[]>([]);
   const [sponsorshipRecords, setSponsorshipRecords] = useState<any[]>([]);
-  const [radarContributions, setRadarContributions] = useState<any[]>([]);
+  const [registrationHistory, setRadarContributions] = useState<any[]>([]);
   const [recruitedMembers, setRecruitedMembers] = useState<any[]>([]);
   const [allProjects, setAllProjects] = useState<Project[]>([]);
   const currentYear = new Date().getFullYear();
   const [radarYear, setRadarYear] = useState(currentYear);
   const availableYears = useMemo(() => Array.from({ length: 5 }, (_, i) => currentYear - i), [currentYear]);
 
-  const groupedRadarContributions = useMemo(() => {
-    const sorted = [...radarContributions].sort((a, b) => {
+  const groupedRegistrationHistory = useMemo(() => {
+    const sorted = [...registrationHistory].sort((a, b) => {
       const dateA = new Date(a.date);
       const dateB = new Date(b.date);
       const valA = isNaN(dateA.getTime()) ? 0 : dateA.getTime();
@@ -143,7 +141,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
     });
 
     return { groups, sortedYears };
-  }, [radarContributions]);
+  }, [registrationHistory]);
 
   const HOBBY_OPTIONS = [
     "Art & Design", "Badminton", "Baking", "Basketball", "Car Enthusiast",
@@ -356,6 +354,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
         'jciCareer.senatorshipValidatedAt': inlineValues.senatorshipValidatedAt?.trim(),
         ...(inlineValues.role ? { role: inlineValues.role } : {}),
         ...(inlineValues.membershipType ? { membershipType: inlineValues.membershipType } : {}),
+        ...(inlineValues.joinDate ? { joinDate: inlineValues.joinDate, 'jciCareer.joinDate': inlineValues.joinDate } : {}),
       });
       const finalAvatar = inlineValues.avatar;
       const originalAvatar = member.general?.avatarUrl || member.general?.avatarUrl || member.general?.avatarUrl || '';
@@ -534,7 +533,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
         const [projects, sponsorshipsSnap, contributionsSnap, allMembers] = await Promise.all([
           ProjectsService.getAllProjects(),
           getDocs(query(collection(db, 'sponsorships'), where('memberId', '==', member.id))),
-          getDocs(query(collection(db, 'RadarContributions'), where('memberId', '==', member.id))),
+          getDocs(query(collection(db, 'RegistrationHistory'), where('memberId', '==', member.id))),
           MembersService.getAllMembers()
         ]);
 
@@ -591,7 +590,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
         });
         setSponsorshipRecords(sponsorList);
 
-        // 3. Process Radar Contributions
+        // 3. Process Registration History
         const contribList: any[] = [];
         contributionsSnap.forEach((doc) => {
           const data = doc.data();
@@ -1143,8 +1142,6 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
         <Tabs
           tabs={[
             { id: 'basic', label: 'Basic Information' },
-            { id: 'contact', label: 'Contact' },
-            { id: 'professional', label: 'Professional & Business' },
             { id: 'career', label: 'JCI Career' },
             { id: 'activities', label: 'Activities Log' }
           ]}
@@ -1172,33 +1169,12 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
             avatarUploadProgress={avatarUploadProgress}
             handleInlineAvatarUpload={handleInlineAvatarUpload}
             resolveIntroducerDisplay={resolveIntroducerDisplay}
-          />
-        </AsyncErrorBoundary>
-      )}
-      {activeDetailTab === 'contact' && (
-        <AsyncErrorBoundary>
-          <MemberDetailContactTab
-            member={member}
-            isEditMode={isEditMode}
-            inlineValues={inlineValues}
-            setInlineValues={setInlineValues}
-            canViewSensitiveFields={canViewSensitiveFields}
             isSelfView={isSelfView}
-          />
-        </AsyncErrorBoundary>
-      )}
-      {activeDetailTab === 'professional' && (
-        <AsyncErrorBoundary>
-          <MemberDetailProfessionalTab
-            member={member}
-            isEditMode={isEditMode}
-            inlineValues={inlineValues}
-            setInlineValues={setInlineValues}
             activeInlineEditCard={activeInlineEditCard}
           />
         </AsyncErrorBoundary>
       )}
-      {activeDetailTab === 'career' && (
+{activeDetailTab === 'career' && (
         <AsyncErrorBoundary>
           <MemberDetailCareerTab
             member={member}
@@ -1213,6 +1189,8 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
             loadingMatches={loadingMatches}
             setShowPaymentHistoryModal={setShowPaymentHistoryModal}
             canEditRoleType={isDeveloper || effectiveRole === UserRole.SUPER_ADMIN}
+            isAdmin={isAdmin || isDeveloper}
+            isSuperAdmin={isSuperAdmin || isDeveloper}
           />
         </AsyncErrorBoundary>
       )}
@@ -1221,8 +1199,8 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
           <MemberDetailActivitiesTab
             member={member}
             activitiesLoading={activitiesLoading}
-            radarContributions={radarContributions}
-            groupedRadarContributions={groupedRadarContributions}
+            registrationHistory={registrationHistory}
+            groupedRegistrationHistory={groupedRegistrationHistory}
             sponsorshipRecords={sponsorshipRecords}
             projectRoles={projectRoles}
             recruitedMembers={recruitedMembers}

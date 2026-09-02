@@ -418,7 +418,7 @@ export const RadarDataImporter: React.FC = () => {
 
         // 1. Check for duplicates
         if (!memberCache[row.matchedMemberId]) {
-          const q = query(collection(db, 'RadarContributions'), where('memberId', '==', row.matchedMemberId));
+          const q = query(collection(db, 'RegistrationHistory'), where('memberId', '==', row.matchedMemberId));
           const snap = await getDocs(q);
           memberCache[row.matchedMemberId] = snap.docs.map(d => d.data());
         }
@@ -441,7 +441,7 @@ export const RadarDataImporter: React.FC = () => {
         });
 
         // 2. Add ledger record
-        await addDoc(collection(db, 'RadarContributions'), {
+        await addDoc(collection(db, 'RegistrationHistory'), {
           memberId: row.matchedMemberId,
           memberName: row.matchedMemberName,
           rawCategory: row.business?.businessCategory,
@@ -491,8 +491,8 @@ export const RadarDataImporter: React.FC = () => {
     <div className="p-4 md:p-6 mx-auto space-y-4 md:space-y-6">
       <div className="space-y-3">
         <div>
-          <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">Radar Contribution System</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Import tabular data or manage existing contribution records.</p>
+          <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">Registration History System</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Import tabular data or manage existing registration records.</p>
         </div>
         <Tabs
           tabs={[
@@ -706,9 +706,9 @@ const RadarLedgerView = () => {
     try {
       let q;
       if (isLoadMore && lastDoc) {
-        q = query(collection(db, 'RadarContributions'), orderBy('createdAt', 'desc'), startAfter(lastDoc), limit(100));
+        q = query(collection(db, 'RegistrationHistory'), orderBy('createdAt', 'desc'), startAfter(lastDoc), limit(100));
       } else {
-        q = query(collection(db, 'RadarContributions'), orderBy('createdAt', 'desc'), limit(100));
+        q = query(collection(db, 'RegistrationHistory'), orderBy('createdAt', 'desc'), limit(100));
       }
       const snap = await getDocs(q);
       const newLogs = snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
@@ -787,7 +787,7 @@ const RadarLedgerView = () => {
 
       // Process ledger record deletions
       for (const log of logsToDelete) {
-        await deleteDoc(doc(db, 'RadarContributions', log.id));
+        await deleteDoc(doc(db, 'RegistrationHistory', log.id));
       }
 
       setSelectedLogs(new Set());
@@ -808,7 +808,7 @@ const RadarLedgerView = () => {
       onConfirm: async () => {
         setConfirmState(CONFIRM_CLOSED);
         try {
-          await deleteDoc(doc(db, 'RadarContributions', logId));
+          await deleteDoc(doc(db, 'RegistrationHistory', logId));
           await PointsService.recalculateMemberRadarStats(memberId);
           fetchLogs();
         } catch (e) {

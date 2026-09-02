@@ -164,7 +164,7 @@ export const MultiSelectDropdown: React.FC<MultiSelectProps> = ({
           {selected.length === 0 ? (
             <span className="text-slate-400 select-none truncate">{placeholder}</span>
           ) : (
-            selected.map(val => {
+            [...new Set(selected)].map(val => {
               const opt = options.find(o => (typeof o === 'object' ? o.value : o) === val);
               const label = typeof opt === 'object' ? opt.label : val;
               return (

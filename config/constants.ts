@@ -118,8 +118,8 @@ export const COLLECTIONS = {
   SYSTEM_CONFIG: 'system_config',
   /** Membership rules and campaign settings (systemSettings/{docId}) */
   SYSTEM_SETTINGS: 'systemSettings',
-  /** Per-user radar contribution snapshots */
-  RADAR_CONTRIBUTIONS: 'RadarContributions',
+  /** Per-user registration history (formerly RadarContributions) */
+  REGISTRATION_HISTORY: 'RegistrationHistory',
   /** Configurable role-permission catalog (permissionCatalog/{id}) */
   PERMISSION_CATALOG: 'permissionCatalog',
   /** Malaysian postcode → area/state lookup table (postcodes/{postcode}) */

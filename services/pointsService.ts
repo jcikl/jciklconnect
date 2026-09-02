@@ -2432,7 +2432,7 @@ export class PointsService {
         sponsorship += Math.floor(amt / 100) * config.sponsorship.pointsPer100;
       });
 
-      // 4. Calculate Events Points (from RadarContributions)
+      // 4. Calculate Events Points (from RegistrationHistory)
       let events = 0;
       const contributionsSnap = await getDocs(
         query(collection(db, COLLECTIONS.RADAR_CONTRIBUTIONS), where('memberId', '==', memberId))

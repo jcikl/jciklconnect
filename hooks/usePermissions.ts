@@ -115,7 +115,7 @@ export const usePermissions = () => {
   };
 
   // Determine effective role (simulated role in dev mode, or actual member role)
-  const effectiveRole = simulatedRole ? simulatedRole : (member?.role || UserRole.GUEST);
+  const effectiveRole: UserRole = simulatedRole ? simulatedRole : ((member?.role as UserRole) || UserRole.GUEST);
 
   const isCurrentBoardMember = isMemberCurrentBoard(member);
   const isLegacyBoardRole = effectiveRole === UserRole.BOARD;
@@ -164,10 +164,12 @@ export const usePermissions = () => {
   const isCurrentBoardFinanceOperator =
     isCurrentBoardMember && !isExternalOfficer && effectiveRole !== UserRole.INACTIVE;
   const canOperateFinance =
-    isCurrentBoardFinanceOperator &&
-    (boardPosition.includes('treasurer') ||
-      boardPosition.includes('secretary') ||
-      (boardPosition.includes('president') && !boardPosition.includes('vice')));
+    effectiveRole === UserRole.SUPER_ADMIN ||
+    effectiveRole === UserRole.ADMIN ||
+    (isCurrentBoardFinanceOperator &&
+      (boardPosition.includes('treasurer') ||
+        boardPosition.includes('secretary') ||
+        (boardPosition.includes('president') && !boardPosition.includes('vice'))));
 
   return {
     permissions,

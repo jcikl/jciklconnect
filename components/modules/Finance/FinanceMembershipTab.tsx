@@ -21,6 +21,7 @@ interface FinanceMembershipTabProps {
     membership?: Record<string, unknown>;
   }>;
   canOperateFinance: boolean;
+  isAdminUser: boolean;
   onEditTransaction: (transaction: Transaction) => void;
   onEditingMembershipFilterYearChange: (year: number) => void;
   onEditingMembershipMemberIdChange: (memberId: string) => void;
@@ -35,6 +36,7 @@ export const FinanceMembershipTab: React.FC<FinanceMembershipTabProps> = ({
   membershipTransactions,
   members,
   canOperateFinance,
+  isAdminUser,
   onEditTransaction,
   onEditingMembershipFilterYearChange,
   onEditingMembershipMemberIdChange,
@@ -56,6 +58,7 @@ export const FinanceMembershipTab: React.FC<FinanceMembershipTabProps> = ({
         onOpenEditModal();
       }}
       hasEditPermission={canOperateFinance}
+      isAdminUser={isAdminUser}
       formatCurrency={(n) => formatCurrency(n)}
       formatDate={(d) => formatDate(d)}
       onMembershipDataChanged={onMembershipDataChanged}

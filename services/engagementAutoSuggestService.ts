@@ -7,7 +7,7 @@ import { MembersService } from './membersService';
 import type { EngagementYear } from './promotionService';
 import type { MemberEngagementRequirementProgress } from '../types';
 
-// Maps rawCategory values (stored in RadarContributions) to { requirement key, select option value }
+// Maps rawCategory values (stored in RegistrationHistory) to { requirement key, select option value }
 // The selectValue must exactly match one of the options[] in ENGAGEMENT_REQUIREMENTS
 const RADAR_CATEGORY_MAP: Array<{
   key: string;
@@ -56,7 +56,7 @@ const LEADERSHIP_REQUIREMENTS: Record<EngagementYear, { key: string; roleFilter?
   },
 };
 
-interface RadarContributionDoc {
+interface RegistrationHistoryDoc {
   id: string;
   memberId: string;
   rawCategory: string;
@@ -114,7 +114,7 @@ export interface AutoSuggestResult {
 }
 
 /**
- * Queries RadarContributions and Projects to find the earliest matching record for
+ * Queries RegistrationHistory and Projects to find the earliest matching record for
  * each engagement requirement in the given year, then writes pending suggestions
  * to Firestore. Skips any key that already has a completed or pending entry.
  */
@@ -125,7 +125,7 @@ export const EngagementAutoSuggestService = {
     suggestedByUid: string
   ): Promise<AutoSuggestResult[]> {
     const [allRadar, allProjects, member] = await Promise.all([
-      EngagementAutoSuggestService._fetchRadarForMember(memberId),
+      EngagementAutoSuggestService._fetchRegistrationsForMember(memberId),
       ProjectsService.getAllProjects(),
       MembersService.getMemberById(memberId),
     ]);
@@ -363,9 +363,9 @@ export const EngagementAutoSuggestService = {
     return result;
   },
 
-  async _fetchRadarForMember(memberId: string): Promise<RadarContributionDoc[]> {
+  async _fetchRegistrationsForMember(memberId: string): Promise<RegistrationHistoryDoc[]> {
     const snap = await getDocs(
-      query(collection(db, COLLECTIONS.RADAR_CONTRIBUTIONS), where('memberId', '==', memberId))
+      query(collection(db, COLLECTIONS.REGISTRATION_HISTORY), where('memberId', '==', memberId))
     );
     return snap.docs.map(d => ({
       id: d.id,

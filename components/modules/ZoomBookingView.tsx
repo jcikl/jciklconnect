@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Video, Plus, X, ExternalLink, Clock, Calendar, Copy, Check, List, ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
 import { Button, Modal, Tabs, PageScaffold, useToast } from '../ui/Common';
+import { ViewToggle } from '../ui/ViewToggle';
 import { Input } from '../ui/Form';
 import { useAuth } from '../../hooks/useAuth';
 import { useZoomBookings } from '../../hooks/useZoomBookings';
@@ -228,20 +229,14 @@ export const ZoomBookingView: React.FC = () => {
       <PageScaffold
         title="Zoom Booking"
         actions={
-          <div className="flex rounded-lg border border-slate-200 overflow-hidden">
-            <button
-              onClick={() => setViewMode('list')}
-              className={`px-2.5 py-1.5 text-xs font-medium flex items-center gap-1.5 transition-colors ${viewMode === 'list' ? 'bg-jci-blue text-white' : 'text-slate-500 hover:bg-slate-50'}`}
-            >
-              <List size={13} /> List
-            </button>
-            <button
-              onClick={() => setViewMode('calendar')}
-              className={`px-2.5 py-1.5 text-xs font-medium flex items-center gap-1.5 transition-colors border-l border-slate-200 ${viewMode === 'calendar' ? 'bg-jci-blue text-white' : 'text-slate-500 hover:bg-slate-50'}`}
-            >
-              <Calendar size={13} /> Calendar
-            </button>
-          </div>
+          <ViewToggle
+            options={[
+              { id: 'list', icon: <List size={14} />, label: 'List' },
+              { id: 'calendar', icon: <Calendar size={14} />, label: 'Calendar' },
+            ]}
+            value={viewMode}
+            onChange={v => setViewMode(v as 'list' | 'calendar')}
+          />
         }
         className="max-w-2xl mx-auto"
         contentClassName="space-y-6"
@@ -258,17 +253,6 @@ export const ZoomBookingView: React.FC = () => {
         {/* List view */}
         {viewMode === 'list' && (
           <>
-          {/* New Booking Row */}
-          <button
-            onClick={() => openModal()}
-            className="w-full flex items-center gap-3 rounded-xl border-2 border-dashed border-slate-200 px-4 py-3 text-slate-400 hover:border-jci-blue hover:text-jci-blue transition-colors group"
-          >
-            <div className="w-8 h-8 rounded-full border-2 border-dashed border-current flex items-center justify-center group-hover:bg-jci-blue/5 transition-colors">
-              <Plus size={14} />
-            </div>
-            <span className="text-sm font-medium">New Booking</span>
-          </button>
-
           <Tabs
             tabs={[
               { id: 'upcoming', label: 'Upcoming', badge: confirmed.filter(b => isFuture(b.startTime)).length > 0 ? <span className="bg-white/30 text-xs rounded-full px-1.5 py-0.5 font-bold">{confirmed.filter(b => isFuture(b.startTime)).length}</span> : undefined },
@@ -282,18 +266,28 @@ export const ZoomBookingView: React.FC = () => {
           {loading ? (
             <p className="text-sm text-slate-400 text-center py-8">Loading…</p>
           ) : listTab === 'upcoming' ? (
-            confirmed.filter(b => isFuture(b.startTime)).length === 0 ? (
-              <div className="text-center py-10 text-slate-400">
-                <Video size={28} className="mx-auto text-slate-300 mb-2" />
-                <p className="text-sm">No upcoming bookings</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {confirmed.filter(b => isFuture(b.startTime)).map(b => (
+            <div className="space-y-3">
+              {/* New Booking Row */}
+              <button
+                onClick={() => openModal()}
+                className="w-full flex items-center gap-3 rounded-xl border-2 border-dashed border-slate-200 px-4 py-3 text-slate-400 hover:border-jci-blue hover:text-jci-blue transition-colors group"
+              >
+                <div className="w-8 h-8 rounded-full border-2 border-dashed border-current flex items-center justify-center group-hover:bg-jci-blue/5 transition-colors">
+                  <Plus size={14} />
+                </div>
+                <span className="text-sm font-medium">New Booking</span>
+              </button>
+              {confirmed.filter(b => isFuture(b.startTime)).length === 0 ? (
+                <div className="text-center py-10 text-slate-400">
+                  <Video size={28} className="mx-auto text-slate-300 mb-2" />
+                  <p className="text-sm">No upcoming bookings</p>
+                </div>
+              ) : (
+                confirmed.filter(b => isFuture(b.startTime)).map(b => (
                   <BookingCard key={b.id} booking={b} onCancel={b.memberId === member?.id ? () => handleCancel(b) : undefined} onEdit={b.memberId === member?.id ? () => openEditModal(b) : undefined} />
-                ))}
-              </div>
-            )
+                ))
+              )}
+            </div>
           ) : (
             past.length === 0 ? (
               <div className="text-center py-10 text-slate-400">

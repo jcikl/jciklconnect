@@ -1,7 +1,7 @@
 import * as React from 'react';
 import {
   Zap, Clock, Briefcase, GraduationCap, UserPlus, UserCheck,
-  Award, Shield, UserCog
+  Award, Shield, UserCog, Heart,
 } from 'lucide-react';
 
 // Generate an inline SVG data URI with initials — avoids external requests blocked by CSP
@@ -31,6 +31,8 @@ interface MemberDetailCareerTabProps {
   loadingMatches: boolean;
   setShowPaymentHistoryModal: React.Dispatch<React.SetStateAction<boolean>>;
   canEditRoleType?: boolean;
+  isAdmin?: boolean;
+  isSuperAdmin?: boolean;
 }
 
 const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) => {
@@ -38,261 +40,28 @@ const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) 
     member, isEditMode, inlineValues, setInlineValues,
     boardPositions, commissionDirectorPositions,
     mentor, mentees, handleFindMentors, loadingMatches,
-    setShowPaymentHistoryModal, canEditRoleType,
+    setShowPaymentHistoryModal, canEditRoleType, isAdmin, isSuperAdmin,
   } = props;
 
+  const [activeCareerTab, setActiveCareerTab] = React.useState<'career' | 'trainer' | 'dues' | 'mentorship'>('career');
+  React.useEffect(() => {
+    if (isEditMode) {
+      const v = member.jciCareer?.joinDate || '';
+      setJoinDateDraft(v);
+      setInlineValues((prev: any) => prev ? { ...prev, joinDate: v } : prev);
+    }
+  }, [isEditMode]);
+  const [joinDateDraft, setJoinDateDraft] = React.useState('');
+
+  const careerTabs = [
+    { id: 'career' as const, label: 'JCI Career Path', icon: Briefcase },
+    { id: 'trainer' as const, label: 'JCI Trainer Pathway', icon: GraduationCap },
+    { id: 'dues' as const, label: 'Membership & Dues', icon: Clock },
+    ...(isAdmin ? [{ id: 'mentorship' as const, label: 'Mentorship & Growth', icon: Heart }] : []),
+  ];
+
   return (
-    <div className="grid lg:grid-cols-3 gap-6">
-      {/* Left column */}
-      <div className="space-y-6">
-        <Card title="Mentorship & Growth">
-          <div className="space-y-4">
-            <div>
-              <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Current Mentor</h4>
-              {mentor ? (
-                <div className="flex items-center gap-3 p-3 border border-slate-100 rounded-lg hover:bg-slate-50 cursor-pointer">
-                  <img src={mentor.general?.avatarUrl || undefined} className="w-10 h-10 rounded-full" alt="" onError={(e) => { e.currentTarget.src = getInitialsSvg(mentor.general?.name, 40); }} />
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">{mentor.general?.name}</p>
-                    <p className="text-xs text-slate-500">{mentor.role}</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="p-4 border border-dashed border-slate-300 rounded-lg text-center">
-                  <p className="text-sm text-slate-500 mb-2">No mentor assigned</p>
-                  <Button size="sm" variant="outline" onClick={handleFindMentors} isLoading={loadingMatches}>
-                    <Zap size={14} className="mr-2" /> Find Mentor
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            {mentees.length > 0 && (
-              <div>
-                <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Mentees</h4>
-                <div className="space-y-2">
-                  {mentees.map(m => (
-                    <div key={m.id} className="flex items-center gap-3 p-2 bg-slate-50 rounded-lg">
-                      <img src={m.general?.avatarUrl || undefined} className="w-8 h-8 rounded-full" alt="" onError={(e) => { e.currentTarget.src = getInitialsSvg(m.general?.name, 32); }} />
-                      <span className="text-sm font-medium">{m.general?.name}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </Card>
-
-        <Card title="Membership & Dues">
-          {isEditMode && inlineValues ? (
-            <div className="space-y-4 text-sm">
-              <div className="grid grid-cols-1 gap-4">
-                <div>
-                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Senatorship Number</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 12345"
-                    value={inlineValues.jciCareer?.senatorship?.senatorNumber}
-                    onChange={e => setInlineValues({ ...inlineValues, senatorshipId: e.target.value })}
-                    disabled={!!inlineValues.senatorshipBoardValidated}
-                    className={`w-full rounded-lg border px-3 py-1.5 text-sm ${inlineValues.senatorshipBoardValidated ? 'border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed' : 'border-slate-300 focus:border-jci-blue'}`}
-                  />
-                </div>
-                {canEditRoleType && (
-                  <>
-                    <div className="flex items-center gap-4 py-1">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={inlineValues.jciCareer?.senatorship?.certified}
-                          onChange={e => setInlineValues({ ...inlineValues, senatorCertified: e.target.checked })}
-                          className="w-4 h-4 rounded border-slate-300 text-jci-blue focus:ring-jci-blue/20"
-                        />
-                        <span className="text-sm font-medium text-slate-700">Senator Certified</span>
-                      </label>
-                    </div>
-                    <div className="flex items-center gap-4 py-1">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={inlineValues.jciCareer?.senatorship?.boardValidated}
-                          onChange={e => setInlineValues({ ...inlineValues, senatorshipBoardValidated: e.target.checked })}
-                          className="w-4 h-4 rounded border-slate-300 text-jci-blue focus:ring-jci-blue/20"
-                        />
-                        <span className="text-sm font-medium text-slate-700">Board Validated</span>
-                      </label>
-                    </div>
-                    {inlineValues.jciCareer?.senatorship?.boardValidated && (
-                      <div className="grid grid-cols-2 gap-4 animate-in fade-in duration-200">
-                        <div>
-                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Validated By</label>
-                          <input
-                            type="text"
-                            value={inlineValues.jciCareer?.senatorshipValidatedBy}
-                            onChange={e => setInlineValues({ ...inlineValues, senatorshipValidatedBy: e.target.value })}
-                            className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Validated At</label>
-                          <Input
-                            type="date"
-                            value={inlineValues.jciCareer?.senatorshipValidatedAt}
-                            onChange={e => setInlineValues({ ...inlineValues, senatorshipValidatedAt: e.target.value })}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              {canEditRoleType && (
-                <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-200">
-                  <div>
-                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Role</label>
-                    <select
-                      value={inlineValues.role}
-                      onChange={e => setInlineValues({ ...inlineValues, role: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
-                    >
-                      {[UserRole.GUEST, UserRole.MEMBER, UserRole.BOARD, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.INACTIVE].map(r => (
-                        <option key={r} value={r}>{r}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Membership Type</label>
-                    <select
-                      value={inlineValues.jciCareer?.membershipType}
-                      onChange={e => setInlineValues({ ...inlineValues, membershipType: e.target.value })}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
-                    >
-                      {['Guest', 'Probation', 'Official', 'Honorary', 'Senator', 'Visiting', 'Associate'].map(t => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              )}
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                <div>
-                  <span className="text-xs text-slate-500 uppercase font-bold">Type</span>
-                  <MembershipTypeDisplay
-                    member={{
-                      nationality: member.general?.nationality,
-                      dateOfBirth: member.general?.dob,
-                      senatorCertified: member.jciCareer?.senatorship?.certified,
-                      senatorshipId: member.jciCareer?.senatorship?.senatorNumber,
-                      role: member.role,
-                      membershipType: member.jciCareer?.membershipType,
-                    }}
-                  />
-                </div>
-                {member.jciCareer?.senatorship?.certified && (
-                  <Badge variant="success" className="animate-pulse">Senator Certified</Badge>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 gap-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-500">Current Status ({new Date().getFullYear()}):</span>
-                  <Badge
-                    variant={
-                      (member.jciCareer?.membershipDuesHistory?.[String(new Date().getFullYear())]?.status === 'paid' ||
-                        member.jciCareer?.membershipDuesHistory?.[String(new Date().getFullYear())]?.status === 'over paid') ? 'success' :
-                        member.jciCareer?.membershipDuesHistory?.[String(new Date().getFullYear())]?.status === 'pending' ? 'warning' : 'error'
-                    }
-                    className="capitalize"
-                  >
-                    {member.jciCareer?.membershipDuesHistory?.[String(new Date().getFullYear())]?.status || 'pending'}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-500">Last Payment Amount:</span>
-                  <span className="font-bold">RM {member.jciCareer?.membershipDuesHistory?.[String(new Date().getFullYear())]?.amount || 0}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-500">Last Payment Date:</span>
-                  <span className="font-medium text-slate-900">{formatDateToDDMMMYYYY(member.jciCareer?.membershipDuesHistory?.[String(new Date().getFullYear())]?.paymentDate)}</span>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setShowPaymentHistoryModal(true)}
-                  className="mt-2 w-full font-bold text-slate-700 hover:text-jci-blue border-slate-200 hover:border-jci-blue flex items-center justify-center gap-1.5"
-                >
-                  <Clock size={12} /> View Payment History
-                </Button>
-
-                {/* Pay dues button — shown when dues are not paid for the current year */}
-                {(() => {
-                  const currentYear = new Date().getFullYear();
-                  const rec = member.jciCareer?.membershipDuesHistory?.[String(currentYear)];
-                  const isPaid = rec?.status === 'paid' || rec?.status === 'over paid';
-                  const noPaymentNeeded = member.jciCareer?.membershipType === 'Honorary' || member.jciCareer?.membershipType === 'Senator';
-                  if (noPaymentNeeded) return null;
-                  return (
-                    <div className="mt-2 pt-3 border-t border-slate-100">
-                      <p className="text-xs text-slate-500 mb-2">{currentYear} Dues Payment</p>
-                      <PaymentButton
-                        type="membership"
-                        member={member}
-                        year={currentYear}
-                        label={isPaid ? undefined : 'Pay Dues'}
-                        size="sm"
-                        existingPaymentUrl={rec?.toyyibPaymentUrl}
-                        existingBillStatus={isPaid ? '1' : rec?.toyyibPaymentStatus}
-                        className="w-full justify-center"
-                      />
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* Senator Details Section */}
-              <div className="border-t pt-4 space-y-3">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Senatorship Details</h4>
-                <div className="grid grid-cols-1 gap-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Certified Senator:</span>
-                    <Badge variant={member.jciCareer?.senatorship?.certified ? 'success' : 'neutral'}>
-                      {member.jciCareer?.senatorship?.certified ? 'Yes' : 'No'}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Senator Number:</span>
-                    <span className="font-semibold text-slate-900">{member.jciCareer?.senatorship?.senatorNumber || 'N/A'}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Board Validated:</span>
-                    <Badge variant={member.jciCareer?.senatorship?.boardValidated ? 'success' : 'neutral'}>
-                      {member.jciCareer?.senatorship?.boardValidated ? 'Validated' : 'Pending'}
-                    </Badge>
-                  </div>
-                  {member.jciCareer?.senatorship?.boardValidated && member.jciCareer?.senatorshipValidatedBy && (
-                    <div className="flex items-center justify-between text-xs text-slate-500">
-                      <span>Validated By:</span>
-                      <span className="font-medium">{member.jciCareer.senatorshipValidatedBy}</span>
-                    </div>
-                  )}
-                  {member.jciCareer?.senatorship?.boardValidated && member.jciCareer?.senatorshipValidatedAt && (
-                    <div className="flex items-center justify-between text-xs text-slate-500">
-                      <span>Validated At:</span>
-                      <span className="font-medium">{formatDateToDDMMMYYYY(member.jciCareer.senatorshipValidatedAt!)}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-        </Card>
-      </div>
-
-      {/* Right column (2 cols) */}
-      <div className="lg:col-span-2 space-y-6">
+    <div className="space-y-6">
         <Card title="Recent Badges">
           <div className="flex gap-4">
             {Array.isArray(member.badges) && member.badges.map(b => (
@@ -307,15 +76,61 @@ const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) 
           </div>
         </Card>
 
-        <div className="grid lg:grid-cols-2 gap-6 items-start">
-          <Card title="JCI Career Path">
+        {/* Vertical folder tabs */}
+        <div className="flex rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+          {/* Left tab bar — icon only */}
+          <div className="flex flex-col border-r border-slate-200 bg-slate-50 w-12 shrink-0">
+            {careerTabs.map((tab, i) => (
+              <button
+                key={tab.id}
+                title={tab.label}
+                onClick={() => setActiveCareerTab(tab.id)}
+                className={`relative flex items-center justify-center py-5 w-full transition-all ${
+                  i > 0 ? 'border-t border-slate-200' : ''
+                } ${
+                  activeCareerTab === tab.id
+                    ? 'bg-white text-jci-blue'
+                    : 'text-slate-400 hover:text-slate-600 hover:bg-white/60'
+                }`}
+              >
+                {activeCareerTab === tab.id && (
+                  <>
+                    <span className="absolute left-0 top-0 bottom-0 w-0.5 bg-jci-blue" />
+                    <span className="absolute right-0 top-0 bottom-0 w-px bg-white" />
+                  </>
+                )}
+                <tab.icon size={16} className="shrink-0" />
+              </button>
+            ))}
+          </div>
+
+          {/* Right content panel */}
+          <div className="flex-1 bg-white overflow-y-auto max-h-[560px]">
+
+          {activeCareerTab === 'career' && (
+            <div className="px-5 pb-5">
+            <h3 className="sticky top-0 z-10 bg-white -mx-5 px-5 py-3 mb-1 text-sm font-bold text-slate-800 border-b border-slate-100">JCI Career Path</h3>
             <div className="relative pl-8 space-y-8 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
               {/* Join milestone */}
               <div className="relative">
                 <div className="absolute -left-8 bg-green-100 text-green-600 p-1 rounded-full border-4 border-white">
                   <UserPlus size={14} />
                 </div>
-                <span className="text-xs text-slate-400 font-mono mb-1 block">{member.jciCareer?.joinDate}</span>
+                {(isSuperAdmin || isAdmin) && isEditMode ? (
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <input
+                      type="date"
+                      value={joinDateDraft}
+                      onChange={e => {
+                        setJoinDateDraft(e.target.value);
+                        setInlineValues((prev: any) => prev ? { ...prev, joinDate: e.target.value } : prev);
+                      }}
+                      className="text-xs border border-slate-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-jci-blue/30"
+                    />
+                  </div>
+                ) : (
+                  <span className="text-xs text-slate-400 font-mono mb-1 block">{member.jciCareer?.joinDate}</span>
+                )}
                 <h4 className="text-sm font-bold text-slate-900">Joined JCI Local Chapter</h4>
               </div>
 
@@ -441,9 +256,12 @@ const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) 
                 <p className="text-sm text-slate-400 italic">No career milestones or board positions recorded yet.</p>
               )}
             </div>
-          </Card>
+            </div>
+          )}
 
-          <Card title="JCI Trainer Pathway">
+          {activeCareerTab === 'trainer' && (
+            <div className="px-5 pb-5">
+            <h3 className="sticky top-0 z-10 bg-white -mx-5 px-5 py-3 mb-1 text-sm font-bold text-slate-800 border-b border-slate-100">JCI Trainer Pathway</h3>
             <div className="relative pl-8 space-y-8 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
               {[
                 {
@@ -510,9 +328,266 @@ const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) 
                 );
               })}
             </div>
-          </Card>
-        </div>
-      </div>
+            </div>
+          )}
+
+          {activeCareerTab === 'dues' && (
+            <div className="px-5 pb-5">
+            <h3 className="sticky top-0 z-10 bg-white -mx-5 px-5 py-3 mb-1 text-sm font-bold text-slate-800 border-b border-slate-100">Membership & Dues</h3>
+            <div>
+            {isEditMode && inlineValues ? (
+              <div className="space-y-4 text-sm">
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Senatorship Number</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 12345"
+                      value={inlineValues.jciCareer?.senatorship?.senatorNumber}
+                      onChange={e => setInlineValues({ ...inlineValues, senatorshipId: e.target.value })}
+                      disabled={!!inlineValues.senatorshipBoardValidated}
+                      className={`w-full rounded-lg border px-3 py-1.5 text-sm ${inlineValues.senatorshipBoardValidated ? 'border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed' : 'border-slate-300 focus:border-jci-blue'}`}
+                    />
+                  </div>
+                  {canEditRoleType && (
+                    <>
+                      <div className="flex items-center gap-4 py-1">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={inlineValues.jciCareer?.senatorship?.certified}
+                            onChange={e => setInlineValues({ ...inlineValues, senatorCertified: e.target.checked })}
+                            className="w-4 h-4 rounded border-slate-300 text-jci-blue focus:ring-jci-blue/20"
+                          />
+                          <span className="text-sm font-medium text-slate-700">Senator Certified</span>
+                        </label>
+                      </div>
+                      <div className="flex items-center gap-4 py-1">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={inlineValues.jciCareer?.senatorship?.boardValidated}
+                            onChange={e => setInlineValues({ ...inlineValues, senatorshipBoardValidated: e.target.checked })}
+                            className="w-4 h-4 rounded border-slate-300 text-jci-blue focus:ring-jci-blue/20"
+                          />
+                          <span className="text-sm font-medium text-slate-700">Board Validated</span>
+                        </label>
+                      </div>
+                      {inlineValues.jciCareer?.senatorship?.boardValidated && (
+                        <div className="grid grid-cols-2 gap-4 animate-in fade-in duration-200">
+                          <div>
+                            <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Validated By</label>
+                            <input
+                              type="text"
+                              value={inlineValues.jciCareer?.senatorshipValidatedBy}
+                              onChange={e => setInlineValues({ ...inlineValues, senatorshipValidatedBy: e.target.value })}
+                              className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Validated At</label>
+                            <Input
+                              type="date"
+                              value={inlineValues.jciCareer?.senatorshipValidatedAt}
+                              onChange={e => setInlineValues({ ...inlineValues, senatorshipValidatedAt: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {canEditRoleType && (
+                    <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-200">
+                      <div>
+                        <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Role</label>
+                        <select
+                          value={inlineValues.role}
+                          onChange={e => setInlineValues({ ...inlineValues, role: e.target.value })}
+                          className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                        >
+                          {[UserRole.GUEST, UserRole.MEMBER, UserRole.BOARD, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.INACTIVE].map(r => (
+                            <option key={r} value={r}>{r}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Membership Type</label>
+                        <select
+                          value={inlineValues.jciCareer?.membershipType}
+                          onChange={e => setInlineValues({ ...inlineValues, membershipType: e.target.value })}
+                          className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                        >
+                          {['Guest', 'Probation', 'Official', 'Honorary', 'Senator', 'Visiting', 'Associate'].map(t => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                  <div>
+                    <span className="text-xs text-slate-500 uppercase font-bold">Type</span>
+                    <MembershipTypeDisplay
+                      member={{
+                        nationality: member.general?.nationality,
+                        dateOfBirth: member.general?.dob,
+                        senatorCertified: member.jciCareer?.senatorship?.certified,
+                        senatorshipId: member.jciCareer?.senatorship?.senatorNumber,
+                        role: member.role,
+                        membershipType: member.jciCareer?.membershipType,
+                      }}
+                    />
+                  </div>
+                  {member.jciCareer?.senatorship?.certified && (
+                    <Badge variant="success" className="animate-pulse">Senator Certified</Badge>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 gap-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-500">Current Status ({new Date().getFullYear()}):</span>
+                    <Badge
+                      variant={
+                        (member.jciCareer?.membershipDuesHistory?.[String(new Date().getFullYear())]?.status === 'paid' ||
+                          member.jciCareer?.membershipDuesHistory?.[String(new Date().getFullYear())]?.status === 'over paid') ? 'success' :
+                          member.jciCareer?.membershipDuesHistory?.[String(new Date().getFullYear())]?.status === 'pending' ? 'warning' : 'error'
+                      }
+                      className="capitalize"
+                    >
+                      {member.jciCareer?.membershipDuesHistory?.[String(new Date().getFullYear())]?.status || 'pending'}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-500">Last Payment Amount:</span>
+                    <span className="font-bold">RM {member.jciCareer?.membershipDuesHistory?.[String(new Date().getFullYear())]?.amount || 0}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-500">Last Payment Date:</span>
+                    <span className="font-medium text-slate-900">{formatDateToDDMMMYYYY(member.jciCareer?.membershipDuesHistory?.[String(new Date().getFullYear())]?.paymentDate)}</span>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowPaymentHistoryModal(true)}
+                    className="mt-2 w-full font-bold text-slate-700 hover:text-jci-blue border-slate-200 hover:border-jci-blue flex items-center justify-center gap-1.5"
+                  >
+                    <Clock size={12} /> View Payment History
+                  </Button>
+
+                  {(() => {
+                    const currentYear = new Date().getFullYear();
+                    const rec = member.jciCareer?.membershipDuesHistory?.[String(currentYear)];
+                    const isPaid = rec?.status === 'paid' || rec?.status === 'over paid';
+                    const noPaymentNeeded = member.jciCareer?.membershipType === 'Honorary' || member.jciCareer?.membershipType === 'Senator';
+                    if (noPaymentNeeded) return null;
+                    return (
+                      <div className="mt-2 pt-3 border-t border-slate-100">
+                        <p className="text-xs text-slate-500 mb-2">{currentYear} Dues Payment</p>
+                        <PaymentButton
+                          type="membership"
+                          member={member}
+                          year={currentYear}
+                          label={isPaid ? undefined : 'Pay Dues'}
+                          size="sm"
+                          existingPaymentUrl={rec?.toyyibPaymentUrl}
+                          existingBillStatus={isPaid ? '1' : rec?.toyyibPaymentStatus}
+                          className="w-full justify-center"
+                        />
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                <div className="border-t pt-4 space-y-3">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Senatorship Details</h4>
+                  <div className="grid grid-cols-1 gap-2 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">Certified Senator:</span>
+                      <Badge variant={member.jciCareer?.senatorship?.certified ? 'success' : 'neutral'}>
+                        {member.jciCareer?.senatorship?.certified ? 'Yes' : 'No'}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">Senator Number:</span>
+                      <span className="font-semibold text-slate-900">{member.jciCareer?.senatorship?.senatorNumber || 'N/A'}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">Board Validated:</span>
+                      <Badge variant={member.jciCareer?.senatorship?.boardValidated ? 'success' : 'neutral'}>
+                        {member.jciCareer?.senatorship?.boardValidated ? 'Validated' : 'Pending'}
+                      </Badge>
+                    </div>
+                    {member.jciCareer?.senatorship?.boardValidated && member.jciCareer?.senatorshipValidatedBy && (
+                      <div className="flex items-center justify-between text-xs text-slate-500">
+                        <span>Validated By:</span>
+                        <span className="font-medium">{member.jciCareer.senatorshipValidatedBy}</span>
+                      </div>
+                    )}
+                    {member.jciCareer?.senatorship?.boardValidated && member.jciCareer?.senatorshipValidatedAt && (
+                      <div className="flex items-center justify-between text-xs text-slate-500">
+                        <span>Validated At:</span>
+                        <span className="font-medium">{formatDateToDDMMMYYYY(member.jciCareer.senatorshipValidatedAt!)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+            </div>
+            </div>
+          )}
+
+          {activeCareerTab === 'mentorship' && (
+            <div className="px-5 pb-5">
+              <h3 className="sticky top-0 z-10 bg-white -mx-5 px-5 py-3 mb-1 text-sm font-bold text-slate-800 border-b border-slate-100">Mentorship & Growth</h3>
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Current Mentor</h4>
+                  {mentor ? (
+                    <div className="flex items-center gap-3 p-3 border border-slate-100 rounded-lg hover:bg-slate-50 cursor-pointer">
+                      <img src={mentor.general?.avatarUrl || undefined} className="w-10 h-10 rounded-full" alt="" onError={(e) => { e.currentTarget.src = getInitialsSvg(mentor.general?.name, 40); }} />
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">{mentor.general?.name}</p>
+                        <p className="text-xs text-slate-500">{mentor.role}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-4 border border-dashed border-slate-300 rounded-lg text-center">
+                      <p className="text-sm text-slate-500 mb-2">No mentor assigned</p>
+                      <Button size="sm" variant="outline" onClick={handleFindMentors} isLoading={loadingMatches}>
+                        <Zap size={14} className="mr-2" /> Find Mentor
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {mentees.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Mentees</h4>
+                    <div className="space-y-2">
+                      {mentees.map(m => (
+                        <div key={m.id} className="flex items-center gap-3 p-2 bg-slate-50 rounded-lg">
+                          <img src={m.general?.avatarUrl || undefined} className="w-8 h-8 rounded-full" alt="" onError={(e) => { e.currentTarget.src = getInitialsSvg(m.general?.name, 32); }} />
+                          <span className="text-sm font-medium">{m.general?.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {mentees.length === 0 && !mentor && (
+                  <p className="text-xs text-slate-400 italic text-center py-4">No mentees assigned yet</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          </div>{/* end right content panel */}
+        </div>{/* end vertical folder tabs */}
     </div>
   );
 };

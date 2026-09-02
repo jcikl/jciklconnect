@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo, useRef, lazy, Suspense, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, lazy, Suspense, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import {
@@ -458,7 +458,7 @@ export const JCIKLApp: React.FC = () => {
     );
 
     return renderAppView(view, {
-      memberRole: member?.role,
+      memberRole: effectiveRole,
       hasMember: !!member,
       isBoard,
       isAdmin,
@@ -486,7 +486,7 @@ export const JCIKLApp: React.FC = () => {
   };
 
   const sidebarNavigationContext: SidebarNavigationContext = {
-    memberRole: member?.role,
+    memberRole: effectiveRole,
     isBoard,
     isAdmin,
     isDeveloper,

@@ -217,6 +217,11 @@ export const ProjectKanban: React.FC<{ projectId: string; projectName: string; p
 
   return (
     <>
+      {/* Header */}
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-base font-semibold text-slate-900">Kanban Board</h3>
+      </div>
+
       {/* Desktop: horizontal 3-column scroll; Mobile: stacked accordion */}
       <div className="md:flex md:gap-5 md:overflow-x-auto md:pb-6 space-y-3 md:space-y-0">
         {columns.map(col => {

@@ -311,9 +311,9 @@ service cloud.firestore {
       return isBoard();
     }
 
-    // Deletion is destructive and irreversible — reserved for board members and admins.
+    // Deletion is destructive and irreversible — reserved for admins and board finance operators.
     function canDeleteFinance() {
-      return isFinanceOperator();
+      return isAdmin() || isFinanceOperator();
     }
 
     // Transactions: board / finance roles; multi-LO scoped by loId unless isAdmin/Board()
@@ -326,14 +326,14 @@ service cloud.firestore {
       allow list: if isAuthenticated() && (isAdmin() || isBoard());
       // E8 fix: on CREATE resource is null; must use request.resource.data not resource.data
       // P1 Fix: require critical fields on create to prevent partial/malformed transaction documents
-      allow create: if isFinanceOperator() &&
+      allow create: if (isAdmin() || isFinanceOperator()) &&
         request.resource.data.keys().hasAll(['amount', 'type', 'date', 'bankAccountId']) &&
         (request.resource.data.get('status', '') != 'Reconciled' &&
          request.resource.data.get('status', '') != 'Partially Reconciled' &&
          request.resource.data.get('status', '') != 'Voided');
       // TX-R2: finance staff limited to business fields; Admin unrestricted (TX-A: added missing writable fields)
       // C1: isAdmin() bypass before Reconciled check so void/unmatch/deleteReconciliation always work
-      allow update: if isFinanceOperator() &&
+      allow update: if (isAdmin() || isFinanceOperator()) &&
         (
         (resource == null ||
           (resource.data.get('status', '') != 'Reconciled' &&
@@ -350,6 +350,13 @@ service cloud.firestore {
            'matchStatus', 'matchedBankTxIds',
            'memberId', 'loId', 'transactionType', 'year'
          ]));
+      // PT-match: board members can link/unlink project entries without full finance operator rights
+      allow update: if (isBoard() || isAdmin()) &&
+        resource.data.get('status', '') != 'Reconciled' &&
+        resource.data.get('status', '') != 'Voided' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'projectTransactionId', 'purpose', 'updatedAt', 'updatedBy'
+        ]);
       allow delete: if canDeleteFinance() &&
         resource.data.get('status', '') != 'Reconciled' &&
         resource.data.get('status', '') != 'Partially Reconciled' &&
@@ -364,9 +371,9 @@ service cloud.firestore {
       // Cross-LO isolation at split level requires a data migration to add loId — out of scope here.
       allow read: if isAuthenticated() && (isAdmin() || isBoard());
       // T7: block adding splits to already-reconciled parent transactions
-      allow create: if isFinanceOperator() &&
+      allow create: if (isAdmin() || isFinanceOperator()) &&
         get(/databases/$(database)/documents/transactions/$(request.resource.data.get('parentTransactionId', ''))).data.get('status', '') != 'Reconciled';
-      allow update: if isFinanceOperator() &&
+      allow update: if (isAdmin() || isFinanceOperator()) &&
         (!exists(/databases/$(database)/documents/transactions/$(resource.data.parentTransactionId)) ||
          (get(/databases/$(database)/documents/transactions/$(resource.data.parentTransactionId)).data.get('status', '') != 'Reconciled' &&
           get(/databases/$(database)/documents/transactions/$(resource.data.parentTransactionId)).data.get('status', '') != 'Partially Reconciled' &&
@@ -406,16 +413,15 @@ service cloud.firestore {
           'bankAccountId', 'loId', 'currency', 'status', 'updatedAt', 'purpose', 'category'
         ]);
       // PT-update/delete: block modifications to already-reconciled project transactions; PT-U2: add hasOnly
-      allow update: if isFinanceOperator() &&
+      allow update: if (isBoard() || isAdmin()) &&
         resource.data.get('status', '') != 'Reconciled' &&
         (isAdmin() ||
-         // E2 fix: removed 'status' from non-admin hasOnly — regular finance users must not set status=Reconciled
          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
            'description', 'amount', 'type', 'date', 'category', 'purpose', 'notes',
            'reference', 'attachments', 'updatedAt', 'updatedBy', 'approvedBy', 'approvedAt',
            'rejectedBy', 'rejectedAt', 'rejectionReason'
          ]));
-      allow delete: if canDeleteFinance() &&
+      allow delete: if (isBoard() || isAdmin()) &&
         resource.data.get('status', '') != 'Reconciled';
     }
     
@@ -1124,6 +1130,14 @@ service cloud.firestore {
     match /system_config/{configId} {
       allow read: if isAuthenticated();
       allow write: if isBoard() || isAdmin();
+    }
+
+    // System settings (membershipRules, pendingWhatsAppCampaign, etc.)
+    // Readable by all authenticated users (config is non-sensitive).
+    // Writable by ADMIN only — these are org-wide settings, not per-board.
+    match /systemSettings/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
     }
 
     // Registration History collection (formerly RadarContributions)

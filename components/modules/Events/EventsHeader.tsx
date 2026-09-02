@@ -1,6 +1,7 @@
 import React from 'react';
 import { Calendar, List } from 'lucide-react';
-import { Button, PageHeader } from '../../ui/Common';
+import { PageHeader } from '../../ui/Common';
+import { ViewToggle } from '../../ui/ViewToggle';
 
 export type EventsViewMode = 'list' | 'calendar';
 
@@ -17,20 +18,14 @@ export const EventsHeader: React.FC<EventsHeaderProps> = ({
     title="Event List"
     description="Plan, track, and analyze LO activities."
     action={
-      <div className="flex gap-2">
-        <Button
-          variant={viewMode === 'list' ? 'primary' : 'outline'}
-          onClick={() => onViewModeChange('list')}
-        >
-          <List size={16} className="sm:mr-2" /><span className="hidden sm:inline">List View</span>
-        </Button>
-        <Button
-          variant={viewMode === 'calendar' ? 'primary' : 'outline'}
-          onClick={() => onViewModeChange('calendar')}
-        >
-          <Calendar size={16} className="sm:mr-2" /><span className="hidden sm:inline">Calendar View</span>
-        </Button>
-      </div>
+      <ViewToggle
+        options={[
+          { id: 'list', icon: <List size={14} />, label: 'List View' },
+          { id: 'calendar', icon: <Calendar size={14} />, label: 'Calendar View' },
+        ]}
+        value={viewMode}
+        onChange={v => onViewModeChange(v as EventsViewMode)}
+      />
     }
   />
 );

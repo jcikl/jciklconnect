@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrainCircuit, TrendingUp, AlertTriangle, CheckCircle } from 'lucide-react';
+import { TrendingUp, AlertTriangle, CheckCircle } from 'lucide-react';
 import { Button, Badge, ProgressBar, useToast } from '../../ui/Common';
 import { LoadingState } from '../../ui/Loading';
 import { AIPredictionService } from '../../../services/aiPredictionService';
@@ -54,8 +54,7 @@ export const ProjectAIPredictions: React.FC<{ projectId: string }> = ({ projectI
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center gap-2">
-        <BrainCircuit className="text-jci-blue flex-shrink-0" size={18} />
+      <div className="flex justify-between items-center">
         <h3 className="text-base font-semibold text-slate-900">AI Insights & Recommendations</h3>
       </div>
 

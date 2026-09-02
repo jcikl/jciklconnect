@@ -490,8 +490,12 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
     }
   };
 
-  const handleDeletePrj = async (txId: string) => {
+  const handleDeletePrj = async (txId: string, matchedBankTxId?: string) => {
     try {
+      if (matchedBankTxId) {
+        try { await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, matchedBankTxId), { projectTransactionId: null }); } catch {}
+        setBankTxList(prev => prev.map(t => t.id === matchedBankTxId ? { ...t, projectTransactionId: null } : t));
+      }
       await FinanceService.deleteProjectTransaction(txId);
       setProjectTrxList(prev => prev.filter(t => t.id !== txId));
       setEditingPrjId(null);
@@ -529,13 +533,13 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
       const bankTx = bankTxList.find(t => t.id === bankTxId);
       // Set the link via direct write
       await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, bankTxId), { projectTransactionId: matchingPrjTxId });
-      // Sync purpose from entry to bank tx
+      // Sync purpose from entry to bank tx (direct write — no reconciliation check needed, already updated above)
       if (entry?.purpose) {
-        try { await FinanceService.updateTransaction(bankTxId, { purpose: entry.purpose }); } catch {}
+        try { await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, bankTxId), { purpose: entry.purpose }); } catch {}
       }
       // Sync date from bank tx to project entry
       if (bankTx?.date) {
-        try { await FinanceService.updateTransaction(matchingPrjTxId, { date: bankTx.date }); } catch {}
+        try { await updateDoc(doc(db, COLLECTIONS.PROJECT_TRANSACTIONS, matchingPrjTxId), { date: bankTx.date }); } catch {}
       }
       setBankTxList(prev => prev.map(t =>
         t.id === bankTxId ? { ...t, projectTransactionId: matchingPrjTxId, ...(entry?.purpose ? { purpose: entry.purpose } : {}) } : t
@@ -560,11 +564,11 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
       const prjTxId = bankTx?.projectTransactionId ?? null;
       // Clear the link via direct write (bypasses reconciliation check)
       await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, bankTxId), { projectTransactionId: null });
-      // Revert purpose separately via service
-      try { await FinanceService.updateTransaction(bankTxId, { purpose: originalPurpose }); } catch {}
+      // Revert purpose (direct write — no reconciliation check needed)
+      try { await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, bankTxId), { purpose: originalPurpose }); } catch {}
       // Revert project entry date to null
       if (prjTxId) {
-        try { await FinanceService.updateTransaction(prjTxId, { date: '' }); } catch {}
+        try { await updateDoc(doc(db, COLLECTIONS.PROJECT_TRANSACTIONS, prjTxId), { date: '' }); } catch {}
         setProjectTrxList(prev => prev.map(t =>
           t.id === prjTxId ? { ...t, date: '' } : t
         ));
@@ -1067,7 +1071,7 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
                                   onAmountChange={v => setPrjDraft(p => ({ ...p, amount: v }))}
                                   onSave={handleSavePrj}
                                   onCancel={() => setEditingPrjId(null)}
-                                  onDelete={() => handleDeletePrj(tx.id)}
+                                  onDelete={() => handleDeletePrj(tx.id, matchedBank?.id)}
                                   isSaving={isSavingPrj}
                                 />
                               ) : (

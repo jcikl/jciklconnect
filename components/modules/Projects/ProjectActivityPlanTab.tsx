@@ -372,16 +372,6 @@ export const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Action bar */}
-      <div className="flex justify-end gap-2">
-        <Button variant="outline" size="sm" onClick={() => { setIsEditing(true); setEditStep(1); }}>
-          <Edit size={14} className="mr-1.5" />Edit
-        </Button>
-        <Button variant="danger" size="sm" onClick={onDelete}>
-          <Trash2 size={14} className="mr-1.5" />Delete
-        </Button>
-      </div>
-
       {/* Classification badges " visible on mobile above poster */}
       <div className="flex flex-wrap gap-1.5 md:hidden">
         {project.level && <Badge variant="jci" className="text-xs px-2.5 py-1">{project.level}</Badge>}
@@ -395,13 +385,22 @@ export const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
         {/* Left: poster + gallery */}
         <div className="space-y-3 mb-4 md:mb-0">
           {project.logoUrl ? (
-            <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 aspect-[4/3] md:aspect-[3/4] w-full shadow-sm">
+            <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 aspect-[4/3] md:aspect-[3/4] w-full shadow-sm group">
               <img src={project.logoUrl} alt="Poster" className="w-full h-full object-cover" />
+              <button
+                onClick={() => { setIsEditing(true); setEditStep(1); }}
+                className="absolute bottom-2 right-2 flex items-center gap-1.5 bg-white/90 backdrop-blur-sm text-slate-700 hover:text-jci-blue border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold shadow-sm transition-colors opacity-100"
+              >
+                <Edit size={12} />Edit
+              </button>
             </div>
           ) : (
-            <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 aspect-[4/3] md:aspect-[3/4] w-full flex flex-col items-center justify-center gap-2 text-slate-300">
+            <div
+              onClick={() => { setIsEditing(true); setEditStep(1); }}
+              className="cursor-pointer rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 hover:border-jci-blue hover:bg-sky-50 aspect-[4/3] md:aspect-[3/4] w-full flex flex-col items-center justify-center gap-2 text-slate-300 hover:text-jci-blue transition-colors"
+            >
               <Image size={32} />
-              <span className="text-xs font-semibold">No poster</span>
+              <span className="text-xs font-semibold">No poster · click to edit</span>
             </div>
           )}
           {project.galleryUrls && project.galleryUrls.length > 0 && project.galleryUrls[0] && (

@@ -3,18 +3,17 @@ import { Gantt, Task as GanttLibTask, ViewMode } from 'gantt-task-react';
 import 'gantt-task-react/dist/index.css';
 import {
   Calendar,
-  Filter,
-  Users,
   Clock,
   AlertTriangle,
   CheckCircle,
-  Play
+  Play,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { Task, Project } from '../../../types';
 import { ProjectsService } from '../../../services/projectsService';
 import { useMembers } from '../../../hooks/useMembers';
-import { useToast } from '../../ui/Common';
-import * as Forms from '../../ui/Form';
+import { useToast, FilterDrawer } from '../../ui/Common';
+import { ViewToggle } from '../../ui/ViewToggle';
 
 interface ProjectGanttChartProps {
   project: Project;
@@ -172,13 +171,14 @@ export const ProjectGanttChart: React.FC<ProjectGanttChartProps> = ({
   const [tasks, setTasks] = useState<GanttTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.Day);
-  const [isChecked, setIsChecked] = useState(true);
+
   const [selectedTask, setSelectedTask] = useState<string>('');
 
   // Filters
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [assigneeFilter, setAssigneeFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
   const { members } = useMembers();
   const { showToast } = useToast();
 
@@ -467,69 +467,115 @@ export const ProjectGanttChart: React.FC<ProjectGanttChartProps> = ({
     { icon: <Clock className="w-4 h-4 text-slate-500" />,       label: 'Critical',   value: criticalPath.length,                                          color: 'text-slate-700' },
   ];
 
+  const activeFilterCount = (statusFilter !== 'all' ? 1 : 0) + (assigneeFilter !== 'all' ? 1 : 0) + (priorityFilter !== 'all' ? 1 : 0);
+
   return (
-    <div className="space-y-4">
-      {/* Controls — 2×2 on mobile, 4-col on desktop */}
-      <div className="rounded-xl border border-slate-100 bg-white p-3">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          <div className="flex items-center gap-1.5">
-            <Calendar size={14} className="text-slate-400 flex-shrink-0" />
-            <Forms.Select
-              value={viewMode}
-              onChange={(e) => setViewMode(e.target.value as ViewMode)}
-              options={[
-                { label: 'Day', value: ViewMode.Day },
-                { label: 'Week', value: ViewMode.Week },
-                { label: 'Month', value: ViewMode.Month },
-                { label: 'Year', value: ViewMode.Year },
-              ]}
-            />
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Filter size={14} className="text-slate-400 flex-shrink-0" />
-            <Forms.Select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              options={[
-                { label: 'All Status', value: 'all' },
-                { label: 'Not Started', value: 'not_started' },
-                { label: 'In Progress', value: 'in_progress' },
-                { label: 'Completed', value: 'completed' },
-                { label: 'Overdue', value: 'overdue' },
-              ]}
-            />
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Users size={14} className="text-slate-400 flex-shrink-0" />
-            <Forms.Select
-              value={assigneeFilter}
-              onChange={(e) => setAssigneeFilter(e.target.value)}
-              options={[
-                { label: 'All Assignees', value: 'all' },
-                ...uniqueAssignees.map(a => ({ label: a, value: a }))
-              ]}
-            />
-          </div>
-          <div className="flex items-center gap-1.5">
-            <AlertTriangle size={14} className="text-slate-400 flex-shrink-0" />
-            <Forms.Select
-              value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value)}
-              options={[
-                { label: 'All Priorities', value: 'all' },
-                { label: 'High', value: 'High' },
-                { label: 'Medium', value: 'Medium' },
-                { label: 'Low', value: 'Low' },
-              ]}
-            />
+    <>
+    <FilterDrawer
+      isOpen={filterDrawerOpen}
+      onClose={() => setFilterDrawerOpen(false)}
+      title="Gantt Filters"
+      applyLabel={`Show ${filteredTasks.length} Task${filteredTasks.length !== 1 ? 's' : ''}`}
+      showReset={activeFilterCount > 0}
+      resetLabel={`Reset ${activeFilterCount} filter${activeFilterCount > 1 ? 's' : ''}`}
+      onReset={() => { setStatusFilter('all'); setAssigneeFilter('all'); setPriorityFilter('all'); }}
+    >
+      {/* Status */}
+      <div>
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Status</p>
+        <div className="flex flex-wrap gap-2">
+          {([
+            { label: 'All', value: 'all' },
+            { label: 'Not Started', value: 'not_started' },
+            { label: 'In Progress', value: 'in_progress' },
+            { label: 'Completed', value: 'completed' },
+            { label: 'Overdue', value: 'overdue' },
+          ] as const).map(({ label, value }) => {
+            const count = value === 'all' ? tasks.length : tasks.filter(t => t.status === value).length;
+            const active = statusFilter === value;
+            return (
+              <button key={value} onClick={() => setStatusFilter(value)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${active ? 'bg-jci-blue text-white border-jci-blue' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}>
+                {label}
+                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{count}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Priority */}
+      <div>
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Priority</p>
+        <div className="flex flex-wrap gap-2">
+          {([
+            { label: 'All', value: 'all' },
+            { label: 'High', value: 'High' },
+            { label: 'Medium', value: 'Medium' },
+            { label: 'Low', value: 'Low' },
+          ] as const).map(({ label, value }) => {
+            const count = value === 'all' ? tasks.length : tasks.filter(t => t.priority === (value as any)).length;
+            const active = priorityFilter === value;
+            return (
+              <button key={value} onClick={() => setPriorityFilter(value)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${active ? 'bg-jci-blue text-white border-jci-blue' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}>
+                {label}
+                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{count}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Assignees */}
+      {uniqueAssignees.length > 0 && (
+        <div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Assignee</p>
+          <div className="space-y-1">
+            {(['all', ...uniqueAssignees]).map(a => {
+              const count = a === 'all' ? tasks.length : tasks.filter(t => t.assignees.includes(a)).length;
+              const active = assigneeFilter === a;
+              const label = a === 'all' ? 'All Assignees' : (members.find(m => m.id === a)?.general?.name || a);
+              return (
+                <button key={a} onClick={() => setAssigneeFilter(a)}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm border transition-colors ${active ? 'bg-jci-blue text-white border-jci-blue font-bold' : 'bg-white text-slate-700 border-slate-100 hover:border-slate-200 hover:bg-slate-50'}`}>
+                  <span>{label}</span>
+                  <span className={`text-[11px] font-black px-2 py-0.5 rounded-full ${active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{count}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
-        <div className="mt-2 flex items-center gap-2">
-          <Forms.Checkbox
-            label="Show Dependencies"
-            checked={isChecked}
-            onChange={(e) => setIsChecked(e.target.checked)}
+      )}
+
+
+    </FilterDrawer>
+
+    <div className="space-y-4">
+      {/* Header + toolbar */}
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-base font-semibold text-slate-900">Gantt Chart</h3>
+        <div className="flex items-center gap-2">
+          <ViewToggle
+            options={[
+              { id: ViewMode.Day,   icon: <span className="text-[10px] font-black leading-none">D</span>, label: 'Day' },
+              { id: ViewMode.Week,  icon: <span className="text-[10px] font-black leading-none">W</span>, label: 'Week' },
+              { id: ViewMode.Month, icon: <span className="text-[10px] font-black leading-none">M</span>, label: 'Month' },
+              { id: ViewMode.Year,  icon: <span className="text-[10px] font-black leading-none">Y</span>, label: 'Year' },
+            ]}
+            value={viewMode}
+            onChange={v => setViewMode(v as ViewMode)}
           />
+          <button
+            onClick={() => setFilterDrawerOpen(true)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${activeFilterCount > 0 ? 'bg-jci-blue text-white border-jci-blue' : 'bg-white text-slate-600 border-slate-200 hover:border-jci-blue hover:text-jci-blue'}`}
+          >
+            <SlidersHorizontal size={13} />
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="ml-0.5 bg-white/25 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">{activeFilterCount}</span>
+            )}
+          </button>
         </div>
       </div>
 
@@ -548,8 +594,19 @@ export const ProjectGanttChart: React.FC<ProjectGanttChartProps> = ({
         </div>
       )}
 
-      {/* Statistics — horizontal scroll chips */}
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+      {/* Statistics */}
+      {/* Mobile: single merged card */}
+      <div className="md:hidden rounded-xl border border-slate-100 bg-white shadow-sm px-4 py-3 space-y-1">
+        {STATS.map(s => (
+          <div key={s.label} className="flex items-center gap-2">
+            {s.icon}
+            <span className="text-xs text-slate-500 flex-1">{s.label}</span>
+            <span className={`text-sm font-bold tabular-nums ${s.color}`}>{s.value}</span>
+          </div>
+        ))}
+      </div>
+      {/* Desktop: individual chips */}
+      <div className="hidden md:flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
         {STATS.map(s => (
           <div key={s.label} className="min-w-[110px] flex-shrink-0 rounded-xl border border-slate-100 bg-white p-3 shadow-sm">
             <div className="flex items-center gap-1.5 mb-1">{s.icon}<span className="text-xs text-slate-500">{s.label}</span></div>
@@ -610,7 +667,7 @@ export const ProjectGanttChart: React.FC<ProjectGanttChartProps> = ({
               onProgressChange={handleProgressChange}
               onSelect={handleSelect}
               onDoubleClick={handleDoubleClick}
-              listCellWidth={isChecked ? "120px" : ""}
+              listCellWidth="120px"
               columnWidth={viewMode === ViewMode.Month ? 300 : viewMode === ViewMode.Week ? 250 : 65}
               ganttHeight={550}
               barBackgroundColor="#3B82F6"
@@ -691,5 +748,6 @@ export const ProjectGanttChart: React.FC<ProjectGanttChartProps> = ({
         ))}
       </div>
     </div>
+    </>
   );
 };

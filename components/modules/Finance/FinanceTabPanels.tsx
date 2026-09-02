@@ -1,6 +1,7 @@
 import React, { lazy, Suspense } from 'react';
 import type { BankAccount } from '../../../types';
 import type { useFinanceData } from '../../../hooks/useFinanceData';
+import { usePermissions } from '../../../hooks/usePermissions';
 import { LoadingState } from '../../ui/Loading';
 import { AsyncErrorBoundary } from '../../ui/AsyncErrorBoundary';
 import { AdministrativeTab } from './AdministrativeTab';
@@ -33,6 +34,8 @@ export const FinanceTabPanels: React.FC<FinanceTabPanelsProps> = ({
   onOpenDuesRenewal,
   onHelpClick,
 }) => {
+  const { isAdmin } = usePermissions();
+
   const {
     accounts,
     administrativeTransactions,
@@ -148,6 +151,7 @@ export const FinanceTabPanels: React.FC<FinanceTabPanelsProps> = ({
           membershipTransactions={membershipTransactions}
           members={members}
           canOperateFinance={canOperateFinance}
+          isAdminUser={isAdmin}
           onEditTransaction={setEditingTransaction}
           onEditingMembershipFilterYearChange={setEditingMembershipFilterYear}
           onEditingMembershipMemberIdChange={setEditingMembershipMemberId}

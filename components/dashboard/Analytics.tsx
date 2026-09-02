@@ -211,7 +211,7 @@ export const PointsSourceRadarChart: React.FC<PointsSourceRadarChartProps> = ({ 
   const [boardPositions, setBoardPositions] = useState<any[]>([]);
   const [commissionDirectorPositions, setCommissionDirectorPositions] = useState<any[]>([]);
   const [projectRoles, setProjectRoles] = useState<any[]>([]);
-  const [radarContributions, setRadarContributions] = useState<any[]>([]);
+  const [registrationHistory, setRadarContributions] = useState<any[]>([]);
   const [recruitedMembers, setRecruitedMembers] = useState<any[]>([]);
   const [sponsorshipRecords, setSponsorshipRecords] = useState<any[]>([]);
   const [pointRules, setPointRules] = useState<PointRule[]>([]);
@@ -265,7 +265,7 @@ export const PointsSourceRadarChart: React.FC<PointsSourceRadarChartProps> = ({ 
           BoardManagementService.getMemberCommissionDirectorPositions(memberId),
           ProjectsService.getAllProjects(),
           getDocs(query(collection(db, 'sponsorships'), where('memberId', '==', memberId))),
-          getDocs(query(collection(db, 'RadarContributions'), where('memberId', '==', memberId))),
+          getDocs(query(collection(db, 'RegistrationHistory'), where('memberId', '==', memberId))),
           MembersService.getAllMembers()
         ]);
 
@@ -391,7 +391,7 @@ export const PointsSourceRadarChart: React.FC<PointsSourceRadarChartProps> = ({ 
     const leadershipScore = (activeBoards * boardBase) + (activeCommittees * committeeBase);
 
     // --- 2. Events Score ---
-    const eventsScore = radarContributions
+    const eventsScore = registrationHistory
       .filter(contrib => {
         if (!selectedYearStr) return true;
         if (!contrib.date) return false;
@@ -454,7 +454,7 @@ export const PointsSourceRadarChart: React.FC<PointsSourceRadarChartProps> = ({ 
     boardPositions,
     commissionDirectorPositions,
     projectRoles,
-    radarContributions,
+    registrationHistory,
     recruitedMembers,
     sponsorshipRecords
   ]);

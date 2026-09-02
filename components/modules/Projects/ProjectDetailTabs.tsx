@@ -1,5 +1,6 @@
 import React, { useState, lazy, Suspense } from 'react';
-import { Card, Tabs, useToast, ConfirmDialog, CONFIRM_CLOSED } from '../../ui/Common';
+import { Card, useToast, ConfirmDialog, CONFIRM_CLOSED } from '../../ui/Common';
+import { ClipboardList, Users, GraduationCap, LayoutDashboard, GanttChartSquare, Wallet, FileBarChart, Sparkles } from 'lucide-react';
 import { LoadingSpinner as Spinner } from '../../ui/Loading';
 import type { ConfirmState } from '../../ui/Common';
 import { Project } from '../../../types';
@@ -65,83 +66,97 @@ export const ProjectDetailTabs: React.FC<ProjectDetailTabsProps> = ({ project, o
     });
   };
 
-  const TAB_ITEMS: { key: typeof activeTab; label: string; shortLabel: string }[] = [
-    { key: 'activity-plan', label: 'Activity Plan', shortLabel: 'Plan' },
-    { key: 'committee', label: 'Event Committee', shortLabel: 'Committee' },
-    { key: 'trainers', label: 'Trainers', shortLabel: 'Trainers' },
-    { key: 'kanban', label: 'Kanban Board', shortLabel: 'Kanban' },
-    { key: 'gantt', label: 'Gantt Chart', shortLabel: 'Gantt' },
-    { key: 'finance', label: 'Financial Account', shortLabel: 'Finance' },
-    { key: 'reports', label: 'Reports', shortLabel: 'Reports' },
-    { key: 'ai', label: 'AI Insights', shortLabel: 'AI' },
+  const TAB_ITEMS: { key: typeof activeTab; label: string; icon: React.ElementType }[] = [
+    { key: 'activity-plan', label: 'Activity Plan',    icon: ClipboardList },
+    { key: 'committee',     label: 'Event Committee',  icon: Users },
+    { key: 'trainers',      label: 'Trainers',         icon: GraduationCap },
+    { key: 'kanban',        label: 'Kanban Board',     icon: LayoutDashboard },
+    { key: 'gantt',         label: 'Gantt Chart',      icon: GanttChartSquare },
+    { key: 'finance',       label: 'Financial Account',icon: Wallet },
+    { key: 'reports',       label: 'Reports',          icon: FileBarChart },
+    { key: 'ai',            label: 'AI Insights',      icon: Sparkles },
   ];
 
   return (
     <>
       <Card noPadding>
-        {/* Tabs — mobile: select dropdown, desktop: underline tabs with short labels */}
-        <div className="px-6 pt-4 border-b border-slate-100">
-          <Tabs
-            tabs={TAB_ITEMS.map(t => ({ id: t.key, label: t.label, shortLabel: t.shortLabel }))}
-            activeTab={activeTab}
-            onTabChange={(tab) => setActiveTab(tab as typeof activeTab)}
-            mobileFallback="select"
-            className="border-b-0"
-          />
-        </div>
-        <div className="p-4">
-          {activeTab === 'committee' && (
-            <AsyncErrorBoundary>
-              <ProjectCommitteeTab
+        <div className="flex">
+          {/* Left vertical tab bar */}
+          <div className="w-12 flex flex-col border-r border-slate-100 shrink-0 py-2">
+            {TAB_ITEMS.map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                onClick={() => setActiveTab(key)}
+                title={label}
+                className={`relative flex items-center justify-center h-10 w-full transition-colors ${
+                  activeTab === key
+                    ? 'text-jci-blue'
+                    : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                {activeTab === key && (
+                  <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 bg-jci-blue rounded-r" />
+                )}
+                <Icon size={16} />
+              </button>
+            ))}
+          </div>
+
+          {/* Right content panel */}
+          <div className="flex-1 min-w-0 p-4">
+            {activeTab === 'committee' && (
+              <AsyncErrorBoundary>
+                <ProjectCommitteeTab
+                  project={project}
+                  onSave={(updates) => onUpdateProject(projectId, updates)}
+                />
+              </AsyncErrorBoundary>
+            )}
+            {activeTab === 'trainers' && (
+              <ProjectTrainerTab
                 project={project}
                 onSave={(updates) => onUpdateProject(projectId, updates)}
               />
-            </AsyncErrorBoundary>
-          )}
-          {activeTab === 'trainers' && (
-            <ProjectTrainerTab
-              project={project}
-              onSave={(updates) => onUpdateProject(projectId, updates)}
-            />
-          )}
-          {activeTab === 'kanban' && (
-            <ProjectKanban projectId={projectId} projectName={projectName} project={project} />
-          )}
-          {activeTab === 'gantt' && (
-            <Suspense fallback={<div className="flex justify-center p-8"><Spinner /></div>}>
-              <ProjectGanttChart
+            )}
+            {activeTab === 'kanban' && (
+              <ProjectKanban projectId={projectId} projectName={projectName} project={project} />
+            )}
+            {activeTab === 'gantt' && (
+              <Suspense fallback={<div className="flex justify-center p-8"><Spinner /></div>}>
+                <ProjectGanttChart
+                  project={project}
+                  onUpdateProject={onUpdateProject}
+                  onClose={() => setActiveTab('kanban')}
+                />
+              </Suspense>
+            )}
+            {activeTab === 'finance' && (
+              <ProjectFinancialAccount
                 project={project}
                 onUpdateProject={onUpdateProject}
-                onClose={() => setActiveTab('kanban')}
               />
-            </Suspense>
-          )}
-          {activeTab === 'finance' && (
-            <ProjectFinancialAccount
-              project={project}
-              onClose={() => setActiveTab('activity-plan')}
-            />
-          )}
-          {activeTab === 'reports' && (
-            <ProjectReportsTab
-              projectId={projectId}
-              projectName={projectName}
-              onGenerateReport={handleGenerateReport}
-              loading={loadingReport}
-            />
-          )}
-          {activeTab === 'ai' && (
-            <ProjectAIPredictions projectId={projectId} />
-          )}
-          {activeTab === 'activity-plan' && (
-            <AsyncErrorBoundary>
-              <ProjectActivityPlanTab
-                project={project}
-                onSave={(updates) => onUpdateProject(projectId, updates)}
-                onDelete={handleDeleteProject}
+            )}
+            {activeTab === 'reports' && (
+              <ProjectReportsTab
+                projectId={projectId}
+                projectName={projectName}
+                onGenerateReport={handleGenerateReport}
+                loading={loadingReport}
               />
-            </AsyncErrorBoundary>
-          )}
+            )}
+            {activeTab === 'ai' && (
+              <ProjectAIPredictions projectId={projectId} />
+            )}
+            {activeTab === 'activity-plan' && (
+              <AsyncErrorBoundary>
+                <ProjectActivityPlanTab
+                  project={project}
+                  onSave={(updates) => onUpdateProject(projectId, updates)}
+                  onDelete={handleDeleteProject}
+                />
+              </AsyncErrorBoundary>
+            )}
+          </div>
         </div>
       </Card>
 

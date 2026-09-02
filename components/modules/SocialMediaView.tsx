@@ -4,6 +4,7 @@ import {
   LayoutList, Columns, CalendarDays,
 } from 'lucide-react';
 import { Drawer, Tabs, useToast } from '../ui/Common';
+import { ViewToggle } from '../ui/ViewToggle';
 import { AsyncErrorBoundary } from '../ui/ErrorBoundary';
 import { useAuth } from '../../hooks/useAuth';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -105,23 +106,15 @@ export const SocialMediaView: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          {/* View mode toggle */}
-          <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200">
-            {([
-              { mode: 'list' as const, icon: <LayoutList size={14} />, label: 'List' },
-              { mode: 'kanban' as const, icon: <Columns size={14} />, label: 'Kanban' },
-              { mode: 'calendar' as const, icon: <CalendarDays size={14} />, label: 'Calendar' },
-            ]).map(({ mode, icon, label }) => (
-              <button
-                key={mode}
-                onClick={() => setViewMode(mode)}
-                aria-label={label}
-                className={`p-1.5 rounded-md transition-colors ${viewMode === mode ? 'bg-white text-jci-blue shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-              >
-                {icon}
-              </button>
-            ))}
-          </div>
+          <ViewToggle
+            options={[
+              { id: 'list', icon: <LayoutList size={14} />, label: 'List' },
+              { id: 'kanban', icon: <Columns size={14} />, label: 'Kanban' },
+              { id: 'calendar', icon: <CalendarDays size={14} />, label: 'Calendar' },
+            ]}
+            value={viewMode}
+            onChange={v => setViewMode(v as typeof viewMode)}
+          />
           {isBod && (
             <button
               onClick={() => setPersonaDrawerOpen(true)}

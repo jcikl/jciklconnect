@@ -24,10 +24,9 @@ const ProjectReportsTabBase: React.FC<ProjectReportsTabProps> = ({
   return (
     <div className="space-y-5">
       {/* Header row */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex justify-between items-center">
         <div>
           <h3 className="text-base font-semibold text-slate-900">Project Reports</h3>
-          <p className="text-sm text-slate-500 mt-0.5">Comprehensive AI-generated report for <span className="font-medium text-slate-700">{projectName}</span></p>
         </div>
         <Button onClick={onGenerateReport} disabled={loading} size="sm">
           {loading
