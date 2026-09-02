@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Search, ChevronDown, Edit, Trash2, Link2Off, Ban } from 'lucide-react';
+import { Search, ChevronDown, Edit, Trash2, Link2Off, Ban, Plus } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Button, Badge, ConfirmDialog, CONFIRM_CLOSED, useToast } from '../../ui/Common';
 import type { ConfirmState } from '../../ui/Common';
@@ -57,6 +57,7 @@ interface TransactionsTabProps {
   hasMoreTransactions: boolean;
   setTransactionLimit: (fn: (prev: number) => number) => void;
   canOperateFinance: boolean;
+  onOpenTransaction?: () => void;
 }
 
 // Flat item types for the virtual list
@@ -116,6 +117,7 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
   hasMoreTransactions,
   setTransactionLimit,
   canOperateFinance,
+  onOpenTransaction,
 }) => {
   const { showToast } = useToast();
   const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
@@ -630,6 +632,16 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
             </div>
           );
         })()}
+
+        {canOperateFinance && onOpenTransaction && (
+          <button
+            onClick={onOpenTransaction}
+            className="w-full flex items-center gap-2 px-3 py-2.5 border border-dashed border-slate-200 rounded-lg text-slate-400 hover:text-jci-blue hover:border-jci-blue hover:bg-blue-50/40 transition-colors text-sm font-medium mb-3"
+          >
+            <Plus size={15} className="shrink-0" />
+            New Transaction
+          </button>
+        )}
 
         <LoadingState loading={loading} error={error} empty={transactions.length === 0} emptyMessage="No transactions found">
           {/* Desktop View */}

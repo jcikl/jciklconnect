@@ -217,6 +217,11 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
       <FinanceTabPanels
         financeData={financeData}
         searchQuery={searchQuery}
+        onOpenTransaction={() => {
+          setAddDefaultCategory(null);
+          setRecordFormCategory('Projects & Activities');
+          setIsModalOpen(true);
+        }}
         onOpenAddAccount={() => setIsAddAccountModalOpen(true)}
         onOpenAccountDetail={(acc) => {
           setDetailAccount(acc);
