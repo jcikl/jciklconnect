@@ -1076,10 +1076,6 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
           {/* Card header */}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between px-4 pt-3.5 pb-3 border-b border-slate-100 gap-2">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
-                <Calendar className="w-3.5 h-3.5 text-indigo-500" />
-              </div>
-              <span className="text-sm font-bold text-slate-800">Renewal Members</span>
               <span className="text-[11px] font-semibold text-slate-400 bg-slate-100 rounded-full px-2 py-0.5 shrink-0">
                 {displayRenewals.length}
               </span>
