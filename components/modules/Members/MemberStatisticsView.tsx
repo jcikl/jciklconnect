@@ -382,8 +382,8 @@ export const MemberStatisticsView: React.FC<{
       {/* Segment member drawer */}
       {drawerSegment && (
         <>
-          <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setDrawerSegment(null)} />
-          <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl flex flex-col max-h-[70vh]">
+          <div className="fixed inset-0 bg-black/40 z-50" onClick={() => setDrawerSegment(null)} />
+          <div className="fixed bottom-0 left-0 right-0 z-[60] bg-white rounded-t-3xl shadow-2xl flex flex-col max-h-[70vh]">
             <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-slate-100 shrink-0">
               <div>
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-0.5">Segment</p>
