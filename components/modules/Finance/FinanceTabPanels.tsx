@@ -23,6 +23,7 @@ interface FinanceTabPanelsProps {
   onOpenEditModal: () => void;
   onOpenDuesRenewal: () => void;
   onOpenTransaction: () => void;
+  onOpenImport: () => void;
   onHelpClick?: (topic?: string) => void;
 }
 
@@ -34,6 +35,7 @@ export const FinanceTabPanels: React.FC<FinanceTabPanelsProps> = ({
   onOpenEditModal,
   onOpenDuesRenewal,
   onOpenTransaction,
+  onOpenImport,
   onHelpClick,
 }) => {
   const { isAdmin } = usePermissions();
@@ -293,6 +295,7 @@ export const FinanceTabPanels: React.FC<FinanceTabPanelsProps> = ({
             setTransactionLimit={setTransactionLimit}
             canOperateFinance={canOperateFinance}
             onOpenTransaction={onOpenTransaction}
+            onOpenImport={onOpenImport}
           />
         </AsyncErrorBoundary>
       )}

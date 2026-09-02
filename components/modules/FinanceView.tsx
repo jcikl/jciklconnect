@@ -222,6 +222,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
           setRecordFormCategory('Projects & Activities');
           setIsModalOpen(true);
         }}
+        onOpenImport={() => setIsImportModalOpen(true)}
         onOpenAddAccount={() => setIsAddAccountModalOpen(true)}
         onOpenAccountDetail={(acc) => {
           setDetailAccount(acc);

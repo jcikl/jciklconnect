@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileText, Upload } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import { Button, Tabs } from '../../ui/Common';
 import { Select } from '../../ui/Form';
 
@@ -48,11 +48,6 @@ export const FinanceHeader: React.FC<FinanceHeaderProps> = ({
         <Button variant="outline" size="sm" onClick={onOpenReports} title="Reports" className="shrink-0 h-[38px] px-2.5 sm:px-3">
           <FileText size={14} className="sm:mr-1.5" /><span className="hidden sm:inline">Reports</span>
         </Button>
-        {canOperateFinance && (
-          <Button variant="outline" size="sm" onClick={onOpenImport} title="Batch Import" className="shrink-0 h-[38px] px-2.5 sm:px-3">
-            <Upload size={14} className="sm:mr-1.5" /><span className="hidden sm:inline">Batch Import</span>
-          </Button>
-        )}
       </div>
     </div>
 
