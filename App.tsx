@@ -764,7 +764,7 @@ export const JCIKLApp: React.FC = () => {
 
       {/* Floating Bottom Navigation Bar (Mobile) */}
       {
-        (isMember || isGuest || isBoard || isAdmin || isDeveloper) && !isBatchMode && (
+        !!effectiveRole && !isBatchMode && (
           <>
             <div className={`mobile-bottom-nav md:hidden fixed bottom-5 left-4 right-4 ${'bg-slate-900/95 border-slate-700/50'} backdrop-blur-xl rounded-3xl shadow-xl border flex items-center h-[66px] px-1 z-50`}>
               {/* Dashboard */}
@@ -996,10 +996,12 @@ export const JCIKLApp: React.FC = () => {
                           <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><Zap size={22} /></div>
                           <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Radar</span>
                         </div>
-                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('SYSTEM_CONFIG'); setShowMobileMenu(false); }}>
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><SlidersHorizontal size={22} /></div>
-                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Config</span>
-                        </div>
+                        {effectiveRole === UserRole.SUPER_ADMIN && (
+                          <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('SYSTEM_CONFIG'); setShowMobileMenu(false); }}>
+                            <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><SlidersHorizontal size={22} /></div>
+                            <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Config</span>
+                          </div>
+                        )}
                         <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('AUTOMATION'); setShowMobileMenu(false); }}>
                           <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><Activity size={22} /></div>
                           <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Automation</span>

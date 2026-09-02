@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Check, ChevronDown, RefreshCw, Search, ShieldCheck, X } from 'lucide-react';
 import { Badge, Button, Card, EmptyState, useToast } from '../ui/Common';
 import { usePermissions } from '../../hooks/usePermissions';
+import { UserRole } from '../../types';
 import {
   PermissionCatalogItem,
   PermissionConfigService,
@@ -143,7 +144,8 @@ function groupPermissions(items: PermissionCatalogItem[]): { category: string; i
 }
 
 export const AccessConfigView: React.FC = () => {
-  const { isAdmin } = usePermissions();
+  const { effectiveRole } = usePermissions();
+  const isSuperAdmin = effectiveRole === UserRole.SUPER_ADMIN;
   const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -217,8 +219,8 @@ export const AccessConfigView: React.FC = () => {
   };
 
   const saveRule = async (column: PrincipalColumn, permission: PermissionCatalogItem, allowed: boolean) => {
-    if (!isAdmin) {
-      showToast('Admin permission required', 'error');
+    if (!isSuperAdmin) {
+      showToast('Super Admin permission required', 'error');
       return;
     }
 
@@ -249,13 +251,13 @@ export const AccessConfigView: React.FC = () => {
     });
   };
 
-  if (!isAdmin) {
+  if (!isSuperAdmin) {
     return (
       <Card>
         <div className="py-8 text-center">
           <ShieldCheck className="mx-auto mb-3 text-slate-400" size={28} />
-          <p className="text-sm font-semibold text-slate-700">Admin permission required</p>
-          <p className="mt-1 text-sm text-slate-500">Only administrators can manage access configuration.</p>
+          <p className="text-sm font-semibold text-slate-700">Super Admin permission required</p>
+          <p className="mt-1 text-sm text-slate-500">Only Super Admins can manage access configuration.</p>
         </div>
       </Card>
     );

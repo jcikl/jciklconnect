@@ -219,6 +219,7 @@ export const sidebarNavigationSections: SidebarNavigationSection[] = [
         label: 'Config',
         view: 'SYSTEM_CONFIG',
         activeViews: ['SYSTEM_CONFIG', 'MEMBERSHIP_CONFIG', 'ACCESS_CONFIG', 'API_CONFIG', 'TOYYIB', 'WHAPI_CONFIG'],
+        visible: ({ memberRole }) => memberRole === UserRole.SUPER_ADMIN,
       },
       {
         icon: <Workflow size={18} />,

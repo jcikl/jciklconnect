@@ -181,19 +181,19 @@ export const renderAppView = (view: ViewType, context: AppViewRenderContext): Re
       if (!isAdmin && !isBoard && !isDeveloper) return dashboardFallback;
       return wrapErrorBoundary(<ToyyibView />, 'ToyyibPay');
     case 'WHAPI_CONFIG':
-      if (!isAdmin && !isBoard && !isDeveloper) return dashboardFallback;
+      if (memberRole !== UserRole.SUPER_ADMIN) return dashboardFallback;
       return wrapErrorBoundary(<SystemConfigView initialTab="whapi" />, '系统配置');
     case 'API_CONFIG':
-      if (!isAdmin && !isBoard && !isDeveloper) return dashboardFallback;
+      if (memberRole !== UserRole.SUPER_ADMIN) return dashboardFallback;
       return wrapErrorBoundary(<SystemConfigView initialTab="toyyib" />, '系统配置');
     case 'MEMBERSHIP_CONFIG':
-      if (!isAdmin && !isBoard) return dashboardFallback;
+      if (memberRole !== UserRole.SUPER_ADMIN) return dashboardFallback;
       return wrapErrorBoundary(<SystemConfigView initialTab="membership" />, '会籍配置');
     case 'ACCESS_CONFIG':
-      if (!isAdmin && !isBoard) return dashboardFallback;
+      if (memberRole !== UserRole.SUPER_ADMIN) return dashboardFallback;
       return wrapErrorBoundary(<SystemConfigView initialTab="access" />, '访问配置');
     case 'SYSTEM_CONFIG':
-      if (!isAdmin && !isBoard) return dashboardFallback;
+      if (memberRole !== UserRole.SUPER_ADMIN) return dashboardFallback;
       return wrapErrorBoundary(<SystemConfigView />, '系统配置');
     case 'PUBLICATIONS':
       if (memberRole === UserRole.GUEST || isPlainMember) return dashboardFallback;
