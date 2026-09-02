@@ -696,19 +696,31 @@ export const BoardOfDirectorsSection: React.FC<BoardOfDirectorsSectionProps> = (
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-        {canManage && (
+      {/* Mobile-only setup button */}
+      {canManage && (
+        <div className="md:hidden">
           <Button
             variant="outline"
-            className="w-full md:w-auto flex items-center justify-center gap-2"
+            className="w-full flex items-center justify-center gap-2"
             onClick={() => handleOpenManage(String(new Date().getFullYear() + 1), true)}
           >
             <Plus size={16} /> Setup Next Year
           </Button>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
+        {canManage && (
+          <div
+            onClick={() => handleOpenManage(String(new Date().getFullYear() + 1), true)}
+            className="hidden md:flex group relative bg-white rounded-2xl border-2 border-dashed border-slate-200 p-4 hover:border-jci-blue hover:shadow-md transition-all cursor-pointer items-center justify-center gap-3 min-h-[80px]"
+          >
+            <div className="w-8 h-8 rounded-full bg-slate-100 group-hover:bg-jci-blue/10 flex items-center justify-center transition-colors shrink-0">
+              <Plus size={16} className="text-slate-400 group-hover:text-jci-blue transition-colors" />
+            </div>
+            <span className="text-sm font-bold text-slate-400 group-hover:text-jci-blue transition-colors">Setup Next Year</span>
+          </div>
+        )}
         {terms.map((term) => (
           <div
             key={term.year}
