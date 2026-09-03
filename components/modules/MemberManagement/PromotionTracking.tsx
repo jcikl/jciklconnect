@@ -82,7 +82,7 @@ const splitEventParticipation = (value?: string): [{ date: string; detail: strin
 
 const displayValue = (value?: string | null) => value?.trim() || '-';
 
-type TrackingView = 'promotion' | EngagementYear | 'requests';
+type TrackingView = 'promotion' | EngagementYear | 'official' | 'requests';
 
 const ENGAGEMENT_VIEW_LABELS: Record<EngagementYear, string> = {
   firstYear: '1st Year Member Engagement',
@@ -764,7 +764,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
   }, [probationMembers, searchQuery]);
 
   const filteredEngagementMembers = React.useMemo(() => {
-    if (activeView === 'promotion' || activeView === 'requests') return [];
+    if (activeView === 'promotion' || activeView === 'requests' || activeView === 'official') return [];
     const term = (searchQuery || '').toLowerCase();
     const yearScopedMembers = engagementMembers.filter((member) => {
       return getEngagementYearFromJoinDate(member.jciCareer?.joinDate) === activeView;
@@ -800,7 +800,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
   }, [engagementMembers]);
 
   const displayedEngagementMembers = React.useMemo(() => {
-    if (activeView === 'promotion' || activeView === 'requests') return [];
+    if (activeView === 'promotion' || activeView === 'requests' || activeView === 'official') return [];
     if (!pendingOnly) return filteredEngagementMembers;
     return filteredEngagementMembers.filter(m => {
       const p = PromotionService.buildEngagementProgress(m, activeView);
@@ -809,7 +809,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
   }, [filteredEngagementMembers, pendingOnly, activeView]);
 
   const engagementStats = React.useMemo(() => {
-    if (activeView === 'promotion' || activeView === 'requests') return null;
+    if (activeView === 'promotion' || activeView === 'requests' || activeView === 'official') return null;
     const year = activeView;
     const members = filteredEngagementMembers;
     const total = members.length;
@@ -854,6 +854,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
           { key: 'promotion' as TrackingView, label: 'Probation', short: 'Probation', badge: 0 },
           { key: 'firstYear' as TrackingView, label: '1st Year', short: '1st Yr', badge: pendingCounts.firstYear },
           { key: 'secondYear' as TrackingView, label: '2nd Year', short: '2nd Yr', badge: pendingCounts.secondYear },
+          { key: 'official' as TrackingView, label: 'Official', short: 'Official', badge: 0 },
           ...(isAdmin ? [{ key: 'requests' as TrackingView, label: 'Requests', short: 'Req', badge: pendingRequests.length }] : []),
         ] as const).map(view => (
           <button
@@ -1313,7 +1314,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
               <div className="py-8 text-center text-sm text-slate-400">
                 {pendingOnly
                   ? 'No pending items to review.'
-                  : `No ${activeView === 'firstYear' ? '1st year' : '2nd year'} members found.`}
+                  : `No ${activeView === 'firstYear' ? '1st year' : activeView === 'secondYear' ? '2nd year' : activeView} members found.`}
               </div>
             )}
           </div>
@@ -1680,6 +1681,42 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
 
       {/* Manual Promotion Request Modal */}
       {/* Requests approval panel */}
+      {activeView === 'official' && (() => {
+        const term = (searchQuery || '').toLowerCase();
+        const officialMembers = engagementMembers
+          .filter(m => m.jciCareer?.membershipType === 'Official')
+          .filter(m => !term || (m.general?.fullName || m.general?.name || '').toLowerCase().includes(term) || (m.contact?.email || '').toLowerCase().includes(term))
+          .sort((a, b) => ((a.general?.fullName || a.general?.name) ?? '').localeCompare((b.general?.fullName || b.general?.name) ?? ''));
+        return (
+          <Card>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-bold text-slate-700">Official Members <span className="ml-1 text-slate-400 font-normal">({officialMembers.length})</span></p>
+            </div>
+            <div className="space-y-2">
+              {officialMembers.length === 0 ? (
+                <div className="py-8 text-center text-sm text-slate-400">No Official members found.</div>
+              ) : officialMembers.map(member => {
+                const joinDate = member.jciCareer?.joinDate;
+                return (
+                  <div key={member.id} className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition-all">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs shrink-0 bg-green-500">
+                      {(member.general?.fullName || member.general?.name || '?').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-sm text-slate-900 truncate">{member.general?.fullName || member.general?.name}</div>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-green-100 text-green-700">Official</span>
+                        {joinDate && <span className="text-[11px] text-slate-400">Joined {joinDate}</span>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        );
+      })()}
+
       {activeView === 'requests' && (
         <div className="space-y-3">
           {pendingRequests.length === 0 ? (
