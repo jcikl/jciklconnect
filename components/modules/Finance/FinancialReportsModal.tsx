@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Download, TrendingUp, TrendingDown } from 'lucide-react';
-import { Card, Button, Modal, useToast, Tabs, ProgressBar } from '../../ui/Common';
+import { Card, Button, Modal, Drawer, useToast, Tabs, ProgressBar } from '../../ui/Common';
 import { Select } from '../../ui/Form';
 import { FinanceService } from '../../../services/financeService';
 import { formatCurrency } from '../../../utils/formatUtils';
@@ -46,6 +46,7 @@ export const FinancialReportsModal: React.FC<FinancialReportsModalProps> = ({
     return map;
   }, [projects]);
   const [activeTab, setActiveTab] = useState<'income' | 'expense' | 'balance' | 'cashflow'>('income');
+  const [drilldown, setDrilldown] = useState<{ category: string; key: string } | null>(null);
   const { showToast } = useToast();
 
   const filteredTransactions = useMemo(() => {
@@ -104,6 +105,26 @@ export const FinancialReportsModal: React.FC<FinancialReportsModalProps> = ({
     });
     return result;
   }, [filteredTransactions, projectNameMap]);
+
+  const accountNameMap = useMemo(
+    () => new Map(accounts.map(a => [a.id, a.name])),
+    [accounts]
+  );
+
+  const drilldownTx = useMemo(() => {
+    if (!drilldown) return [];
+    const { category, key } = drilldown;
+    return filteredTransactions
+      .filter(t => {
+        const txCat = t.category || '';
+        if (txCat !== category) return false;
+        const txKey = category === 'Projects & Activities' && t.projectId
+          ? (projectNameMap[t.projectId] || t.projectId)
+          : (t.purpose?.trim() || t.description?.trim() || 'Other');
+        return txKey === key;
+      })
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [drilldown, filteredTransactions, projectNameMap]);
 
   const totalCash = accounts.reduce((sum, acc) => sum + acc.balance, 0);
   const netBalance = incomeTransactions.reduce((sum, t) => sum + t.amount, 0)
@@ -178,6 +199,7 @@ export const FinancialReportsModal: React.FC<FinancialReportsModalProps> = ({
   const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
   return (
+    <>
     <Modal
       isOpen={isOpen}
       onClose={onClose}
@@ -294,7 +316,11 @@ export const FinancialReportsModal: React.FC<FinancialReportsModalProps> = ({
                             .map(([key, sd]) => ({ key, net: sd.income - sd.expenses }))
                             .sort((a, b) => a.key.localeCompare(b.key))
                             .map(({ key, net: sNet }) => (
-                              <div key={key} className="flex justify-between items-center text-xs pl-4 text-slate-400">
+                              <div
+                                key={key}
+                                className="flex justify-between items-center text-xs pl-4 text-slate-400 cursor-pointer hover:bg-slate-100 rounded px-1 -mx-1 transition-colors"
+                                onClick={() => setDrilldown({ category: cat, key })}
+                              >
                                 <span className="truncate max-w-[60%]">{key}</span>
                                 <span className={sNet >= 0 ? 'text-green-500' : 'text-red-400'}>
                                   {sNet < 0 ? '-' : ''}{formatCurrency(Math.abs(sNet))}
@@ -326,7 +352,11 @@ export const FinancialReportsModal: React.FC<FinancialReportsModalProps> = ({
                               .filter(([_, sd]) => sd.income > 0)
                               .sort(([a], [b]) => a.localeCompare(b))
                               .map(([key, sd]) => (
-                                <div key={key} className="flex justify-between items-center text-xs pl-4 text-slate-400">
+                                <div
+                                  key={key}
+                                  className="flex justify-between items-center text-xs pl-4 text-slate-400 cursor-pointer hover:bg-slate-100 rounded px-1 -mx-1 transition-colors"
+                                  onClick={() => setDrilldown({ category, key })}
+                                >
                                   <span className="truncate max-w-[60%]">{key}</span>
                                   <span className="text-green-500">{formatCurrency(sd.income)}</span>
                                 </div>
@@ -352,7 +382,11 @@ export const FinancialReportsModal: React.FC<FinancialReportsModalProps> = ({
                               .filter(([_, sd]) => sd.expenses > 0)
                               .sort(([a], [b]) => a.localeCompare(b))
                               .map(([key, sd]) => (
-                                <div key={key} className="flex justify-between items-center text-xs pl-4 text-slate-400">
+                                <div
+                                  key={key}
+                                  className="flex justify-between items-center text-xs pl-4 text-slate-400 cursor-pointer hover:bg-slate-100 rounded px-1 -mx-1 transition-colors"
+                                  onClick={() => setDrilldown({ category, key })}
+                                >
                                   <span className="truncate max-w-[60%]">{key}</span>
                                   <span className="text-red-400">-{formatCurrency(sd.expenses)}</span>
                                 </div>
@@ -505,5 +539,67 @@ export const FinancialReportsModal: React.FC<FinancialReportsModalProps> = ({
         </div>
       </div>
     </Modal>
+
+    {/* Drilldown drawer — slides in over the modal (z-[55] > modal z-50) */}
+    <Drawer
+      isOpen={!!drilldown}
+      onClose={() => setDrilldown(null)}
+      title={drilldown ? `${drilldown.category} — ${drilldown.key}` : ''}
+      size="lg"
+    >
+      {drilldown && (() => {
+        const drillIncome = drilldownTx.filter(t => t.type === 'Income').reduce((s, t) => s + t.amount, 0);
+        const drillExpenses = drilldownTx.filter(t => t.type !== 'Income').reduce((s, t) => s + Math.abs(t.amount), 0);
+        const drillNet = drillIncome - drillExpenses;
+        return (
+          <div className="space-y-4 pb-4">
+            {/* Summary chips */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {[
+                { label: 'Income', value: formatCurrency(drillIncome), color: 'text-green-600' },
+                { label: 'Expenses', value: formatCurrency(drillExpenses), color: 'text-red-500' },
+                { label: 'Net', value: (drillNet < 0 ? '-' : '') + formatCurrency(Math.abs(drillNet)), color: drillNet >= 0 ? 'text-green-600' : 'text-red-500' },
+                { label: 'Transactions', value: String(drilldownTx.length), color: 'text-slate-700' },
+              ].map(item => (
+                <div key={item.label} className="bg-slate-50 rounded-lg p-3 text-center">
+                  <p className="text-xs text-slate-500 mb-1">{item.label}</p>
+                  <p className={`text-sm font-bold ${item.color}`}>{item.value}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Transaction list */}
+            {drilldownTx.length === 0 ? (
+              <p className="text-center text-slate-400 text-sm py-10">No transactions found</p>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {drilldownTx.map(tx => (
+                  <div key={tx.id} className="flex items-start justify-between gap-3 py-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-slate-400 mb-0.5">{tx.date}</p>
+                      <p className="text-sm font-medium text-slate-800 truncate">{tx.description}</p>
+                      {tx.purpose && tx.purpose !== tx.description && (
+                        <p className="text-xs text-slate-500 truncate">{tx.purpose}</p>
+                      )}
+                      {tx.referenceNumber && (
+                        <p className="text-xs text-slate-400">Ref: {tx.referenceNumber}</p>
+                      )}
+                      <p className="text-xs text-slate-400 mt-0.5">{accountNameMap.get(tx.bankAccountId) ?? tx.bankAccountId}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className={`text-sm font-semibold ${tx.type === 'Income' ? 'text-green-600' : 'text-red-500'}`}>
+                        {tx.type !== 'Income' ? '-' : ''}{formatCurrency(Math.abs(tx.amount))}
+                      </span>
+                      <p className="text-xs text-slate-400 mt-0.5 capitalize">{tx.status}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+    </Drawer>
+    </>
   );
 };
