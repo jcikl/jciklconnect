@@ -701,16 +701,20 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
               );
             }
 
-            const txsThisYear = txsByYear.get(yr) ?? [];
-            const paid = txsThisYear.reduce((sum, tx) => sum + (tx.amount || 0), 0);
-            const paidDate = txsThisYear.length > 0
-              ? [...txsThisYear].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0].date
-              : null;
-
-            // Use per-year stored type if available (member's type can change year-to-year:
-            // Guest → Probation → Official → Associate → Senator each has its own dues rate).
-            // Fall back to current membershipType only if no historical type recorded.
+            // Use live transactions only for the currently selected year.
+            // Past years use stored membership record values — membershipTransactions prop
+            // only contains the selected year's data, so past-year tx lookups return nothing.
+            const isCurrentYear = yr === year;
+            const txsThisYear = isCurrentYear ? (txsByYear.get(yr) ?? []) : [];
             const storedRec = m.membership?.[String(yr)] as MembershipRecord | undefined;
+            const paid = isCurrentYear
+              ? txsThisYear.reduce((sum, tx) => sum + (tx.amount || 0), 0)
+              : (storedRec?.amount != null ? Number(storedRec.amount) : 0);
+            const paidDate = isCurrentYear
+              ? (txsThisYear.length > 0
+                  ? [...txsThisYear].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0].date
+                  : null)
+              : (storedRec?.paymentDate ?? null);
             const isFirstYear = effectiveJoinYear !== null ? yr === effectiveJoinYear : false;
             // If no stored type, infer from age at year-end so we don't incorrectly show current
             // type (e.g. Associate) for years when the member was still under 40.
