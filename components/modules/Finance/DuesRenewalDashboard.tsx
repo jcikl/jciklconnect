@@ -717,7 +717,9 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
               const ageThen = getMemberAge(dob, new Date(yr, 11, 31));
               if (ageThen !== null && ageThen > 40) return 'Associate';
               if (ageThen !== null && ageThen < 18) return 'Guest';
-              // Within normal range — use current type (can't distinguish Probation/Official historically)
+              // Age 18-40: if current type is Associate the member hadn't aged out yet —
+              // use Official as the conservative historical type.
+              if (rawType === 'Associate') return 'Official';
               return rawType;
             })();
             const yearType = storedYearType ?? inferredYearType;
