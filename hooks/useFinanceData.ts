@@ -149,16 +149,19 @@ export function useFinanceData(searchQuery?: string) {
 
   // ── Helper wrappers (close over local state) ──────────────────────────────
 
-  const isTransactionInCategory = (tx: Transaction, category: string): boolean =>
-    isTransactionInCategoryUtil(tx, category, transactionSplits);
+  const isTransactionInCategory = useCallback((tx: Transaction, category: string): boolean =>
+    isTransactionInCategoryUtil(tx, category, transactionSplits),
+    [transactionSplits]);
 
-  const getLinkedBankTxInfo = (projectTxId: string) =>
-    getLinkedBankTxInfoUtil(projectTxId, transactions, accounts, transactionSplits);
+  const getLinkedBankTxInfo = useCallback((projectTxId: string) =>
+    getLinkedBankTxInfoUtil(projectTxId, transactions, accounts, transactionSplits),
+    [transactions, accounts, transactionSplits]);
 
-  const getTransactionAccountLabel = (
+  const getTransactionAccountLabel = useCallback((
     item: Partial<Transaction | TransactionSplit>,
     parent?: Partial<Transaction>
-  ) => getTransactionAccountLabelUtil(item, parent, accounts, projectAccounts, projects, members, UNASSIGNED_PROJECT_ID);
+  ) => getTransactionAccountLabelUtil(item, parent, accounts, projectAccounts, projects, members, UNASSIGNED_PROJECT_ID),
+    [accounts, projectAccounts, projects, members]);
 
   // ── selectedProjectInfo ───────────────────────────────────────────────────
 
@@ -565,7 +568,11 @@ export function useFinanceData(searchQuery?: string) {
     let ignore = false;
     loadPrPendingReconciliation(() => ignore);
     return () => { ignore = true; };
-  }, [moduleTab, transactions, loadPrPendingReconciliation]);
+  // transactions intentionally excluded: loadPrPendingReconciliation identity already changes
+  // when transactions change (via useCallback deps), so adding transactions here would cause
+  // a 200-PR fetch on every transaction poll cycle.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [moduleTab, loadPrPendingReconciliation]);
 
   useEffect(() => {
     let ignore = false;
@@ -946,6 +953,9 @@ export function useFinanceData(searchQuery?: string) {
   }, [visibleTransactions]);
 
   const hasMoreTransactions = useMemo(() => {
+    const acctNameMap = new Map(accounts.map(a => [a.id, (a.name || '').toLowerCase()]));
+    const projNameMap = new Map(projects.map(p => [p.id, (p.name || p.title || '').toLowerCase()]));
+
     const filteredCount = transactions.filter(tx => {
       if (txCategoryFilter !== 'All') {
         if (txCategoryFilter === 'Uncategorized') {
@@ -975,8 +985,8 @@ export function useFinanceData(searchQuery?: string) {
             (tx.purpose || '').toLowerCase(),
             (tx.projectId || '').toLowerCase(),
             (tx.memberId || '').toLowerCase(),
-            (accounts.find(a => a.id === tx.bankAccountId)?.name || '').toLowerCase(),
-            (projects.find(p => p.id === tx.projectId)?.name || projects.find(p => p.id === tx.projectId)?.title || '').toLowerCase()
+            acctNameMap.get(tx.bankAccountId) || '',
+            projNameMap.get(tx.projectId ?? '') || '',
           ];
           if (parentFields.some(field => field.includes(term))) return true;
           return transactionSplits[tx.id]?.some(s =>
@@ -984,9 +994,7 @@ export function useFinanceData(searchQuery?: string) {
             s.description.toLowerCase().includes(term) ||
             s.purpose?.toLowerCase().includes(term) ||
             String(s.amount).includes(term) ||
-            (s.projectId || '').toLowerCase().includes(term) ||
-            (s.memberId || '').toLowerCase().includes(term) ||
-            (projects.find(p => p.id === s.projectId)?.name || projects.find(p => p.id === s.projectId)?.title || '').toLowerCase().includes(term)
+            (projNameMap.get(s.projectId ?? '') || '').includes(term)
           );
         });
       }
@@ -994,7 +1002,7 @@ export function useFinanceData(searchQuery?: string) {
     }).length;
 
     return filteredCount > transactionLimit;
-  }, [transactions, txCategoryFilter, debouncedSearchTerm, bankAccountFilter, transactionSplits, transactionLimit]);
+  }, [transactions, txCategoryFilter, debouncedSearchTerm, bankAccountFilter, transactionSplits, transactionLimit, accounts, projects, searchQuery, isTransactionInCategory]);
 
   const dashboardStats = useMemo(() => {
     return {
@@ -1151,19 +1159,13 @@ export function useFinanceData(searchQuery?: string) {
           );
         }
 
-        const allTx = await FinanceService.getAllTransactions(reportYear);
-        allTx.forEach(t => {
+        // Use already-loaded transactions state instead of re-fetching
+        transactions.forEach(t => {
           if (t.projectId === projectId && t.purpose) purposes.add(t.purpose);
         });
 
-        // Fetch all split sets in parallel instead of serially
-        const splitTx = allTx.filter(t => t.isSplit && t.splitIds);
-        const allSplitsArrays = await Promise.all(
-          splitTx.map(t =>
-            FinanceService.getTransactionSplits(t.id).catch(() => [] as TransactionSplit[])
-          )
-        );
-        allSplitsArrays.flat().forEach(s => {
+        // Use already-loaded splits from state instead of firing N parallel queries
+        Object.values(transactionSplits).flat().forEach(s => {
           if (s.projectId === projectId && s.purpose) purposes.add(s.purpose);
         });
 
@@ -1186,7 +1188,8 @@ export function useFinanceData(searchQuery?: string) {
     loadPurposesForProject();
     return () => { ignore = true; };
   // editingProjectPurposesByProject intentionally excluded — fetchedProjectPurposesRef guards re-fetch
-  }, [isEditModalOpen, editingTransaction?.projectId, editingTransaction?.category, reportYear, showToast]);
+  // reportYear removed: we now use already-loaded transactions state instead of re-fetching by year
+  }, [isEditModalOpen, editingTransaction?.projectId, editingTransaction?.category, showToast, transactions, transactionSplits]);
 
   useEffect(() => {
     let ignore = false;
@@ -1203,15 +1206,11 @@ export function useFinanceData(searchQuery?: string) {
         const purposes = new Set<string>(ADMINISTRATIVE_PURPOSES);
         const accts = new Set<string>();
 
-        const allTx = await FinanceService.getAllTransactions();
-        allTx.forEach(t => {
+        // Use already-loaded transactions state instead of a full-collection re-fetch
+        transactions.forEach(t => {
           if (t.category === 'Administrative') {
-            if (t.purpose) {
-              purposes.add(t.purpose);
-            }
-            if (t.projectId) {
-              accts.add(t.projectId);
-            }
+            if (t.purpose) purposes.add(t.purpose);
+            if (t.projectId) accts.add(t.projectId);
           }
         });
 
@@ -1231,7 +1230,8 @@ export function useFinanceData(searchQuery?: string) {
 
     loadAdminPurposes();
     return () => { ignore = true; };
-  }, [isEditModalOpen, editingTransaction?.category]);
+  // transactions added: source for purposes now uses loaded state instead of re-fetching
+  }, [isEditModalOpen, editingTransaction?.category, transactions]);
 
 
   // ── Handlers ──────────────────────────────────────────────────────────────

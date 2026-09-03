@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useHelpModal } from '../../contexts/HelpModalContext';
 import { ADMINISTRATIVE_PURPOSES } from '../../config/constants';
 import { useFinanceData } from '../../hooks/useFinanceData';
@@ -193,6 +193,75 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
     finally { setIsUpdatingTransaction(false); }
   };
 
+  const handleReportYearChange = useCallback((year: number) => {
+    setReportYear(year);
+    setProjectAccountYearFilter(year);
+  }, [setReportYear, setProjectAccountYearFilter]);
+
+  const handleOpenTransaction = useCallback(() => {
+    setAddDefaultCategory(null);
+    setRecordFormCategory('Projects & Activities');
+    setIsModalOpen(true);
+  }, [setAddDefaultCategory, setRecordFormCategory, setIsModalOpen]);
+
+  const handleOpenAccountDetail = useCallback((acc: Parameters<typeof setDetailAccount>[0]) => {
+    setDetailAccount(acc);
+    setDetailYear(new Date().getFullYear());
+    setIsAccountDetailOpen(true);
+  }, [setDetailAccount, setDetailYear, setIsAccountDetailOpen]);
+
+  const handleCloseCreate = useCallback(() => {
+    setIsModalOpen(false);
+    setAddDefaultCategory(null);
+    setRecordFormCategory('Projects & Activities');
+    setRecordFormMemberId('');
+    setRecordFormYear(new Date().getFullYear());
+    setRecordFormProjectId('');
+  }, [setIsModalOpen, setAddDefaultCategory, setRecordFormCategory, setRecordFormMemberId, setRecordFormYear, setRecordFormProjectId]);
+
+  const handleCloseEdit = useCallback(() => {
+    setIsEditModalOpen(false);
+    setEditingTransaction(null);
+    setEditingMembershipFilterYear(null);
+    setEditingMembershipMemberId('');
+    setEditingMembershipYear(new Date().getFullYear());
+    setEditingAdministrativeYear(new Date().getFullYear());
+    setEditingAdministrativePurposeBase('');
+  }, [setIsEditModalOpen, setEditingTransaction, setEditingMembershipFilterYear, setEditingMembershipMemberId, setEditingMembershipYear, setEditingAdministrativeYear, setEditingAdministrativePurposeBase]);
+
+  const handleCloseSplit = useCallback(() => {
+    setIsSplitModalOpen(false);
+    setSelectedTransaction(null);
+  }, [setIsSplitModalOpen, setSelectedTransaction]);
+
+  const handleSplitSuccess = useCallback(() => {
+    showToast('Transaction split created successfully', 'success');
+    loadData();
+  }, [showToast, loadData]);
+
+  const handleBatchCategorySuccess = useCallback(() => {
+    showToast('Batch category update applied successfully', 'success');
+    setSelectedTxIds(new Set());
+    setSelectedSplitIds(new Set());
+    loadData();
+  }, [showToast, setSelectedTxIds, setSelectedSplitIds, loadData]);
+
+  const handleBankMatchingComplete = useCallback(() => {
+    setMatchingAccount(null);
+    loadData();
+  }, [setMatchingAccount, loadData]);
+
+  const handleAccountDetailYearChange = useCallback((year: number) => {
+    setDetailYear(year);
+    setReportYear(year);
+    setProjectAccountYearFilter(year);
+  }, [setDetailYear, setReportYear, setProjectAccountYearFilter]);
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedTxIds(new Set());
+    setSelectedSplitIds(new Set());
+  }, [setSelectedTxIds, setSelectedSplitIds]);
+
   return (
     <div className="space-y-6">
       <FinanceHeader
@@ -200,35 +269,20 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
         allTransactionYears={allTransactionYears}
         activeTab={moduleTab}
         canOperateFinance={canOperateFinance}
-        onReportYearChange={(year) => {
-          setReportYear(year);
-          setProjectAccountYearFilter(year);
-        }}
+        onReportYearChange={handleReportYearChange}
         onTabChange={setModuleTab}
         onOpenReports={() => setIsReportsModalOpen(true)}
         onOpenImport={() => setIsImportModalOpen(true)}
-        onOpenTransaction={() => {
-          setAddDefaultCategory(null);
-          setRecordFormCategory('Projects & Activities');
-          setIsModalOpen(true);
-        }}
+        onOpenTransaction={handleOpenTransaction}
       />
 
       <FinanceTabPanels
         financeData={financeData}
         searchQuery={searchQuery}
-        onOpenTransaction={() => {
-          setAddDefaultCategory(null);
-          setRecordFormCategory('Projects & Activities');
-          setIsModalOpen(true);
-        }}
+        onOpenTransaction={handleOpenTransaction}
         onOpenImport={() => setIsImportModalOpen(true)}
         onOpenAddAccount={() => setIsAddAccountModalOpen(true)}
-        onOpenAccountDetail={(acc) => {
-          setDetailAccount(acc);
-          setDetailYear(new Date().getFullYear());
-          setIsAccountDetailOpen(true);
-        }}
+        onOpenAccountDetail={handleOpenAccountDetail}
         onOpenEditModal={() => setIsEditModalOpen(true)}
         onOpenDuesRenewal={() => setIsDuesRenewalModalOpen(true)}
         onHelpClick={helpModal?.openHelp}
@@ -259,23 +313,8 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
         editingMembershipYear={editingMembershipYear}
         editingAdministrativeYear={editingAdministrativeYear}
         editingAdministrativePurposeBase={editingAdministrativePurposeBase}
-        onCloseCreate={() => {
-          setIsModalOpen(false);
-          setAddDefaultCategory(null);
-          setRecordFormCategory('Projects & Activities');
-          setRecordFormMemberId('');
-          setRecordFormYear(new Date().getFullYear());
-          setRecordFormProjectId('');
-        }}
-        onCloseEdit={() => {
-          setIsEditModalOpen(false);
-          setEditingTransaction(null);
-          setEditingMembershipFilterYear(null);
-          setEditingMembershipMemberId('');
-          setEditingMembershipYear(new Date().getFullYear());
-          setEditingAdministrativeYear(new Date().getFullYear());
-          setEditingAdministrativePurposeBase('');
-        }}
+        onCloseCreate={handleCloseCreate}
+        onCloseEdit={handleCloseEdit}
         onCreateSubmit={wrappedHandleAddTransaction}
         onEditSubmit={wrappedHandleUpdateTransaction}
         setRecordFormCategory={setRecordFormCategory}
@@ -346,28 +385,14 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
         onRenewalYearChange={setRenewalYear}
         onRenewingChange={setIsRenewing}
         onCloseImport={() => setIsImportModalOpen(false)}
-        onCloseSplit={() => {
-          setIsSplitModalOpen(false);
-          setSelectedTransaction(null);
-        }}
+        onCloseSplit={handleCloseSplit}
         onCloseBatchCategory={() => setIsBatchCategoryModalOpen(false)}
         onCloseAddAccount={() => setIsAddAccountModalOpen(false)}
         onCloseBankMatching={() => setMatchingAccount(null)}
         onImported={loadData}
-        onSplitSuccess={() => {
-          showToast('Transaction split created successfully', 'success');
-          loadData();
-        }}
-        onBatchCategorySuccess={() => {
-          showToast('Batch category update applied successfully', 'success');
-          setSelectedTxIds(new Set());
-          setSelectedSplitIds(new Set());
-          loadData();
-        }}
-        onBankMatchingComplete={() => {
-          setMatchingAccount(null);
-          loadData();
-        }}
+        onSplitSuccess={handleSplitSuccess}
+        onBatchCategorySuccess={handleBatchCategorySuccess}
+        onBankMatchingComplete={handleBankMatchingComplete}
         showToast={showToast}
         loadData={loadData}
       />
@@ -388,17 +413,10 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
         deleteProjectTransactionId={deleteProjectTxConfirm}
         showBatchDeleteConfirm={showBatchDeleteConfirm}
         onCloseAccountDetail={() => setIsAccountDetailOpen(false)}
-        onAccountDetailYearChange={(year) => {
-          setDetailYear(year);
-          setReportYear(year);
-          setProjectAccountYearFilter(year);
-        }}
+        onAccountDetailYearChange={handleAccountDetailYearChange}
         onOpenBatchCategory={() => setIsBatchCategoryModalOpen(true)}
         onOpenBatchDeleteConfirm={() => setShowBatchDeleteConfirm(true)}
-        onClearSelection={() => {
-          setSelectedTxIds(new Set());
-          setSelectedSplitIds(new Set());
-        }}
+        onClearSelection={handleClearSelection}
         onDeleteProjectTransaction={handleDeleteProjectTrx}
         onProjectDeleteConfirmChange={setDeleteProjectTxConfirm}
         onBatchDeleteConfirmChange={setShowBatchDeleteConfirm}

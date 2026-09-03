@@ -1,4 +1,4 @@
-import React, { lazy, Suspense } from 'react';
+import React, { lazy, Suspense, useMemo } from 'react';
 import type { BankAccount, Project, Transaction } from '../../../types';
 import { FinanceService } from '../../../services/financeService';
 import { ADMINISTRATIVE_PURPOSES } from '../../../config/constants';
@@ -120,106 +120,113 @@ export const FinanceAuxiliaryModals: React.FC<FinanceAuxiliaryModalsProps> = ({
   onBankMatchingComplete,
   showToast,
   loadData,
-}) => (
-  <>
-    <AsyncErrorBoundary>
-      <FinancialReportsModal
-        isOpen={isReportsModalOpen}
-        onClose={onCloseReports}
-        transactions={transactions}
-        accounts={accounts}
-        projects={projects.map(toProjectOption)}
-        summary={summary}
-        reportYear={reportYear}
-        reportMonth={reportMonth}
-        fiscalYearStart={fiscalYearStart}
-        onYearChange={onReportYearChange}
-        onMonthChange={onReportMonthChange}
-        onFiscalYearStartChange={onFiscalYearStartChange}
+}) => {
+  const projectOptions = useMemo(() => projects.map(toProjectOption), [projects]);
+  const adminPurposes = useMemo(() => [...ADMINISTRATIVE_PURPOSES], []);
+
+  return (
+    <>
+      {isReportsModalOpen && (
+        <AsyncErrorBoundary>
+          <FinancialReportsModal
+            isOpen={isReportsModalOpen}
+            onClose={onCloseReports}
+            transactions={transactions}
+            accounts={accounts}
+            projects={projectOptions}
+            summary={summary}
+            reportYear={reportYear}
+            reportMonth={reportMonth}
+            fiscalYearStart={fiscalYearStart}
+            onYearChange={onReportYearChange}
+            onMonthChange={onReportMonthChange}
+            onFiscalYearStartChange={onFiscalYearStartChange}
+          />
+        </AsyncErrorBoundary>
+      )}
+
+      <DuesRenewalModal
+        isOpen={canOperateFinance && isDuesRenewalModalOpen}
+        onClose={onCloseDuesRenewal}
+        year={renewalYear}
+        onYearChange={onRenewalYearChange}
+        onRenew={async () => {
+          onRenewingChange(true);
+          try {
+            const result = await FinanceService.initiateDuesRenewal(renewalYear);
+            showToast(
+              `Dues renewal initiated: ${result.totalMembers} members processed, ${result.notificationsSent} notifications sent`,
+              'success'
+            );
+            await loadData();
+            onCloseDuesRenewal();
+          } catch (err) {
+            showToast('Failed to initiate dues renewal', 'error');
+          } finally {
+            onRenewingChange(false);
+          }
+        }}
+        isRenewing={isRenewing}
       />
-    </AsyncErrorBoundary>
 
-    <DuesRenewalModal
-      isOpen={canOperateFinance && isDuesRenewalModalOpen}
-      onClose={onCloseDuesRenewal}
-      year={renewalYear}
-      onYearChange={onRenewalYearChange}
-      onRenew={async () => {
-        onRenewingChange(true);
-        try {
-          const result = await FinanceService.initiateDuesRenewal(renewalYear);
-          showToast(
-            `Dues renewal initiated: ${result.totalMembers} members processed, ${result.notificationsSent} notifications sent`,
-            'success'
-          );
-          await loadData();
-          onCloseDuesRenewal();
-        } catch (err) {
-          showToast('Failed to initiate dues renewal', 'error');
-        } finally {
-          onRenewingChange(false);
-        }
-      }}
-      isRenewing={isRenewing}
-    />
-
-    <Suspense fallback={null}>
-      <BankTransactionImportModal
-        isOpen={canOperateFinance && isImportModalOpen}
-        onClose={onCloseImport}
-        onImported={onImported}
-      />
-    </Suspense>
-
-    {selectedTransaction && (
       <Suspense fallback={null}>
-        <TransactionSplitModal
-          transaction={selectedTransaction}
-          isOpen={canOperateFinance && isSplitModalOpen}
-          adminProjectIds={dynamicAdministrativeProjectIds}
-          memberOptions={members}
-          projectOptions={projects.map(toProjectOption)}
-          administrativePurposes={[...ADMINISTRATIVE_PURPOSES]}
+        <BankTransactionImportModal
+          isOpen={canOperateFinance && isImportModalOpen}
+          onClose={onCloseImport}
+          onImported={onImported}
+        />
+      </Suspense>
+
+      {selectedTransaction && (
+        <Suspense fallback={null}>
+          <TransactionSplitModal
+            transaction={selectedTransaction}
+            isOpen={canOperateFinance && isSplitModalOpen}
+            adminProjectIds={dynamicAdministrativeProjectIds}
+            memberOptions={members}
+            projectOptions={projectOptions}
+            administrativePurposes={adminPurposes}
+            projectYears={projectYears}
+            projectPurposes={projectPurposes}
+            onClose={onCloseSplit}
+            onSuccess={onSplitSuccess}
+          />
+        </Suspense>
+      )}
+
+      <Suspense fallback={null}>
+        <BatchCategoryModal
+          isOpen={canOperateFinance && isBatchCategoryModalOpen}
+          onClose={onCloseBatchCategory}
+          onSuccess={onBatchCategorySuccess}
+          selectedTransactionIds={Array.from(selectedTxIds)}
+          selectedSplitIds={Array.from(selectedSplitIds)}
+          projects={projectOptions}
+          members={members}
+          administrativeProjectIds={dynamicAdministrativeProjectIds}
+          adminPurposes={adminPurposes}
           projectYears={projectYears}
-          projectPurposes={projectPurposes}
-          onClose={onCloseSplit}
-          onSuccess={onSplitSuccess}
+          projectPurposesByProject={editingProjectPurposesByProject}
         />
       </Suspense>
-    )}
 
-    <Suspense fallback={null}>
-      <BatchCategoryModal
-        isOpen={canOperateFinance && isBatchCategoryModalOpen}
-        onClose={onCloseBatchCategory}
-        onSuccess={onBatchCategorySuccess}
-        selectedTransactionIds={Array.from(selectedTxIds)}
-        selectedSplitIds={Array.from(selectedSplitIds)}
-        projects={projects.map(toProjectOption)}
-        members={members}
-        administrativeProjectIds={dynamicAdministrativeProjectIds}
-        adminPurposes={[...ADMINISTRATIVE_PURPOSES]}
-        projectYears={projectYears}
-        projectPurposesByProject={editingProjectPurposesByProject}
+      <AddBankAccountModal
+        isOpen={canOperateFinance && isAddAccountModalOpen}
+        onClose={onCloseAddAccount}
+        onAdded={loadData}
       />
-    </Suspense>
 
-    <AddBankAccountModal
-      isOpen={canOperateFinance && isAddAccountModalOpen}
-      onClose={onCloseAddAccount}
-      onAdded={loadData}
-    />
-
-    {canOperateFinance && matchingAccount && (
-      <Suspense fallback={null}>
-        <BankMatchingModal
-          isOpen={!!matchingAccount}
-          onClose={onCloseBankMatching}
-          account={matchingAccount}
-          currentUserId={currentUserId}
-          onComplete={onBankMatchingComplete}
-        />
-      </Suspense>
-    )}
-  </>
-);
+      {canOperateFinance && matchingAccount && (
+        <Suspense fallback={null}>
+          <BankMatchingModal
+            isOpen={!!matchingAccount}
+            onClose={onCloseBankMatching}
+            account={matchingAccount}
+            currentUserId={currentUserId}
+            onComplete={onBankMatchingComplete}
+          />
+        </Suspense>
+      )}
+    </>
+  );
+};

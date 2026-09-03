@@ -267,6 +267,9 @@ export class FinanceService {
         return Array.from(years).sort((a, b) => b - a);
       },
       async () => {
+        const cacheKey = `${FINANCE_CACHE_PREFIX}:acctYears:${bankAccountId}`;
+        const cached = apiCache.get<number[]>(cacheKey);
+        if (cached) return cached;
         try {
           const q = query(
             collection(db, COLLECTIONS.TRANSACTIONS),
@@ -280,13 +283,13 @@ export class FinanceService {
             if (data.date) {
               const dateVal = (data.date as any)?.toDate?.() || new Date(data.date as string);
               const y = new Date(dateVal).getFullYear();
-              if (!isNaN(y)) {
-                years.add(y);
-              }
+              if (!isNaN(y)) years.add(y);
             }
           });
           years.add(getMYTYear());
-          return Array.from(years).sort((a, b) => b - a);
+          const result = Array.from(years).sort((a, b) => b - a);
+          apiCache.set(cacheKey, result, 60 * 60 * 1000); // 1-hour TTL — years change rarely
+          return result;
         } catch (error) {
           errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.getTransactionYearsForAccount' });
           return [getMYTYear()];
@@ -304,10 +307,12 @@ export class FinanceService {
         return Array.from(years).sort((a, b) => b - a);
       },
       async () => {
+        const cacheKey = `${FINANCE_CACHE_PREFIX}:allYears`;
+        const cached = apiCache.get<number[]>(cacheKey);
+        if (cached) return cached;
         try {
           // TODO: Replace with a finance/meta summary document storing a sorted year array,
-          // updated via arrayUnion on each transaction creation.
-          // STOPGAP: limit raised to 5000 from 1000 — truncation risk remains for large datasets.
+          // updated via arrayUnion on each transaction creation. Cache below is the stopgap.
           const q = query(collection(db, COLLECTIONS.TRANSACTIONS), limit(5000));
           const snapshot = await getDocs(q);
           const years = new Set<number>();
@@ -316,13 +321,13 @@ export class FinanceService {
             if (data.date) {
               const dateVal = (data.date as any)?.toDate?.() || new Date(data.date as string);
               const y = new Date(dateVal).getFullYear();
-              if (!isNaN(y)) {
-                years.add(y);
-              }
+              if (!isNaN(y)) years.add(y);
             }
           });
           years.add(getMYTYear());
-          return Array.from(years).sort((a, b) => b - a);
+          const result = Array.from(years).sort((a, b) => b - a);
+          apiCache.set(cacheKey, result, 60 * 60 * 1000); // 1-hour TTL — years change rarely
+          return result;
         } catch (error) {
           errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.getAllTransactionYears' });
           return [getMYTYear()];

@@ -384,7 +384,7 @@ export const FinancialReportsModal: React.FC<FinancialReportsModalProps> = ({
                       .filter(([_, data]) => data.expenses > 0)
                       .sort(([_, a], [__, b]) => b.expenses - a.expenses)
                       .map(([category, data]) => {
-                        const percentage = (data.expenses / totalExpenses) * 100;
+                        const percentage = displayedExpenses > 0 ? (data.expenses / displayedExpenses) * 100 : 0;
                         return (
                           <div key={category || '__uncategorised'} className="space-y-2">
                             <div className="flex justify-between items-center">
@@ -402,7 +402,7 @@ export const FinancialReportsModal: React.FC<FinancialReportsModalProps> = ({
                   </div>
                   <div className="pt-4 border-t flex justify-between items-center font-bold">
                     <span>Total Expenses</span>
-                    <span className="text-red-600">{formatCurrency(totalExpenses)}</span>
+                    <span className="text-red-600">{formatCurrency(displayedExpenses)}</span>
                   </div>
                 </div>
               </Card>
@@ -465,11 +465,11 @@ export const FinancialReportsModal: React.FC<FinancialReportsModalProps> = ({
                       <div className="space-y-2 pl-4">
                         <div className="flex justify-between items-center">
                           <span className="text-slate-600">Operating Income</span>
-                          <span className="font-medium text-green-600">{formatCurrency(totalIncome)}</span>
+                          <span className="font-medium text-green-600">{formatCurrency(displayedIncome)}</span>
                         </div>
                         <div className="pt-2 border-t flex justify-between items-center font-semibold">
                           <span>Total Cash Inflows</span>
-                          <span className="text-green-600">{formatCurrency(totalIncome)}</span>
+                          <span className="text-green-600">{formatCurrency(displayedIncome)}</span>
                         </div>
                       </div>
                     </div>
@@ -481,11 +481,11 @@ export const FinancialReportsModal: React.FC<FinancialReportsModalProps> = ({
                       <div className="space-y-2 pl-4">
                         <div className="flex justify-between items-center">
                           <span className="text-slate-600">Operating Expenses</span>
-                          <span className="font-medium text-red-600">-{formatCurrency(totalExpenses)}</span>
+                          <span className="font-medium text-red-600">-{formatCurrency(displayedExpenses)}</span>
                         </div>
                         <div className="pt-2 border-t flex justify-between items-center font-semibold">
                           <span>Total Cash Outflows</span>
-                          <span className="text-red-600">-{formatCurrency(totalExpenses)}</span>
+                          <span className="text-red-600">-{formatCurrency(displayedExpenses)}</span>
                         </div>
                       </div>
                     </div>
