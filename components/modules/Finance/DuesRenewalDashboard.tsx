@@ -639,7 +639,8 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
     const storedYears = m.membership ? Object.keys(m.membership).map(Number) : [];
     const earliestStored = storedYears.length > 0 ? Math.min(...storedYears) : null;
     const startYear = joinCalendarYear ?? earliestStored ?? year;
-    const endYear = new Date().getFullYear();
+    // Cap history at the selected dashboard year — don't show future years when browsing past periods.
+    const endYear = Math.min(year, new Date().getFullYear());
 
     if (startYear > endYear) {
       return <p className="text-xs text-slate-400 italic py-2">No membership history recorded.</p>;
