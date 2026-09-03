@@ -176,7 +176,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
   const [mobileStatPanel, setMobileStatPanel] = useState<'stats' | 'breakdown'>('stats');
   const [expandedMemberId, setExpandedMemberId] = useState<string | null>(null);
 
-  /** One-click: fuzzy-match all unlinked membership transactions and persist memberId to Firestore */
+  /** One-click: fuzzy-match all membership transactions (including already-linked) and persist memberId to Firestore */
   const handleAutoMatchMembers = async () => {
     setAutoMatching(true);
     try {
@@ -187,12 +187,13 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
         return txYear === year;
       });
 
-      const unlinked = filteredByYear.filter(tx => !tx.memberId);
       let matched = 0;
+      let rewritten = 0;
       let skipped = 0;
       const rules = await MembershipConfigService.getRules();
 
-      for (const tx of unlinked) {
+      let errors = 0;
+      for (const tx of filteredByYear) {
         const member = findMatchingMember(tx, members);
         if (member) {
           const catFields = buildCategoryFields({
@@ -202,19 +203,34 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
             memberId: member.id,
             rules,
           });
-          await FinanceService.updateTransaction(tx.id, {
-            memberId: member.id,
-            projectId: catFields.projectId,
-            category: 'Membership',
-            purpose: catFields.purpose,
-          });
-          matched++;
+          try {
+            if ((tx as any).isSplitChild) {
+              await FinanceService.updateTransactionSplit(tx.id, {
+                memberId: member.id,
+                projectId: catFields.projectId,
+                purpose: catFields.purpose,
+              });
+            } else {
+              await FinanceService.updateTransaction(tx.id, {
+                memberId: member.id,
+                projectId: catFields.projectId,
+                category: 'Membership',
+                purpose: catFields.purpose,
+              });
+            }
+            if (tx.memberId) rewritten++; else matched++;
+          } catch {
+            errors++;
+          }
         } else {
           skipped++;
         }
       }
 
-      showToast(`自动匹配完成！成功关联: ${matched} 笔，未匹配: ${skipped} 笔`, 'success');
+      showToast(
+        `自动匹配完成！新关联: ${matched} 笔，重新覆写: ${rewritten} 笔，未匹配: ${skipped} 笔${errors > 0 ? `，写入失败: ${errors} 笔` : ''}`,
+        errors > 0 ? 'warning' : 'success'
+      );
 
       // Reload page data to reflect changes
       window.location.reload();
@@ -445,10 +461,10 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
       const rules = membershipRules || DEFAULT_MEMBERSHIP_RULES;
 
       const joinYear = getEffectiveJoinYear(m);
-      // Probation members always pay renewal dues (RM300) — they already paid the
-      // one-time RM350 entry fee as a Guest. Never treat them as "first year".
+      // All first-year joiners start as Guest; they may be promoted to Probation in the same
+      // calendar year. isFirstYear applies regardless of current membershipType.
       const rawMembershipType = m.membershipType || 'Probation';
-      const isFirstYear = joinYear === year && rawMembershipType !== 'Probation';
+      const isFirstYear = joinYear === year;
 
       const getTargetDues = (mType: MembershipType) =>
         getTargetDuesForMembershipType(mType, isFirstYear, rules);
@@ -457,10 +473,21 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
         resolveMembershipTypeFromDues(amt, rules, currentType);
 
       const rawType = m.membershipType || 'Probation';
-      const duesVal = membershipData
-        ? (Number(membershipData.dues) || getTargetDues(rawType))
-        : getTargetDues(rawType);
-      const resolvedType = resolveTypeFromDues(duesVal, rawType);
+      const computedDues = getTargetDues(rawType);
+      // For first-year members, always use the computed target dues (RM350) even if the
+      // stored record has an incorrect RM300 value from a prior sync.
+      const duesVal = isFirstYear
+        ? computedDues
+        : (membershipData ? (Number(membershipData.dues) || computedDues) : computedDues);
+      // First-year: use rawType directly — resolveTypeFromDues(350) would incorrectly
+      // match Guest (duesAmount=350) and mislabel Probation first-year members as Guest.
+      const resolvedType = isFirstYear ? rawType : resolveTypeFromDues(duesVal, rawType);
+      const paidAmount = Number(membershipData?.amount ?? 0);
+      // For first-year members, recompute status from live dues vs paid amount so stale
+      // "over paid" stored values (written when dues was incorrectly 300) don't persist.
+      const computedStatus: MembershipStatus = isFirstYear
+        ? (paidAmount <= 0 ? 'pending' : paidAmount >= duesVal ? (paidAmount > duesVal ? 'over paid' : 'paid') : 'pending')
+        : (membershipData?.status ?? 'pending');
       return {
         id: `summary-${m.id}-${year}`,
         memberId: m.id,
@@ -468,7 +495,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
         duesYear: year,
         amount: membershipData?.amount,
         targetDues: duesVal,
-        status: membershipData?.status ?? 'pending',
+        status: computedStatus,
         dueDate: new Date(year, 2, 31).toISOString(),
         isRenewal: !isFirstYear,
       } as RenewalWithTargetDues;
@@ -640,6 +667,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
         <thead>
           <tr className="border-b border-slate-100">
             <th className="py-1.5 px-2 text-left font-semibold text-slate-500">Year</th>
+            <th className="py-1.5 px-2 text-left font-semibold text-slate-500">Type</th>
             <th className="py-1.5 px-2 text-right font-semibold text-slate-500">Dues</th>
             <th className="py-1.5 px-2 text-right font-semibold text-slate-500">Paid</th>
             <th className="py-1.5 px-2 text-right font-semibold text-slate-500">Outstanding</th>
@@ -657,6 +685,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
               return (
                 <tr key={yr} className={isSelectedYear ? 'bg-indigo-50/60' : 'hover:bg-slate-50/60'}>
                   <td className={`py-1.5 px-2 font-bold ${isSelectedYear ? 'text-indigo-700' : 'text-slate-400'}`}>{yr}</td>
+                  <td className="py-1.5 px-2 text-slate-400">—</td>
                   <td className="py-1.5 px-2 text-right text-slate-400">—</td>
                   <td className="py-1.5 px-2 text-right text-slate-400">—</td>
                   <td className="py-1.5 px-2 text-right text-slate-400">—</td>
@@ -674,13 +703,19 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
               ? [...txsThisYear].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0].date
               : null;
 
-            // Dues: prefer stored record value, then derive from config.
-            // First-year (entry fee RM350) applies to all types in their effectiveJoinYear.
+            // Use per-year stored type if available (member's type can change year-to-year:
+            // Guest → Probation → Official → Associate → Senator each has its own dues rate).
+            // Fall back to current membershipType only if no historical type recorded.
             const storedRec = m.membership?.[String(yr)] as MembershipRecord | undefined;
             const isFirstYear = effectiveJoinYear !== null ? yr === effectiveJoinYear : false;
-            const dues = storedRec?.dues
-              ? Number(storedRec.dues)
-              : getTargetDuesForMembershipType(rawType, isFirstYear, rules);
+            const yearType = (storedRec?.type as MembershipType | undefined) || rawType;
+            const computedDues = getTargetDuesForMembershipType(yearType, isFirstYear, rules);
+            // Guest's entry fee (RM350) is stored correctly — getTargetDuesForMembershipType
+            // returns 0 for Guest so we must trust the stored value for Guest years.
+            // For non-Guest first-year, prefer computed (corrects stale RM300 stored values).
+            const dues = (isFirstYear && yearType !== 'Guest' && computedDues > 0)
+              ? computedDues
+              : (storedRec?.dues != null ? Number(storedRec.dues) : computedDues);
 
             const outstanding = dues - paid;
             const isPast = yr < new Date().getFullYear();
@@ -696,9 +731,25 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
               status = 'pending';
             }
 
+            const typeLabel: Record<string, string> = {
+              Guest: 'Guest', Probation: 'Probation', Official: 'Official',
+              Associate: 'Associate', Senator: 'Senator',
+            };
+            const typeColorClass: Record<string, string> = {
+              Guest: 'bg-blue-100 text-blue-800',
+              Probation: 'bg-blue-100 text-blue-800',
+              Official: 'bg-green-100 text-green-800',
+              Associate: 'bg-orange-100 text-orange-800',
+              Senator: 'bg-purple-100 text-purple-800',
+            };
             return (
               <tr key={yr} className={isSelectedYear ? 'bg-indigo-50/60' : 'hover:bg-slate-50/60'}>
                 <td className={`py-1.5 px-2 font-bold ${isSelectedYear ? 'text-indigo-700' : 'text-slate-700'}`}>{yr}</td>
+                <td className="py-1.5 px-2">
+                  <span className={`px-1.5 py-0 rounded-full text-[9px] font-semibold ${typeColorClass[yearType] ?? 'bg-slate-100 text-slate-600'}`}>
+                    {typeLabel[yearType] ?? yearType}
+                  </span>
+                </td>
                 <td className="py-1.5 px-2 text-right text-slate-600">RM{dues.toLocaleString()}</td>
                 <td className="py-1.5 px-2 text-right text-green-600 font-semibold">RM{paid.toLocaleString()}</td>
                 <td className={`py-1.5 px-2 text-right font-bold ${outstanding < 0 ? 'text-purple-600' : outstanding === 0 ? 'text-green-600' : 'text-amber-700'}`}>
