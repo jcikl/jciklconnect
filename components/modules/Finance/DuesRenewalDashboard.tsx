@@ -47,6 +47,7 @@ import {
   DEFAULT_MEMBERSHIP_RULES,
   getTargetDuesForMembershipType,
   resolveMembershipTypeFromDues,
+  getMemberAge,
   getPendingWhatsAppCampaign,
   dismissWhatsAppCampaign,
   type WhatsAppCampaign,
@@ -708,7 +709,18 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
             // Fall back to current membershipType only if no historical type recorded.
             const storedRec = m.membership?.[String(yr)] as MembershipRecord | undefined;
             const isFirstYear = effectiveJoinYear !== null ? yr === effectiveJoinYear : false;
-            const yearType = (storedRec?.type as MembershipType | undefined) || rawType;
+            // If no stored type, infer from age at year-end so we don't incorrectly show current
+            // type (e.g. Associate) for years when the member was still under 40.
+            const storedYearType = storedRec?.type as MembershipType | undefined;
+            const inferredYearType: MembershipType = (() => {
+              const dob = m.general?.dob || (m as any).dob;
+              const ageThen = getMemberAge(dob, new Date(yr, 11, 31));
+              if (ageThen !== null && ageThen > 40) return 'Associate';
+              if (ageThen !== null && ageThen < 18) return 'Guest';
+              // Within normal range — use current type (can't distinguish Probation/Official historically)
+              return rawType;
+            })();
+            const yearType = storedYearType ?? inferredYearType;
             const computedDues = getTargetDuesForMembershipType(yearType, isFirstYear, rules);
             // Guest's entry fee (RM350) is stored correctly — getTargetDuesForMembershipType
             // returns 0 for Guest so we must trust the stored value for Guest years.

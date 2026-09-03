@@ -1991,6 +1991,7 @@ export class MembersService {
           membership[yStr] = {
             ...(existing || {}),
             year: y,
+            type: membershipType,
             dues: targetDues,
             amount,
             status: nextStatus,
@@ -2025,6 +2026,7 @@ export class MembersService {
         membership[yearStr] = {
           ...(existing || {}),
           year,
+          type: membershipType,
           dues: targetDues,
           amount,
           status: nextStatus,
