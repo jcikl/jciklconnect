@@ -13,6 +13,8 @@ interface FinanceMembershipTabProps {
     name: string;
     fullName?: string;
     phone?: string;
+    dob?: string;
+    general?: { dob?: string };
     membershipType?: string;
     introducer?: string;
     tshirtSize?: string;

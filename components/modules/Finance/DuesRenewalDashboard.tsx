@@ -144,6 +144,8 @@ interface DuesRenewalDashboardProps {
     tshirtSize?: string;
     jacketSize?: string;
     joinDate?: string;
+    dob?: string;
+    general?: { dob?: string };
     membership?: Record<string, MembershipRecord>;
   }>;
 }
@@ -715,8 +717,10 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
             const inferredYearType: MembershipType = (() => {
               const dob = m.general?.dob || (m as any).dob;
               const ageThen = getMemberAge(dob, new Date(yr, 11, 31));
-              if (ageThen !== null && ageThen > 40) return 'Associate';
-              if (ageThen !== null && ageThen < 18) return 'Guest';
+              // Without DOB we can't infer — fall back to current type as-is.
+              if (ageThen === null) return rawType;
+              if (ageThen > 40) return 'Associate';
+              if (ageThen < 18) return 'Guest';
               // Age 18-40: if current type is Associate the member hadn't aged out yet —
               // use Official as the conservative historical type.
               if (rawType === 'Associate') return 'Official';

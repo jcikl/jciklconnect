@@ -92,7 +92,7 @@ export function useFinanceData(searchQuery?: string) {
   const [addDefaultCategory, setAddDefaultCategory] = useState<string | null>(null);
   const [recordFormCategory, setRecordFormCategory] = useState<string>('Projects & Activities');
   const [projects, setProjects] = useState<Project[]>([]);
-  const [members, setMembers] = useState<Array<{ id: string; name: string; membershipType?: MembershipType }>>([]);
+  const [members, setMembers] = useState<Array<{ id: string; name: string; dob?: string; general?: { dob?: string }; membershipType?: MembershipType }>>([]);
   const [editingMembershipFilterYear, setEditingMembershipFilterYear] = useState<number | null>(null);
   const [editingMembershipMemberId, setEditingMembershipMemberId] = useState<string>('');
   const [editingMembershipYear, setEditingMembershipYear] = useState<number>(new Date().getFullYear());
@@ -286,6 +286,8 @@ export function useFinanceData(searchQuery?: string) {
           ? `${m.general?.fullName} (${m.general?.name})`
           : (m.general?.fullName || m.general?.name || m.contact?.email || m.id),
         fullName: m.general?.fullName,
+        dob: m.general?.dob,
+        general: m.general ? { dob: m.general.dob } : undefined,
         membershipType: m.jciCareer?.membershipType,
         tshirtSize: m.others?.tshirtSize,
         jacketSize: m.others?.jacketSize,
