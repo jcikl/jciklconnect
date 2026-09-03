@@ -1955,6 +1955,22 @@ export class MembersService {
     const config = await MembershipConfigService.getConfig();
     const { rules, calculationMode } = config;
 
+    // Derive the membership type a member would have held at the end of a given year.
+    // Associate members were Official (or Probation) before aging out at 41 — computeMembershipTypeFromMember
+    // can't recover that because it only sees the current membershipType field.
+    const historicalTypeForYear = (member: Member, y: number): MembershipType => {
+      const currentType = (member.jciCareer?.membershipType || 'Probation') as MembershipType;
+      // For types that don't change with age, use as-is.
+      if (currentType === 'Honorary' || currentType === 'Senator' || currentType === 'Visiting') return currentType;
+      // Use age-based computation for the reference date.
+      const computed = computeMembershipTypeFromMember(member, rules, new Date(y, 11, 31));
+      // If the member is currently Associate (aged out) but computed returns Probation for a
+      // historical year (age ≤40), they were actually Official by then — Associate requires
+      // having first been Official. Upgrade Probation → Official in this case.
+      if (currentType === 'Associate' && computed === 'Probation') return 'Official';
+      return computed;
+    };
+
     const applyToMember = (member: Member): boolean => {
       const membershipType = (member.jciCareer?.membershipType || 'Probation') as MembershipType;
       const effectiveJoinYear = this.getEffectiveJoinYear(
@@ -1980,10 +1996,12 @@ export class MembersService {
             continue;
           }
           const isFirstYear = effectiveJoinYear === y;
-          const targetDues = getTargetDuesForMembershipType(membershipType, isFirstYear, rules);
+          // Compute the type the member would have had at year-end of y (age-based).
+          const yearType = historicalTypeForYear(member, y);
+          const targetDues = getTargetDuesForMembershipType(yearType, isFirstYear, rules);
           const amount = Number(existing?.amount || 0);
           const nextStatus = this.statusFromMembershipAmount(amount, targetDues);
-          if (existing && existing.dues === targetDues && existing.status === nextStatus) {
+          if (existing && existing.dues === targetDues && existing.status === nextStatus && existing.type === yearType) {
             result.alreadyCorrect += 1;
             continue;
           }
@@ -1991,7 +2009,7 @@ export class MembersService {
           membership[yStr] = {
             ...(existing || {}),
             year: y,
-            type: membershipType,
+            type: yearType,
             dues: targetDues,
             amount,
             status: nextStatus,
@@ -2015,10 +2033,12 @@ export class MembersService {
           return false;
         }
         const isFirstYear = effectiveJoinYear === year;
-        const targetDues = getTargetDuesForMembershipType(membershipType, isFirstYear, rules);
+        // Compute the type the member would have had at year-end (age-based).
+        const yearType = historicalTypeForYear(member, year);
+        const targetDues = getTargetDuesForMembershipType(yearType, isFirstYear, rules);
         const amount = Number(existing?.amount || 0);
         const nextStatus = this.statusFromMembershipAmount(amount, targetDues);
-        if (existing && existing.dues === targetDues && existing.status === nextStatus) {
+        if (existing && existing.dues === targetDues && existing.status === nextStatus && existing.type === yearType) {
           result.alreadyCorrect += 1;
           return false;
         }
@@ -2026,7 +2046,7 @@ export class MembersService {
         membership[yearStr] = {
           ...(existing || {}),
           year,
-          type: membershipType,
+          type: yearType,
           dues: targetDues,
           amount,
           status: nextStatus,
