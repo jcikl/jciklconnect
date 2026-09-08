@@ -20,7 +20,7 @@ import { ProjectCommitteeMember } from '../../../../types';
 interface JciMalaysiaEvent {
   id: string;
   title: string;
-  group: string;       // "Events" | "Skill Development" | "Programs" | "Projects"
+  group: string;       // "JCIM Program" | "Skill Development" | "Events" | "LO Projects"
   category: string;   // e.g. "National Convention", "JCIM Leadership Summit"
   datetime: string;   // "2026-11-11 00:00 am - 2026-11-14 23:59 pm"
   level: string;      // "National"
@@ -48,8 +48,8 @@ function extractEndDate(datetime: string, startDate: string): string {
 
 /**
  * Parse the JSON response from JCI Malaysia national events API into TSV.
- * Maps: title → Project Title, group → Category, datetime start → Proposed Date + Event Start Date,
- * datetime end → Event End Date, level → Level, category → Description, chapter/area → Objectives.
+ * category (ev.category) → Category; group (ev.group) → Type;
+ * ev.id → Roadmap ID; ev.chapter → Hosting LO; ev.area → Area.
  */
 function parseJciEventsJson(json: string): string {
   const parsed = JSON.parse(json) as { data?: JciMalaysiaEvent[] };
@@ -58,24 +58,27 @@ function parseJciEventsJson(json: string): string {
     throw new Error('No events found in JCI Malaysia response');
   }
 
-  const headers = ['Project Title', 'Category', 'Proposed Date', 'Event Start Date', 'Level', 'Description', 'Objectives'];
+  const headers = [
+    'Project Title', 'Category', 'Type',
+    'Event Start Date', 'Event End Date',
+    'Level', 'Roadmap ID', 'Hosting LO', 'Area',
+  ];
   const rows: string[][] = [headers];
 
   for (const ev of events) {
     const startDate = extractStartDate(ev.datetime);
     const endDate = extractEndDate(ev.datetime, startDate);
-    const description = [ev.category, ev.status === 'completed' ? '(Completed)' : '']
-      .filter(Boolean).join(' ');
-    const objectives = [ev.chapter, ev.area].filter(Boolean).join(', ');
 
     rows.push([
       ev.title,
-      ev.group,         // preprocessor maps "Events"→events, "Skill Development"→skill_development, etc.
+      ev.category,          // specific JCI Malaysia category name (free-form)
+      ev.group,             // type preprocessor: "JCIM Program"→program, "LO Projects"→project, etc.
       startDate,
       endDate,
       ev.level,
-      description,
-      objectives,
+      ev.id,
+      ev.chapter || '',
+      ev.area,
     ]);
   }
 
@@ -90,7 +93,7 @@ export const projectImportConfig: BatchImportConfig = {
             key: 'title',
             label: 'Project Title',
             required: true,
-            aliases: ['Title', 'Project Name', 'Name', '项目名称', '标题', 'Name of Project', 'Match'],
+            aliases: ['Title', 'Project Name', 'Name', '项目名称', '标题', 'Name of Project'],
             validators: [notEmpty],
             preprocessor: trimPreprocessor,
         },
@@ -98,18 +101,26 @@ export const projectImportConfig: BatchImportConfig = {
             key: 'category',
             label: 'Category',
             required: false,
-            aliases: ['Category', '项目类别', '组别', 'Classification', 'events', 'programs', 'projects', 'skill_development'],
+            aliases: ['Category', '项目类别', '组别', 'Classification'],
+            validators: [],
+            preprocessor: trimPreprocessor,
+        },
+        {
+            key: 'type',
+            label: 'Type',
+            required: false,
+            aliases: ['Type', '类型', 'JCIM Program', 'LO Projects', 'Skill Development', 'Events'],
             validators: [],
             preprocessor: (val: any) => {
-                if (!val) return 'projects';
+                if (!val) return 'project';
                 const lower = String(val).trim().toLowerCase();
-                if (lower.includes('event')) return 'events';
-                if (lower.includes('program')) return 'programs';
+                if (lower.includes('event')) return 'event';
+                if (lower.includes('program') || lower === 'jcim program') return 'program';
                 if (lower.includes('skill') || lower.includes('development') || lower.includes('training')) return 'skill_development';
-                if (lower.includes('project')) return 'projects';
-                return lower;
+                if (lower.includes('project') || lower === 'lo projects') return 'project';
+                return 'project';
             },
-            defaultValue: 'projects',
+            defaultValue: 'project',
         },
         {
             key: 'description',
@@ -138,18 +149,18 @@ export const projectImportConfig: BatchImportConfig = {
             defaultValue: 'Community',
         },
         {
-            key: 'objectives',
-            label: 'Objectives',
-            required: false,
-            aliases: ['Objectives', 'Goals', '项目目标', '目标'],
-            validators: [],
-            preprocessor: trimPreprocessor,
-        },
-        {
             key: 'eventStartDate',
             label: 'Event Start Date',
             required: false,
             aliases: ['Event Start Date', '活动开始日期', 'Start Date'],
+            validators: [isValidDate],
+            preprocessor: parseDatePreprocessor,
+        },
+        {
+            key: 'eventEndDate',
+            label: 'Event End Date',
+            required: false,
+            aliases: ['Event End Date', '活动结束日期', 'End Date'],
             validators: [isValidDate],
             preprocessor: parseDatePreprocessor,
         },
@@ -161,14 +172,40 @@ export const projectImportConfig: BatchImportConfig = {
             validators: [],
             preprocessor: trimPreprocessor,
         },
+        {
+            key: 'roadmapId',
+            label: 'Roadmap ID',
+            required: false,
+            aliases: ['Roadmap ID', 'JCI ID', 'roadmapid'],
+            validators: [],
+            preprocessor: trimPreprocessor,
+        },
+        {
+            key: 'hostingLo',
+            label: 'Hosting LO',
+            required: false,
+            aliases: ['Hosting LO', 'Chapter', 'Host Chapter', 'chapter'],
+            validators: [],
+            preprocessor: trimPreprocessor,
+        },
+        {
+            key: 'area',
+            label: 'Area',
+            required: false,
+            aliases: ['Area', '地区', 'area'],
+            validators: [],
+            preprocessor: trimPreprocessor,
+        },
     ],
 
     tableColumns: [
         { key: 'title', label: 'Title', width: 200 },
-        { key: 'category', label: 'Category', width: 120 },
-        { key: 'eventStartDate', label: 'Date', width: 120 },
-        { key: 'level', label: 'Level', width: 100 },
-        { key: 'valid', label: 'Status', width: 80 },
+        { key: 'category', label: 'Category', width: 130 },
+        { key: 'type', label: 'Type', width: 100 },
+        { key: 'eventStartDate', label: 'Start', width: 100 },
+        { key: 'eventEndDate', label: 'End', width: 100 },
+        { key: 'level', label: 'Level', width: 80 },
+        { key: 'valid', label: 'Status', width: 70 },
     ],
 
     supportCsv: true,
@@ -179,9 +216,9 @@ export const projectImportConfig: BatchImportConfig = {
 
     sampleFileName: 'JCI_Project_Import_Template.csv',
     sampleData: [
-        ['Project Title', 'Description', 'Event Start Date', 'Category', 'Level', 'Pillar', 'Objectives', 'Target Audience'],
-        ['Summer Leadership Summit', 'Annual youth leadership training program', '2026-07-20', 'programs', 'Local', 'Individual', 'Develop leadership skills in 50 youth', 'Members and students'],
-        ['Community Clean-up Day', 'Environmental awareness project', '2026-04-22', 'projects', 'Local', 'Community', 'Clean up Central Park area', 'Public'],
+        ['Project Title', 'Category', 'Type', 'Event Start Date', 'Event End Date', 'Level', 'Pillar', 'Description', 'Target Audience', 'Roadmap ID', 'Hosting LO', 'Area'],
+        ['Leadership Summit', 'National Convention', 'program', '2026-07-20', '2026-07-22', 'National', 'Individual', 'Annual leadership training', 'Members and students', 'JCI001', 'JCI KL', 'Central'],
+        ['Community Clean-up', 'Environmental Project', 'project', '2026-04-22', '2026-04-22', 'Local', 'Community', 'Green city initiative', 'Public', '', 'JCI PJ', 'West'],
     ],
 
     loaders: [
@@ -207,20 +244,22 @@ export const projectImportConfig: BatchImportConfig = {
             },
         ];
 
-        const eventStartDate = row.eventStartDate || undefined;
-
         await ProjectsService.createProject({
             name: row.title,
             title: row.title,
             description: row.description || '',
             proposedDate: row.eventStartDate || new Date().toISOString().split('T')[0],
             proposedBudget: 0,
-            objectives: row.objectives || '',
-            category: row.category as any || 'projects',
+            category: row.category || '',
+            type: row.type as any || 'project',
             level: row.level as any || 'Local',
             pillar: row.pillar as any || 'Community',
             targetAudience: row.targetAudience || '',
-            eventStartDate,
+            eventStartDate: row.eventStartDate || undefined,
+            eventEndDate: row.eventEndDate || undefined,
+            roadmapId: row.roadmapId || undefined,
+            hostingLo: row.hostingLo || undefined,
+            area: row.area || undefined,
             status: 'Planning',
             submittedBy: member?.id || '',
             committee: defaultCommittee,
