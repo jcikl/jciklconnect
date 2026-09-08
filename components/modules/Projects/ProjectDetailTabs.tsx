@@ -18,6 +18,7 @@ import { ProjectTrainerTab } from './ProjectTrainerTab';
 import { ProjectReportsTab } from './ProjectReportsTab';
 import { ProjectAIPredictions } from './ProjectAIPredictions';
 import { ProjectReportModal } from './ProjectReportModal';
+import { usePermissions } from '../../../hooks/usePermissions';
 
 export interface ProjectDetailTabsProps {
   project: Project;
@@ -28,6 +29,8 @@ export interface ProjectDetailTabsProps {
 
 export const ProjectDetailTabs: React.FC<ProjectDetailTabsProps> = ({ project, onUpdateProject, onDeleteProject, onNavigate }) => {
   const { projectId, projectName } = { projectId: project.id, projectName: project.name ?? project.title ?? 'Project' };
+  const { isBoard, isAdmin, isDeveloper } = usePermissions();
+  const canDelete = isBoard || isAdmin || isDeveloper;
   const [activeTab, setActiveTab] = useState<'activity-plan' | 'committee' | 'trainers' | 'kanban' | 'gantt' | 'finance' | 'reports' | 'ai'>('activity-plan');
   const [projectReport, setProjectReport] = useState<ProjectReport | null>(null);
   const [loadingReport, setLoadingReport] = useState(false);
@@ -152,7 +155,7 @@ export const ProjectDetailTabs: React.FC<ProjectDetailTabsProps> = ({ project, o
                 <ProjectActivityPlanTab
                   project={project}
                   onSave={(updates) => onUpdateProject(projectId, updates)}
-                  onDelete={handleDeleteProject}
+                  onDelete={canDelete ? handleDeleteProject : undefined}
                 />
               </AsyncErrorBoundary>
             )}
