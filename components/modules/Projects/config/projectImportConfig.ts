@@ -249,6 +249,7 @@ export const projectImportConfig: BatchImportConfig = {
             eventStartDate: row.eventStartDate || undefined,
             eventEndDate: row.eventEndDate || undefined,
             roadmapId: row.roadmapId || undefined,
+            roadmapUrl: row.roadmapId ? `https://jcimalaysia.cc/roadmap/event-details-public.php?eventid=${row.roadmapId}` : undefined,
             hostingLo: row.hostingLo || undefined,
             area: row.area || undefined,
             status: 'Planning',
