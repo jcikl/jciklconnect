@@ -19,42 +19,67 @@ import {
 import { ProjectsService } from '../../../../services/projectsService';
 import { ProjectCommitteeMember } from '../../../../types';
 
+interface JciMalaysiaEvent {
+  id: string;
+  title: string;
+  group: string;       // "Events" | "Skill Development" | "Programs" | "Projects"
+  category: string;   // e.g. "National Convention", "JCIM Leadership Summit"
+  datetime: string;   // "2026-11-11 00:00 am - 2026-11-14 23:59 pm"
+  level: string;      // "National"
+  chapter: string | null;
+  area: string;
+  status: string;     // "published" | "completed"
+  year: string;
+}
+
+/** Extract YYYY-MM-DD from "2026-11-11 00:00 am - ..." */
+function extractStartDate(datetime: string): string {
+  const match = datetime.match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : '';
+}
+
+/** Extract end date YYYY-MM-DD from "... - 2026-11-14 23:59 pm", or fall back to start */
+function extractEndDate(datetime: string, startDate: string): string {
+  const parts = datetime.split(' - ');
+  if (parts.length >= 2) {
+    const match = parts[1].match(/^(\d{4}-\d{2}-\d{2})/);
+    if (match) return match[1];
+  }
+  return startDate;
+}
+
 /**
- * Parse an HTML table returned by the JCI Malaysia national events page into TSV text.
- * Uses DOMParser (browser-only) to extract rows from the first <table> found.
- * Columns detected from <th> headers; rows from <td> cells.
- * Unknown columns are preserved as-is so the user can remap them in the modal.
+ * Parse the JSON response from JCI Malaysia national events API into TSV.
+ * Maps: title → Project Title, group → Category, datetime start → Proposed Date + Event Start Date,
+ * datetime end → Event End Date, level → Level, category → Description, chapter/area → Objectives.
  */
-function parseJciEventsHtml(html: string): string {
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  const table = doc.querySelector('table');
-  if (!table) throw new Error('No table found in JCI Malaysia response');
-
-  const rows: string[][] = [];
-
-  // Header row
-  const ths = Array.from(table.querySelectorAll('thead tr th, thead tr td'));
-  if (ths.length > 0) {
-    rows.push(ths.map(th => th.textContent?.trim() ?? ''));
+function parseJciEventsJson(json: string): string {
+  const parsed = JSON.parse(json) as { data?: JciMalaysiaEvent[] };
+  const events = parsed?.data;
+  if (!Array.isArray(events) || events.length === 0) {
+    throw new Error('No events found in JCI Malaysia response');
   }
 
-  // Data rows
-  table.querySelectorAll('tbody tr').forEach(tr => {
-    const cells = Array.from(tr.querySelectorAll('td'));
-    if (cells.length === 0) return;
-    rows.push(cells.map(td => td.textContent?.trim() ?? ''));
-  });
+  const headers = ['Project Title', 'Category', 'Proposed Date', 'Event Start Date', 'Level', 'Description', 'Objectives'];
+  const rows: string[][] = [headers];
 
-  // Fallback: no thead — treat first <tr> as header
-  if (rows.length === 0) {
-    table.querySelectorAll('tr').forEach(tr => {
-      const cells = Array.from(tr.querySelectorAll('th, td'));
-      if (cells.length === 0) return;
-      rows.push(cells.map(c => c.textContent?.trim() ?? ''));
-    });
+  for (const ev of events) {
+    const startDate = extractStartDate(ev.datetime);
+    const endDate = extractEndDate(ev.datetime, startDate);
+    const description = [ev.category, ev.status === 'completed' ? '(Completed)' : '']
+      .filter(Boolean).join(' ');
+    const objectives = [ev.chapter, ev.area].filter(Boolean).join(', ');
+
+    rows.push([
+      ev.title,
+      ev.group,         // preprocessor maps "Events"→events, "Skill Development"→skill_development, etc.
+      startDate,
+      endDate,
+      ev.level,
+      description,
+      objectives,
+    ]);
   }
-
-  if (rows.length === 0) throw new Error('Table in JCI Malaysia response has no rows');
 
   return rows.map(r => r.join('\t')).join('\n');
 }
@@ -80,10 +105,9 @@ export const projectImportConfig: BatchImportConfig = {
             preprocessor: (val: any) => {
                 if (!val) return 'projects';
                 const lower = String(val).trim().toLowerCase();
-                // Map common variations to canonical keys
                 if (lower.includes('event')) return 'events';
                 if (lower.includes('program')) return 'programs';
-                if (lower.includes('skill')) return 'skill_development';
+                if (lower.includes('skill') || lower.includes('development') || lower.includes('training')) return 'skill_development';
                 if (lower.includes('project')) return 'projects';
                 return lower;
             },
@@ -186,8 +210,8 @@ export const projectImportConfig: BatchImportConfig = {
             load: async () => {
                 const res = await fetch('/.netlify/functions/jci-events-proxy');
                 if (!res.ok) throw new Error(`Server error ${res.status}`);
-                const html = await res.text();
-                return parseJciEventsHtml(html);
+                const json = await res.text();
+                return parseJciEventsJson(json);
             },
         },
     ],

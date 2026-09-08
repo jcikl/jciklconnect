@@ -22,11 +22,12 @@ export default async () => {
       });
     }
 
-    const html = await response.text();
-    return new Response(html, {
+    const body = await response.text();
+    const contentType = response.headers.get('Content-Type') || 'application/json';
+    return new Response(body, {
       status: 200,
       headers: {
-        'Content-Type': 'text/html; charset=utf-8',
+        'Content-Type': contentType,
         'Access-Control-Allow-Origin': '*',
       },
     });
