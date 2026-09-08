@@ -141,7 +141,7 @@ export const ProjectsCreateDrawer: React.FC<ProjectsCreateDrawerProps> = ({
             <div>
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l-4 border-jci-blue/40 pl-2 mb-3">Project Info</p>
               <div className="space-y-3">
-                <Input name="title" label="Title *" placeholder="e.g. Summer Leadership Summit"
+                <Input name="title" label="Title" placeholder="e.g. Summer Leadership Summit"
                   value={newTitle} onChange={(event) => onTitleChange(event.target.value)}
                   icon={<FileText size={16} />} required />
                 <Textarea name="description" label="Description" placeholder="Brief description of the project..."
@@ -195,16 +195,16 @@ export const ProjectsCreateDrawer: React.FC<ProjectsCreateDrawerProps> = ({
             <div>
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l-4 border-jci-blue/40 pl-2 mb-2">Classification</p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                <Select name="level" label="Level *" required value={newLevel}
+                <Select name="level" label="Level" required value={newLevel}
                   onChange={(event) => onLevelChange(event.target.value as ProjectLevel | '')}
                   options={[{ label: '" Select "', value: '' }, ...PROJECT_LEVELS.map(level => ({ label: level, value: level }))]} />
-                <Select name="pillar" label="Pillar *" required value={newPillar}
+                <Select name="pillar" label="Pillar" required value={newPillar}
                   onChange={(event) => onPillarChange(event.target.value as ProjectPillar | '')}
                   options={[{ label: '" Select "', value: '' }, ...PROJECT_PILLARS.map(pillar => ({ label: pillar, value: pillar }))]} />
-                <Select name="type" label="Type *" required value={projectType}
+                <Select name="type" label="Type" required value={projectType}
                   onChange={(event) => onProjectTypeChange(event.target.value)}
                   options={[{ label: '" Select "', value: '' }, ...PROJECT_TYPES.map(type => ({ label: PROJECT_TYPE_LABELS[type] || type, value: type }))]} />
-                <Select name="category" label="Category *" required value={newCategory}
+                <Select name="category" label="Category" required value={newCategory}
                   onChange={(event) => onCategoryChange(event.target.value)}
                   options={[{ label: '" Select "', value: '' }, ...(projectType ? (PROJECT_CATEGORIES_BY_TYPE[projectType] ?? []) : []).map(type => ({ label: type, value: type }))]} />
               </div>
@@ -212,10 +212,8 @@ export const ProjectsCreateDrawer: React.FC<ProjectsCreateDrawerProps> = ({
             <div>
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l-4 border-jci-blue/40 pl-2 mb-2">Schedule</p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                <Input name="proposedDate" label="Proposed *" type="date" value={newProposedDate}
-                  onChange={(event) => onProposedDateChange(event.target.value)} icon={<Calendar size={16} />} required min={today} />
-                <Input name="eventStartDate" label="Start Date *" type="date" value={newEventStartDate}
-                  onChange={(event) => onEventStartDateChange(event.target.value)} icon={<Calendar size={16} />} required min={today} />
+                <Input name="eventStartDate" label="Start Date" type="date" value={newEventStartDate}
+                  onChange={(event) => { onEventStartDateChange(event.target.value); onProposedDateChange(event.target.value); }} icon={<Calendar size={16} />} required min={today} />
                 <Input name="eventEndDate" label="End Date" type="date" value={newEventEndDate}
                   onChange={(event) => onEventEndDateChange(event.target.value)} icon={<Calendar size={16} />} min={newEventStartDate || today} />
                 <div />
@@ -227,13 +225,6 @@ export const ProjectsCreateDrawer: React.FC<ProjectsCreateDrawerProps> = ({
                   value={newPriceMin} onChange={(event) => onPriceMinChange(event.target.value)} icon={<DollarSign size={16} />} />
                 <Input name="priceMax" label="Max Price (RM)" type="number" min="0" placeholder="e.g. 150"
                   value={newPriceMax} onChange={(event) => onPriceMaxChange(event.target.value)} icon={<DollarSign size={16} />} />
-              </div>
-            </div>
-            <div>
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l-4 border-jci-blue/40 pl-2 mb-2">Goals</p>
-              <div className="md:grid md:grid-cols-2 md:gap-3 space-y-2 md:space-y-0">
-                <Textarea name="objectives" label="Objectives & Goals" placeholder="Goals and expected community impact..." rows={2} />
-                <Textarea name="expectedImpact" label="Expected Impact" placeholder="Expected outcomes and impact..." rows={2} />
               </div>
             </div>
           </div>
