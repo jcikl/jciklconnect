@@ -308,6 +308,19 @@ export const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
         {editStep === 2 && (
           <div className="space-y-4">
             <div>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l-4 border-jci-blue/40 pl-2 mb-2">JCI Malaysia</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <Input label="Roadmap ID" placeholder="e.g. 7780"
+                  value={editRoadmapId} onChange={(e) => setEditRoadmapId(e.target.value)} />
+                <Input label="Hosting LO" placeholder="e.g. JCI KL"
+                  value={editHostingLo} onChange={(e) => setEditHostingLo(e.target.value)} />
+                <Input label="Area" placeholder="e.g. Kuala Lumpur"
+                  value={editArea} onChange={(e) => setEditArea(e.target.value)} />
+                <Input label="Co-Hosting" placeholder="e.g. JCI PJ, JCI Ampang"
+                  value={editCoHosting} onChange={(e) => setEditCoHosting(e.target.value)} />
+              </div>
+            </div>
+            <div>
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l-4 border-jci-blue/40 pl-2 mb-2">Classification</p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 <Select name="level" label="Level" required value={editLevel} onChange={(e) => setEditLevel(e.target.value as any)}
@@ -341,19 +354,6 @@ export const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
               <div className="mt-2">
                 <Input name="location" label="Location" placeholder="e.g. KLCC Convention Centre"
                   value={editLocation} onChange={(e) => setEditLocation(e.target.value)} icon={<MapPin size={16} />} />
-              </div>
-            </div>
-            <div>
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l-4 border-jci-blue/40 pl-2 mb-2">JCI Malaysia</p>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                <Input label="Roadmap ID" placeholder="e.g. 7780"
-                  value={editRoadmapId} onChange={(e) => setEditRoadmapId(e.target.value)} />
-                <Input label="Hosting LO" placeholder="e.g. JCI KL"
-                  value={editHostingLo} onChange={(e) => setEditHostingLo(e.target.value)} />
-                <Input label="Area" placeholder="e.g. Kuala Lumpur"
-                  value={editArea} onChange={(e) => setEditArea(e.target.value)} />
-                <Input label="Co-Hosting" placeholder="e.g. JCI PJ, JCI Ampang"
-                  value={editCoHosting} onChange={(e) => setEditCoHosting(e.target.value)} />
               </div>
             </div>
           </div>
