@@ -12,6 +12,7 @@ export const COLLECTIONS = {
   PROJECTS: 'projects',
   FLAGSHIP_PROJECTS: 'flagship_projects',
   TRANSACTIONS: 'transactions',
+  FINANCE_META: 'finance', // single-document meta collection: finance/meta stores year summary
   PROJECT_TRANSACTIONS: 'projectTrx',
   BANK_ACCOUNTS: 'bankAccounts',
   INVENTORY: 'inventory',
@@ -543,18 +544,7 @@ export const JOIN_US_SURVEY_QUESTIONS = [
   }
 ];
 
-/** 
- * Wolf-like Competition System Logic Enums 
- * Designed to trigger psychological urgency (FOMO, Greed, Loss Aversion)
- */
-export const BOUNTY_STATUS = {
-  OPEN: 'Open',           // Waiting for a hunter
-  CLAIMED: 'Claimed',     // Hunter working on it, points escrowed
-  COMPLETED: 'Completed', // Success, points transferred
-  DISPUTED: 'Disputed',   // Conflict, needs admin
-  CANCELLED: 'Cancelled', // Refunded
-} as const;
-
+/** Competition / contract system status values. */
 export const CONTRACT_STATUS = {
   ACTIVE: 'Active',       // Under commitment
   VERIFYING: 'Verifying', // Proof submitted

@@ -1579,8 +1579,8 @@ export function useFinanceData(searchQuery?: string) {
         await FinanceService.updateTransaction(bankTxId, {
           paymentRequestId: prId,
           status: 'Reconciled',
-          reconciledAt: new Date().toISOString(),
-          reconciledBy: user.uid,
+          'reconciliation.reconciledAt': new Date().toISOString(),
+          'reconciliation.reconciledBy': user.uid,
         });
       }
       // Mark PR as paid (情景 26). Always runs — a missing bank tx date must not
@@ -1600,8 +1600,8 @@ export function useFinanceData(searchQuery?: string) {
           await FinanceService.updateTransaction(bankTxId, {
             paymentRequestId: undefined,
             status: 'Cleared',
-            reconciledAt: undefined,
-            reconciledBy: undefined,
+            'reconciliation.reconciledAt': null,
+            'reconciliation.reconciledBy': null,
           }).catch(rollbackErr => {
             errorLoggingService.logError(rollbackErr, { action: 'compensate-unmatch-failed' });
             showToast('支付标记失败，数据回滚也未完成，请联系财务手动检查', 'error');
@@ -1665,8 +1665,8 @@ export function useFinanceData(searchQuery?: string) {
     try {
       await FinanceService.updateTransaction(transactionId, {
         status: 'Reconciled',
-        reconciledAt: new Date().toISOString(),
-        reconciledBy: user.uid,
+        'reconciliation.reconciledAt': new Date().toISOString(),
+        'reconciliation.reconciledBy': user.uid,
       });
       showToast('Marked as reconciled', 'success');
       await loadData();
@@ -1700,7 +1700,7 @@ export function useFinanceData(searchQuery?: string) {
   const handleUnmatchTransaction = useCallback(async (tx: Transaction) => {
     if (isUnmatchingRef.current) return;
     isUnmatchingRef.current = true;
-    const partnerId = tx.matchedBankTxIds?.[0];
+    const partnerId = tx.reconciliation?.matchedBankTxIds?.[0];
     if (!partnerId) { isUnmatchingRef.current = false; return; }
     if (!confirm('Unmatch this transaction? Both sides will revert to their previous status.')) {
       isUnmatchingRef.current = false;

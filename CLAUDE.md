@@ -63,7 +63,7 @@ types.ts             → All domain TypeScript interfaces (~2000 lines)
 
 - **Member** — nested `general / contact / business / jciCareer` sub-objects; flat aliases exist for backward compatibility.
 - **Event / Project** — full lifecycle with committee assignments, financials, and attendance.
-- **Points / Award / Badge** — gamification engine with tiers (Bronze → Legendary), milestones, escrow/bounty mechanics, and `IncentiveProgram` (yearly JCI-specific star targets).
+- **Points / Award / Badge** — gamification engine with tiers (Bronze → Legendary), milestones, escrow mechanics, and `IncentiveProgram` (yearly JCI-specific star targets).
 - **Transaction / BankAccount** — double-entry finance with `TransactionSplit`, reconciliation, and `ProjectFinancialAccount` budgeting.
 - **Workflow / Rule** — automation engine; triggers, conditions, and actions are all stored in Firestore and executed by `automationService` + `workflowExecutionService`.
 
@@ -72,6 +72,20 @@ types.ts             → All domain TypeScript interfaces (~2000 lines)
 Collection names are all in `config/constants.ts`. There are 48+ collections. The most-touched ones are: `members`, `events`, `projects`, `transactions`, `bankAccounts`, `points`, `pointRules`, `badges`, `achievements`, `incentivePrograms`, `incentiveSubmissions`, `paymentRequests`, `eventRegistrations`, `notifications`, `workflows`, `automationRules`.
 
 Firestore security rules are in `firestore.rules` (34 KB). Composite indexes are in `firestore.indexes.json`.
+> **Schema reference（字段清单）：** 见 [`SCHEMA.md`](SCHEMA.md) — 自动生成，按集合列出所有 TS 字段。
+> **权限矩阵：** 见 [`SCHEMA-PERMISSIONS.md`](SCHEMA-PERMISSIONS.md) — 所有集合的 get/list/create/update/delete 权限，含 P0 缺陷速查。
+
+### Schema “来 / 往”字段流规则
+
+`SCHEMA.md` 每个集合字段表中的“来 / 往”列必须按实际代码和权限规则记录字段流向：
+
+- **来**：记录字段的实际写入或维护来源，例如角色填写、管理员操作、系统计算、服务同步、导入流程，或其他集合/字段引用。来源应尽量写明角色、服务、操作或字段名称。
+- **往**：记录字段写入后的实际使用目标，例如页面展示、权限判断、统计计算、业务流程、服务读取，或写入其他集合/字段。目标应尽量写明页面、流程、集合和字段名称。
+- **集合联动**：跨集合关系使用 `` `collection.field` `` 表示；冗余展示字段必须说明复制来源及是否会自动回写。
+- **角色来源**：涉及权限的字段要注明 `SCHEMA-PERMISSIONS.md` 中的角色或权限范围；不能把“角色允许更新”误写成系统自动同步。
+- **系统来源**：只有代码、服务或明确的计算流程能证明时，才标记为系统自动操作；Firestore 本身不会因字段出现在“来 / 往”列而自动触发联动。
+- **空白标准**：只有在当前代码、权限规则和文档中都无法确认来源或去向时才留空，不得根据字段名称臆测关系。
+- **维护要求**：新增、重命名、删除字段或修改服务联动时，同时更新 `SCHEMA.md` 的“来 / 往”列，并运行 Markdown/diff 校验。
 
 ### Deployment
 
@@ -358,6 +372,29 @@ Use this prompt to perform a full systematic analysis of any single Firestore co
 ⑤ 逻辑错误报告表：每行一个错误，列 = 错误类型｜位置｜错误描述｜修复原因（大白话）｜修复建议（大白话）｜优先级（P0紧急/P1重要/P2建议）
 ```
 
+### 并行执行模式（Workflow 指令模板）
+
+触发词必须包含 `用 workflow` 或 `use a workflow`，否则不会启动多 agent。
+
+**标准批次指令（≤15 集合/批）：**
+```
+用 workflow 并行分析以下集合，每集合一个 agent，
+执行 CLAUDE.md 六步 Collection Analysis Framework，
+STEP 6 show_widget 五合一输出。
+完成后生成跨集合对比总表，按 P0 数量降序，标注退回完整度和关键联动集合。
+集合：[列表]
+```
+
+**自动发现模式（需先在 /config 设置 Dynamic workflow size: unlimited）：**
+```
+用 workflow 从 config/constants.ts 自动发现所有集合，
+每集合一个 agent 执行六步分析，最后聚合生成跨集合风险矩阵。
+```
+
+**断点续跑：** workflow 中途中断可用 `resumeFromRunId` 续跑，每批完成后更新 CLAUDE.md "已分析集合" 表格。
+
+---
+
 ### 已分析集合（analyze-collection）
 
 **v3 re-analysis（2026-07-16，修复后残余）— P0×3 P1×47 P2×28 Total×78**
@@ -382,7 +419,6 @@ Use this prompt to perform a full systematic analysis of any single Firestore co
 | 集合 | 分析日期 | 逻辑错误数（P0/P1/P2）| 变体不对称数 | 退回完整度 | 关键P0摘要 |
 |------|----------|-----------------------|------------|-----------|-----------|
 | `workflows` | 2026-07-16 | 13（1/8/4）| 4 | 缺失 | 重复触发无防护→数据重复写入 |
-| `elections` | 2026-07-16 | 12（2/6/4）| 2 | 缺失 | 服务层为零（空壳）；双重投票无防护 |
 | `toyyibBills` | 2026-07-16 | 12（2/6/4）| 3 | 部分 | webhook 重复回调二次创建交易；账单创建失败不回滚members字段 |
 | `events` | 2026-07-16 | 11（2/7/2）| 4 | 部分 | 任意登录用户可删改任意活动；公开活动页永远空列表 |
 | `points` | 2026-07-16 | 11（2/6/3）| 3 | 部分 | 任意用户可刷积分；审批通过积分从不发放 |
@@ -397,8 +433,6 @@ Use this prompt to perform a full systematic analysis of any single Firestore co
 | `loStarProgress` | 2026-07-16 | 9（0/6/3）| 2 | 部分 | — |
 | `achievements` | 2026-07-16 | 8（1/6/1）| 2 | 缺失 | awardAward三步无批次→永久数据不一致 |
 | `incentivePrograms` | 2026-07-16 | 8（1/4/3）| 3 | 部分 | 多个program同时isActive=true |
-| `votes` | 2026-07-16 | 8（2/3/3）| 2 | 缺失 | 重复投票无防护；选票明文存储 |
-| `bounties` | 2026-07-16 | 8（2/4/2）| 0 | 缺失 | 服务层为零（空壳）；Firestore规则全开放 |
 | `badges` | 2026-07-16 | 7（1/2/4）| 2 | 部分 | ruleExecutionService.awardBadge返回假成功→自动化颁奖全部静默失败 |
 | `bankAccounts` | 2026-07-16 | 7（0/3/4）| 1 | 部分 | — |
 
@@ -463,6 +497,21 @@ Use this prompt to perform a full systematic analysis of any single Firestore co
 | `toyyibpay_webhooks` | 2026-07-19 | 12（3/6/3）| 0 | 部分 | firestore.rules无规则块→任意登录用户可读幂等记录；webhook失败.catch(warn)静默→membership更新失败但标为processed；集合名硬编码非常量 |
 | `birthdayNotificationsSent` | 2026-07-19 | 8（2/4/2）| 0 | 缺失 | 三套并行生日系统（Netlify+CF+客户端）互不协调→每位会员最多收3条重复通知；客户端每15分钟全量触发 |
 
+**第六批扫描（2026-09-03，uncovered-collections）— P0×6 P1×35 P2×25 Total×66**
+
+| 集合 | 分析日期 | 逻辑错误数（P0/P1/P2）| 变体不对称数 | 退回完整度 | 关键P0摘要 |
+|------|----------|-----------------------|------------|-----------|-----------|
+| `nudges` | 2026-09-03 | 7（2/3/2）| 0 | 缺失 | Firestore规则完全缺失→dismiss永久失败；dismissed状态从不读Firestore→关闭后刷新重现 |
+| `boardMembers + boardTransitions` | 2026-09-03 | 9（1/6/2）| 2 | 部分 | executeBoardTransition先标completed再writeBatch→批次失败时换届永久显示已完成但boardMembers未变更 |
+| `RegistrationHistory` | 2026-09-03 | 5（1/3/1）| 1 | 缺失 | COLLECTIONS.RADAR_CONTRIBUTIONS常量不存在→recalculateMemberRadarStats运行时崩溃，雷达统计永不更新 |
+| `counters + system + system_config` | 2026-09-03 | 5（1/2/2）| 1 | 部分 | counters集合无Firestore规则→生产环境所有付款申请创建PERMISSION_DENIED全部失败 |
+| `socialPosts + socialPersonas` | 2026-09-03 | 7（1/4/2）| 2 | 部分 | allow update无hasOnly白名单→BOD可修改submittedBy等不可变字段实现署名欺诈 |
+| `zoomBookings` | 2026-09-03 | 7（0/5/2）| 1 | 部分 | — |
+| `mentorshipFeedback` | 2026-09-03 | 7（0/4/3）| 0 | 缺失 | — |
+| `errorLogs` | 2026-09-03 | 6（0/2/4）| 3 | 缺失 | — |
+| `sisterChapters` | 2026-09-03 | 5（0/2/3）| 1 | 缺失 | — |
+| `systemSettings + permissionCatalog` | 2026-09-03 | 8（0/4/4）| 1 | 缺失 | — |
+
 **v4 全库重分析（2026-07-19，修复5集合后）— P0×90 P1×312 P2×191 Total×593（vs v3: 616，净减23）**
 
 本次修复：callback.js P0×3、membersService.ts P0×1、App.tsx P0×1、eventsService.ts P1、firestore.rules 5集合。
@@ -475,13 +524,12 @@ Firestore rules 5项修复已写入文件，**待执行 `firebase deploy --only 
 
 本次修复：16路并行 agent 修复所有服务层+Firestore规则（P0+P1+P2），commit `8ceaede`。
 P0减少20条（91→71）确认修复生效；P2增加54条因分析粒度更深。
-Top P0集合：pointsRuleExecutions×3、votes×3、webhooks×3、birthdayNotificationsSent×3；退回完整度：完整1个（boardTermSettings）、部分55个、缺失25个。
+Top P0集合：pointsRuleExecutions×3、webhooks×3、birthdayNotificationsSent×3；退回完整度：完整1个（boardTermSettings）、部分55个、缺失25个。
 
 **v6 P0专项修复（2026-07-19）— 17路并行 agent，commit `1c9bba2`**
 
 修复内容：
-- firestore.rules：pointsRuleExecutions hasOnly白名单扩展；votes list限isAdmin；workflow_executions create限Board/Admin；systemLogs create限Admin+hasOnly；webhook_logs hasOnly；points create限Board/Admin（防自我加分）；communication update改用resource.data.authorId；advertisements update hasOnly修正；achievementProgress list开放isAuthenticated；manualPromotionRequests create强制status==pending
-- services/electionsService.ts：ballot ID修正为voterId_electionId（匹配Firestore规则）
+- firestore.rules：pointsRuleExecutions hasOnly白名单扩展；workflow_executions create限Board/Admin；systemLogs create限Admin+hasOnly；webhook_logs hasOnly；points create限Board/Admin（防自我加分）；communication update改用resource.data.authorId；advertisements update hasOnly修正；achievementProgress list开放isAuthenticated；manualPromotionRequests create强制status==pending
 - services/gamificationService.ts：成就进度计算新增recruitment/training/role三种类型
 - services/promotionService.ts：overrideRequirements仅ADMIN可绕过审批
 - functions/src/notifications.ts + functions/lib/notifications.js：生日通知去重（birthdayNotificationsSent集合）

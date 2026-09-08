@@ -156,8 +156,9 @@ const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) 
                 const items: TimelineItem[] = [];
 
                 // Career history from member profile
-                if (Array.isArray(member.careerHistory)) {
-                  member.careerHistory.forEach(m => {
+                const careerHistory = member.jciCareer?.careerHistory ?? member.careerHistory;
+                if (Array.isArray(careerHistory)) {
+                  careerHistory.forEach(m => {
                     items.push({ sortKey: String(m.year), type: 'career', year: String(m.year), title: m.role, subtitle: m.description });
                   });
                 }
@@ -252,7 +253,7 @@ const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) 
               })()}
 
               {/* Empty state */}
-              {(!member.careerHistory || member.careerHistory.length === 0) && boardPositions.length === 0 && commissionDirectorPositions.length === 0 && (
+              {(!(member.jciCareer?.careerHistory ?? member.careerHistory)?.length) && boardPositions.length === 0 && commissionDirectorPositions.length === 0 && (
                 <p className="text-sm text-slate-400 italic">No career milestones or board positions recorded yet.</p>
               )}
             </div>

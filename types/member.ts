@@ -53,6 +53,12 @@ export interface MemberPromotionProgress {
   completedAt?: string;
 }
 
+export interface MemberFoundationPathway extends Partial<MemberPromotionProgress> {
+  tasks?: ProbationTask[];
+  /** @deprecated legacy alias; use tasks */
+  probationTasks?: ProbationTask[];
+}
+
 export interface InternationalConnection {
   country: string;
   loName: string;
@@ -234,6 +240,7 @@ export interface Member {
     companyDescription?: string;
     interestedIndustries?: string[];
     idealReferralTypes?: string[];
+    bookmarkedBusinessIds?: string[];
   };
   jciCareer?: {
     membershipType: MembershipType;
@@ -254,7 +261,10 @@ export interface Member {
     badgesCount: number;
     projectsCount: number;
     trainingsCount: number;
-    probationTasks: ProbationTask[];
+    foundationPathway?: MemberFoundationPathway;
+    /** @deprecated legacy alias; use foundationPathway.tasks */
+    probationTasks?: ProbationTask[];
+    /** @deprecated legacy alias; use foundationPathway */
     promotionProgress?: MemberPromotionProgress;
     isDuesPaidCurrentYear?: boolean;
     engagementProgress?: {
@@ -268,6 +278,7 @@ export interface Member {
     hasPaidInitiationFee?: boolean;
     senatorshipValidatedAt?: string;
     senatorshipValidatedBy?: string;
+    careerHistory?: CareerMilestone[];
   };
   createdAt?: string | Timestamp | Date;
   updatedAt?: string | Timestamp | Date;
@@ -289,7 +300,9 @@ export interface Member {
   menteeIds?: string[];
   points?: number;
   duesStatus?: string;
+  /** @deprecated legacy flat alias; use business.bookmarkedBusinessIds */
   bookmarkedBusinessIds?: string[];
+  /** @deprecated legacy flat alias; use jciCareer.careerHistory */
   careerHistory?: CareerMilestone[];
   attendanceRate?: number;
   age?: number;
@@ -300,7 +313,6 @@ export interface Member {
   surveyAnswers?: Record<string, string | string[]>;
   tendencyTags?: string[];
   internationalConnections?: InternationalConnection[];
-  internationalPartnershipTypes?: string[];
   privacy?: {
     showPhone?: boolean;
     showAlternatePhone?: boolean;
@@ -345,7 +357,6 @@ export interface BusinessProfile {
   idealReferralTypes?: string[];
   interestedIndustries?: string[];
   jciChapters?: string[];
-  internationalPartnershipTypes?: string[];
 }
 
 /** @deprecated Use getTargetDuesForMembershipType() from membershipConfigService instead */

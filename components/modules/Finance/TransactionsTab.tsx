@@ -360,7 +360,7 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
             title={`${tx.isSplit ? 'Split' : (tx.category || '—')} | ${getTransactionAccountLabel(tx)} | ${tx.purpose || '—'}`}
           >
             {tx.status === 'Pending' && <Badge variant="warning" className="shrink-0 py-0 text-[10px]">Pending</Badge>}
-            {tx.matchStatus === 'full' && <Badge variant="success" icon={<Link2Off size={9} />} className="shrink-0 py-0 text-[10px]">Matched</Badge>}
+            {tx.reconciliation?.matchStatus === 'full' && <Badge variant="success" icon={<Link2Off size={9} />} className="shrink-0 py-0 text-[10px]">Matched</Badge>}
             {tx.status === 'Voided' && <Badge variant="neutral" icon={<Ban size={9} />} className="shrink-0 py-0 text-[10px]">Voided</Badge>}
             <span className="font-medium text-slate-600">{tx.isSplit ? 'Split' : (tx.category || '—')}</span>
             <span className="text-slate-300">|</span>
@@ -396,7 +396,7 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
                   <Trash2 size={16} />
                 </Button>
               )}
-              {tx.matchStatus === 'full' && tx.matchedBankTxIds?.length ? (
+              {tx.reconciliation?.matchStatus === 'full' && tx.reconciliation?.matchedBankTxIds?.length ? (
                 <Button variant="ghost" size="sm" onClick={() => handleUnmatchTransaction(tx)} className="text-amber-500 hover:text-amber-700 p-1" title="Unmatch bank transaction">
                   <Link2Off size={16} />
                 </Button>
@@ -490,7 +490,7 @@ const TransactionsTabBase: React.FC<TransactionsTabProps> = ({
                       <Trash2 size={14} />
                     </button>
                   )}
-                  {tx.matchStatus === 'full' && tx.matchedBankTxIds?.length ? (
+                  {tx.reconciliation?.matchStatus === 'full' && tx.reconciliation?.matchedBankTxIds?.length ? (
                     <button onClick={() => handleUnmatchTransaction(tx)} className="p-1.5 rounded-lg text-amber-500 hover:text-amber-700 hover:bg-amber-50 transition-colors" title="Unmatch bank transaction">
                       <Link2Off size={14} />
                     </button>

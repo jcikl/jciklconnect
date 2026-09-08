@@ -18,13 +18,14 @@ import {
   writeBatch,
   runTransaction,
   increment,
+  arrayUnion,
   getDoc as getFirestoreDoc,
   documentId,
   DocumentSnapshot,
 } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
-import { Transaction, BankAccount, ReconciliationRecord, ReconciliationDiscrepancy, TransactionSplit, TransactionType, MembershipDues, MembershipRecord, MembershipStatus, MembershipType, FinanceAlert } from '../types';
+import { Transaction, BankAccount, ReconciliationRecord, ReconciliationDiscrepancy, TransactionSplit, TransactionType, MembershipDues, MembershipRecord, MembershipStatus, MembershipType, FinanceAlert, TransactionReconciliation, TransactionReversal, TransactionOriginal } from '../types';
 import { withDevMode, isDevMode } from '../utils/devMode';
 import { getMYTYear } from '../utils/dateUtils';
 import { MOCK_TRANSACTIONS, MOCK_ACCOUNTS, MOCK_MEMBERS } from './mockData';
@@ -74,6 +75,40 @@ interface RawTransactionDoc {
 
 const FINANCE_CACHE_PREFIX = 'finance:';
 const TX_CACHE_TTL = CACHE_TTL_3MIN;
+
+/**
+ * Maps a raw Firestore document (flat or nested) to the Transaction interface.
+ * Handles backward compat: old docs have flat reconciledAt/reversalOf/originalCategory;
+ * new docs write the reconciliation/reversal/original sub-objects.
+ */
+function normalizeTransaction(raw: Record<string, any>): Transaction {
+  const d = raw;
+  const reconciliation: TransactionReconciliation = d.reconciliation ?? {
+    reconciledAt: d.reconciledAt ?? null,
+    reconciledBy: d.reconciledBy ?? null,
+    matchedBankAmount: d.matchedBankAmount ?? null,
+    matchedBankTxIds: d.matchedBankTxIds ?? null,
+    matchStatus: d.matchStatus ?? null,
+    prevStatus: d.prevStatus ?? null,
+  };
+  const reversal: TransactionReversal | undefined =
+    d.reversal ?? (d.reversalOf ? { reversalOf: d.reversalOf, reversalReason: d.reversalReason, reversedBy: d.reversedBy } : undefined);
+  const original: TransactionOriginal | undefined =
+    d.original ?? (d.originalCategory ? {
+      category: d.originalCategory,
+      projectId: d.originalProjectId ?? null,
+      memberId: d.originalMemberId ?? null,
+      paymentRequestId: d.originalPaymentRequestId ?? null,
+      purpose: d.originalPurpose ?? null,
+      year: d.originalYear,
+    } : undefined);
+
+  const { reconciledAt, reconciledBy, matchedBankAmount, matchedBankTxIds, matchStatus, prevStatus,
+          reversalOf, reversalReason, reversedBy,
+          originalCategory, originalProjectId, originalMemberId, originalPaymentRequestId, originalPurpose, originalYear,
+          ...rest } = d;
+  return { ...rest, reconciliation, reversal, original } as Transaction;
+}
 
 /** Invalidate all finance caches (call after any write to transactions/bankAccounts). */
 export function invalidateFinanceCache(): void {
@@ -168,11 +203,11 @@ export class FinanceService {
             const snapshot = await (forceServer ? getDocsFromServer(q) : getDocs(q));
             let transactions = snapshot.docs.map(doc => {
               const data = doc.data() as RawTransactionDoc;
-              return {
+              return normalizeTransaction({
                 id: doc.id,
                 ...data,
                 date: (data.date as any)?.toDate?.()?.toISOString() || data.date,
-              } as Transaction;
+              });
             });
 
             if (year) {
@@ -311,21 +346,30 @@ export class FinanceService {
         const cached = apiCache.get<number[]>(cacheKey);
         if (cached) return cached;
         try {
-          // TODO: Replace with a finance/meta summary document storing a sorted year array,
-          // updated via arrayUnion on each transaction creation. Cache below is the stopgap.
-          const q = query(collection(db, COLLECTIONS.TRANSACTIONS), limit(5000));
-          const snapshot = await getDocs(q);
-          const years = new Set<number>();
-          snapshot.docs.forEach(doc => {
-            const data = doc.data() as RawTransactionDoc;
-            if (data.date) {
-              const dateVal = (data.date as any)?.toDate?.() || new Date(data.date as string);
-              const y = new Date(dateVal).getFullYear();
-              if (!isNaN(y)) years.add(y);
-            }
-          });
-          years.add(getMYTYear());
-          const result = Array.from(years).sort((a, b) => b - a);
+          // PERF-001: read from finance/meta summary doc instead of scanning all transactions.
+          // Meta doc is maintained via arrayUnion in createTransaction. Falls back to a full
+          // scan only if the meta doc doesn't exist yet (first run / legacy data).
+          const metaSnap = await getDoc(doc(db, COLLECTIONS.FINANCE_META, 'meta'));
+          let years: number[];
+          if (metaSnap.exists() && Array.isArray(metaSnap.data().years)) {
+            years = metaSnap.data().years as number[];
+          } else {
+            // Fallback: one-time full scan; subsequent creates will populate the meta doc.
+            const q = query(collection(db, COLLECTIONS.TRANSACTIONS), limit(5000));
+            const snapshot = await getDocs(q);
+            const yearSet = new Set<number>();
+            snapshot.docs.forEach(d => {
+              const data = d.data() as RawTransactionDoc;
+              if (data.date) {
+                const dateVal = (data.date as any)?.toDate?.() || new Date(data.date as string);
+                const y = new Date(dateVal).getFullYear();
+                if (!isNaN(y)) yearSet.add(y);
+              }
+            });
+            years = Array.from(yearSet);
+          }
+          const yearSet = new Set([...years, getMYTYear()]);
+          const result = Array.from(yearSet).sort((a, b) => b - a);
           apiCache.set(cacheKey, result, 60 * 60 * 1000); // 1-hour TTL — years change rarely
           return result;
         } catch (error) {
@@ -349,11 +393,11 @@ export class FinanceService {
             orderBy('date', 'desc')
           );
           const snapshot = await getDocs(projectTrxQuery);
-          return snapshot.docs.map(doc => ({
+          return snapshot.docs.map(doc => normalizeTransaction({
             id: doc.id,
             ...doc.data(),
             date: doc.data().date?.toDate?.()?.toISOString() || doc.data().date,
-          } as Transaction));
+          }));
         } catch (indexError: any) {
           if (indexError?.code === 'failed-precondition') {
             // Index still building — fall back to unordered query, sort client-side
@@ -364,11 +408,11 @@ export class FinanceService {
               );
               const snapshot = await getDocs(fallbackQuery);
               return snapshot.docs
-                .map(doc => ({
+                .map(doc => normalizeTransaction({
                   id: doc.id,
                   ...doc.data(),
                   date: doc.data().date?.toDate?.()?.toISOString() || doc.data().date,
-                } as Transaction))
+                }))
                 .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
             } catch (fallbackError) {
               errorLoggingService.logError(fallbackError instanceof Error ? fallbackError : new Error(String(fallbackError)), { context: 'financeService.getProjectTransactions:fallback' });
@@ -403,8 +447,7 @@ export class FinanceService {
               projectId: s.projectId,
               memberId: s.memberId,
               bankAccountId: parent?.bankAccountId,
-              reconciledAt: parent?.reconciledAt,
-              reconciledBy: parent?.reconciledBy,
+              reconciliation: parent?.reconciliation,
               referenceNumber: parent?.referenceNumber,
               paymentRequestId: s.paymentRequestId,
               projectTransactionId: s.projectTransactionId || null,
@@ -423,11 +466,11 @@ export class FinanceService {
         where('projectId', '==', projectId)
       );
       const snapshot = await getDocs(q);
-      const directTransactions = snapshot.docs.map(doc => ({
+      const directTransactions = snapshot.docs.map(doc => normalizeTransaction({
         id: doc.id,
         ...doc.data(),
         date: doc.data().date?.toDate?.()?.toISOString() || doc.data().date,
-      } as Transaction));
+      }));
 
       // 2. Get splits assigned to the project
       const splitsQuery = query(
@@ -450,11 +493,11 @@ export class FinanceService {
           );
           const parentsSnapshot = await getDocs(parentsQuery);
           parentsSnapshot.docs.forEach(pDoc => {
-            parentTransactionsMap.set(pDoc.id, {
+            parentTransactionsMap.set(pDoc.id, normalizeTransaction({
               id: pDoc.id,
               ...pDoc.data(),
               date: pDoc.data().date?.toDate?.()?.toISOString() || pDoc.data().date,
-            });
+            }));
           });
         }
 
@@ -476,8 +519,7 @@ export class FinanceService {
               projectId: splitData.projectId,
               memberId: splitData.memberId || parent.memberId || '',
               bankAccountId: parent.bankAccountId,
-              reconciledAt: parent.reconciledAt,
-              reconciledBy: parent.reconciledBy,
+              reconciliation: parent.reconciliation,
               referenceNumber: parent.referenceNumber,
               paymentRequestId: splitData.paymentRequestId || parent.paymentRequestId,
               projectTransactionId: (splitData as TransactionSplit).projectTransactionId || null,
@@ -566,9 +608,14 @@ export class FinanceService {
             }
           }
 
+          const txYear = new Date(transactionData.date).getFullYear();
+          const financeMetaRef = doc(db, COLLECTIONS.FINANCE_META, 'meta');
+
           const createBatch = writeBatch(db);
           createBatch.set(txRef, cleanTransaction);
           createBatch.update(bankAccountRef, { currentBalance: increment(amountDelta) });
+          // PERF-001: maintain year list in finance/meta so getAllTransactionYears avoids a 5000-doc scan
+          createBatch.set(financeMetaRef, { years: arrayUnion(txYear) }, { merge: true });
           await createBatch.commit();
 
           // Fix 17: syncMemberMembership moved AFTER batch.commit() so the tx exists before sync runs.
@@ -780,11 +827,19 @@ export class FinanceService {
         // Update parent transaction
         const parentIdx = localMockTransactions.findIndex(t => t.id === parentTransactionId);
         if (parentIdx !== -1) {
+          const _p = localMockTransactions[parentIdx];
           localMockTransactions[parentIdx] = {
-            ...localMockTransactions[parentIdx],
+            ..._p,
             isSplit: true,
             splitIds,
-            originalCategory: localMockTransactions[parentIdx].category,
+            original: {
+              category: _p.category,
+              projectId: _p.projectId ?? null,
+              memberId: _p.memberId ?? null,
+              paymentRequestId: _p.paymentRequestId ?? null,
+              purpose: _p.purpose ?? null,
+              year: _p.year,
+            },
             category: '',
             projectId: '',
             purpose: '',
@@ -956,7 +1011,14 @@ export class FinanceService {
         const parentTxnUpdate: Record<string, unknown> = {
           isSplit: true,
           splitIds,
-          originalCategory: freshParent.category,
+          original: {
+            category: freshParent.category,
+            projectId: freshParent.projectId ?? null,
+            memberId: freshParent.memberId ?? null,
+            paymentRequestId: freshParent.paymentRequestId ?? null,
+            purpose: freshParent.purpose ?? null,
+            year: freshParent.year,
+          },
           category: '',
           projectId: '',
           purpose: '',
@@ -1196,7 +1258,7 @@ export class FinanceService {
         const parentIdx = localMockTransactions.findIndex(t => t.id === split.parentTransactionId);
         if (parentIdx !== -1) {
           const parentTx = localMockTransactions[parentIdx];
-          const originalCategory = (parentTx as any).originalCategory || parentTx.category || '';
+          const originalCategory = (parentTx.original?.category || parentTx.category || '') as Transaction['category'];
           localMockTransactions[parentIdx] = {
             ...parentTx,
             splitIds: remainingIds,
@@ -1206,7 +1268,7 @@ export class FinanceService {
             ...(remainingIds.length === 0 ? {
               projectTransactionIds: [],
               projectTransactionId: null,
-              status: (parentTx as any).prevStatus ?? 'Pending',
+              status: parentTx.reconciliation?.prevStatus ?? 'Pending',
               purpose: '',
             } : {}),
           };
@@ -1236,7 +1298,7 @@ export class FinanceService {
             const currentSplitIds: string[] = (parentTx?.splitIds as string[]) ?? [];
             const remainingIds = currentSplitIds.filter(id => id !== splitId);
 
-            const originalCategory = (parentTx as any)?.originalCategory || parentTx?.category || '';
+            const originalCategory = (parentTx as any)?.original?.category || parentTx?.category || '';
             const updateData: Record<string, unknown> = {
               splitIds: remainingIds,
               isSplit: remainingIds.length > 0,
@@ -1247,7 +1309,7 @@ export class FinanceService {
             if (remainingIds.length === 0) {
               updateData.projectTransactionIds = [];
               updateData.projectTransactionId = null;
-              updateData.status = parentTx?.prevStatus ?? 'Pending';
+              updateData.status = (parentTx as any)?.reconciliation?.prevStatus ?? 'Pending';
               updateData.purpose = '';
             }
 
@@ -1309,11 +1371,11 @@ export class FinanceService {
             orderBy('date', 'desc')
           );
           const snapshot = await getDocs(q);
-          const transactions = snapshot.docs.map(doc => ({
+          const transactions = snapshot.docs.map(doc => normalizeTransaction({
             id: doc.id,
             ...doc.data(),
             date: doc.data().date?.toDate?.()?.toISOString() || doc.data().date,
-          } as Transaction));
+          }));
 
           // Also get transactions that have splits of this type
           const [allTransactions, allSplits] = await Promise.all([
@@ -1341,7 +1403,9 @@ export class FinanceService {
   }
 
   // Update transaction
-  static async updateTransaction(transactionId: string, updates: Partial<Transaction>): Promise<void> {
+  // Accepts Partial<Transaction> for typed fields, or a string-keyed map for Firestore dot-notation
+  // paths (e.g. 'reconciliation.reconciledAt') that target nested sub-object fields.
+  static async updateTransaction(transactionId: string, updates: Partial<Transaction> & Record<string, unknown>): Promise<void> {
     return withDevMode(
       () => {
         console.log(`[Dev Mode] Mocking update for transaction ${transactionId}`);
@@ -1887,21 +1951,21 @@ export class FinanceService {
           // Try main transactions collection
           const txDoc = await getDoc(doc(db, COLLECTIONS.TRANSACTIONS, transactionId));
           if (txDoc.exists()) {
-            return {
+            return normalizeTransaction({
               id: txDoc.id,
               ...txDoc.data(),
               date: txDoc.data().date?.toDate?.()?.toISOString() || txDoc.data().date,
-            } as Transaction;
+            });
           }
 
           // Try project transactions collection
           const pjDoc = await getDoc(doc(db, COLLECTIONS.PROJECT_TRANSACTIONS, transactionId));
           if (pjDoc.exists()) {
-            return {
+            return normalizeTransaction({
               id: pjDoc.id,
               ...pjDoc.data(),
               date: pjDoc.data().date?.toDate?.()?.toISOString() || pjDoc.data().date,
-            } as Transaction;
+            });
           }
 
           return null;
@@ -1986,9 +2050,9 @@ export class FinanceService {
 
           // If this is a matched income tx, remove the match from the linked bank tx AFTER
           // the deletion batch commits so a removeMatch failure never orphans the deleted tx.
-          if (transaction?.matchedBankTxIds?.length) {
+          if (transaction?.reconciliation?.matchedBankTxIds?.length) {
             const { EventPaymentMatchingService } = await import('./eventPaymentMatchingService');
-            for (const bankTxId of transaction.matchedBankTxIds) {
+            for (const bankTxId of transaction.reconciliation.matchedBankTxIds) {
               await EventPaymentMatchingService.removeMatch(transactionId, bankTxId).catch((err) =>
                 errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { context: 'financeService.deleteTransaction:removeBankTxLink', additionalData: { bankTxId } })
               );
@@ -2082,9 +2146,7 @@ export class FinanceService {
               projectId: original.projectId,
               year: original.year,
               transactionType: original.transactionType,
-              reversalOf: transactionId,
-              reversalReason: reason,
-              reversedBy: operatorId,
+              reversal: { reversalOf: transactionId, reversalReason: reason, reversedBy: operatorId },
               createdAt: Timestamp.now(),
               updatedAt: Timestamp.now(),
             });
@@ -2092,8 +2154,8 @@ export class FinanceService {
             txn.set(reversalRef, reversalData);
             txn.update(originalRef, {
               status: 'Voided',
-              reversalReason: reason,
-              reversedBy: operatorId,
+              'reversal.reversalReason': reason,
+              'reversal.reversedBy': operatorId,
               updatedAt: Timestamp.now(),
             });
 
@@ -2490,7 +2552,7 @@ export class FinanceService {
               && member.probationApprovedAt
               && !hasPaidFee) {
             zeroTxUpdates.role = 'GUEST';
-            Object.assign(zeroTxUpdates, { 'jciCareer.membershipType': 'Guest', 'jciCareer.probationTasks': null });
+            Object.assign(zeroTxUpdates, { 'jciCareer.membershipType': 'Guest', 'jciCareer.foundationPathway.tasks': null });
             zeroTxUpdates.probationApprovedBy = null;
             zeroTxUpdates.probationApprovedAt = null;
           }
@@ -3744,10 +3806,10 @@ export class FinanceService {
           for (const transaction of accountTransactions) {
             if (!transaction.id) continue;
             markBatch.update(doc(db, COLLECTIONS.TRANSACTIONS, transaction.id), {
-              prevStatus: transaction.status,
+              'reconciliation.prevStatus': transaction.status,
               status: 'Reconciled',
-              reconciledAt: Timestamp.now(),
-              reconciledBy,
+              'reconciliation.reconciledAt': Timestamp.now(),
+              'reconciliation.reconciledBy': reconciledBy,
               reconciliationId: reconciliationRef.id,
             });
             batchCount++;
@@ -3885,10 +3947,13 @@ export class FinanceService {
               rollbackBatch.update(doc(db, COLLECTIONS.TRANSACTIONS, txDoc.id), {
                 // E-3: restore the status the transaction had before reconciliation,
                 // not a hardcoded 'Pending' (most transactions were 'Cleared').
-                status: txDoc.data().prevStatus ?? 'Cleared',
+                // Read from nested reconciliation.prevStatus first; fall back to flat
+                // prevStatus for docs written by older code.
+                status: (txDoc.data().reconciliation?.prevStatus ?? txDoc.data().prevStatus) ?? 'Cleared',
                 reconciliationId: null,
-                reconciledAt: null,
-                reconciledBy: null,
+                'reconciliation.reconciledAt': null,
+                'reconciliation.reconciledBy': null,
+                'reconciliation.prevStatus': null,
               });
               affectedTxIds.push(txDoc.id);
               batchCount++;
@@ -3965,7 +4030,7 @@ export class FinanceService {
       )
     );
     const unreconciled = snap.docs
-      .map(d => ({ id: d.id, ...d.data() } as Transaction))
+      .map(d => normalizeTransaction({ id: d.id, ...d.data() }))
       .filter(t => !t.isSplitChild);
     return {
       bankImports: unreconciled.filter(t => t.source === 'bank_import'),
@@ -3984,7 +4049,7 @@ export class FinanceService {
       () => {
         localMockTransactions = localMockTransactions.map(t => {
           if (t.id === bankTxId || t.id === manualTxId) {
-            return { ...t, matchStatus: 'full' as const, matchedBankTxIds: [t.id === bankTxId ? manualTxId : bankTxId], status: 'Reconciled' as const, reconciledBy, reconciledAt: new Date().toISOString(), prevStatus: t.status };
+            return { ...t, reconciliation: { matchStatus: 'full' as const, matchedBankTxIds: [t.id === bankTxId ? manualTxId : bankTxId], reconciledBy, reconciledAt: new Date().toISOString(), prevStatus: t.status, matchedBankAmount: null }, status: 'Reconciled' as const };
           }
           return t;
         });
@@ -4004,20 +4069,20 @@ export class FinanceService {
 
         const batch = writeBatch(db);
         batch.update(doc(db, COLLECTIONS.TRANSACTIONS, bankTxId), {
-          matchStatus: 'full',
-          matchedBankTxIds: [manualTxId],
+          'reconciliation.matchStatus': 'full',
+          'reconciliation.matchedBankTxIds': [manualTxId],
           status: 'Reconciled',
-          prevStatus: bankPrevStatus,
-          reconciledBy,
-          reconciledAt: now,
+          'reconciliation.prevStatus': bankPrevStatus,
+          'reconciliation.reconciledBy': reconciledBy,
+          'reconciliation.reconciledAt': now,
         });
         batch.update(doc(db, COLLECTIONS.TRANSACTIONS, manualTxId), {
-          matchStatus: 'full',
-          matchedBankTxIds: [bankTxId],
+          'reconciliation.matchStatus': 'full',
+          'reconciliation.matchedBankTxIds': [bankTxId],
           status: 'Reconciled',
-          prevStatus: manualPrevStatus,
-          reconciledBy,
-          reconciledAt: now,
+          'reconciliation.prevStatus': manualPrevStatus,
+          'reconciliation.reconciledBy': reconciledBy,
+          'reconciliation.reconciledAt': now,
         });
         await batch.commit();
       }
@@ -4031,7 +4096,7 @@ export class FinanceService {
       () => {
         localMockTransactions = localMockTransactions.map(t => {
           if (t.id === txId1 || t.id === txId2) {
-            return { ...t, matchStatus: undefined, matchedBankTxIds: undefined, status: (t.prevStatus ?? 'Pending') as Transaction['status'], prevStatus: undefined, reconciledBy: undefined, reconciledAt: undefined };
+            return { ...t, reconciliation: undefined, status: (t.reconciliation?.prevStatus ?? 'Pending') as Transaction['status'] };
           }
           return t;
         });
@@ -4042,14 +4107,12 @@ export class FinanceService {
         const batch = writeBatch(db);
         for (const snap of snaps) {
           if (!snap.exists()) continue;
-          const prevStatus = (snap.data() as Transaction).prevStatus ?? 'Pending';
+          const rawData = snap.data() as any;
+          // Read prevStatus from nested reconciliation first; fall back to flat field for old docs
+          const prevStatus = rawData.reconciliation?.prevStatus ?? rawData.prevStatus ?? 'Pending';
           batch.update(snap.ref, {
-            matchStatus: null,
-            matchedBankTxIds: null,
+            reconciliation: null,
             status: prevStatus,
-            prevStatus: null,
-            reconciledBy: null,
-            reconciledAt: null,
           });
         }
         await batch.commit();
@@ -4959,9 +5022,9 @@ export class FinanceService {
         // than Voided-but-uncleaned.
 
         // Clean up bank-tx match links
-        if (tx.matchedBankTxIds?.length) {
+        if (tx.reconciliation?.matchedBankTxIds?.length) {
           const { EventPaymentMatchingService } = await import('./eventPaymentMatchingService');
-          for (const bankTxId of tx.matchedBankTxIds) {
+          for (const bankTxId of tx.reconciliation.matchedBankTxIds) {
             await EventPaymentMatchingService.removeMatch(transactionId, bankTxId).catch((err) =>
               errorLoggingService.logError(err instanceof Error ? err : new Error(String(err)), { context: 'financeService.voidTransaction:removeBankTxLink', additionalData: { bankTxId } })
             );
@@ -4993,9 +5056,9 @@ export class FinanceService {
           voidedAt: Timestamp.now(),
           voidedBy,
           voidReason: reason,
-          prevStatus: tx.status,
-          matchedBankTxIds: [],
-          matchStatus: 'unmatched',
+          'reconciliation.prevStatus': tx.status,
+          'reconciliation.matchedBankTxIds': [],
+          'reconciliation.matchStatus': 'unmatched',
           updatedAt: Timestamp.now(),
         });
         if (tx.bankAccountId && tx.amount && tx.type) {

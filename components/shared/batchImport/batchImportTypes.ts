@@ -97,6 +97,12 @@ export interface BatchImportConfig {
   onSuccess?: () => void;
   /** 行后处理器，用于在验证后标记这行是新增还是更新等 */
   rowPostProcessor?: (row: ImportRow, context?: ImportContext) => ImportRow;
+  /** External data loaders — each adds a button next to Template/Upload */
+  loaders?: Array<{
+    label: string;
+    /** Returns TSV text (tab-separated, first row = headers) */
+    load: () => Promise<string>;
+  }>;
 }
 
 export interface ImportRow {

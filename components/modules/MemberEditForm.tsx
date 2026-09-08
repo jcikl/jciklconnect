@@ -83,7 +83,6 @@ function initFormValues(member: Member) {
     businessCategory: Array.isArray(member.business?.businessCategory) ? member.business?.businessCategory : (member.business?.businessCategory ? [member.business?.businessCategory] : []),
     industry: member.industry || '',
     interestedIndustries: (() => { const v = member.business?.interestedIndustries; return Array.isArray(v) ? v : (v ? [v as string] : []); })(),
-    internationalPartnershipTypes: Array.isArray(member.internationalPartnershipTypes) ? member.internationalPartnershipTypes : (member.internationalPartnershipTypes ? [member.internationalPartnershipTypes] : []),
 
     // Contact Information
     phone: member.contact?.phone || '',
@@ -244,7 +243,6 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
       businessCategory: formValues.businessCategory.length > 0 ? formValues.businessCategory : undefined,
       industry: formValues.industry || undefined,
       interestedIndustries: interestedIndustriesArr.length > 0 ? interestedIndustriesArr : undefined,
-      internationalPartnershipTypes: formValues.internationalPartnershipTypes,
       alternatePhone: formValues.alternatePhone || member.contact?.alternatePhone,
       address: formValues.address || undefined,
       linkedin: formValues.linkedin || undefined,
@@ -682,44 +680,6 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
               </div>
             </div>
 
-            {/* Conditional International Partnership Selection */}
-            {(formValues.acceptInternationalBusiness === 'Yes' || formValues.acceptInternationalBusiness === 'Willing to Explore') && (
-              <div className="col-span-1 md:col-span-2 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300 py-4 px-3 md:px-6 bg-blue-50/50 rounded-xl border border-blue-100/50 mt-2">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-1 h-5 bg-blue-500 rounded-full"></div>
-                  <h4 className="text-sm md:text-sm font-bold text-slate-800 uppercase tracking-tight">Global partnerships sought?</h4>
-                </div>
-                <div className="grid grid-cols-1 gap-2">
-                  {IDEAL_REFERRAL_OPTIONS.map(opt => (
-                    <label key={opt.label} className="group relative flex items-start gap-3 p-3 rounded-lg border border-slate-200 bg-white hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer">
-                      <div className="flex items-center h-5">
-                        <input
-                          type="checkbox"
-                          checked={formValues.internationalPartnershipTypes.includes(opt.label)}
-                          onChange={(e) => {
-                            const newTypes = e.target.checked
-                              ? [...formValues.internationalPartnershipTypes, opt.label]
-                              : formValues.internationalPartnershipTypes.filter(t => t !== opt.label);
-                            handleChange('internationalPartnershipTypes', newTypes);
-                          }}
-                          className="w-5 h-5 md:w-4 md:h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
-                        />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className={`text-sm font-bold leading-tight ${formValues.internationalPartnershipTypes.includes(opt.label) ? 'text-blue-700' : 'text-slate-700'}`}>
-                          {opt.label}
-                        </span>
-                        {opt.description && (
-                          <span className="text-[10px] text-slate-500 mt-1 leading-snug">
-                            {opt.description}
-                          </span>
-                        )}
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
             <div className="col-span-1 md:col-span-2 pt-2">
               <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Business Category</label>
               <MultiSelectDropdown

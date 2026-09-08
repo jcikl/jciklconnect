@@ -100,7 +100,7 @@ export const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = (
     industry: `${member.jciChapter} (${member.country})`,
     description: member.description, website: member.email,
     offer: getSpecialOfferSummary(member.specialOffer), logo: member.avatarUrl,
-    internationalPartnershipTypes: [],
+    idealReferralTypes: [],
     businessCategory: member.businessCategory, acceptsInternationalBusiness: 'Yes'
   });
 
@@ -440,7 +440,7 @@ export const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = (
                   industry: `${detailMember.jciChapter} (${detailMember.country})`,
                   description: detailMember.description, website: detailMember.email,
                   offer: getSpecialOfferSummary(detailMember.specialOffer), logo: detailMember.avatarUrl,
-                  internationalPartnershipTypes: [],
+                  idealReferralTypes: [],
                   businessCategory: detailMember.businessCategory, acceptsInternationalBusiness: 'Yes'
                 };
                 onContact(mappedBiz);

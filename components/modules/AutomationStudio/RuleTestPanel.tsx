@@ -29,7 +29,7 @@ const SAMPLE_TEST_DATA: Record<string, RuleTestData> = {
       general: { name: 'John Doe', idNumber: '', dob: '', gender: 'Male', race: 'Chinese', nationality: 'Malaysian' },
       contact: { email: 'john.doe@example.com', phone: '', address: '', whatsappJoined: false, socials: {}, emergency: { name: '', relationship: '', phone: '' } },
       points: 150,
-      jciCareer: { membershipType: 'Official', membershipStatus: 'paid' as import('../../../types').MembershipStatus, joinDate: '2023-01-15', senatorship: { certified: false, boardValidated: false }, isCurrentBoardMember: false, boardHistory: [], points: 150, attendanceRate: 0, badgesCount: 0, projectsCount: 0, trainingsCount: 0, probationTasks: [] },
+      jciCareer: { membershipType: 'Official', membershipStatus: 'paid' as import('../../../types').MembershipStatus, joinDate: '2023-01-15', senatorship: { certified: false, boardValidated: false }, isCurrentBoardMember: false, boardHistory: [], points: 150, attendanceRate: 0, badgesCount: 0, projectsCount: 0, trainingsCount: 0, foundationPathway: { tasks: [] } },
     },
   },
   event_scenario: {

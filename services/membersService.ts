@@ -390,11 +390,17 @@ export class MembersService {
     else if (data.acceptInternationalBusiness !== undefined) business.acceptInternationalBusiness = data.acceptInternationalBusiness;
     
     if (data.business?.idealReferrals !== undefined) {
-      business.idealReferrals = data.business?.idealReferrals;
-    } else if (data.business?.idealReferrals !== undefined) {
-      business.idealReferrals = typeof data.business?.idealReferrals === 'string'
-        ? data.business?.idealReferrals.split(', ').filter(Boolean)
-        : data.business?.idealReferrals;
+      business.idealReferrals = Array.isArray(data.business?.idealReferrals)
+        ? data.business?.idealReferrals
+        : String(data.business?.idealReferrals).split(', ').filter(Boolean);
+    } else if (data.idealReferral !== undefined) {
+      business.idealReferrals = Array.isArray(data.idealReferral)
+        ? data.idealReferral
+        : String(data.idealReferral).split(', ').filter(Boolean);
+    } else if (data.idealReferrals !== undefined) {
+      business.idealReferrals = Array.isArray(data.idealReferrals)
+        ? data.idealReferrals
+        : String(data.idealReferrals).split(', ').filter(Boolean);
     } else if (data.idealReferralIndustry !== undefined) {
       business.idealReferrals = typeof data.idealReferralIndustry === 'string'
         ? data.idealReferralIndustry.split(', ').filter(Boolean)
@@ -406,6 +412,8 @@ export class MembersService {
     else if (data.levelOfManagement !== undefined) business.levelOfManagement = data.levelOfManagement;
     if (data.business?.interestedIndustries !== undefined) business.interestedIndustries = data.business?.interestedIndustries;
     if (data.business?.idealReferralTypes !== undefined) business.idealReferralTypes = data.business?.idealReferralTypes;
+    if (data.business?.bookmarkedBusinessIds !== undefined) business.bookmarkedBusinessIds = data.business?.bookmarkedBusinessIds;
+    else if (data.bookmarkedBusinessIds !== undefined) business.bookmarkedBusinessIds = data.bookmarkedBusinessIds;
 
     if (Object.keys(business).length > 0 || existing?.business) {
       result.business = business;
@@ -451,8 +459,30 @@ export class MembersService {
     if (data.jciCareer?.projectsCount !== undefined) jciCareer.projectsCount = data.jciCareer?.projectsCount;
     if (data.jciCareer?.trainingsCount !== undefined) jciCareer.trainingsCount = data.jciCareer?.trainingsCount;
 
-    if (data.jciCareer?.probationTasks !== undefined) jciCareer.probationTasks = data.jciCareer?.probationTasks;
-    if (data.jciCareer?.promotionProgress !== undefined) jciCareer.promotionProgress = data.jciCareer?.promotionProgress;
+    const foundationPathway = {
+      ...(existing?.jciCareer?.foundationPathway || {}),
+      ...(data.jciCareer?.foundationPathway || {}),
+      ...(data.jciCareer?.promotionProgress || {}),
+      ...(data['jciCareer.foundationPathway'] || {}),
+      ...(data['jciCareer.promotionProgress'] || {}),
+      ...(data.promotionProgress || {}),
+    };
+    if (data.jciCareer?.foundationPathway?.tasks !== undefined) {
+      foundationPathway.tasks = data.jciCareer.foundationPathway.tasks;
+    } else if (data.jciCareer?.foundationPathway?.probationTasks !== undefined) {
+      foundationPathway.tasks = data.jciCareer.foundationPathway.probationTasks;
+    } else if (data.jciCareer?.probationTasks !== undefined) {
+      foundationPathway.tasks = data.jciCareer.probationTasks;
+    } else if (data['jciCareer.foundationPathway.tasks'] !== undefined) {
+      foundationPathway.tasks = data['jciCareer.foundationPathway.tasks'];
+    } else if (data['jciCareer.foundationPathway.probationTasks'] !== undefined) {
+      foundationPathway.tasks = data['jciCareer.foundationPathway.probationTasks'];
+    } else if (data['jciCareer.probationTasks'] !== undefined) {
+      foundationPathway.tasks = data['jciCareer.probationTasks'];
+    } else if (data.probationTasks !== undefined) {
+      foundationPathway.tasks = data.probationTasks;
+    }
+    if (Object.keys(foundationPathway).length > 0) jciCareer.foundationPathway = foundationPathway;
     if (data.jciCareer?.isDuesPaidCurrentYear !== undefined) jciCareer.isDuesPaidCurrentYear = data.jciCareer?.isDuesPaidCurrentYear;
     if (data.jciCareer?.engagementProgress !== undefined) jciCareer.engagementProgress = data.jciCareer?.engagementProgress;
     if (data.jciCareer?.radarStats !== undefined) jciCareer.radarStats = data.jciCareer?.radarStats;
@@ -462,6 +492,8 @@ export class MembersService {
     if (data.jciCareer?.hasPaidInitiationFee !== undefined) jciCareer.hasPaidInitiationFee = data.jciCareer?.hasPaidInitiationFee;
     if (data.jciCareer?.senatorshipValidatedAt !== undefined) jciCareer.senatorshipValidatedAt = data.jciCareer?.senatorshipValidatedAt;
     if (data.jciCareer?.senatorshipValidatedBy !== undefined) jciCareer.senatorshipValidatedBy = data.jciCareer?.senatorshipValidatedBy;
+    if (data.jciCareer?.careerHistory !== undefined) jciCareer.careerHistory = data.jciCareer?.careerHistory;
+    else if (data.careerHistory !== undefined) jciCareer.careerHistory = data.careerHistory;
 
     if (Object.keys(jciCareer.senatorship).length === 0 && !existing?.jciCareer?.senatorship) delete jciCareer.senatorship;
     if (Object.keys(jciCareer).length > 0 || existing?.jciCareer) {
@@ -506,13 +538,15 @@ export class MembersService {
       'companyWebsite', 'companyLogoUrl', 'introduction', 'companyDescription',
       'businessCategory', 'category', 'specialOffer', 'offerToMember',
       'acceptInternationalBusiness', 'idealReferral', 'idealReferrals', 'connections',
-      'levelOfManagement', 'departmentAndPosition', 'interestedIndustries', 'idealReferralTypes',
+      'levelOfManagement', 'departmentAndPosition', 'interestedIndustries', 'idealReferralTypes', 'bookmarkedBusinessIds',
       'profession', 'title', 'position',
       // jciCareer.*
       'joinDate', 'joinedDate', 'membershipType', 'introducer', 'probationTasks',
-      'promotionProgress', 'isDuesPaidCurrentYear',
+      'promotionProgress', 'jciCareer.probationTasks', 'jciCareer.promotionProgress',
+      'jciCareer.foundationPathway.probationTasks',
+      'isDuesPaidCurrentYear',
       'attendanceCheckins', 'attendanceMonths', 'attendanceYear',
-      'badgesCount', 'projectsCount', 'trainingsCount',
+      'badgesCount', 'projectsCount', 'trainingsCount', 'careerHistory',
       'senatorCertified', 'senatorshipId', 'senatorshipBoardValidated',
       'currentBoardYear', 'currentBoardPosition', 'isCurrentBoardMember', 'boardHistory',
       'points', 'engagementProgress', 'radarStats', 'radarStatsByYear', 'membershipDuesHistory',

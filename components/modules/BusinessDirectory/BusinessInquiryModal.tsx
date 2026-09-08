@@ -103,8 +103,8 @@ export const BusinessInquiryModal: React.FC<BusinessInquiryModalProps> = ({
             <div className="pt-3 border-t border-slate-50">
               <span className="font-bold text-slate-700 block mb-2 uppercase text-[10px] tracking-widest">Seeking Partnerships</span>
               <div className="flex flex-wrap gap-1.5">
-                {business.internationalPartnershipTypes && business.internationalPartnershipTypes.length > 0 ? (
-                  business.internationalPartnershipTypes.map((type, index) => (
+                {business.idealReferralTypes && business.idealReferralTypes.length > 0 ? (
+                  business.idealReferralTypes.map((type, index) => (
                     <Badge key={index} variant="neutral" className="bg-sky-50/50 text-sky-600 border border-sky-100 font-bold">{type}</Badge>
                   ))
                 ) : (

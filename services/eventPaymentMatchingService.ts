@@ -27,7 +27,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
-import type { Transaction } from '../types';
+import type { Transaction, TransactionReconciliation } from '../types';
 import { invalidateFinanceCache } from './financeService';
 
 export interface EventMatchResult {
@@ -116,11 +116,11 @@ export class EventPaymentMatchingService {
     // Track how much of each bank tx has been allocated this run
     const bankAllocated = new Map<string, number>();
     bankTxs.forEach((b) => {
-      bankAllocated.set(b.id, b.matchedBankAmount ?? 0);
+      bankAllocated.set(b.id, b.reconciliation?.matchedBankAmount ?? 0);
     });
 
     for (const income of incomeTxs) {
-      if (income.matchStatus === 'full') continue;
+      if (income.reconciliation?.matchStatus === 'full') continue;
 
       const result = EventPaymentMatchingService._findBestBankTx(income, bankTxs, bankAllocated);
       if (!result) {
@@ -151,7 +151,7 @@ export class EventPaymentMatchingService {
     const income = { id: snap.id, ...(snap.data() as Omit<Transaction, 'id'>) };
 
     const bankAllocated = new Map<string, number>();
-    bankTxs.forEach((b) => bankAllocated.set(b.id, b.matchedBankAmount ?? 0));
+    bankTxs.forEach((b) => bankAllocated.set(b.id, b.reconciliation?.matchedBankAmount ?? 0));
 
     const result = EventPaymentMatchingService._findBestBankTx(income, bankTxs, bankAllocated);
     if (!result) return null;
@@ -174,28 +174,28 @@ export class EventPaymentMatchingService {
       const incomeData = incomeSnap.exists() ? (incomeSnap.data() as Transaction) : null;
 
       // Fix 6 (P1): idempotency guard — if bankTxId is already in matchedBankTxIds, skip
-      const existingIds: string[] = incomeData?.matchedBankTxIds ?? [];
+      const existingIds: string[] = incomeData?.reconciliation?.matchedBankTxIds ?? [];
       if (existingIds.includes(bankTxId)) return;
 
-      const newAllocated = (bankData?.matchedBankAmount ?? 0) + Math.abs(incomeData?.amount ?? 0);
+      const newAllocated = (bankData?.reconciliation?.matchedBankAmount ?? 0) + Math.abs(incomeData?.amount ?? 0);
       const bankTotal = Math.abs(bankData?.amount ?? 0);
-      const bankMatchStatus: Transaction['matchStatus'] =
+      const bankMatchStatus: TransactionReconciliation['matchStatus'] =
         newAllocated >= bankTotal - AMOUNT_TOLERANCE ? 'full' : 'partial';
 
       // Update income tx → Cleared; record prevStatus so removeMatch can restore exactly
       transaction.update(incomeRef, {
-        matchStatus: 'full',
-        matchedBankTxIds: [...existingIds, bankTxId],
+        'reconciliation.matchStatus': 'full',
+        'reconciliation.matchedBankTxIds': [...existingIds, bankTxId],
         status: 'Cleared',
-        prevStatus: incomeData?.status ?? 'Pending',
+        'reconciliation.prevStatus': incomeData?.status ?? 'Pending',
         updatedAt: Timestamp.now(),
       });
 
       // Update bank tx allocation
       const existingProjectTxIds: string[] = (bankData as any)?.projectTransactionIds ?? [];
       transaction.update(bankRef, {
-        matchedBankAmount: newAllocated,
-        matchStatus: bankMatchStatus,
+        'reconciliation.matchedBankAmount': newAllocated,
+        'reconciliation.matchStatus': bankMatchStatus,
         projectTransactionIds: [...existingProjectTxIds, incomeTxId],
         updatedAt: Timestamp.now(),
       });
@@ -223,27 +223,27 @@ export class EventPaymentMatchingService {
       if (!incomeData || !bankData) throw new Error('Transaction not found');
 
       // Restore income tx
-      const newIncomeBankTxIds = (incomeData.matchedBankTxIds ?? []).filter((id) => id !== bankTxId);
+      const newIncomeBankTxIds = (incomeData.reconciliation?.matchedBankTxIds ?? []).filter((id) => id !== bankTxId);
       transaction.update(incomeRef, {
-        matchStatus: newIncomeBankTxIds.length > 0 ? 'partial' : null,
-        matchedBankTxIds: newIncomeBankTxIds.length > 0 ? newIncomeBankTxIds : null,
-        status: incomeData.prevStatus ?? 'Pending',
-        prevStatus: null,
+        'reconciliation.matchStatus': newIncomeBankTxIds.length > 0 ? 'partial' : null,
+        'reconciliation.matchedBankTxIds': newIncomeBankTxIds.length > 0 ? newIncomeBankTxIds : null,
+        status: incomeData.reconciliation?.prevStatus ?? 'Pending',
+        'reconciliation.prevStatus': null,
         updatedAt: Timestamp.now(),
       });
 
       // Reduce bank tx allocation — clamp at 0 to prevent negative matchedBankAmount
       const removedAmount = Math.abs(incomeData.amount ?? 0);
-      const newAllocated = Math.max(0, (bankData.matchedBankAmount ?? 0) - removedAmount);
+      const newAllocated = Math.max(0, (bankData.reconciliation?.matchedBankAmount ?? 0) - removedAmount);
       const bankTotal = Math.abs(bankData.amount ?? 0);
-      const newBankMatchStatus: Transaction['matchStatus'] =
+      const newBankMatchStatus: TransactionReconciliation['matchStatus'] =
         newAllocated <= AMOUNT_TOLERANCE ? 'unmatched' :
         newAllocated >= bankTotal - AMOUNT_TOLERANCE ? 'full' : 'partial';
       const newProjectTxIds = (bankData.projectTransactionIds ?? []).filter((id) => id !== incomeTxId);
 
       transaction.update(bankRef, {
-        matchedBankAmount: newAllocated,
-        matchStatus: newAllocated <= AMOUNT_TOLERANCE ? null : newBankMatchStatus,
+        'reconciliation.matchedBankAmount': newAllocated,
+        'reconciliation.matchStatus': newAllocated <= AMOUNT_TOLERANCE ? null : newBankMatchStatus,
         projectTransactionIds: newProjectTxIds.length > 0 ? newProjectTxIds : null,
         updatedAt: Timestamp.now(),
       });

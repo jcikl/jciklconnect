@@ -229,41 +229,6 @@ POST /api/financial/reports
 }
 ```
 
-### 治理工具 API
-
-#### 创建投票
-```http
-POST /api/governance/votes
-```
-
-**请求体：**
-```json
-{
-  "title": "新项目提案投票",
-  "description": "是否批准新的社区服务项目",
-  "options": [
-    { "id": "yes", "text": "同意" },
-    { "id": "no", "text": "不同意" }
-  ],
-  "startDate": "2024-02-01T00:00:00Z",
-  "endDate": "2024-02-07T23:59:59Z",
-  "eligibleVoters": ["member_123", "member_456"]
-}
-```
-
-#### 投票
-```http
-POST /api/governance/votes/{voteId}/cast
-```
-
-**请求体：**
-```json
-{
-  "optionId": "yes",
-  "memberId": "member_123"
-}
-```
-
 ## 🔄 实时数据
 
 ### Firestore 实时监听

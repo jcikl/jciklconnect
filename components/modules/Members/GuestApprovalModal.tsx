@@ -94,7 +94,7 @@ export const GuestApprovalModal: React.FC<GuestApprovalModalProps> = ({
       const memberUpdates = {
         role: UserRole.MEMBER,
         'jciCareer.membershipType': 'Probation',
-        'jciCareer.probationTasks': makeDefaultTasks(),
+        'jciCareer.foundationPathway.tasks': makeDefaultTasks(),
         probationApprovedBy: approverId,
         probationApprovedAt: new Date().toISOString(),
         membership: {

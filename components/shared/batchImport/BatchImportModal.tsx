@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertCircle, CheckCircle, Download, Upload, FileSpreadsheet, ChevronDown, ChevronUp, Trash2, X } from 'lucide-react';
+import { AlertCircle, CheckCircle, Download, Upload, FileSpreadsheet, ChevronDown, ChevronUp, Trash2, X, Globe } from 'lucide-react';
 import { Modal, Button, useToast, ProgressBar } from '../../ui/Common';
 import { Input } from '../../ui/Form';
 import { BatchImportConfig, ImportRow, ColumnMapping, ImportContext } from './batchImportTypes';
@@ -46,6 +46,7 @@ export const BatchImportModal: React.FC<Props> = ({
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   const [importProgress, setImportProgress] = useState<{ current: number; total: number; errors: number; done: boolean } | null>(null);
   const [failedImportRows, setFailedImportRows] = useState<Set<number>>(new Set());
+  const [loadingSource, setLoadingSource] = useState<string | null>(null);
   // Inline row editing (情景 LL)
   const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
   const [editingRowValues, setEditingRowValues] = useState<Record<string, any>>({});
@@ -722,28 +723,57 @@ export const BatchImportModal: React.FC<Props> = ({
           </button>
         </div>
         {/* Actions right — always visible */}
-        {config.supportCsv && (
-          <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
+          {config.loaders?.map((loader) => (
             <button
+              key={loader.label}
               type="button"
-              onClick={handleDownloadTemplate}
-              title="Download template"
-              className="flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 hover:bg-slate-50 transition-colors"
+              disabled={loadingSource !== null}
+              onClick={async () => {
+                setLoadingSource(loader.label);
+                try {
+                  const tsv = await loader.load();
+                  handleTextChange(tsv);
+                  setActiveTab('paste');
+                  showToast(`Loaded from ${loader.label}`, 'success');
+                } catch (err: any) {
+                  showToast(`Failed to load: ${err.message}`, 'error');
+                } finally {
+                  setLoadingSource(null);
+                }
+              }}
+              title={`Load data from ${loader.label}`}
+              className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 hover:text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5 hover:bg-emerald-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Download size={13} />
-              <span className="hidden sm:inline">Template</span>
+              <Globe size={13} className={loadingSource === loader.label ? 'animate-spin' : ''} />
+              <span className="hidden sm:inline">
+                {loadingSource === loader.label ? 'Loading…' : loader.label}
+              </span>
             </button>
-            <button
-              type="button"
-              onClick={triggerFileUpload}
-              title="Upload CSV file"
-              className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-1.5 hover:bg-blue-100 transition-colors"
-            >
-              <Upload size={13} />
-              <span className="hidden sm:inline">Upload</span>
-            </button>
-          </div>
-        )}
+          ))}
+          {config.supportCsv && (
+            <>
+              <button
+                type="button"
+                onClick={handleDownloadTemplate}
+                title="Download template"
+                className="flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 hover:bg-slate-50 transition-colors"
+              >
+                <Download size={13} />
+                <span className="hidden sm:inline">Template</span>
+              </button>
+              <button
+                type="button"
+                onClick={triggerFileUpload}
+                title="Upload CSV file"
+                className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-2.5 py-1.5 hover:bg-blue-100 transition-colors"
+              >
+                <Upload size={13} />
+                <span className="hidden sm:inline">Upload</span>
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* ── Tab: Paste ── */}

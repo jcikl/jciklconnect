@@ -245,7 +245,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
       setSelectedMemberProfile(profile ?? probationMembers.find((m) => m.id === memberId) ?? null);
       setSelectedMemberRecord(member);
 
-      const pp = member?.jciCareer?.promotionProgress || ({} as MemberPromotionProgress);
+      const pp = member?.jciCareer?.foundationPathway ?? member?.jciCareer?.promotionProgress ?? ({} as MemberPromotionProgress);
       const bodMeeting = parseDatedDetail(String(pp.bodMeetingAttended ?? ''));
       const organizingCommittee = parseDatedDetail(String(pp.eventOrganizerParticipation ?? ''));
       const [eventParticipation1, eventParticipation2] = splitEventParticipation(String(pp.eventParticipation ?? ''));
@@ -752,7 +752,7 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
       : [...probationMembers];
     const getName = (m: any) => ((m.general?.fullName || m.general?.name) ?? '').toLowerCase();
     const isEligible = (m: any) => {
-      const pp = m.jciCareer?.promotionProgress ?? m.jciCareer?.promotionProgress;
+      const pp = m.jciCareer?.foundationPathway ?? m.jciCareer?.promotionProgress;
       return !!(pp?.bodMeetingAttended && pp?.eventOrganizerParticipation && pp?.eventParticipation && pp?.jciInspireCompleted);
     };
     return filtered.sort((a, b) => {

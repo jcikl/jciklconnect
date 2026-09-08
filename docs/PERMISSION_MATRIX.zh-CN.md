@@ -159,7 +159,6 @@
 | `memberBenefits` | authenticated | board | 权益配置。 | P2 |
 | `contracts` | 本人/board/admin get；list board/admin | member create；board/admin/参与方条件 update；delete admin | 与 point escrow/惩罚相关。 | P1 |
 | `pointEscrow` | 本人/board/admin get；list board/admin | admin 或严格条件 create/update；delete admin | 积分托管，需状态机测试。 | P1 |
-| `bounties` | authenticated | create/update board/admin；delete admin | 新/局部功能，需确认使用状态。 | P2 |
 | `sisterChapters` | active member | SUPER_ADMIN | 对外关系数据。 | P2 |
 | `socialPosts` | active member，部分本人/board get | 本人 create；board/admin update；admin delete | 社媒审批状态机需测试。 | P1 |
 | `socialPersonas` | active member | board | 账号/persona 配置。 | P1 |
@@ -224,4 +223,3 @@
 - 修改 `firestore.rules` 时，同步更新本文件。
 - 新增 Netlify Function 时，必须写明：认证方式、角色要求、写入集合、外部 API、是否含 secret。
 - UI 权限不得作为安全依据；所有敏感写入必须有 Rules 或 Function 服务端角色校验。
-

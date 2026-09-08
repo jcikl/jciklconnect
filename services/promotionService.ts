@@ -259,7 +259,7 @@ export class PromotionService {
     details: Record<string, string | number | boolean | string[]>;
     evidence?: string[];
   } | null {
-    const progress = member.jciCareer?.promotionProgress;
+    const progress = member.jciCareer?.foundationPathway ?? member.jciCareer?.promotionProgress;
 
     switch (requirementType) {
       case 'bod_meeting_attendance': {
@@ -882,7 +882,7 @@ export class PromotionService {
       role: m.role,
       membershipType: m.jciCareer?.membershipType,
       computedMembershipType: this.getComputedMembershipTypeWithRules(m, rules),
-      promotionProgress: m.jciCareer?.promotionProgress,
+      promotionProgress: m.jciCareer?.foundationPathway ?? m.jciCareer?.promotionProgress,
     }));
   }
 
@@ -896,8 +896,8 @@ export class PromotionService {
   ): Promise<void> {
     const m = await this.getMemberById(memberId);
     await MembersService.updateMember(memberId, {
-      promotionProgress: {
-        ...(m?.jciCareer?.promotionProgress ?? m?.jciCareer?.promotionProgress ?? {}),
+      'jciCareer.foundationPathway': {
+        ...(m?.jciCareer?.foundationPathway ?? m?.jciCareer?.promotionProgress ?? {}),
         [field]: value
       }
     } as unknown as Partial<Member>); // computed field key not statically checkable against MemberPromotionProgress
@@ -1097,7 +1097,7 @@ export class PromotionService {
       try {
         // Persist increment to Firestore so progress survives page reloads
         await MembersService.updateMember(memberId, {
-          promotionProgress: {
+          'jciCareer.foundationPathway': {
             [field]: (activityData.value ?? 1) as string | number
           }
         } as unknown as Partial<Member>);

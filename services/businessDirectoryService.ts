@@ -33,6 +33,12 @@ function cacheKeyById(id: string): string {
   return `businessDirectory:byId:${id}`;
 }
 
+function toStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+  if (typeof value === 'string') return value.split(/,|\|\|/).map(item => item.trim()).filter(Boolean);
+  return [];
+}
+
 export function mapMemberToBusinessProfile(id: string, data: Record<string, unknown>): BusinessProfile | null {
   const business = (data.business ?? {}) as Record<string, unknown>;
   const general = (data.general ?? {}) as Record<string, unknown>;
@@ -45,6 +51,10 @@ export function mapMemberToBusinessProfile(id: string, data: Record<string, unkn
   }
 
   const businessCategory = data.businessCategory ?? business.businessCategory;
+  const idealReferralTypes =
+    toStringArray(business.idealReferralTypes).length > 0
+      ? toStringArray(business.idealReferralTypes)
+      : toStringArray(business.idealReferrals ?? data.idealReferral ?? data.idealReferrals);
 
   return {
     id,
@@ -88,7 +98,7 @@ export function mapMemberToBusinessProfile(id: string, data: Record<string, unkn
       (business.acceptInternationalBusiness as boolean | undefined) ??
       false,
     globalNetworkEnabled: (data.globalNetworkEnabled as boolean | undefined) || false,
-    internationalPartnershipTypes: (data.internationalPartnershipTypes as BusinessProfile['internationalPartnershipTypes']) || [],
+    idealReferralTypes,
   };
 }
 
@@ -107,7 +117,7 @@ function mapListingDoc(id: string, data: Record<string, unknown>): BusinessProfi
     businessCategory: (data.businessCategory as string | undefined) || '',
     acceptsInternationalBusiness: (data.acceptsInternationalBusiness as boolean | undefined) || false,
     globalNetworkEnabled: (data.globalNetworkEnabled as boolean | undefined) || false,
-    internationalPartnershipTypes: (data.internationalPartnershipTypes as BusinessProfile['internationalPartnershipTypes']) || [],
+    idealReferralTypes: toStringArray(data.idealReferralTypes ?? data.idealReferrals ?? data.idealReferral),
   };
 }
 

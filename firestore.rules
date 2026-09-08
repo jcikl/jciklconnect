@@ -316,6 +316,13 @@ service cloud.firestore {
       return isAdmin() || isFinanceOperator();
     }
 
+    // PERF-001: finance/meta stores a summary of available transaction years (arrayUnion in createTransaction).
+    // Any authenticated user can read (year list is non-sensitive); only finance roles can write.
+    match /finance/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || isFinanceOperator();
+    }
+
     // Transactions: board / finance roles; multi-LO scoped by loId unless isAdmin/Board()
     match /transactions/{transactionId} {
       // TX-R1: split read into get (resource.data valid) and list (resource.data is null — no loId check)
@@ -1338,16 +1345,6 @@ service cloud.firestore {
     match /birthdayNotificationsSent/{docId} {
       allow read, write: if false;
     }
-
-    // Bounties collection (peer-to-peer reward pledges)
-    // FIX: no match block existed — all access silently denied by catch-all
-    match /bounties/{bountyId} {
-      allow read: if isAuthenticated();
-      allow create: if isBoard() || isAdmin();
-      allow update: if isBoard() || isAdmin();
-      allow delete: if isAdmin();
-    }
-
 
     // Permission configuration collections
     // Used by Config > Access. Authenticated users may read effective permission metadata;

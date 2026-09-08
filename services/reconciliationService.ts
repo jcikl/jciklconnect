@@ -679,8 +679,8 @@ export class ReconciliationService {
           unlinkBatch.update(doc(db, COLLECTIONS.TRANSACTIONS, bankTxId), {
             isSplit: false,
             splitIds: [],
-            status: (bankTx as any).prevStatus ?? 'Pending',
-            category: (bankTx as any).originalCategory || bankTx.category || '',
+            status: bankTx.reconciliation?.prevStatus ?? 'Pending',
+            category: bankTx.original?.category || bankTx.category || '',
             projectId: '',
             purpose: '',
             projectTransactionIds: [],
@@ -721,7 +721,7 @@ export class ReconciliationService {
         // Full unlink (no specific projectTxId) — restore parent tx status so it re-enters the reconciliation candidate pool
         if (!projectTxId) {
           await FinanceService.updateTransaction(bankTxId, {
-            status: (bankTx as any).prevStatus ?? 'Pending',
+            status: bankTx.reconciliation?.prevStatus ?? 'Pending',
             projectTransactionIds: [],
             projectTransactionId: null,
           });
@@ -733,7 +733,7 @@ export class ReconciliationService {
       const updates: any = {
         projectTransactionIds: [],
         projectTransactionId: null,
-        status: (bankTx as any).prevStatus ?? 'Pending',
+        status: bankTx.reconciliation?.prevStatus ?? 'Pending',
         purpose: '',
       };
 
@@ -772,7 +772,7 @@ export class ReconciliationService {
       if (!freshSnap.exists()) return;
       const freshData = freshSnap.data() as Transaction;
 
-      const currentMatchedIds: string[] = freshData.matchedBankTxIds || [];
+      const currentMatchedIds: string[] = freshData.reconciliation?.matchedBankTxIds || [];
       const alreadyMatched = currentMatchedIds.includes(bankTxId);
       const newMatchedIds = alreadyMatched
         ? currentMatchedIds
@@ -781,15 +781,15 @@ export class ReconciliationService {
       // Guard: if bankTxId is already in matchedBankTxIds, do not add to matchedBankAmount again
       // (prevents double-counting on retry calls that find the ID already recorded)
       const newMatchedAmount = alreadyMatched
-        ? (freshData.matchedBankAmount || 0)
-        : (freshData.matchedBankAmount || 0) + allocatedAmount;
+        ? (freshData.reconciliation?.matchedBankAmount || 0)
+        : (freshData.reconciliation?.matchedBankAmount || 0) + allocatedAmount;
       const total = Math.abs(freshData.amount);
       const status = computeMatchStatus(total - newMatchedAmount, total);
 
       const writePayload: any = {
-        matchedBankAmount: newMatchedAmount,
-        matchedBankTxIds: newMatchedIds,
-        matchStatus: status,
+        'reconciliation.matchedBankAmount': newMatchedAmount,
+        'reconciliation.matchedBankTxIds': newMatchedIds,
+        'reconciliation.matchStatus': status,
         updatedAt: Timestamp.now(),
       };
       if (bankDate) writePayload.date = bankDate;
@@ -817,7 +817,7 @@ export class ReconciliationService {
         if (!freshSnap.exists()) return;
         const fresh = freshSnap.data() as Transaction;
 
-        const currentMatchedIds = (fresh.matchedBankTxIds ?? []).filter((id: string) => id !== bankTxId);
+        const currentMatchedIds = (fresh.reconciliation?.matchedBankTxIds ?? []).filter((id: string) => id !== bankTxId);
 
         // Recompute matched amount from remaining linked bank txs (uses caller-supplied list as best-effort;
         // acceptable here since this is a derived denormalised field, not a balance-critical value).
@@ -836,9 +836,9 @@ export class ReconciliationService {
         const status = computeMatchStatus(total - recomputedAmount, total);
 
         const updates: Record<string, unknown> = {
-          matchedBankAmount: recomputedAmount,
-          matchedBankTxIds: currentMatchedIds,
-          matchStatus: status,
+          'reconciliation.matchedBankAmount': recomputedAmount,
+          'reconciliation.matchedBankTxIds': currentMatchedIds,
+          'reconciliation.matchStatus': status,
           updatedAt: Timestamp.now(),
         };
 

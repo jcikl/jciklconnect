@@ -562,7 +562,7 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
   const handleUnmatchBank = async (bankTxId: string) => {
     try {
       const bankTx = bankTxList.find(t => t.id === bankTxId);
-      const originalPurpose = bankTx?.originalPurpose ?? null;
+      const originalPurpose = bankTx?.original?.purpose ?? null;
       const prjTxId = bankTx?.projectTransactionId ?? null;
       // Clear the link via direct write (bypasses reconciliation check)
       await updateDoc(doc(db, COLLECTIONS.TRANSACTIONS, bankTxId), { projectTransactionId: null });

@@ -151,7 +151,7 @@ export const GuestManagementView: React.FC<{ searchQuery?: string; onSelect: (id
         const memberUpdates = {
           role: UserRole.MEMBER,
           'jciCareer.membershipType': 'Probation',
-          'jciCareer.probationTasks': makeDefaultTasks(),
+          'jciCareer.foundationPathway.tasks': makeDefaultTasks(),
           probationApprovedBy: currentMember?.id,
           probationApprovedAt: new Date().toISOString(),
           membership: {

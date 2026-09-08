@@ -34,32 +34,3 @@ export interface Survey {
   createdBy: string;
   createdAt: string;
 }
-
-export interface VoteOption {
-  id: string;
-  text: string;
-  voteCount: number;
-}
-
-export interface Vote {
-  id: string;
-  question: string;
-  description: string;
-  options: VoteOption[];
-  eligibleVoters: string[];
-  startDate: Date;
-  endDate: Date;
-  anonymous: boolean;
-  status: 'draft' | 'active' | 'closed';
-  createdBy: string;
-  createdAt: Date;
-  updatedAt?: Date;
-}
-
-export interface VoteCast {
-  id: string;
-  voteId: string;
-  voterId: string;
-  optionId: string;
-  timestamp: Date;
-}

@@ -19,6 +19,46 @@ import {
 import { ProjectsService } from '../../../../services/projectsService';
 import { ProjectCommitteeMember } from '../../../../types';
 
+/**
+ * Parse an HTML table returned by the JCI Malaysia national events page into TSV text.
+ * Uses DOMParser (browser-only) to extract rows from the first <table> found.
+ * Columns detected from <th> headers; rows from <td> cells.
+ * Unknown columns are preserved as-is so the user can remap them in the modal.
+ */
+function parseJciEventsHtml(html: string): string {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const table = doc.querySelector('table');
+  if (!table) throw new Error('No table found in JCI Malaysia response');
+
+  const rows: string[][] = [];
+
+  // Header row
+  const ths = Array.from(table.querySelectorAll('thead tr th, thead tr td'));
+  if (ths.length > 0) {
+    rows.push(ths.map(th => th.textContent?.trim() ?? ''));
+  }
+
+  // Data rows
+  table.querySelectorAll('tbody tr').forEach(tr => {
+    const cells = Array.from(tr.querySelectorAll('td'));
+    if (cells.length === 0) return;
+    rows.push(cells.map(td => td.textContent?.trim() ?? ''));
+  });
+
+  // Fallback: no thead — treat first <tr> as header
+  if (rows.length === 0) {
+    table.querySelectorAll('tr').forEach(tr => {
+      const cells = Array.from(tr.querySelectorAll('th, td'));
+      if (cells.length === 0) return;
+      rows.push(cells.map(c => c.textContent?.trim() ?? ''));
+    });
+  }
+
+  if (rows.length === 0) throw new Error('Table in JCI Malaysia response has no rows');
+
+  return rows.map(r => r.join('\t')).join('\n');
+}
+
 export const projectImportConfig: BatchImportConfig = {
     name: 'Projects',
 
@@ -138,6 +178,18 @@ export const projectImportConfig: BatchImportConfig = {
         ['Project Title', 'Description', 'Proposed Date', 'Event Start Date', 'Category', 'Level', 'Pillar', 'Proposed Budget', 'Objectives', 'Target Audience'],
         ['Summer Leadership Summit', 'Annual youth leadership training program', '2026-07-15', '2026-07-20', 'programs', 'Local', 'Individual', '5000', 'Develop leadership skills in 50 youth', 'Members and students'],
         ['Community Clean-up Day', 'Environmental awareness project', '2026-04-22', '2026-04-22', 'projects', 'Local', 'Community', '1200', 'Clean up Central Park area', 'Public'],
+    ],
+
+    loaders: [
+        {
+            label: 'JCI Malaysia',
+            load: async () => {
+                const res = await fetch('/.netlify/functions/jci-events-proxy');
+                if (!res.ok) throw new Error(`Server error ${res.status}`);
+                const html = await res.text();
+                return parseJciEventsHtml(html);
+            },
+        },
     ],
 
     importer: async (row, context) => {

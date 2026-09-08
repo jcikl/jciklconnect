@@ -27,6 +27,35 @@ export interface TransactionSplit {
   reconciledBy?: string;
 }
 
+// Nested sub-objects for Transaction — fields that are never used as Firestore where() filters
+// are grouped here for semantic clarity. Query fields (bankAccountId, status, memberId, etc.)
+// stay flat at the Transaction root for index compatibility.
+
+export interface TransactionReconciliation {
+  reconciledAt?: string | null;
+  reconciledBy?: string | null;
+  matchedBankAmount?: number | null;
+  matchedBankTxIds?: string[] | null;
+  matchStatus?: 'unmatched' | 'partial' | 'full' | 'over' | null;
+  /** Status held before matchTransactions() set it to Reconciled — restored on unmatch. */
+  prevStatus?: 'Pending' | 'Cleared' | 'Reconciled' | 'Partially Reconciled' | 'Voided' | null;
+}
+
+export interface TransactionReversal {
+  reversalOf?: string;
+  reversalReason?: string;
+  reversedBy?: string;
+}
+
+export interface TransactionOriginal {
+  category?: string;
+  projectId?: string | null;
+  memberId?: string | null;
+  paymentRequestId?: string | null;
+  purpose?: string | null;
+  year?: number;
+}
+
 export interface Transaction {
   id: string;
   date: string;
@@ -36,12 +65,11 @@ export interface Transaction {
   type: 'Income' | 'Expense';
   category: 'Projects & Activities' | 'Membership' | 'Administrative' | ''; // '' used for split-parent records — see financeService.ts
   status: 'Pending' | 'Cleared' | 'Reconciled' | 'Partially Reconciled' | 'Voided';
+  // Query fields — kept flat for Firestore composite index compatibility
   projectId?: string | null;
   memberId?: string | null;
   bankAccountId?: string;
   loId?: string | null;
-  reconciledAt?: string;
-  reconciledBy?: string;
   referenceNumber?: string | null;
   paymentRequestId?: string | null;
   projectTransactionId?: string | null;
@@ -56,26 +84,16 @@ export interface Transaction {
   inventoryLinkId?: string;
   inventoryVariant?: string;
   inventoryQuantity?: number;
-  createdAt?: string;
-  updatedAt?: string;
-  originalCategory?: string;
-  originalProjectId?: string;
-  originalMemberId?: string;
-  originalPaymentRequestId?: string;
-  originalPurpose?: string;
-  originalYear?: number;
-  matchedBankAmount?: number;
-  matchedBankTxIds?: string[];
-  matchStatus?: 'unmatched' | 'partial' | 'full' | 'over';
-  /** Status held immediately before matchTransactions() set it to Reconciled — lets unmatch restore it exactly. */
-  prevStatus?: Transaction['status'] | null;
   source?: 'bank_import' | 'manual';
   eventRegistrationId?: string;
   paymentMethod?: 'toyyib' | 'bank_transfer' | 'cash';
   toyyibBillCode?: string;
-  reversalOf?: string;
-  reversalReason?: string;
-  reversedBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  // Nested groups
+  reconciliation?: TransactionReconciliation;
+  reversal?: TransactionReversal;
+  original?: TransactionOriginal;
 }
 
 export interface BankAccount {

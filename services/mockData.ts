@@ -301,8 +301,7 @@ export const MOCK_TRANSACTIONS: Transaction[] = [
     referenceNumber: 'PR-jcikl-20231206-002',
     paymentRequestId: 'pr-mock-004',
     memberId: 'u2',
-    reconciledAt: '2023-12-07',
-    reconciledBy: 'u1',
+    reconciliation: { reconciledAt: '2023-12-07', reconciledBy: 'u1', matchedBankAmount: null, matchedBankTxIds: null, matchStatus: null, prevStatus: null },
   },
 ];
 
