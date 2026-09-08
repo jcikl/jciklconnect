@@ -165,14 +165,6 @@ export const projectImportConfig: BatchImportConfig = {
             preprocessor: parseDatePreprocessor,
         },
         {
-            key: 'targetAudience',
-            label: 'Target Audience',
-            required: false,
-            aliases: ['Target Audience', '目标群体', '对象'],
-            validators: [],
-            preprocessor: trimPreprocessor,
-        },
-        {
             key: 'roadmapId',
             label: 'Roadmap ID',
             required: false,
@@ -216,9 +208,9 @@ export const projectImportConfig: BatchImportConfig = {
 
     sampleFileName: 'JCI_Project_Import_Template.csv',
     sampleData: [
-        ['Project Title', 'Category', 'Type', 'Event Start Date', 'Event End Date', 'Level', 'Pillar', 'Description', 'Target Audience', 'Roadmap ID', 'Hosting LO', 'Area'],
-        ['Leadership Summit', 'National Convention', 'program', '2026-07-20', '2026-07-22', 'National', 'Individual', 'Annual leadership training', 'Members and students', 'JCI001', 'JCI KL', 'Central'],
-        ['Community Clean-up', 'Environmental Project', 'project', '2026-04-22', '2026-04-22', 'Local', 'Community', 'Green city initiative', 'Public', '', 'JCI PJ', 'West'],
+        ['Project Title', 'Category', 'Type', 'Event Start Date', 'Event End Date', 'Level', 'Pillar', 'Description', 'Roadmap ID', 'Hosting LO', 'Area'],
+        ['Leadership Summit', 'National Convention', 'program', '2026-07-20', '2026-07-22', 'National', 'Individual', 'Annual leadership training', 'JCI001', 'JCI KL', 'Central'],
+        ['Community Clean-up', 'Environmental Project', 'project', '2026-04-22', '2026-04-22', 'Local', 'Community', 'Green city initiative', '', 'JCI PJ', 'West'],
     ],
 
     loaders: [
@@ -254,7 +246,6 @@ export const projectImportConfig: BatchImportConfig = {
             type: row.type as any || 'project',
             level: row.level as any || 'Local',
             pillar: row.pillar as any || 'Community',
-            targetAudience: row.targetAudience || '',
             eventStartDate: row.eventStartDate || undefined,
             eventEndDate: row.eventEndDate || undefined,
             roadmapId: row.roadmapId || undefined,
