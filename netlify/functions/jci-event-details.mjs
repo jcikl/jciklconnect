@@ -29,10 +29,9 @@ async function fetchDetail(id) {
 function extractCoHosting(detail) {
   if (!detail) return '';
   const root = detail?.data ?? detail;
-  const raw = root?.cohosting ?? root?.co_hosts ?? root?.cohosts ?? root?.cohost ?? [];
-  if (Array.isArray(raw)) {
-    return raw.map(h => h?.chapter || h?.name || h?.lo || String(h)).filter(Boolean).join(', ');
-  }
+  // cohosting is an array of chapter name strings e.g. ["JCI KL", "JCI PJ", ...]
+  const raw = root?.cohosting;
+  if (Array.isArray(raw)) return raw.filter(Boolean).join(', ');
   return typeof raw === 'string' ? raw : '';
 }
 
