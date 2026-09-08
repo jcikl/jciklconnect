@@ -1,6 +1,6 @@
 /**
- * Proxy for JCI Malaysia national event listing.
- * Returns raw HTML from jcimalaysia.cc/roadmap to work around browser CORS restrictions.
+ * Proxy for JCI Malaysia national event listing (DataTables JSON API).
+ * Works around browser CORS restrictions by fetching server-side.
  */
 
 const EVENTS_URL =
@@ -11,7 +11,7 @@ export default async () => {
     const response = await fetch(EVENTS_URL, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; JCIKLConnect/1.0)',
-        Accept: 'text/html,application/xhtml+xml',
+        Accept: 'application/json, text/plain, */*',
       },
     });
 
@@ -23,11 +23,19 @@ export default async () => {
     }
 
     const body = await response.text();
-    const contentType = response.headers.get('Content-Type') || 'application/json';
+
+    // Guard: if the upstream returned HTML instead of JSON, surface a clear error
+    if (body.trimStart().startsWith('<')) {
+      return new Response(
+        JSON.stringify({ error: 'JCI Malaysia returned HTML — the API may require authentication or the endpoint has changed.' }),
+        { status: 502, headers: { 'Content-Type': 'application/json' } },
+      );
+    }
+
     return new Response(body, {
       status: 200,
       headers: {
-        'Content-Type': contentType,
+        'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
       },
     });
