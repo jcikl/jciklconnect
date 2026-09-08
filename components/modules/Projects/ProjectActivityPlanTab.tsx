@@ -324,10 +324,8 @@ export const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
             <div>
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l-4 border-jci-blue/40 pl-2 mb-2">Schedule</p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                <Input name="proposedDate" label="Proposed" type="date" value={editProposedDate}
-                  onChange={(e) => setEditProposedDate(e.target.value)} icon={<Calendar size={16} />} required />
                 <Input name="eventStartDate" label="Start Date" type="date" value={editEventStartDate}
-                  onChange={(e) => setEditEventStartDate(e.target.value)} icon={<Calendar size={16} />} required />
+                  onChange={(e) => { setEditEventStartDate(e.target.value); setEditProposedDate(e.target.value); }} icon={<Calendar size={16} />} required />
                 <Input name="eventEndDate" label="End Date" type="date" value={editEventEndDate}
                   onChange={(e) => setEditEventEndDate(e.target.value)} icon={<Calendar size={16} />} />
                 <div />
