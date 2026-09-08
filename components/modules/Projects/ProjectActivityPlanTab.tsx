@@ -21,7 +21,6 @@ export const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
   const [descExpanded, setDescExpanded] = useState(false);
 
   const hasPlanFields =
-    project.proposedDate ||
     project.proposedBudget != null ||
     project.objectives ||
     project.eventStartDate ||
@@ -61,7 +60,6 @@ export const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
 
   // View mode
   const scheduleItems: { label: string; date: string; time?: string }[] = [];
-  if (project.proposedDate) scheduleItems.push({ label: 'Proposed', date: formatDate(toDate(project.proposedDate as any)) });
   if (project.eventStartDate) scheduleItems.push({ label: 'Start', date: formatDate(toDate(project.eventStartDate as any)), time: project.eventStartTime });
   if (project.eventEndDate) scheduleItems.push({ label: 'End', date: formatDate(toDate(project.eventEndDate as any)), time: project.eventEndTime });
 

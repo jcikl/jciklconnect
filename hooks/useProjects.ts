@@ -73,6 +73,21 @@ export const useProjects = () => {
     }
   };
 
+  const batchDeleteProjects = async (ids: string[], onProgress?: (current: number) => void): Promise<{ succeeded: string[]; failed: string[] }> => {
+    let completed = 0;
+    const results = await Promise.allSettled(
+      ids.map(async id => {
+        const result = await ProjectsService.deleteProject(id);
+        onProgress?.(++completed);
+        return result;
+      })
+    );
+    const succeeded = ids.filter((_, i) => results[i].status === 'fulfilled');
+    const failed    = ids.filter((_, i) => results[i].status === 'rejected');
+    await loadProjects();
+    return { succeeded, failed };
+  };
+
   const getProjectTasksRef = useRef(false);
   const getProjectTasks = async (projectId: string): Promise<Task[]> => {
     if (getProjectTasksRef.current) return [];
@@ -144,6 +159,7 @@ export const useProjects = () => {
     createProject,
     updateProject,
     deleteProject,
+    batchDeleteProjects,
     getProjectTasks,
     createTask,
     updateTask,

@@ -46,17 +46,56 @@ export class ProjectsService {
           const snapshot = await getDocs(
             query(collection(db, COLLECTIONS.PROJECTS), orderBy('createdAt', 'desc'))
           );
-          return snapshot.docs.map(d => ({
-            id: d.id,
-            ...d.data(),
-            createdAt: d.data().createdAt?.toDate?.()?.toISOString?.() ?? d.data().createdAt,
-            updatedAt: d.data().updatedAt?.toDate?.()?.toISOString?.() ?? d.data().updatedAt,
-          } as Project));
+          const toIsoDate = (val: any): string | undefined => {
+            if (!val) return undefined;
+            if (typeof val === 'string') {
+              // Already ISO YYYY-MM-DD — return as-is
+              if (/^\d{4}-\d{2}-\d{2}/.test(val)) return val.slice(0, 10);
+              // Attempt to parse formatted strings like "Sep 8, 2026"
+              const d = new Date(val);
+              if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+              return val;
+            }
+            // Firestore Timestamp
+            if (typeof val === 'object' && typeof val.toDate === 'function') {
+              return val.toDate().toISOString().slice(0, 10);
+            }
+            return undefined;
+          };
+          return snapshot.docs.map(d => {
+            const data = d.data();
+            return {
+              id: d.id,
+              ...data,
+              createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? data.createdAt,
+              updatedAt: data.updatedAt?.toDate?.()?.toISOString?.() ?? data.updatedAt,
+              eventStartDate: toIsoDate(data.eventStartDate),
+              eventEndDate: toIsoDate(data.eventEndDate),
+            } as Project;
+          });
         } catch (error) {
           errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'ProjectsService.getAllProjects' });
           throw error;
         }
       }, PROJECTS_TTL, 'projectsService.getAllProjects')
+    );
+  }
+
+  // Return Set of roadmapId values that already exist in Firestore — used by the batch importer to skip duplicates.
+  static async getExistingRoadmapIds(): Promise<Set<string>> {
+    return withDevMode(
+      () => new Set(MOCK_PROJECTS.filter(p => (p as any).roadmapId).map(p => (p as any).roadmapId as string)),
+      async () => {
+        try {
+          const snapshot = await getDocs(
+            query(collection(db, COLLECTIONS.PROJECTS), where('roadmapId', '!=', null))
+          );
+          return new Set(snapshot.docs.map(d => d.data().roadmapId as string).filter(Boolean));
+        } catch (error) {
+          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'ProjectsService.getExistingRoadmapIds' });
+          return new Set<string>();
+        }
+      }
     );
   }
 
@@ -107,6 +146,7 @@ export class ProjectsService {
         updatedAt: Timestamp.now(),
       };
       if (projectData.description != null) payload.description = projectData.description;
+      if (projectData.lgDesc != null) payload.lgDesc = projectData.lgDesc;
       if (projectData.team != null) payload.team = projectData.team;
       if (projectData.financialAccountId != null) payload.financialAccountId = projectData.financialAccountId;
       if (projectData.startDate != null) payload.startDate = projectData.startDate;

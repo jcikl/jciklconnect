@@ -31,6 +31,30 @@ interface JciMalaysiaEvent {
   coHosting?: string; // enriched by proxy from fetch-event detail
   desc?: string;      // short description from fetch-event
   lgDesc?: string;    // long description from fetch-event
+  startTime?: string; // HH:MM 24h, enriched from fetch-event start_time
+  endTime?: string;   // HH:MM 24h, enriched from fetch-event end_time
+  logoUrl?: string;   // enriched from event HTML page (og:image)
+  pillar?: string;    // enriched from event HTML page (badge)
+  priceMin?: number;  // enriched from event HTML page (ticket prices)
+  priceMax?: number;  // enriched from event HTML page (ticket prices)
+}
+
+/** Strip HTML tags and decode entities from API description fields. */
+function decodeHtml(raw: string): string {
+  if (!raw) return '';
+  // Remove HTML tags
+  const stripped = raw.replace(/<[^>]*>/g, ' ');
+  // Decode common named + numeric entities via DOMParser (browser) or regex fallback
+  try {
+    const doc = new DOMParser().parseFromString(stripped, 'text/html');
+    return (doc.body.textContent ?? stripped).replace(/\s+/g, ' ').trim();
+  } catch {
+    return stripped
+      .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ')
+      .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+      .replace(/\s+/g, ' ').trim();
+  }
 }
 
 /** Extract YYYY-MM-DD from "2026-11-11 00:00 am - ..." */
@@ -49,6 +73,28 @@ function extractEndDate(datetime: string, startDate: string): string {
   return startDate;
 }
 
+/** Convert "HH:MM am/pm" → "HH:MM" (24-hour). Returns '' if no match. */
+function parseAmPmTime(segment: string): string {
+  const m = segment.match(/(\d{1,2}):(\d{2})\s*(am|pm)/i);
+  if (!m) return '';
+  let h = parseInt(m[1], 10);
+  const min = m[2];
+  const ampm = m[3].toLowerCase();
+  if (ampm === 'pm' && h < 12) h += 12;
+  if (ampm === 'am' && h === 12) h = 0;
+  return `${h.toString().padStart(2, '0')}:${min}`;
+}
+
+/** Extract start time (HH:MM 24h) from "2026-11-11 00:00 am - ..." */
+function extractStartTime(datetime: string): string {
+  return parseAmPmTime(datetime.split(' - ')[0] ?? '');
+}
+
+/** Extract end time (HH:MM 24h) from "... - 2026-11-14 23:59 pm" */
+function extractEndTime(datetime: string): string {
+  return parseAmPmTime(datetime.split(' - ')[1] ?? '');
+}
+
 /**
  * Parse the JSON response from JCI Malaysia national events API into TSV.
  * category (ev.category) → Category; group (ev.group) → Type;
@@ -63,8 +109,10 @@ function parseJciEventsJson(json: string): string {
 
   const headers = [
     'Project Title', 'Category', 'Type',
-    'Event Start Date', 'Event End Date',
-    'Level', 'Roadmap ID', 'Hosting LO', 'Area', 'Co-Hosting', 'Description',
+    'Event Start Date', 'Event End Date', 'Event Start Time', 'Event End Time',
+    'Level', 'Roadmap ID', 'Hosting LO', 'Area', 'Co-Hosting',
+    'Description', 'Long Description', 'Status',
+    'Logo URL', 'Pillar', 'Price Min', 'Price Max',
   ];
   const rows: string[][] = [headers];
 
@@ -74,16 +122,24 @@ function parseJciEventsJson(json: string): string {
 
     rows.push([
       ev.title,
-      ev.category,          // specific JCI Malaysia category name (free-form)
-      ev.group,             // type preprocessor: "JCIM Program"→program, "LO Projects"→project, etc.
+      ev.category,
+      ev.group,
       startDate,
       endDate,
+      ev.startTime || extractStartTime(ev.datetime),
+      ev.endTime   || extractEndTime(ev.datetime),
       ev.level,
       ev.id,
       ev.chapter || '',
       ev.area,
       ev.coHosting || '',
-      ev.lgDesc || ev.desc || '',  // long description preferred, fall back to short
+      decodeHtml(ev.desc || ''),
+      decodeHtml(ev.lgDesc || ''),
+      ev.status || '',
+      ev.logoUrl || '',
+      ev.pillar || '',
+      ev.priceMin != null ? String(ev.priceMin) : '',
+      ev.priceMax != null ? String(ev.priceMax) : '',
     ]);
   }
 
@@ -131,7 +187,15 @@ export const projectImportConfig: BatchImportConfig = {
             key: 'description',
             label: 'Description',
             required: false,
-            aliases: ['Description', '项目描述', '简介', 'About'],
+            aliases: ['Description', '项目描述', '简介', 'About', 'Short Description'],
+            validators: [],
+            preprocessor: trimPreprocessor,
+        },
+        {
+            key: 'lgDesc',
+            label: 'Long Description',
+            required: false,
+            aliases: ['Long Description', 'lg_desc', 'lgDesc', '详细描述', '长描述'],
             validators: [],
             preprocessor: trimPreprocessor,
         },
@@ -170,6 +234,22 @@ export const projectImportConfig: BatchImportConfig = {
             preprocessor: parseDatePreprocessor,
         },
         {
+            key: 'eventStartTime',
+            label: 'Event Start Time',
+            required: false,
+            aliases: ['Event Start Time', 'Start Time', '开始时间'],
+            validators: [],
+            preprocessor: trimPreprocessor,
+        },
+        {
+            key: 'eventEndTime',
+            label: 'Event End Time',
+            required: false,
+            aliases: ['Event End Time', 'End Time', '结束时间'],
+            validators: [],
+            preprocessor: trimPreprocessor,
+        },
+        {
             key: 'roadmapId',
             label: 'Roadmap ID',
             required: false,
@@ -201,6 +281,46 @@ export const projectImportConfig: BatchImportConfig = {
             validators: [],
             preprocessor: trimPreprocessor,
         },
+        {
+            key: 'logoUrl',
+            label: 'Logo URL',
+            required: false,
+            aliases: ['Logo URL', 'logoUrl', 'Logo', 'Image URL', 'Poster URL'],
+            validators: [],
+            preprocessor: trimPreprocessor,
+        },
+        {
+            key: 'priceMin',
+            label: 'Price Min',
+            required: false,
+            aliases: ['Price Min', 'priceMin', 'Min Price', 'Minimum Price', 'Price From'],
+            validators: [],
+            preprocessor: trimPreprocessor,
+        },
+        {
+            key: 'priceMax',
+            label: 'Price Max',
+            required: false,
+            aliases: ['Price Max', 'priceMax', 'Max Price', 'Maximum Price', 'Price To'],
+            validators: [],
+            preprocessor: trimPreprocessor,
+        },
+        {
+            key: 'status',
+            label: 'Status',
+            required: false,
+            aliases: ['Status', 'status', 'Event Status'],
+            validators: [],
+            // Map JCI Malaysia status → Project status
+            preprocessor: (val: any) => {
+                const v = String(val || '').toLowerCase().trim();
+                if (v === 'completed') return 'Completed';
+                if (v === 'published') return 'Active';
+                if (v === 'draft') return 'Draft';
+                return 'Planning';
+            },
+            defaultValue: 'Planning',
+        },
     ],
 
     tableColumns: [
@@ -210,7 +330,8 @@ export const projectImportConfig: BatchImportConfig = {
         { key: 'eventStartDate', label: 'Start', width: 100 },
         { key: 'eventEndDate', label: 'End', width: 100 },
         { key: 'level', label: 'Level', width: 80 },
-        { key: 'valid', label: 'Status', width: 70 },
+        { key: 'status', label: 'JCI Status', width: 90 },
+        { key: 'valid', label: 'Valid', width: 70 },
     ],
 
     supportCsv: true,
@@ -231,31 +352,74 @@ export const projectImportConfig: BatchImportConfig = {
             label: 'JCI Malaysia',
             load: async (onProgress) => {
                 // Step 1: fetch merged event list from all 4 levels
-                onProgress?.('1/2 · 获取活动列表…');
+                onProgress?.('1/3 · 获取活动列表…');
                 const listRes = await fetch('/api/jci-events-proxy');
                 if (!listRes.ok) throw new Error(`Server error ${listRes.status}`);
                 const listData = await listRes.json();
                 if (listData.error) throw new Error(listData.error);
-                const events: JciMalaysiaEvent[] = listData.data ?? [];
-                if (!events.length) throw new Error('JCI Malaysia returned no events');
+                const allEvents: JciMalaysiaEvent[] = listData.data ?? [];
+                if (!allEvents.length) throw new Error('JCI Malaysia returned no events');
 
-                // Step 2: batch-fetch detail (desc, lg_desc, cohosting) for all events
-                onProgress?.(`2/2 · 加载 ${events.length} 个活动详情…`);
+                // Filter out projects already in Firestore (deduplicate by roadmapId)
+                const existingIds = await ProjectsService.getExistingRoadmapIds();
+                const events = allEvents.filter(ev => !existingIds.has(ev.id));
+                const skippedCount = allEvents.length - events.length;
+                if (!events.length) throw new Error(`所有 ${allEvents.length} 个活动已存在于数据库，无需重新导入`);
+                onProgress?.(skippedCount > 0
+                    ? `1/3 · 共 ${allEvents.length} 个，跳过 ${skippedCount} 个已存在，新增 ${events.length} 个…`
+                    : `1/3 · 共 ${allEvents.length} 个活动，全部为新项目…`);
+                // Brief pause so the user can read the count before step 2 starts
+                await new Promise(r => setTimeout(r, 800));
+
+                // Step 2: batch-fetch detail (desc, lg_desc, cohosting, start/end time) in chunks
                 const ids = events.map(ev => ev.id);
-                const detailRes = await fetch('/api/jci-event-details', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ids }),
-                });
-                const detailMap: Record<string, { desc: string; lgDesc: string; coHosting: string }> =
-                    detailRes.ok ? await detailRes.json() : {};
+                const CHUNK = 100;
+                const detailMap: Record<string, { desc: string; lgDesc: string; coHosting: string; startTime: string; endTime: string }> = {};
+                let done = 0;
+                onProgress?.(`2/3 · 加载详情 0/${ids.length}…`);
+                for (let i = 0; i < ids.length; i += CHUNK) {
+                    const chunk = ids.slice(i, i + CHUNK);
+                    const res = await fetch('/api/jci-event-details', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ids: chunk }),
+                    });
+                    if (res.ok) Object.assign(detailMap, await res.json());
+                    done += chunk.length;
+                    onProgress?.(`2/3 · 加载详情 ${done}/${ids.length}…`);
+                }
 
-                // Merge detail data into events
+                // Step 3: batch-fetch HTML pages for logo, pillar and pricing
+                const PAGE_CHUNK = 50;
+                const pageMap: Record<string, { logoUrl: string; pillar: string; priceMin?: number; priceMax?: number }> = {};
+                done = 0;
+                onProgress?.(`3/3 · 同步海报/Pillar/价格 0/${ids.length}…`);
+                for (let i = 0; i < ids.length; i += PAGE_CHUNK) {
+                    const chunk = ids.slice(i, i + PAGE_CHUNK);
+                    try {
+                        const res = await fetch('/api/jci-page-details', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ ids: chunk }),
+                        });
+                        if (res.ok) Object.assign(pageMap, await res.json());
+                    } catch { /* non-blocking — missing logo/pillar/price is acceptable */ }
+                    done += chunk.length;
+                    onProgress?.(`3/3 · 同步海报/Pillar/价格 ${done}/${ids.length}…`);
+                }
+
+                // Merge all enriched data into events
                 const enriched = events.map(ev => ({
                     ...ev,
-                    desc: detailMap[ev.id]?.desc ?? '',
-                    lgDesc: detailMap[ev.id]?.lgDesc ?? '',
-                    coHosting: detailMap[ev.id]?.coHosting ?? '',
+                    desc: detailMap[ev.id]?.desc || ev.desc || '',
+                    lgDesc: detailMap[ev.id]?.lgDesc || ev.lgDesc || '',
+                    coHosting: detailMap[ev.id]?.coHosting || ev.coHosting || '',
+                    startTime: detailMap[ev.id]?.startTime || '',
+                    endTime: detailMap[ev.id]?.endTime || '',
+                    logoUrl: pageMap[ev.id]?.logoUrl || '',
+                    pillar: pageMap[ev.id]?.pillar || '',
+                    priceMin: pageMap[ev.id]?.priceMin,
+                    priceMax: pageMap[ev.id]?.priceMax,
                 }));
 
                 return parseJciEventsJson(JSON.stringify({ data: enriched }));
@@ -278,6 +442,7 @@ export const projectImportConfig: BatchImportConfig = {
             name: row.title,
             title: row.title,
             description: row.description || '',
+            lgDesc: row.lgDesc || undefined,
             proposedDate: row.eventStartDate || new Date().toISOString().split('T')[0],
             proposedBudget: 0,
             category: row.category || '',
@@ -286,12 +451,17 @@ export const projectImportConfig: BatchImportConfig = {
             pillar: row.pillar as any || 'Community',
             eventStartDate: row.eventStartDate || undefined,
             eventEndDate: row.eventEndDate || undefined,
+            eventStartTime: row.eventStartTime || undefined,
+            eventEndTime: row.eventEndTime || undefined,
             roadmapId: row.roadmapId || undefined,
             roadmapUrl: row.roadmapId ? `https://jcimalaysia.cc/roadmap/event-details-public.php?eventid=${row.roadmapId}` : undefined,
             hostingLo: row.hostingLo || undefined,
             coHosting: row.coHosting || undefined,
             area: row.area || undefined,
-            status: 'Planning',
+            logoUrl: row.logoUrl || undefined,
+            priceMin: row.priceMin ? parseFloat(row.priceMin) || undefined : undefined,
+            priceMax: row.priceMax ? parseFloat(row.priceMax) || undefined : undefined,
+            status: (row.status as any) || 'Planning',
             submittedBy: member?.id || '',
             committee: defaultCommittee,
         } as any);

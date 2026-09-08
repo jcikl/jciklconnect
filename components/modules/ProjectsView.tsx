@@ -13,6 +13,7 @@ import type { ProjectFinancialAccount as ProjectFinancialAccountType, ProjectTra
 import { useBatchMode } from '../../contexts/BatchModeContext';
 import { projectFinancialService } from '../../services/projectFinancialService';
 import { PENDING_USE_TEMPLATE_KEY } from '../../utils/roadmapUtils';
+import { ProjectsService } from '../../services/projectsService';
 import { ProjectDetailTabs } from './Projects/ProjectDetailTabs';
 import { TemplatePreviewModal } from './Projects/TemplatePreviewModal';
 import { ProjectsBatchActions } from './Projects/ProjectsBatchActions';
@@ -34,7 +35,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
   const [templateSearchTerm, setTemplateSearchTerm] = useState('');
   const [templateFilterType, setTemplateFilterType] = useState<string>('all');
 
-  const { projects, loading, error, createProject, updateProject, deleteProject } = useProjects();
+  const { projects, loading, error, createProject, updateProject, deleteProject, batchDeleteProjects, loadProjects } = useProjects();
   const { eventTemplates, loading: templatesLoading, error: templatesError, createEventTemplate, updateEventTemplate, deleteEventTemplate } = useTemplates();
   const { member } = useAuth();
   const { isBoard, isAdmin, isDeveloper } = usePermissions();
@@ -103,7 +104,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
   }, [initialSelectedProjectId, projects, onClearSelection]);
 
   const displayedProjects = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kuala_Lumpur' }); // YYYY-MM-DD in MYT
     const term = (searchQuery || '').toLowerCase();
 
     let filtered = projects;
@@ -159,24 +160,88 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
     setConfirmState({ open: true, title: 'Delete Events', message: `Are you sure you want to delete ${selectedProjectIds.size} selected events? This action cannot be undone.`, variant: 'danger', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await _doBatchDelete(); } });
   };
   const _doBatchDelete = async () => {
-
     const idsToDelete = Array.from(selectedProjectIds);
     setBatchOperationProgress({ current: 0, total: idsToDelete.length });
 
-    try {
-      // Process in parallel with progress updates
-      await Promise.all(idsToDelete.map(async (id) => {
-        await deleteProject(id);
-        setBatchOperationProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
-      }));
+    const { succeeded, failed } = await batchDeleteProjects(idsToDelete, (current) => {
+      setBatchOperationProgress({ current, total: idsToDelete.length });
+    });
 
-      setSelectedProjectIds(new Set());
-      showToast(`Successfully deleted ${idsToDelete.length} events`, 'success');
-    } catch (err) {
-      showToast('Some events could not be deleted', 'error');
-    } finally {
-      setBatchOperationProgress(null);
+    setSelectedProjectIds(prev => {
+      const next = new Set(prev);
+      succeeded.forEach(id => next.delete(id));
+      return next;
+    });
+
+    if (failed.length === 0) {
+      showToast(`Successfully deleted ${succeeded.length} events`, 'success');
+    } else if (succeeded.length === 0) {
+      showToast(`Could not delete any events — they may have financial records`, 'error');
+    } else {
+      showToast(`Deleted ${succeeded.length} events · ${failed.length} skipped (have financial records)`, 'error');
     }
+
+    setBatchOperationProgress(null);
+  };
+
+  const handleBatchSyncPoster = async () => {
+    const targets = Array.from(selectedProjectIds)
+      .map(id => projects.find(p => p.id === id))
+      .filter((p): p is Project => !!p && !!(p as any).roadmapId && !(p as any).logoUrl);
+    if (!targets.length) { showToast('All selected projects already have a poster (or no Roadmap ID)', 'info'); return; }
+
+    setBatchOperationProgress({ current: 0, total: targets.length });
+
+    const getPosterUrl = async (roadmapId: string): Promise<string | null> => {
+      try {
+        const html = await fetch(`/api/jci-proxy?eventid=${encodeURIComponent(roadmapId)}`).then(r => r.text());
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        const poster =
+          doc.querySelector('meta[property="og:image"]')?.getAttribute('content') ||
+          [...doc.querySelectorAll('img')]
+            .map(img => img.getAttribute('src'))
+            .find(src => !!src && /\/uploads\/\d+\/cover\//i.test(src)) ||
+          null;
+        if (!poster) return null;
+        try { return new URL(poster, 'https://jcimalaysia.cc').href; } catch { return poster; }
+      } catch { return null; }
+    };
+
+    // Phase 1: fetch all poster URLs in parallel (concurrency 20)
+    let completed = 0;
+    const CONCURRENCY = 20;
+    const posterResults: Array<{ id: string; logoUrl: string }> = [];
+    let idx = 0;
+    const worker = async () => {
+      while (idx < targets.length) {
+        const i = idx++;
+        const proj = targets[i];
+        const logoUrl = await getPosterUrl((proj as any).roadmapId);
+        if (logoUrl) posterResults.push({ id: proj.id!, logoUrl });
+        setBatchOperationProgress({ current: ++completed, total: targets.length });
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, targets.length) }, worker));
+
+    // Phase 2: write Firestore with bounded concurrency + progress
+    if (posterResults.length > 0) {
+      const WRITE_CONCURRENCY = 30;
+      let writeIdx = 0;
+      let written = 0;
+      setBatchOperationProgress({ current: 0, total: posterResults.length });
+      const writeWorker = async () => {
+        while (writeIdx < posterResults.length) {
+          const { id, logoUrl } = posterResults[writeIdx++];
+          await ProjectsService.updateProject(id, { logoUrl } as any).catch(() => null);
+          setBatchOperationProgress({ current: ++written, total: posterResults.length });
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(WRITE_CONCURRENCY, posterResults.length) }, writeWorker));
+      await loadProjects();
+    }
+
+    setBatchOperationProgress(null);
+    showToast(`Synced poster for ${posterResults.length} / ${targets.length} projects`, posterResults.length > 0 ? 'success' : 'warning');
   };
 
   const handleBatchStatusUpdate = (newStatus: Project['status']) => {
@@ -207,10 +272,17 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
     }
   };
 
-  const handleSelectAll = useCallback(() => {
-    const allIds = displayedProjects.map(p => p.id).filter(id => !!id) as string[];
-    setSelectedProjectIds(new Set(allIds));
-  }, [displayedProjects]);
+  const handleSelectAll = useCallback((ids: string[]) => {
+    setSelectedProjectIds(prev => {
+      const allSelected = ids.length > 0 && ids.every(id => prev.has(id));
+      if (allSelected) {
+        const next = new Set(prev);
+        ids.forEach(id => next.delete(id));
+        return next;
+      }
+      return new Set([...prev, ...ids]);
+    });
+  }, []);
 
   const handleImport = useCallback(() => setImportModalOpen(true), []);
 
@@ -234,14 +306,14 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
 
         if (!isInput && (activeTab === 'projects' || activeTab === 'past-projects') && !selectedProjectId) {
           e.preventDefault();
-          handleSelectAll();
+          // select-all handled by the page checkbox in ProjectGrid
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleSelectAll, activeTab, selectedProjectId]);
+  }, [activeTab, selectedProjectId]);
 
   const handleStatusUpdate = async (newStatus: Project['status']) => {
     if (!selectedProjectId) return;
@@ -352,6 +424,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
           onActiveTabChange={(tab) => {
             setActiveTab(tab);
             setSelectedProjectId(null);
+            setSelectedProjectIds(new Set());
           }}
           onYearChange={setSelectedYear}
           onSelectProject={setSelectedProjectId}
@@ -359,6 +432,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
           onImport={handleImport}
           onToggleSelection={handleToggleSelection}
           onSelectAll={handleSelectAll}
+          onClearSelection={() => setSelectedProjectIds(new Set())}
           onTemplateSearchTermChange={setTemplateSearchTerm}
           onTemplateFilterTypeChange={setTemplateFilterType}
           onCreateTemplate={() => { setSelectedTemplate(null); setTemplateModalOpen(true); }}
@@ -382,7 +456,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
       )}
 
       <ProjectsBatchActions
-        visible={(activeTab === 'projects' || activeTab === 'past-projects') && !selectedProjectId && displayedProjects.length > 0 && selectedProjectIds.size > 1}
+        visible={((activeTab === 'projects' || activeTab === 'past-projects') && !selectedProjectId && displayedProjects.length > 0 && selectedProjectIds.size > 1) || batchOperationProgress !== null}
         selectedCount={selectedProjectIds.size}
         progress={batchOperationProgress}
         isStatusModalOpen={isBatchStatusModalOpen}
@@ -391,6 +465,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
         onDelete={handleBatchDelete}
         onClearSelection={() => setSelectedProjectIds(new Set())}
         onStatusUpdate={handleBatchStatusUpdate}
+        onSyncPoster={handleBatchSyncPoster}
       />
 
 

@@ -4,7 +4,7 @@
  * Returns: { [id]: { desc, lgDesc, coHosting } }
  */
 
-const DETAIL_URL = 'https://jcimalaysia.cc/roadmap/functions/event.php?stat=fetch-event&eventid=';
+const DETAIL_URL = 'https://jcimalaysia.cc/roadmap/functions/event.php?role=administrator&stat=fetch-event&eventid=';
 
 const HEADERS = {
   'User-Agent': 'Mozilla/5.0 (compatible; JCIKLConnect/1.0)',
@@ -44,6 +44,35 @@ function extractDesc(detail) {
   };
 }
 
+/** Convert "HH:MM" or "HH:MM am/pm" to 24-hour "HH:MM". Returns '' if unrecognised. */
+function parseTime(raw) {
+  if (!raw) return '';
+  const s = String(raw).trim();
+  // Already 24h "HH:MM"
+  const h24 = s.match(/^(\d{1,2}):(\d{2})$/);
+  if (h24) return `${h24[1].padStart(2, '0')}:${h24[2]}`;
+  // "HH:MM am/pm"
+  const ampm = s.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/i);
+  if (ampm) {
+    let h = parseInt(ampm[1], 10);
+    const m = ampm[2];
+    const p = ampm[3].toLowerCase();
+    if (p === 'pm' && h < 12) h += 12;
+    if (p === 'am' && h === 12) h = 0;
+    return `${h.toString().padStart(2, '0')}:${m}`;
+  }
+  return '';
+}
+
+function extractTimes(detail) {
+  if (!detail) return { startTime: '', endTime: '' };
+  const root = detail?.data ?? detail;
+  return {
+    startTime: parseTime(root?.start_time ?? root?.startTime ?? root?.start ?? ''),
+    endTime:   parseTime(root?.end_time   ?? root?.endTime   ?? root?.end   ?? ''),
+  };
+}
+
 export default async (req) => {
   try {
     // Use POST body to avoid HTTP 414 URI Too Long with thousands of IDs
@@ -67,7 +96,8 @@ export default async (req) => {
     ids.forEach((id, i) => {
       const detail = results[i].status === 'fulfilled' ? results[i].value : null;
       const { desc, lgDesc } = extractDesc(detail);
-      map[id] = { desc, lgDesc, coHosting: extractCoHosting(detail) };
+      const { startTime, endTime } = extractTimes(detail);
+      map[id] = { desc, lgDesc, coHosting: extractCoHosting(detail), startTime, endTime };
     });
 
     return new Response(JSON.stringify(map), {

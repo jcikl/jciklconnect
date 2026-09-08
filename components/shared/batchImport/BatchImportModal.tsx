@@ -780,12 +780,49 @@ export const BatchImportModal: React.FC<Props> = ({
       </div>
 
       {/* ── Loader progress banner ── */}
-      {loadingSource !== null && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-700">
-          <svg className="animate-spin shrink-0" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-          <span>{loadingMessage ?? `Loading from ${loadingSource}…`}</span>
-        </div>
-      )}
+      {loadingSource !== null && (() => {
+        // Parse "N/T · description [done/total]…" from onProgress messages
+        const msg = loadingMessage ?? '';
+        const stepMatch = msg.match(/^(\d+)\/(\d+)\s*·\s*(.+?)(?:\s+(\d+)\/(\d+))?…?$/);
+        const stepCurrent = stepMatch ? parseInt(stepMatch[1]) : null;
+        const stepTotal   = stepMatch ? parseInt(stepMatch[2]) : null;
+        const desc        = stepMatch ? stepMatch[3] : (loadingMessage ?? `Loading from ${loadingSource}…`);
+        const done        = stepMatch?.[4] != null ? parseInt(stepMatch[4]) : null;
+        const total       = stepMatch?.[5] != null ? parseInt(stepMatch[5]) : null;
+        const pct         = done != null && total != null && total > 0 ? Math.round((done / total) * 100) : null;
+
+        return (
+          <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs text-emerald-800 space-y-1.5">
+            <div className="flex items-center gap-2">
+              <svg className="animate-spin shrink-0" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+              <span className="flex-1 font-medium truncate">{desc}</span>
+              {stepTotal != null && (
+                <span className="flex items-center gap-1 shrink-0">
+                  {Array.from({ length: stepTotal }, (_, i) => (
+                    <span
+                      key={i}
+                      className={`inline-block rounded-full ${i < (stepCurrent ?? 0) ? 'bg-emerald-500' : 'bg-emerald-200'}`}
+                      style={{ width: 6, height: 6 }}
+                    />
+                  ))}
+                  <span className="ml-1 text-emerald-600">{stepCurrent}/{stepTotal}</span>
+                </span>
+              )}
+            </div>
+            {pct != null && (
+              <div className="space-y-0.5">
+                <div className="flex justify-between text-[10px] text-emerald-600">
+                  <span>{done!.toLocaleString()} / {total!.toLocaleString()}</span>
+                  <span>{pct}%</span>
+                </div>
+                <div className="h-1 rounded-full bg-emerald-200 overflow-hidden">
+                  <div className="h-full rounded-full bg-emerald-500 transition-all duration-300" style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ── Tab: Paste ── */}
       {activeTab === 'paste' && (

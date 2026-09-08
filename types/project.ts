@@ -33,6 +33,7 @@ export interface Project {
   title?: string;
   name?: string;
   description?: string;
+  lgDesc?: string;
   logoUrl?: string;
   roadmapUrl?: string;
   galleryUrls?: string[];

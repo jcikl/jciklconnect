@@ -65,8 +65,8 @@ export const normalizeHeaderName = (header: string): string => {
     .replace(/[^\w\s]/g, '')
     // Remove common prefixes
     .replace(/^(the|a|an)\s+/, '')
-    // Remove common suffixes
-    .replace(/\s+(number|no|num|date|time|info|information)$/, '')
+    // Remove common suffixes (note: 'time' intentionally excluded — "Event Start Time" must not collapse to "event start")
+    .replace(/\s+(number|no|num|date|info|information)$/, '')
     // Replace multiple spaces with single space
     .replace(/\s+/g, ' ')
     .trim();

@@ -55,6 +55,7 @@ export const ProjectActivityDrawer: React.FC<ProjectActivityDrawerProps> = ({
   const [hostingLo, setHostingLo] = useState('');
   const [area, setArea] = useState('');
   const [coHosting, setCoHosting] = useState('');
+  const [lgDesc, setLgDesc] = useState('');
 
   // Reset / populate state whenever the drawer opens or the project changes
   useEffect(() => {
@@ -62,6 +63,7 @@ export const ProjectActivityDrawer: React.FC<ProjectActivityDrawerProps> = ({
     setStep(1);
     setTitle(project?.title ?? project?.name ?? '');
     setDescription(project?.description ?? '');
+    setLgDesc(project?.lgDesc ?? '');
     setRoadmapUrl(project?.roadmapUrl ?? '');
     setLogoUrl(project?.logoUrl ?? '');
     setGalleryUrl(project?.galleryUrls?.[0] ?? '');
@@ -99,21 +101,14 @@ export const ProjectActivityDrawer: React.FC<ProjectActivityDrawerProps> = ({
     if (!roadmapUrl) { showToast('Please enter a Roadmap Event URL or ID', 'warning'); return; }
     setIsFetchingPoster(true);
     try {
+      // Sync only fields the batch import cannot capture: logoUrl, pillar, priceMin/priceMax
       const details = await fetchRoadmapEventDetails(roadmapUrl);
       if (details.logoUrl) setLogoUrl(details.logoUrl);
-      if (details.title) setTitle(details.title);
-      if (details.description) setDescription(details.description);
-      if (details.level) setLevel(details.level);
       if (details.pillar) setPillar(details.pillar);
-      if (details.type) setType(details.type);
-      if (details.category) setCategory(details.category);
-      if (details.eventStartDate) setEventStartDate(details.eventStartDate);
-      if (details.eventEndDate) setEventEndDate(details.eventEndDate);
-      if (details.eventStartTime) setEventStartTime(details.eventStartTime);
-      if (details.eventEndTime) setEventEndTime(details.eventEndTime);
       if (details.priceMin != null) setPriceMin(String(details.priceMin));
       if (details.priceMax != null) setPriceMax(String(details.priceMax));
-      showToast('Successfully synchronized event details!', 'success');
+
+      showToast('Synced poster, pillar and pricing from JCI Malaysia', 'success');
     } catch (err: any) {
       showToast(err.message || 'Failed to sync event details', 'error');
     } finally {
@@ -128,10 +123,7 @@ export const ProjectActivityDrawer: React.FC<ProjectActivityDrawerProps> = ({
     setStep(2);
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (step === 1) { handleNext(); return; }
-
+  const handleSaveData = async () => {
     if (!level || !pillar || !type || !category) {
       showToast('Please fill in Level, Pillar, Type, and Category', 'error');
       return;
@@ -140,21 +132,20 @@ export const ProjectActivityDrawer: React.FC<ProjectActivityDrawerProps> = ({
       showToast('End date must be on or after start date', 'error');
       return;
     }
-
-    const formData = new FormData(e.currentTarget);
     setIsSaving(true);
     try {
       await onSave({
         title,
         name: title,
         description: description || '',
+        lgDesc: lgDesc || undefined,
         logoUrl: logoUrl || '',
         roadmapUrl: roadmapUrl || '',
         galleryUrls: galleryUrl ? [galleryUrl] : [],
-        level: (formData.get('level') as ProjectLevel) || undefined,
-        pillar: (formData.get('pillar') as ProjectPillar) || undefined,
-        type: (formData.get('type') as any) || undefined,
-        category: (formData.get('category') as string) || undefined,
+        level: level as ProjectLevel || undefined,
+        pillar: pillar as ProjectPillar || undefined,
+        type: type as any || undefined,
+        category: category || undefined,
         proposedDate: eventStartDate || '',
         eventStartDate: eventStartDate || undefined,
         eventEndDate: eventEndDate || undefined,
@@ -174,6 +165,12 @@ export const ProjectActivityDrawer: React.FC<ProjectActivityDrawerProps> = ({
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (step === 1) { handleNext(); return; }
+    await handleSaveData();
   };
 
   const today = new Date().toISOString().split('T')[0];
@@ -208,7 +205,7 @@ export const ProjectActivityDrawer: React.FC<ProjectActivityDrawerProps> = ({
           {step === 1 ? (
             <Button type="button" onClick={handleNext}>Next →</Button>
           ) : (
-            <Button type="submit" form="activity-drawer-form" disabled={isSaving}>
+            <Button type="button" onClick={handleSaveData} disabled={isSaving}>
               {isSaving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Project'}
             </Button>
           )}
@@ -245,8 +242,10 @@ export const ProjectActivityDrawer: React.FC<ProjectActivityDrawerProps> = ({
                 <Input label="Title" placeholder="e.g. Summer Leadership Summit"
                   value={title} onChange={(e) => setTitle(e.target.value)}
                   icon={<FileText size={16} />} required />
-                <Textarea label="Description" placeholder="Brief description of the activity plan..."
+                <Textarea label="Description (Short)" placeholder="Brief description of the activity plan..."
                   value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
+                <Textarea label="Long Description" placeholder="Full event description (lg_desc)..."
+                  value={lgDesc} onChange={(e) => setLgDesc(e.target.value)} rows={5} />
               </div>
             </div>
             <div>

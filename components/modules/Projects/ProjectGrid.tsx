@@ -81,7 +81,7 @@ const ProjectGridBase: React.FC<ProjectGridProps> = ({
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50/60">
               <th className="w-8 px-4 py-3">
-                <Checkbox checked={selectedIds?.size === projects.length && projects.length > 0} onChange={onSelectAll} />
+                <Checkbox checked={projects.length > 0 && projects.every(p => selectedIds?.has(p.id!))} onChange={onSelectAll} />
               </th>
               <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-3 py-3 w-[35%]">Project</th>
               <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wide px-3 py-3">Status</th>

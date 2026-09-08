@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layers, Settings, Trash2, X } from 'lucide-react';
+import { Image, Layers, Settings, Trash2, X } from 'lucide-react';
 import { Button, Modal } from '../../ui/Common';
 import type { Project } from '../../../types';
 
@@ -13,6 +13,7 @@ interface ProjectsBatchActionsProps {
   onDelete: () => void;
   onClearSelection: () => void;
   onStatusUpdate: (status: Project['status']) => void;
+  onSyncPoster: () => void;
 }
 
 const BATCH_STATUSES: Project['status'][] = ['Planning', 'Draft', 'Under Review', 'Approved', 'Active', 'Completed', 'Cancelled'];
@@ -33,6 +34,7 @@ export const ProjectsBatchActions: React.FC<ProjectsBatchActionsProps> = ({
   onDelete,
   onClearSelection,
   onStatusUpdate,
+  onSyncPoster,
 }) => (
   <>
     {visible && (
@@ -44,14 +46,29 @@ export const ProjectsBatchActions: React.FC<ProjectsBatchActionsProps> = ({
           </div>
 
           {progress ? (
-            <div className="flex-1 max-w-[150px] md:w-48 h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
-              <div
-                className="h-full bg-blue-500 transition-all duration-300 ease-out"
-                style={{ width: `${(progress.current / progress.total) * 100}%` }}
-              />
+            <div className="flex-1 flex flex-col gap-1.5 max-w-[150px] md:max-w-none md:w-56">
+              <div className="flex items-center justify-between text-[10px] text-slate-400">
+                <span>{progress.current} / {progress.total}</span>
+                <span>{progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0}%</span>
+              </div>
+              <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                <div
+                  className="h-full bg-blue-500 transition-all duration-300 ease-out"
+                  style={{ width: `${progress.total > 0 ? (progress.current / progress.total) * 100 : 0}%` }}
+                />
+              </div>
             </div>
           ) : (
             <>
+              <button
+                onClick={onSyncPoster}
+                className="flex flex-col md:flex-row items-center gap-1 md:gap-2 text-emerald-400 hover:text-emerald-300 transition-all min-w-[70px] md:min-w-0"
+              >
+                <div className="p-2 md:p-0 rounded-2xl md:rounded-none bg-white/5 md:bg-transparent">
+                  <Image size={20} className="md:w-4 md:h-4" />
+                </div>
+                <span className="text-[9px] md:text-sm font-bold tracking-widest md:tracking-normal uppercase md:capitalize">Poster</span>
+              </button>
               <button
                 onClick={onOpenStatusModal}
                 className="flex flex-col md:flex-row items-center gap-1 md:gap-2 text-blue-400 hover:text-blue-300 transition-all min-w-[70px] md:min-w-0"
