@@ -254,7 +254,7 @@ export const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
             <div>
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l-4 border-jci-blue/40 pl-2 mb-3">Project Info</p>
               <div className="space-y-3">
-                <Input name="title" label="Title *" placeholder="e.g. Summer Leadership Summit"
+                <Input name="title" label="Title" placeholder="e.g. Summer Leadership Summit"
                   value={editTitle} onChange={(e) => setEditTitle(e.target.value)}
                   icon={<FileText size={16} />} required />
                 <Textarea name="description" label="Description" placeholder="Brief description of the activity plan..."
@@ -312,23 +312,23 @@ export const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
             <div>
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l-4 border-jci-blue/40 pl-2 mb-2">Classification</p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                <Select name="level" label="Level *" required value={editLevel} onChange={(e) => setEditLevel(e.target.value as any)}
+                <Select name="level" label="Level" required value={editLevel} onChange={(e) => setEditLevel(e.target.value as any)}
                   options={[{ label: '— Select —', value: '' }, ...PROJECT_LEVELS.map(l => ({ label: l, value: l }))]} />
-                <Select name="pillar" label="Pillar *" required value={editPillar} onChange={(e) => setEditPillar(e.target.value as any)}
+                <Select name="pillar" label="Pillar" required value={editPillar} onChange={(e) => setEditPillar(e.target.value as any)}
                   options={[{ label: '— Select —', value: '' }, ...PROJECT_PILLARS.map(p => ({ label: p, value: p }))]} />
-                <Select name="type" label="Type *" required value={formType}
+                <Select name="type" label="Type" required value={formType}
                   options={[{ label: '— Select —', value: '' }, ...PROJECT_TYPES.map(c => ({ label: PROJECT_TYPE_LABELS[c] || c, value: c }))]}
                   onChange={(e) => { setFormType(e.target.value); setEditCategory(''); }} />
-                <Select name="category" label="Category *" required value={editCategory} onChange={(e) => setEditCategory(e.target.value)}
+                <Select name="category" label="Category" required value={editCategory} onChange={(e) => setEditCategory(e.target.value)}
                   options={[{ label: '— Select —', value: '' }, ...(formType ? (PROJECT_CATEGORIES_BY_TYPE[formType] ?? []) : []).map(t => ({ label: t, value: t }))]} />
               </div>
             </div>
             <div>
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l-4 border-jci-blue/40 pl-2 mb-2">Schedule</p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                <Input name="proposedDate" label="Proposed *" type="date" value={editProposedDate}
+                <Input name="proposedDate" label="Proposed" type="date" value={editProposedDate}
                   onChange={(e) => setEditProposedDate(e.target.value)} icon={<Calendar size={16} />} required />
-                <Input name="eventStartDate" label="Start Date *" type="date" value={editEventStartDate}
+                <Input name="eventStartDate" label="Start Date" type="date" value={editEventStartDate}
                   onChange={(e) => setEditEventStartDate(e.target.value)} icon={<Calendar size={16} />} required />
                 <Input name="eventEndDate" label="End Date" type="date" value={editEventEndDate}
                   onChange={(e) => setEditEventEndDate(e.target.value)} icon={<Calendar size={16} />} />
