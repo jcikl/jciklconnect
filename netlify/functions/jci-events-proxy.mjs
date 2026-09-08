@@ -44,7 +44,6 @@ async function fetchDetail(id) {
 
 function extractCoHosting(detail) {
   if (!detail) return '';
-  // Try common field names the JCI Malaysia API might use
   const raw =
     detail?.cohosting ??
     detail?.co_hosts ??
@@ -61,6 +60,16 @@ function extractCoHosting(detail) {
   return typeof raw === 'string' ? raw : '';
 }
 
+function extractDesc(detail) {
+  if (!detail) return { desc: '', lgDesc: '' };
+  // detail may be the root object or wrapped under .data
+  const root = detail?.data ?? detail;
+  return {
+    desc: root?.desc ?? root?.description ?? '',
+    lgDesc: root?.lg_desc ?? root?.long_description ?? root?.lgDesc ?? '',
+  };
+}
+
 export default async () => {
   try {
     // Step 1: fetch all levels in parallel
@@ -74,12 +83,18 @@ export default async () => {
       );
     }
 
-    // Step 2: enrich each event with co-hosting data in parallel
+    // Step 2: enrich each event with detail data (cohosting + descriptions) in parallel
     const details = await Promise.allSettled(merged.map(ev => fetchDetail(ev.id)));
-    const enriched = merged.map((ev, i) => ({
-      ...ev,
-      coHosting: details[i].status === 'fulfilled' ? extractCoHosting(details[i].value) : '',
-    }));
+    const enriched = merged.map((ev, i) => {
+      const detail = details[i].status === 'fulfilled' ? details[i].value : null;
+      const { desc, lgDesc } = extractDesc(detail);
+      return {
+        ...ev,
+        coHosting: extractCoHosting(detail),
+        desc,
+        lgDesc,
+      };
+    });
 
     return new Response(JSON.stringify({ data: enriched }), {
       status: 200,

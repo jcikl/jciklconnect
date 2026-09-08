@@ -29,6 +29,8 @@ interface JciMalaysiaEvent {
   status: string;     // "published" | "completed"
   year: string;
   coHosting?: string; // enriched by proxy from fetch-event detail
+  desc?: string;      // short description from fetch-event
+  lgDesc?: string;    // long description from fetch-event
 }
 
 /** Extract YYYY-MM-DD from "2026-11-11 00:00 am - ..." */
@@ -62,7 +64,7 @@ function parseJciEventsJson(json: string): string {
   const headers = [
     'Project Title', 'Category', 'Type',
     'Event Start Date', 'Event End Date',
-    'Level', 'Roadmap ID', 'Hosting LO', 'Area', 'Co-Hosting',
+    'Level', 'Roadmap ID', 'Hosting LO', 'Area', 'Co-Hosting', 'Description',
   ];
   const rows: string[][] = [headers];
 
@@ -81,6 +83,7 @@ function parseJciEventsJson(json: string): string {
       ev.chapter || '',
       ev.area,
       ev.coHosting || '',
+      ev.lgDesc || ev.desc || '',  // long description preferred, fall back to short
     ]);
   }
 
