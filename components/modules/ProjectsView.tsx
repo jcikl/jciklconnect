@@ -16,11 +16,10 @@ import { PENDING_USE_TEMPLATE_KEY } from '../../utils/roadmapUtils';
 import { ProjectDetailTabs } from './Projects/ProjectDetailTabs';
 import { TemplatePreviewModal } from './Projects/TemplatePreviewModal';
 import { ProjectsBatchActions } from './Projects/ProjectsBatchActions';
-import { ProjectsCreateDrawer } from './Projects/ProjectsCreateDrawer';
+import { ProjectActivityDrawer } from './Projects/ProjectActivityDrawer';
 import { ProjectsTemplateModal } from './Projects/ProjectsTemplateModal';
 import { ProjectsDetailHeader } from './Projects/ProjectsDetailHeader';
 import { ProjectsListShell } from './Projects/ProjectsListShell';
-import { useProjectCreateForm } from './Projects/useProjectCreateForm';
 
 // Roadmap template bridge extracted to utils/roadmapUtils.ts
 // All sub-components extracted to Projects/ subdirectory
@@ -41,11 +40,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
   const { isBoard, isAdmin, isDeveloper } = usePermissions();
   const isPrivileged = isBoard || isAdmin || isDeveloper;
   const { showToast } = useToast();
-  const { drawerProps: createDrawerProps, open: handleNewProposal } = useProjectCreateForm({
-    member,
-    createProject,
-    showToast,
-  });
+  const [isCreating, setIsCreating] = useState(false);
   const [isStatusUpdating, setIsStatusUpdating] = useState(false);
   const [isImportModalOpen, setImportModalOpen] = useState(false);
   const [selectedProjectIds, setSelectedProjectIds] = useState<Set<string>>(new Set());
@@ -360,7 +355,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
           }}
           onYearChange={setSelectedYear}
           onSelectProject={setSelectedProjectId}
-          onNewProposal={handleNewProposal}
+          onNewProposal={() => setIsCreating(true)}
           onImport={handleImport}
           onToggleSelection={handleToggleSelection}
           onSelectAll={handleSelectAll}
@@ -399,7 +394,22 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
       />
 
 
-      <ProjectsCreateDrawer {...createDrawerProps} />
+      <ProjectActivityDrawer
+        isOpen={isCreating}
+        onClose={() => setIsCreating(false)}
+        onSave={async (data) => {
+          const committee = member
+            ? [{ memberId: member.id, role: 'organizer' as const, name: (member as any).name || (member as any).displayName || (member as any).general?.name || '' }]
+            : [];
+          await createProject({
+            ...data,
+            status: 'Planning',
+            submittedBy: member?.id || '',
+            committee,
+          } as any);
+          showToast('Project created successfully!', 'success');
+        }}
+      />
 
 
       <ProjectsTemplateModal
