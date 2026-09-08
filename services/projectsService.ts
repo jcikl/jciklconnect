@@ -131,6 +131,11 @@ export class ProjectsService {
       if (projectData.priceMin != null) payload.priceMin = projectData.priceMin;
       if (projectData.priceMax != null) payload.priceMax = projectData.priceMax;
       if (projectData.roadmapUrl != null) payload.roadmapUrl = projectData.roadmapUrl;
+      if (projectData.roadmapId != null) payload.roadmapId = projectData.roadmapId;
+      if (projectData.hostingLo != null) payload.hostingLo = projectData.hostingLo;
+      if (projectData.area != null) payload.area = projectData.area;
+      if (projectData.coHosting != null) payload.coHosting = projectData.coHosting;
+      if (projectData.location != null) payload.location = projectData.location;
 
       const docRef = await addDoc(collection(db, COLLECTIONS.PROJECTS), payload);
       this.invalidateProjectsCache();
