@@ -164,8 +164,6 @@ export const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
         type: (formData.get('type') as any) || undefined,
         category: (formData.get('category') as string) || undefined,
         proposedDate: editProposedDate || '',
-        objectives: (formData.get('objectives') as string) || '',
-        expectedImpact: (formData.get('expectedImpact') as string) || '',
         eventStartDate: editEventStartDate || undefined,
         eventEndDate: editEventEndDate || undefined,
         eventStartTime: editEventStartTime || undefined,
@@ -345,15 +343,6 @@ export const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
               <div className="mt-2">
                 <Input name="location" label="Location" placeholder="e.g. KLCC Convention Centre"
                   value={editLocation} onChange={(e) => setEditLocation(e.target.value)} icon={<MapPin size={16} />} />
-              </div>
-            </div>
-            <div>
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l-4 border-jci-blue/40 pl-2 mb-2">Goals</p>
-              <div className="md:grid md:grid-cols-2 md:gap-3 space-y-2 md:space-y-0">
-                <Textarea name="objectives" label="Objectives & Goals" placeholder="Goals and expected community impact..."
-                  defaultValue={project.objectives} rows={2} />
-                <Textarea name="expectedImpact" label="Expected Impact" placeholder="Expected outcomes and impact..."
-                  defaultValue={project.expectedImpact} rows={2} />
               </div>
             </div>
             <div>
