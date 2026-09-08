@@ -15,7 +15,7 @@ async function fetchDetail(id) {
   try {
     const res = await fetch(`${DETAIL_URL}${id}`, {
       headers: HEADERS,
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(4000),
     });
     if (!res.ok) return null;
     const body = await res.text();

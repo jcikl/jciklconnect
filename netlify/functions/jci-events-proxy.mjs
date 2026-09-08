@@ -38,7 +38,13 @@ export default async () => {
       );
     }
 
-    return new Response(JSON.stringify({ data: merged }), {
+    // Filter to current + next year only — the full list contains thousands of
+    // historical events which would cause the detail-fetch step to time out.
+    const currentYear = new Date().getFullYear();
+    const validYears = new Set([String(currentYear), String(currentYear + 1)]);
+    const filtered = merged.filter(ev => validYears.has(String(ev.year)));
+
+    return new Response(JSON.stringify({ data: filtered.length > 0 ? filtered : merged }), {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
