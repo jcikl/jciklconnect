@@ -241,8 +241,12 @@ export const projectImportConfig: BatchImportConfig = {
 
                 // Step 2: batch-fetch detail (desc, lg_desc, cohosting) for all events
                 onProgress?.(`2/2 · 加载 ${events.length} 个活动详情…`);
-                const ids = events.map(ev => ev.id).join(',');
-                const detailRes = await fetch(`/api/jci-event-details?ids=${encodeURIComponent(ids)}`);
+                const ids = events.map(ev => ev.id);
+                const detailRes = await fetch('/api/jci-event-details', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids }),
+                });
                 const detailMap: Record<string, { desc: string; lgDesc: string; coHosting: string }> =
                     detailRes.ok ? await detailRes.json() : {};
 

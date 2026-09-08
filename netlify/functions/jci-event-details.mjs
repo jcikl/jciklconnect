@@ -46,8 +46,15 @@ function extractDesc(detail) {
 
 export default async (req) => {
   try {
-    const url = new URL(req.url);
-    const ids = (url.searchParams.get('ids') ?? '').split(',').map(s => s.trim()).filter(Boolean);
+    // Use POST body to avoid HTTP 414 URI Too Long with thousands of IDs
+    let ids = [];
+    if (req.method === 'POST') {
+      const body = await req.json().catch(() => ({}));
+      ids = Array.isArray(body.ids) ? body.ids.map(String).filter(Boolean) : [];
+    } else {
+      const url = new URL(req.url);
+      ids = (url.searchParams.get('ids') ?? '').split(',').map(s => s.trim()).filter(Boolean);
+    }
 
     if (ids.length === 0) {
       return new Response(JSON.stringify({}), {
