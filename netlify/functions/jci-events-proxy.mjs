@@ -1,10 +1,12 @@
 /**
  * Proxy for JCI Malaysia event listing (DataTables JSON API).
- * Fetches all four levels in parallel and merges results.
+ * Fetches all four levels in parallel, then enriches each event with
+ * co-hosting data from the individual event detail endpoint.
  * Works around browser CORS restrictions by fetching server-side.
  */
 
 const BASE_URL = 'https://jcimalaysia.cc/roadmap/functions/event.php?role=administrator&view=&stat=event-level-manage&level=';
+const DETAIL_URL = 'https://jcimalaysia.cc/roadmap/functions/event.php?stat=fetch-event&eventid=';
 const LEVELS = ['national', 'area', 'local', 'jci'];
 
 const HEADERS = {
@@ -13,11 +15,11 @@ const HEADERS = {
 };
 
 async function fetchLevel(level) {
-  const res = await fetch(`${BASE_URL}${level}`, { headers: HEADERS });
-  if (!res.ok) return [];
-  const body = await res.text();
-  if (body.trimStart().startsWith('<')) return [];
   try {
+    const res = await fetch(`${BASE_URL}${level}`, { headers: HEADERS });
+    if (!res.ok) return [];
+    const body = await res.text();
+    if (body.trimStart().startsWith('<')) return [];
     const parsed = JSON.parse(body);
     return Array.isArray(parsed?.data) ? parsed.data : [];
   } catch {
@@ -25,8 +27,43 @@ async function fetchLevel(level) {
   }
 }
 
+async function fetchDetail(id) {
+  try {
+    const res = await fetch(`${DETAIL_URL}${id}`, {
+      headers: HEADERS,
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) return null;
+    const body = await res.text();
+    if (body.trimStart().startsWith('<')) return null;
+    return JSON.parse(body);
+  } catch {
+    return null;
+  }
+}
+
+function extractCoHosting(detail) {
+  if (!detail) return '';
+  // Try common field names the JCI Malaysia API might use
+  const raw =
+    detail?.cohosting ??
+    detail?.co_hosts ??
+    detail?.cohosts ??
+    detail?.cohost ??
+    detail?.data?.cohosting ??
+    [];
+  if (Array.isArray(raw)) {
+    return raw
+      .map(h => h?.chapter || h?.name || h?.lo || String(h))
+      .filter(Boolean)
+      .join(', ');
+  }
+  return typeof raw === 'string' ? raw : '';
+}
+
 export default async () => {
   try {
+    // Step 1: fetch all levels in parallel
     const results = await Promise.all(LEVELS.map(fetchLevel));
     const merged = results.flat();
 
@@ -37,7 +74,14 @@ export default async () => {
       );
     }
 
-    return new Response(JSON.stringify({ data: merged }), {
+    // Step 2: enrich each event with co-hosting data in parallel
+    const details = await Promise.allSettled(merged.map(ev => fetchDetail(ev.id)));
+    const enriched = merged.map((ev, i) => ({
+      ...ev,
+      coHosting: details[i].status === 'fulfilled' ? extractCoHosting(details[i].value) : '',
+    }));
+
+    return new Response(JSON.stringify({ data: enriched }), {
       status: 200,
       headers: {
         'Content-Type': 'application/json',

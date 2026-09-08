@@ -81,7 +81,9 @@ export interface Project {
   committee?: ProjectCommitteeMember[];
   trainers?: ProjectTrainer[];
   roadmapId?: string;
+  roadmapUrl?: string;
   hostingLo?: string;
+  coHosting?: string;
   area?: string;
   createdAt?: string;
   updatedAt?: string;

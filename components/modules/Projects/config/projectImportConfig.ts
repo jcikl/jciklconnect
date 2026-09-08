@@ -28,6 +28,7 @@ interface JciMalaysiaEvent {
   area: string;
   status: string;     // "published" | "completed"
   year: string;
+  coHosting?: string; // enriched by proxy from fetch-event detail
 }
 
 /** Extract YYYY-MM-DD from "2026-11-11 00:00 am - ..." */
@@ -61,7 +62,7 @@ function parseJciEventsJson(json: string): string {
   const headers = [
     'Project Title', 'Category', 'Type',
     'Event Start Date', 'Event End Date',
-    'Level', 'Roadmap ID', 'Hosting LO', 'Area',
+    'Level', 'Roadmap ID', 'Hosting LO', 'Area', 'Co-Hosting',
   ];
   const rows: string[][] = [headers];
 
@@ -79,6 +80,7 @@ function parseJciEventsJson(json: string): string {
       ev.id,
       ev.chapter || '',
       ev.area,
+      ev.coHosting || '',
     ]);
   }
 
@@ -188,6 +190,14 @@ export const projectImportConfig: BatchImportConfig = {
             validators: [],
             preprocessor: trimPreprocessor,
         },
+        {
+            key: 'coHosting',
+            label: 'Co-Hosting',
+            required: false,
+            aliases: ['Co-Hosting', 'Co-host', 'Co Host', 'Cohosting', 'cohosts'],
+            validators: [],
+            preprocessor: trimPreprocessor,
+        },
     ],
 
     tableColumns: [
@@ -251,6 +261,7 @@ export const projectImportConfig: BatchImportConfig = {
             roadmapId: row.roadmapId || undefined,
             roadmapUrl: row.roadmapId ? `https://jcimalaysia.cc/roadmap/event-details-public.php?eventid=${row.roadmapId}` : undefined,
             hostingLo: row.hostingLo || undefined,
+            coHosting: row.coHosting || undefined,
             area: row.area || undefined,
             status: 'Planning',
             submittedBy: member?.id || '',
