@@ -44,6 +44,10 @@ export const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
   const [editPriceMin, setEditPriceMin] = useState(project.priceMin != null ? String(project.priceMin) : '');
   const [editPriceMax, setEditPriceMax] = useState(project.priceMax != null ? String(project.priceMax) : '');
   const [editLocation, setEditLocation] = useState(project.location || '');
+  const [editRoadmapId, setEditRoadmapId] = useState(project.roadmapId || '');
+  const [editHostingLo, setEditHostingLo] = useState(project.hostingLo || '');
+  const [editArea, setEditArea] = useState(project.area || '');
+  const [editCoHosting, setEditCoHosting] = useState(project.coHosting || '');
   const [descExpanded, setDescExpanded] = useState(false);
 
   useEffect(() => {
@@ -62,6 +66,10 @@ export const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
     setEditEventEndTime(project.eventEndTime || '');
     setEditPriceMin(project.priceMin != null ? String(project.priceMin) : '');
     setEditPriceMax(project.priceMax != null ? String(project.priceMax) : '');
+    setEditRoadmapId(project.roadmapId || '');
+    setEditHostingLo(project.hostingLo || '');
+    setEditArea(project.area || '');
+    setEditCoHosting(project.coHosting || '');
     // Reset edit mode when project changes so stepper always starts at step 1
     setIsEditing(false);
     setEditStep(1);
@@ -126,6 +134,9 @@ export const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
     project.eventStartDate ||
     project.eventEndDate ||
     project.logoUrl ||
+    project.roadmapId ||
+    project.hostingLo ||
+    project.description ||
     (project.galleryUrls && project.galleryUrls.length > 0);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -162,6 +173,10 @@ export const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
         priceMin: editPriceMin !== '' ? Number(editPriceMin) : undefined,
         priceMax: editPriceMax !== '' ? Number(editPriceMax) : undefined,
         location: editLocation || undefined,
+        roadmapId: editRoadmapId || undefined,
+        hostingLo: editHostingLo || undefined,
+        area: editArea || undefined,
+        coHosting: editCoHosting || undefined,
       });
       setIsEditing(false);
       setEditStep(1);
@@ -341,6 +356,19 @@ export const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
                   defaultValue={project.expectedImpact} rows={2} />
               </div>
             </div>
+            <div>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider border-l-4 border-jci-blue/40 pl-2 mb-2">JCI Malaysia</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <Input label="Roadmap ID" placeholder="e.g. 7780"
+                  value={editRoadmapId} onChange={(e) => setEditRoadmapId(e.target.value)} />
+                <Input label="Hosting LO" placeholder="e.g. JCI KL"
+                  value={editHostingLo} onChange={(e) => setEditHostingLo(e.target.value)} />
+                <Input label="Area" placeholder="e.g. Kuala Lumpur"
+                  value={editArea} onChange={(e) => setEditArea(e.target.value)} />
+                <Input label="Co-Hosting" placeholder="e.g. JCI PJ, JCI Ampang"
+                  value={editCoHosting} onChange={(e) => setEditCoHosting(e.target.value)} />
+              </div>
+            </div>
           </div>
         )}
       </form>
@@ -458,6 +486,52 @@ export const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* JCI Malaysia metadata */}
+          {(project.location || project.hostingLo || project.area || project.coHosting || project.roadmapId) && (
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">JCI Malaysia</p>
+              <div className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2.5 space-y-1.5">
+                {project.hostingLo && (
+                  <div className="flex items-start gap-2">
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-20 shrink-0 mt-0.5">Hosting LO</span>
+                    <span className="text-sm text-slate-700">{project.hostingLo}</span>
+                  </div>
+                )}
+                {project.area && (
+                  <div className="flex items-start gap-2">
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-20 shrink-0 mt-0.5">Area</span>
+                    <span className="text-sm text-slate-700">{project.area}</span>
+                  </div>
+                )}
+                {project.coHosting && (
+                  <div className="flex items-start gap-2">
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-20 shrink-0 mt-0.5">Co-Hosting</span>
+                    <span className="text-sm text-slate-700">{project.coHosting}</span>
+                  </div>
+                )}
+                {project.location && (
+                  <div className="flex items-center gap-2">
+                    <MapPin size={11} className="text-slate-400 shrink-0" />
+                    <span className="text-sm text-slate-700">{project.location}</span>
+                  </div>
+                )}
+                {project.roadmapId && (
+                  <div className="flex items-start gap-2">
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-20 shrink-0 mt-0.5">Roadmap</span>
+                    <a
+                      href={project.roadmapUrl || `https://jcimalaysia.cc/roadmap/event-details-public.php?eventid=${project.roadmapId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-jci-blue hover:underline flex items-center gap-1"
+                    >
+                      #{project.roadmapId} <ExternalLink size={10} />
+                    </a>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
