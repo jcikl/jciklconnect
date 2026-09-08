@@ -12,9 +12,7 @@ import {
 } from '../../../shared/batchImport/validators';
 import {
     parseDatePreprocessor,
-    createChainedPreprocessor,
     trimPreprocessor,
-    toNumberPreprocessor,
 } from '../../../shared/batchImport/batchImportUtils';
 import { ProjectsService } from '../../../../services/projectsService';
 import { ProjectCommitteeMember } from '../../../../types';
@@ -114,24 +112,6 @@ export const projectImportConfig: BatchImportConfig = {
             defaultValue: 'projects',
         },
         {
-            key: 'proposedDate',
-            label: 'Proposed Date',
-            required: true,
-            aliases: ['Proposed Date', '建议日期', 'Project Date', 'Date'],
-            validators: [isValidDate],
-            preprocessor: parseDatePreprocessor,
-            defaultValue: new Date().toISOString().split('T')[0],
-        },
-        {
-            key: 'proposedBudget',
-            label: 'Proposed Budget',
-            required: false,
-            aliases: ['Budget', 'Proposed Budget', '预计预算', '预算', 'Estimated Cost'],
-            validators: [],
-            preprocessor: toNumberPreprocessor,
-            defaultValue: 0,
-        },
-        {
             key: 'description',
             label: 'Description',
             required: false,
@@ -186,8 +166,8 @@ export const projectImportConfig: BatchImportConfig = {
     tableColumns: [
         { key: 'title', label: 'Title', width: 200 },
         { key: 'category', label: 'Category', width: 120 },
-        { key: 'proposedDate', label: 'Date', width: 120 },
-        { key: 'proposedBudget', label: 'Budget', width: 100 },
+        { key: 'eventStartDate', label: 'Date', width: 120 },
+        { key: 'level', label: 'Level', width: 100 },
         { key: 'valid', label: 'Status', width: 80 },
     ],
 
@@ -199,9 +179,9 @@ export const projectImportConfig: BatchImportConfig = {
 
     sampleFileName: 'JCI_Project_Import_Template.csv',
     sampleData: [
-        ['Project Title', 'Description', 'Proposed Date', 'Event Start Date', 'Category', 'Level', 'Pillar', 'Proposed Budget', 'Objectives', 'Target Audience'],
-        ['Summer Leadership Summit', 'Annual youth leadership training program', '2026-07-15', '2026-07-20', 'programs', 'Local', 'Individual', '5000', 'Develop leadership skills in 50 youth', 'Members and students'],
-        ['Community Clean-up Day', 'Environmental awareness project', '2026-04-22', '2026-04-22', 'projects', 'Local', 'Community', '1200', 'Clean up Central Park area', 'Public'],
+        ['Project Title', 'Description', 'Event Start Date', 'Category', 'Level', 'Pillar', 'Objectives', 'Target Audience'],
+        ['Summer Leadership Summit', 'Annual youth leadership training program', '2026-07-20', 'programs', 'Local', 'Individual', 'Develop leadership skills in 50 youth', 'Members and students'],
+        ['Community Clean-up Day', 'Environmental awareness project', '2026-04-22', 'projects', 'Local', 'Community', 'Clean up Central Park area', 'Public'],
     ],
 
     loaders: [
@@ -227,16 +207,14 @@ export const projectImportConfig: BatchImportConfig = {
             },
         ];
 
-        // Fall back to proposedDate when eventStartDate is not explicitly set,
-        // so that date-dependent features (Finance year filter, Events view) work correctly.
-        const eventStartDate = row.eventStartDate || row.proposedDate || undefined;
+        const eventStartDate = row.eventStartDate || undefined;
 
         await ProjectsService.createProject({
             name: row.title,
             title: row.title,
             description: row.description || '',
-            proposedDate: row.proposedDate,
-            proposedBudget: parseFloat(row.proposedBudget) || 0,
+            proposedDate: row.eventStartDate || new Date().toISOString().split('T')[0],
+            proposedBudget: 0,
             objectives: row.objectives || '',
             category: row.category as any || 'projects',
             level: row.level as any || 'Local',
