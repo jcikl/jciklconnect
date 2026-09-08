@@ -229,11 +229,32 @@ export const projectImportConfig: BatchImportConfig = {
     loaders: [
         {
             label: 'JCI Malaysia',
-            load: async () => {
-                const res = await fetch('/api/jci-events-proxy');
-                if (!res.ok) throw new Error(`Server error ${res.status}`);
-                const json = await res.text();
-                return parseJciEventsJson(json);
+            load: async (onProgress) => {
+                // Step 1: fetch merged event list from all 4 levels
+                onProgress?.('1/2 · 获取活动列表…');
+                const listRes = await fetch('/api/jci-events-proxy');
+                if (!listRes.ok) throw new Error(`Server error ${listRes.status}`);
+                const listData = await listRes.json();
+                if (listData.error) throw new Error(listData.error);
+                const events: JciMalaysiaEvent[] = listData.data ?? [];
+                if (!events.length) throw new Error('JCI Malaysia returned no events');
+
+                // Step 2: batch-fetch detail (desc, lg_desc, cohosting) for all events
+                onProgress?.(`2/2 · 加载 ${events.length} 个活动详情…`);
+                const ids = events.map(ev => ev.id).join(',');
+                const detailRes = await fetch(`/api/jci-event-details?ids=${encodeURIComponent(ids)}`);
+                const detailMap: Record<string, { desc: string; lgDesc: string; coHosting: string }> =
+                    detailRes.ok ? await detailRes.json() : {};
+
+                // Merge detail data into events
+                const enriched = events.map(ev => ({
+                    ...ev,
+                    desc: detailMap[ev.id]?.desc ?? '',
+                    lgDesc: detailMap[ev.id]?.lgDesc ?? '',
+                    coHosting: detailMap[ev.id]?.coHosting ?? '',
+                }));
+
+                return parseJciEventsJson(JSON.stringify({ data: enriched }));
             },
         },
     ],

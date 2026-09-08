@@ -101,7 +101,7 @@ export interface BatchImportConfig {
   loaders?: Array<{
     label: string;
     /** Returns TSV text (tab-separated, first row = headers) */
-    load: () => Promise<string>;
+    load: (onProgress?: (msg: string) => void) => Promise<string>;
   }>;
 }
 

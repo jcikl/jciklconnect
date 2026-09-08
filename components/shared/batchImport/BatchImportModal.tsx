@@ -47,6 +47,7 @@ export const BatchImportModal: React.FC<Props> = ({
   const [importProgress, setImportProgress] = useState<{ current: number; total: number; errors: number; done: boolean } | null>(null);
   const [failedImportRows, setFailedImportRows] = useState<Set<number>>(new Set());
   const [loadingSource, setLoadingSource] = useState<string | null>(null);
+  const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
   // Inline row editing (情景 LL)
   const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
   const [editingRowValues, setEditingRowValues] = useState<Record<string, any>>({});
@@ -731,8 +732,9 @@ export const BatchImportModal: React.FC<Props> = ({
               disabled={loadingSource !== null}
               onClick={async () => {
                 setLoadingSource(loader.label);
+                setLoadingMessage(null);
                 try {
-                  const tsv = await loader.load();
+                  const tsv = await loader.load((msg) => setLoadingMessage(msg));
                   handleTextChange(tsv);
                   setActiveTab('paste');
                   showToast(`Loaded from ${loader.label}`, 'success');
@@ -740,6 +742,7 @@ export const BatchImportModal: React.FC<Props> = ({
                   showToast(`Failed to load: ${err.message}`, 'error');
                 } finally {
                   setLoadingSource(null);
+                  setLoadingMessage(null);
                 }
               }}
               title={`Load data from ${loader.label}`}
@@ -775,6 +778,14 @@ export const BatchImportModal: React.FC<Props> = ({
           )}
         </div>
       </div>
+
+      {/* ── Loader progress banner ── */}
+      {loadingSource !== null && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-700">
+          <svg className="animate-spin shrink-0" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+          <span>{loadingMessage ?? `Loading from ${loadingSource}…`}</span>
+        </div>
+      )}
 
       {/* ── Tab: Paste ── */}
       {activeTab === 'paste' && (
