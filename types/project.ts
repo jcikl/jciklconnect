@@ -80,6 +80,9 @@ export interface Project {
   registeredMembers?: string[];
   committee?: ProjectCommitteeMember[];
   trainers?: ProjectTrainer[];
+  roadmapId?: string;
+  hostingLo?: string;
+  area?: string;
   createdAt?: string;
   updatedAt?: string;
 }
