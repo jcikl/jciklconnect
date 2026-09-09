@@ -75,12 +75,22 @@ export const Combobox: React.FC<ComboboxProps> = ({
             return isGrouped ? groupedOptions : options;
         }
 
+        const tokens = inputValue.toLowerCase().split(/\s+/).filter(Boolean);
+        const fuzzyMatch = (opt: string) => {
+            const lower = opt.toLowerCase();
+            return tokens.every(t => lower.includes(t));
+        };
+        const fuzzySort = (a: string, b: string) => {
+            const al = a.toLowerCase(), bl = b.toLowerCase(), q = inputValue.toLowerCase();
+            const aExact = al.startsWith(q) ? 0 : 1;
+            const bExact = bl.startsWith(q) ? 0 : 1;
+            return aExact - bExact || a.localeCompare(b);
+        };
+
         if (isGrouped && groupedOptions) {
             const filtered: { label: string; options: string[] }[] = [];
             groupedOptions.forEach(group => {
-                const matchingOptions = group.options.filter(opt =>
-                    opt.toLowerCase().includes(inputValue.toLowerCase())
-                );
+                const matchingOptions = group.options.filter(fuzzyMatch).sort(fuzzySort);
                 if (matchingOptions.length > 0) {
                     filtered.push({ label: group.label, options: matchingOptions });
                 }
@@ -88,9 +98,7 @@ export const Combobox: React.FC<ComboboxProps> = ({
             return filtered;
         }
 
-        return options.filter(opt =>
-            opt.toLowerCase().includes(inputValue.toLowerCase())
-        );
+        return options.filter(fuzzyMatch).sort(fuzzySort);
     }, [inputValue, options, groupedOptions, isGrouped]);
 
     const getDisplayValue = () => {
