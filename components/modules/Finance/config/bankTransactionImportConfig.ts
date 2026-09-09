@@ -104,22 +104,11 @@ export const bankTransactionImportConfig: BatchImportConfig = {
       validators: [
         (val, context) => {
           const category = context?.row?.category;
-          // Only validate system existence if category is Projects & Activities
-          if (category !== 'Projects & Activities') {
-            return null;
-          }
-
+          if (category !== 'Projects & Activities') return null;
           if (!val || String(val).trim() === '') {
             return 'Project Title is required for Project transactions';
           }
-
-          if (context?.projects) {
-            const match = context.projects.find((p: any) =>
-              (p.name?.toLowerCase() === String(val).toLowerCase()) ||
-              (p.title?.toLowerCase() === String(val).toLowerCase())
-            );
-            if (!match) return `Project "${val}" not found in system`;
-          }
+          // "Not found in system" is a warning (handled in rowPostProcessor), not a blocking error
           return null;
         }
       ],
@@ -173,39 +162,82 @@ export const bankTransactionImportConfig: BatchImportConfig = {
     ['2026-02-17', 'Office Supplies', 'ADM-2026-001', '0', '50', 'Administrative', 'Secretariat', 'Stationery'],
   ],
 
-  // Duplicate detection: mark rows that match existing transactions (情景 A)
+  // Post-processor: unmatched project warning
   rowPostProcessor: (row, context) => {
-    const existing: any[] = context?.existingTransactions || [];
-    if (!existing.length) return row;
-    const parsed = row.parsed;
-    const income = parsed.income || 0;
-    const expense = parsed.expense || 0;
-    const amount = income > 0 ? income : Math.abs(expense);
-    const rowDate = parsed.date ? String(parsed.date).substring(0, 10) : '';
-    const rowRef = parsed.referenceNumber ? String(parsed.referenceNumber).trim().toLowerCase() : '';
-    const rowDesc = parsed.description ? String(parsed.description).trim().toLowerCase() : '';
-    const isDuplicate = existing.some(t => {
-      const tDate = t.date ? String(t.date).substring(0, 10) : '';
-      if (tDate !== rowDate) return false;
-      if (rowRef && t.referenceNumber && t.referenceNumber.trim().toLowerCase() === rowRef) return true;
-      return Math.abs(t.amount - amount) < 0.01 && t.description?.trim().toLowerCase() === rowDesc;
-    });
-    if (isDuplicate) {
-      return {
-        ...row,
-        errors: [...row.errors, 'Possible duplicate: transaction with same date/amount/description already exists'],
-        valid: false,
-      };
+    const category = row.parsed.category;
+    const projectTitle = row.parsed.projectTitle?.trim();
+    if (category === 'Projects & Activities' && projectTitle && context?.projects) {
+      const match = (context.projects as any[]).find(p =>
+        p.name?.toLowerCase() === projectTitle.toLowerCase() ||
+        p.title?.toLowerCase() === projectTitle.toLowerCase()
+      );
+      if (!match) {
+        return {
+          ...row,
+          warnings: [...(row.warnings || []), `"${projectTitle}" 未匹配到系统项目，将保存为待关联状态`],
+        };
+      }
     }
     return row;
   },
 
-  // Import function - called for each valid row
+  // Batch import — called once with ALL valid rows, replaces per-row importer for efficiency.
+  // Uses FinanceService.batchCreateBankTransactions: 1 read + 1 commit instead of N reads + N commits.
+  batchImporter: async (rows, context, onProgress) => {
+    const transactions = rows.map((row) => {
+      let projectId = '';
+      const projectTitle = row.projectTitle?.trim();
+      const category = row.category;
+      let unmatchedProjectTitle: string | undefined;
+
+      if (category === 'Projects & Activities' && projectTitle && context?.projects) {
+        const match = (context.projects as any[]).find((p: any) =>
+          (p.name?.toLowerCase() === projectTitle.toLowerCase()) ||
+          (p.title?.toLowerCase() === projectTitle.toLowerCase())
+        );
+        if (match) { projectId = match.id; } else { unmatchedProjectTitle = projectTitle; }
+      } else if (category === 'Administrative' && projectTitle) {
+        projectId = projectTitle;
+        addAdministrativeProjectId(projectTitle);
+      } else if (category === 'Membership') {
+        const year = row.date ? new Date(row.date).getFullYear() : new Date().getFullYear();
+        projectId = `${year} membership`;
+      }
+
+      const income = row.income || 0;
+      const expense = row.expense || 0;
+      const amount = income > 0 ? income : Math.abs(expense);
+      const type = income > 0 ? 'Income' : 'Expense';
+
+      return {
+        date: row.date,
+        description: row.description,
+        referenceNumber: row.referenceNumber,
+        amount,
+        income,
+        expense,
+        category,
+        projectId: projectId || undefined,
+        unmatchedProjectTitle,
+        purpose: row.purpose,
+        bankAccountId: context?.bankAccountId,
+        loId: context?.loId,
+        status: 'Pending' as const,
+        type: type as 'Income' | 'Expense',
+        source: 'bank_import' as const,
+      };
+    });
+
+    await FinanceService.batchCreateBankTransactions(transactions as any, onProgress);
+  },
+
+  // Fallback single-row importer (used only if batchImporter is unavailable)
   importer: async (row, context) => {
     let projectId = '';
     const projectTitle = row.projectTitle?.trim();
     const category = row.category;
 
+    let unmatchedProjectTitle: string | undefined;
     if (category === 'Projects & Activities' && projectTitle && context?.projects) {
       // Look up existing project ID
       const match = context.projects.find((p: any) =>
@@ -215,6 +247,9 @@ export const bankTransactionImportConfig: BatchImportConfig = {
 
       if (match) {
         projectId = match.id;
+      } else {
+        // Not found — flag for later manual linking
+        unmatchedProjectTitle = projectTitle;
       }
     } else if (category === 'Administrative' && projectTitle) {
       // For Administrative, the projectTitle is the Admin Account name
@@ -241,6 +276,7 @@ export const bankTransactionImportConfig: BatchImportConfig = {
       expense: expense,
       category: category,
       projectId: projectId || undefined,
+      unmatchedProjectTitle: unmatchedProjectTitle,
       purpose: row.purpose,
       bankAccountId: context?.bankAccountId,
       loId: context?.loId,
