@@ -94,10 +94,11 @@ export const BatchReclassifyModal: React.FC<BatchReclassifyModalProps> = ({
 
   const dirtyRows = rows.filter(r => r.dirty);
   const totalAffected = dirtyRows.reduce((s, r) => s + r.count, 0);
-  const matchedCount = rows.filter(r => r.projectId !== null).length;
+  // "Matched" = has a real system projectId (no unmatchedProjectTitle)
+  const matchedCount = rows.filter(r => r.projectId && !r.unmatchedProjectTitle).length;
   const displayRows = showMatched
     ? rows.map((r, i) => ({ row: r, originalIndex: i }))
-    : rows.map((r, i) => ({ row: r, originalIndex: i })).filter(({ row }) => row.projectId === null);
+    : rows.map((r, i) => ({ row: r, originalIndex: i })).filter(({ row }) => !row.projectId || !!row.unmatchedProjectTitle);
 
   const handleCategoryChange = (index: number, value: string) => {
     setRows(prev => prev.map((r, i) => i === index
@@ -216,10 +217,10 @@ export const BatchReclassifyModal: React.FC<BatchReclassifyModalProps> = ({
                       <td className="py-2 px-3 font-mono text-slate-500">{row.loId || <span className="text-amber-500">—</span>}</td>
                       <td className="py-2 px-3 text-slate-600">{row.category || <span className="italic text-slate-400">none</span>}</td>
                       <td className="py-2 px-3 text-slate-500 max-w-[160px]">
-                        {row.projectId
-                          ? <span className="truncate block">{projectById.get(row.projectId) ?? row.projectId}</span>
-                          : row.unmatchedProjectTitle
-                            ? <span className="flex flex-col gap-0.5"><span className="truncate text-amber-700 font-medium">{row.unmatchedProjectTitle}</span><span className="text-[10px] text-amber-500">未匹配</span></span>
+                        {row.unmatchedProjectTitle
+                          ? <span className="flex flex-col gap-0.5"><span className="truncate text-amber-700 font-medium">{row.unmatchedProjectTitle}</span><span className="text-[10px] text-amber-500">未匹配</span></span>
+                          : row.projectId
+                            ? <span className="truncate block">{projectById.get(row.projectId) ?? row.projectId}</span>
                             : <span className="italic text-slate-400">—</span>}
                       </td>
                       <td className="py-2 px-3 text-right font-mono font-semibold text-slate-700">{row.count}</td>
@@ -249,10 +250,10 @@ export const BatchReclassifyModal: React.FC<BatchReclassifyModalProps> = ({
                   </div>
                   {/* Current project */}
                   <div className="text-xs text-slate-500">
-                    {row.projectId
-                      ? <span className="truncate block">{projectById.get(row.projectId) ?? row.projectId}</span>
-                      : row.unmatchedProjectTitle
-                        ? <span className="text-amber-700 font-medium">{row.unmatchedProjectTitle} <span className="text-amber-400 font-normal">未匹配</span></span>
+                    {row.unmatchedProjectTitle
+                      ? <span className="text-amber-700 font-medium">{row.unmatchedProjectTitle} <span className="text-amber-400 font-normal">未匹配</span></span>
+                      : row.projectId
+                        ? <span className="truncate block">{projectById.get(row.projectId) ?? row.projectId}</span>
                         : <span className="italic text-slate-400">— no project —</span>}
                   </div>
                   {/* New selectors */}

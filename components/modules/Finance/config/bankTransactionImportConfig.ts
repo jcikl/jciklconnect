@@ -195,7 +195,15 @@ export const bankTransactionImportConfig: BatchImportConfig = {
           (p.name?.toLowerCase() === projectTitle.toLowerCase()) ||
           (p.title?.toLowerCase() === projectTitle.toLowerCase())
         );
-        if (match) { projectId = match.id; } else { unmatchedProjectTitle = projectTitle; }
+        if (match) {
+          projectId = match.id;
+        } else {
+          // Store the raw title directly as projectId so it is visible and
+          // searchable in the reclassify flow; also set unmatchedProjectTitle
+          // for backward-compat with existing grouping logic.
+          projectId = projectTitle;
+          unmatchedProjectTitle = projectTitle;
+        }
       } else if (category === 'Administrative' && projectTitle) {
         projectId = projectTitle;
         addAdministrativeProjectId(projectTitle);
