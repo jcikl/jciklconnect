@@ -629,6 +629,7 @@ export class PaymentRequestService {
         : (pr.purpose || pr.referenceNumber);
 
       await FinanceService.createTransaction({
+        loId: DEFAULT_LO_ID,
         date: pr.date || pr.createdAt?.split('T')[0] || new Date().toISOString().split('T')[0],
         description,
         referenceNumber: pr.referenceNumber,

@@ -7,6 +7,7 @@ import { EventRegistrationService } from '../../../services/eventRegistrationSer
 import { EventsService } from '../../../services/eventsService';
 import { MembersService } from '../../../services/membersService';
 import { FinanceService } from '../../../services/financeService';
+import { DEFAULT_LO_ID } from '../../../config/constants';
 import { formatCurrency } from '../../../utils/formatUtils';
 import { formatDate } from '../../../utils/dateUtils';
 import { EventStatsTab } from './EventStatsTab';
@@ -243,6 +244,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
       const amount = event?.price ?? 0;
       if (amount > 0) {
         financeTransactionId = await FinanceService.createTransaction({
+          loId: DEFAULT_LO_ID,
           type: 'Income',
           category: 'Projects & Activities',
           status: 'Pending',

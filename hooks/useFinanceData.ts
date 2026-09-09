@@ -8,7 +8,7 @@
 import { useState, useEffect, useMemo, useCallback, useTransition, useRef } from 'react';
 import { writeBatch, doc } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { COLLECTIONS } from '../config/constants';
+import { COLLECTIONS, DEFAULT_LO_ID } from '../config/constants';
 import { useToast } from '../components/ui/Common';
 import { usePermissions } from './usePermissions';
 import { useAuth } from './useAuth';
@@ -1322,6 +1322,7 @@ export function useFinanceData(searchQuery?: string) {
       memberId = catFields.memberId ?? undefined;
 
       const transactionData = {
+        loId: DEFAULT_LO_ID,
         date: formData.get('date') as string,
         description: formData.get('description') as string,
         purpose,
