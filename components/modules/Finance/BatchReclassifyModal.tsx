@@ -30,7 +30,7 @@ const CATEGORY_OPTIONS = [
 interface BatchReclassifyModalProps {
   isOpen: boolean;
   onClose: () => void;
-  projects: Array<{ id: string; name: string }>;
+  projects: Array<{ id: string; name: string; hostingLo?: string }>;
   loadReclassificationGroups: () => Promise<ReclassGroup[]>;
   handleBatchReclassify: (rules: {
     matchLoId: string | null;
@@ -59,9 +59,9 @@ export const BatchReclassifyModal: React.FC<BatchReclassifyModalProps> = ({
   const [missingLoIdCount, setMissingLoIdCount] = useState<number | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const projectNames = projects.map(p => p.name);
-  const projectByName = new Map(projects.map(p => [p.name, p.id]));
-  const projectById = new Map(projects.map(p => [p.id, p.name]));
+  const projectOptions = projects.map(p => p.hostingLo ? `${p.name} [${p.hostingLo}]` : p.name);
+  const projectByOption = new Map(projects.map(p => [p.hostingLo ? `${p.name} [${p.hostingLo}]` : p.name, p.id]));
+  const projectById = new Map(projects.map(p => [p.id, p.hostingLo ? `${p.name} [${p.hostingLo}]` : p.name]));
 
   const loadGroups = useCallback(async () => {
     setLoading(true);
@@ -97,7 +97,7 @@ export const BatchReclassifyModal: React.FC<BatchReclassifyModalProps> = ({
   };
 
   const handleProjectChange = (index: number, name: string) => {
-    const id = projectByName.get(name) ?? null;
+    const id = projectByOption.get(name) ?? null;
     setRows(prev => prev.map((r, i) => i === index
       ? { ...r, newProjectId: id, dirty: true }
       : r
@@ -214,7 +214,7 @@ export const BatchReclassifyModal: React.FC<BatchReclassifyModalProps> = ({
                     </td>
                     <td className="py-2 px-3 min-w-[180px]">
                       <Combobox
-                        options={projectNames}
+                        options={projectOptions}
                         value={row.newProjectId ? (projectById.get(row.newProjectId) ?? '') : ''}
                         onChange={val => handleProjectChange(i, val)}
                         placeholder="— no project —"
