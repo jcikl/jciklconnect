@@ -30,7 +30,7 @@ const CATEGORY_OPTIONS = [
 interface BatchReclassifyModalProps {
   isOpen: boolean;
   onClose: () => void;
-  projects: Array<{ id: string; name: string; hostingLo?: string }>;
+  projects: Array<{ id: string; name: string; hostingLo?: string; startDate?: string; endDate?: string; date?: string }>;
   loadReclassificationGroups: () => Promise<ReclassGroup[]>;
   handleBatchReclassify: (rules: {
     matchLoId: string | null;
@@ -60,9 +60,14 @@ export const BatchReclassifyModal: React.FC<BatchReclassifyModalProps> = ({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [showMatched, setShowMatched] = useState(false);
 
-  const projectOptions = projects.map(p => p.hostingLo ? `${p.name} [${p.hostingLo}]` : p.name);
-  const projectByOption = new Map(projects.map(p => [p.hostingLo ? `${p.name} [${p.hostingLo}]` : p.name, p.id]));
-  const projectById = new Map(projects.map(p => [p.id, p.hostingLo ? `${p.name} [${p.hostingLo}]` : p.name]));
+  const projectLabel = (p: { name?: string; hostingLo?: string; endDate?: string; startDate?: string; date?: string }) => {
+    const year = (p.endDate || p.startDate || p.date || '').slice(0, 4);
+    const lo = p.hostingLo ? ` [${p.hostingLo}]` : '';
+    return year ? `${year} ${p.name}${lo}` : `${p.name}${lo}`;
+  };
+  const projectOptions = projects.map(projectLabel);
+  const projectByOption = new Map(projects.map(p => [projectLabel(p), p.id]));
+  const projectById = new Map(projects.map(p => [p.id, projectLabel(p)]));
 
   const loadGroups = useCallback(async () => {
     setLoading(true);
