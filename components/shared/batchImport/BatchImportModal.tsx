@@ -60,6 +60,15 @@ export const BatchImportModal: React.FC<Props> = ({
     });
     return init;
   });
+  // Step-1 confirm panel state (pause between Step 1 and Steps 2+3)
+  const [step1Confirm, setStep1Confirm] = useState<{
+    info: { found: number; newCount: number; skipped: number; yearOptions: string[] };
+    resolve: (params: Record<string, string> | null) => void;
+    loaderLabel: string;
+    originalParams: Record<string, string>;
+  } | null>(null);
+  const [confirmParams, setConfirmParams] = useState<Record<string, string>>({});
+
   // Inline row editing (情景 LL)
   const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
   const [editingRowValues, setEditingRowValues] = useState<Record<string, any>>({});
@@ -757,7 +766,7 @@ export const BatchImportModal: React.FC<Props> = ({
         <div className="flex items-center gap-1.5 shrink-0">
           {config.loaders?.map((loader) => (
             <div key={loader.label} className="flex items-center gap-1">
-              {loader.params?.map(p => (
+              {loader.params?.filter(p => !p.confirmOnly).map(p => (
                 <select
                   key={p.key}
                   value={loaderParams[loader.label]?.[p.key] ?? p.default}
@@ -779,15 +788,23 @@ export const BatchImportModal: React.FC<Props> = ({
                   setLoadingMessage(null);
                   try {
                     const params = loaderParams[loader.label];
-                    const tsv = await loader.load((msg) => setLoadingMessage(msg), params);
+                    const waitForConfirm = (
+                      info: { found: number; newCount: number; skipped: number; yearOptions: string[] },
+                      currentParams: Record<string, string>
+                    ) => new Promise<Record<string, string> | null>(resolve => {
+                      setConfirmParams({ ...currentParams });
+                      setStep1Confirm({ info, resolve, loaderLabel: loader.label, originalParams: { ...currentParams } });
+                    });
+                    const tsv = await loader.load((msg) => setLoadingMessage(msg), params, waitForConfirm);
                     handleTextChange(tsv);
                     setActiveTab('paste');
                     showToast(`Loaded from ${loader.label}`, 'success');
                   } catch (err: any) {
-                    showToast(`Failed to load: ${err.message}`, 'error');
+                    if (!err?.cancelled) showToast(`Failed to load: ${err.message}`, 'error');
                   } finally {
                     setLoadingSource(null);
                     setLoadingMessage(null);
+                    setStep1Confirm(null);
                   }
                 }}
                 title={`Load data from ${loader.label}`}
@@ -825,50 +842,107 @@ export const BatchImportModal: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* ── Loader progress banner ── */}
-      {loadingSource !== null && (() => {
-        // Parse "N/T · description [done/total]…" from onProgress messages
-        const msg = loadingMessage ?? '';
-        const stepMatch = msg.match(/^(\d+)\/(\d+)\s*·\s*(.+?)(?:\s+(\d+)\/(\d+))?…?$/);
-        const stepCurrent = stepMatch ? parseInt(stepMatch[1]) : null;
-        const stepTotal   = stepMatch ? parseInt(stepMatch[2]) : null;
-        const desc        = stepMatch ? stepMatch[3] : (loadingMessage ?? `Loading from ${loadingSource}…`);
-        const done        = stepMatch?.[4] != null ? parseInt(stepMatch[4]) : null;
-        const total       = stepMatch?.[5] != null ? parseInt(stepMatch[5]) : null;
-        const pct         = done != null && total != null && total > 0 ? Math.round((done / total) * 100) : null;
+      {/* ── Loader progress banner / Step-1 confirm panel ── */}
+      {loadingSource !== null && (
+        step1Confirm !== null ? (() => {
+          const loaderDef = config.loaders?.find(l => l.label === step1Confirm.loaderLabel);
+          const { found, newCount, skipped } = step1Confirm.info;
+          return (
+            <div className="rounded-lg bg-blue-50 border border-blue-200 px-4 py-3 space-y-3 text-sm">
+              <div className="font-semibold text-blue-900">
+                Step 1 完成 — 共找到 <strong>{found}</strong> 个活动
+                {skipped > 0 && <span className="text-blue-700">，跳过 <strong>{skipped}</strong> 个已存在</span>}
+                ，将导入 <strong>{newCount}</strong> 个新项目
+              </div>
+              {(loaderDef?.params ?? []).length > 0 && (
+                <div className="flex flex-wrap gap-3 items-center text-xs">
+                  <span className="text-blue-700 font-medium">调整参数：</span>
+                  {(loaderDef?.params ?? []).map(p => {
+                    const opts = p.key === 'year' && step1Confirm.info.yearOptions.length
+                      ? step1Confirm.info.yearOptions
+                      : p.options;
+                    return (
+                      <label key={p.key} className="flex items-center gap-1.5 text-blue-800">
+                        {p.label}:
+                        <select
+                          value={confirmParams[p.key] ?? p.default}
+                          onChange={e => setConfirmParams(prev => ({ ...prev, [p.key]: e.target.value }))}
+                          className="rounded border border-blue-300 text-xs px-2 py-0.5 bg-white text-slate-700"
+                        >
+                          {opts.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                        </select>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+              {(() => {
+                const yearChanged = confirmParams.year !== undefined && confirmParams.year !== step1Confirm.originalParams.year;
+                return (
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      type="button"
+                      onClick={() => { step1Confirm.resolve(null); setStep1Confirm(null); }}
+                      className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 transition-colors"
+                    >
+                      取消
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { const p = { ...confirmParams }; setStep1Confirm(null); step1Confirm.resolve(p); }}
+                      className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium"
+                    >
+                      {yearChanged ? `切换到 ${confirmParams.year} 年重新查询 →` : '继续导入 Steps 2–3 →'}
+                    </button>
+                  </div>
+                );
+              })()}
+            </div>
+          );
+        })() : (() => {
+          // Parse "N/T · description [done/total]…" from onProgress messages
+          const msg = loadingMessage ?? '';
+          const stepMatch = msg.match(/^(\d+)\/(\d+)\s*·\s*(.+?)(?:\s+(\d+)\/(\d+))?…?$/);
+          const stepCurrent = stepMatch ? parseInt(stepMatch[1]) : null;
+          const stepTotal   = stepMatch ? parseInt(stepMatch[2]) : null;
+          const desc        = stepMatch ? stepMatch[3] : (loadingMessage ?? `Loading from ${loadingSource}…`);
+          const done        = stepMatch?.[4] != null ? parseInt(stepMatch[4]) : null;
+          const total       = stepMatch?.[5] != null ? parseInt(stepMatch[5]) : null;
+          const pct         = done != null && total != null && total > 0 ? Math.round((done / total) * 100) : null;
 
-        return (
-          <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs text-emerald-800 space-y-1.5">
-            <div className="flex items-center gap-2">
-              <svg className="animate-spin shrink-0" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-              <span className="flex-1 font-medium truncate">{desc}</span>
-              {stepTotal != null && (
-                <span className="flex items-center gap-1 shrink-0">
-                  {Array.from({ length: stepTotal }, (_, i) => (
-                    <span
-                      key={i}
-                      className={`inline-block rounded-full ${i < (stepCurrent ?? 0) ? 'bg-emerald-500' : 'bg-emerald-200'}`}
-                      style={{ width: 6, height: 6 }}
-                    />
-                  ))}
-                  <span className="ml-1 text-emerald-600">{stepCurrent}/{stepTotal}</span>
-                </span>
+          return (
+            <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs text-emerald-800 space-y-1.5">
+              <div className="flex items-center gap-2">
+                <svg className="animate-spin shrink-0" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                <span className="flex-1 font-medium truncate">{desc}</span>
+                {stepTotal != null && (
+                  <span className="flex items-center gap-1 shrink-0">
+                    {Array.from({ length: stepTotal }, (_, i) => (
+                      <span
+                        key={i}
+                        className={`inline-block rounded-full ${i < (stepCurrent ?? 0) ? 'bg-emerald-500' : 'bg-emerald-200'}`}
+                        style={{ width: 6, height: 6 }}
+                      />
+                    ))}
+                    <span className="ml-1 text-emerald-600">{stepCurrent}/{stepTotal}</span>
+                  </span>
+                )}
+              </div>
+              {pct != null && (
+                <div className="space-y-0.5">
+                  <div className="flex justify-between text-[10px] text-emerald-600">
+                    <span>{done!.toLocaleString()} / {total!.toLocaleString()}</span>
+                    <span>{pct}%</span>
+                  </div>
+                  <div className="h-1 rounded-full bg-emerald-200 overflow-hidden">
+                    <div className="h-full rounded-full bg-emerald-500 transition-all duration-300" style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
               )}
             </div>
-            {pct != null && (
-              <div className="space-y-0.5">
-                <div className="flex justify-between text-[10px] text-emerald-600">
-                  <span>{done!.toLocaleString()} / {total!.toLocaleString()}</span>
-                  <span>{pct}%</span>
-                </div>
-                <div className="h-1 rounded-full bg-emerald-200 overflow-hidden">
-                  <div className="h-full rounded-full bg-emerald-500 transition-all duration-300" style={{ width: `${pct}%` }} />
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      })()}
+          );
+        })()
+      )}
 
       {/* ── Tab: Paste ── */}
       {activeTab === 'paste' && (

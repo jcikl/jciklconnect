@@ -100,16 +100,25 @@ export interface BatchImportConfig {
   /** External data loaders — each adds a button next to Template/Upload */
   loaders?: Array<{
     label: string;
-    /** Optional inline params shown next to the loader button */
+    /** Optional inline params shown next to the loader button (or only in the Step-1 confirm panel when confirmOnly=true) */
     params?: Array<{
       key: string;
       label: string;
       type: 'select';
       options: string[];
       default: string;
+      /** When true, this param is only shown in the confirm panel, not as a header select */
+      confirmOnly?: boolean;
     }>;
     /** Returns TSV text (tab-separated, first row = headers) */
-    load: (onProgress?: (msg: string) => void, params?: Record<string, string>) => Promise<string>;
+    load: (
+      onProgress?: (msg: string) => void,
+      params?: Record<string, string>,
+      waitForConfirm?: (
+        info: { found: number; newCount: number; skipped: number; yearOptions: string[] },
+        currentParams: Record<string, string>
+      ) => Promise<Record<string, string> | null>
+    ) => Promise<string>;
   }>;
 }
 

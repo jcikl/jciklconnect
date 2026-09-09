@@ -30,8 +30,9 @@ export default async (req) => {
   try {
     const url = new URL(req.url);
     const yearParam = url.searchParams.get('year');
+    const fetchAll = yearParam === 'all' || !yearParam;
     const currentYear = new Date().getFullYear();
-    const targetYear = yearParam && /^\d{4}$/.test(yearParam) ? yearParam : String(currentYear);
+    const targetYear = (!fetchAll && /^\d{4}$/.test(yearParam)) ? yearParam : null;
 
     const results = await Promise.all(LEVELS.map(fetchLevel));
     const merged = results.flat();
@@ -43,9 +44,9 @@ export default async (req) => {
       );
     }
 
-    const filtered = merged.filter(ev => String(ev.year) === targetYear);
+    const data = targetYear ? merged.filter(ev => String(ev.year) === targetYear) : merged;
 
-    return new Response(JSON.stringify({ data: filtered.length > 0 ? filtered : merged }), {
+    return new Response(JSON.stringify({ data: data.length > 0 ? data : merged }), {
       status: 200,
       headers: {
         'Content-Type': 'application/json',

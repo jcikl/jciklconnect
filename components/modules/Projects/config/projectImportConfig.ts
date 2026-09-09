@@ -360,6 +360,7 @@ export const projectImportConfig: BatchImportConfig = {
                         return [String(cur + 1), String(cur), String(cur - 1), String(cur - 2)];
                     })(),
                     default: String(new Date().getFullYear()),
+                    confirmOnly: true,
                 },
                 {
                     key: 'skip_step3',
@@ -369,27 +370,58 @@ export const projectImportConfig: BatchImportConfig = {
                     default: 'Yes',
                 },
             ],
-            load: async (onProgress, params) => {
-                const year = params?.year ?? String(new Date().getFullYear());
-                // Step 1: fetch merged event list from all 4 levels
-                onProgress?.(`1/3 · 获取 ${year} 年活动列表…`);
-                const listRes = await fetch(`/api/jci-events-proxy?year=${year}`);
+            load: async (onProgress, params, waitForConfirm) => {
+                let workingParams: Record<string, string> = { ...(params ?? {}) };
+
+                // Step 1: fetch ALL events (no year filter) to build the year selector
+                onProgress?.(`1/3 · 获取全部活动列表…`);
+                const listRes = await fetch(`/api/jci-events-proxy?year=all`);
                 if (!listRes.ok) throw new Error(`Server error ${listRes.status}`);
                 const listData = await listRes.json();
                 if (listData.error) throw new Error(listData.error);
                 const allEvents: JciMalaysiaEvent[] = listData.data ?? [];
                 if (!allEvents.length) throw new Error('JCI Malaysia returned no events');
 
-                // Filter out projects already in Firestore (deduplicate by roadmapId)
+                const yearOptions = [...new Set(allEvents.map(ev => String(ev.year)).filter(Boolean))].sort((a, b) => b.localeCompare(a));
+                const currentYearStr = String(new Date().getFullYear());
+                if (!workingParams.year || !yearOptions.includes(workingParams.year)) {
+                    workingParams.year = yearOptions.includes(currentYearStr) ? currentYearStr : yearOptions[0];
+                }
+
                 const existingIds = await ProjectsService.getExistingRoadmapIds();
-                const events = allEvents.filter(ev => !existingIds.has(ev.id));
-                const skippedCount = allEvents.length - events.length;
-                if (!events.length) throw new Error(`所有 ${allEvents.length} 个活动已存在于数据库，无需重新导入`);
-                onProgress?.(skippedCount > 0
-                    ? `1/3 · 共 ${allEvents.length} 个，跳过 ${skippedCount} 个已存在，新增 ${events.length} 个…`
-                    : `1/3 · 共 ${allEvents.length} 个活动，全部为新项目…`);
-                // Brief pause so the user can read the count before step 2 starts
-                await new Promise(r => setTimeout(r, 800));
+
+                // Confirm loop: re-filter in memory when user changes year (no re-fetch)
+                let events: JciMalaysiaEvent[] = [];
+                while (true) {
+                    const selectedYear = workingParams.year;
+                    const yearEvents = allEvents.filter(ev => String(ev.year) === selectedYear);
+                    events = yearEvents.filter(ev => !existingIds.has(ev.id));
+                    const skippedCount = yearEvents.length - events.length;
+                    onProgress?.(skippedCount > 0
+                        ? `1/3 · ${selectedYear} 年共 ${yearEvents.length} 个，跳过 ${skippedCount} 个已存在，新增 ${events.length} 个…`
+                        : `1/3 · ${selectedYear} 年共 ${yearEvents.length} 个活动，全部为新项目…`);
+
+                    if (!waitForConfirm) {
+                        await new Promise(r => setTimeout(r, 800));
+                        break;
+                    }
+
+                    const confirmed = await waitForConfirm(
+                        { found: yearEvents.length, newCount: events.length, skipped: skippedCount, yearOptions },
+                        workingParams
+                    );
+                    if (confirmed === null) {
+                        const err = new Error('已取消');
+                        (err as any).cancelled = true;
+                        throw err;
+                    }
+                    const yearChanged = confirmed.year !== workingParams.year;
+                    workingParams = confirmed;
+                    if (yearChanged) continue; // re-filter with new year, no API call
+                    break;
+                }
+
+                if (!events.length) throw new Error(`所有活动已存在于数据库，无需重新导入`);
 
                 // Step 2: batch-fetch detail (desc, lg_desc, cohosting, start/end time) in chunks
                 const ids = events.map(ev => ev.id);
@@ -412,7 +444,7 @@ export const projectImportConfig: BatchImportConfig = {
                 // Step 3: batch-fetch HTML pages for logo, pillar and pricing (optional)
                 const PAGE_CHUNK = 50;
                 const pageMap: Record<string, { logoUrl: string; pillar: string; priceMin?: number; priceMax?: number }> = {};
-                if (params?.skip_step3 !== 'Yes') {
+                if (workingParams.skip_step3 !== 'Yes') {
                     done = 0;
                     onProgress?.(`3/3 · 同步海报/Pillar/价格 0/${ids.length}…`);
                     for (let i = 0; i < ids.length; i += PAGE_CHUNK) {
