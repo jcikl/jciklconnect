@@ -463,26 +463,25 @@ export class FinanceService {
           });
         return [...direct, ...splitVirtuals].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       },
-      async () => {
+      () => apiCache.getOrSet(
+        `${FINANCE_CACHE_PREFIX}byProject:${projectId}`,
+        async () => {
     try {
-      // 1. Get transactions directly assigned to the project (e.g. non-split)
+      // 1 & 2: fetch project transactions and splits in parallel
       const q = query(
         collection(db, COLLECTIONS.TRANSACTIONS),
         where('projectId', '==', projectId)
       );
-      const snapshot = await getDocs(q);
+      const splitsQuery = query(
+        collection(db, COLLECTIONS.TRANSACTION_SPLITS),
+        where('projectId', '==', projectId)
+      );
+      const [snapshot, splitsSnapshot] = await Promise.all([getDocs(q), getDocs(splitsQuery)]);
       const directTransactions = snapshot.docs.map(doc => normalizeTransaction({
         id: doc.id,
         ...doc.data(),
         date: doc.data().date?.toDate?.()?.toISOString() || doc.data().date,
       }));
-
-      // 2. Get splits assigned to the project
-      const splitsQuery = query(
-        collection(db, COLLECTIONS.TRANSACTION_SPLITS),
-        where('projectId', '==', projectId)
-      );
-      const splitsSnapshot = await getDocs(splitsQuery);
       const virtualTransactionsFromSplits: Transaction[] = [];
       const parentIds = Array.from(new Set(splitsSnapshot.docs.map(doc => doc.data().parentTransactionId).filter(Boolean)));
 
@@ -542,7 +541,10 @@ export class FinanceService {
         errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.getBankTransactionsForProject' });
         throw error;
       }
-      }
+        },
+        TX_CACHE_TTL,
+        'financeService.getBankTransactionsByProject'
+      )
     );
   }
 
@@ -2504,13 +2506,19 @@ export class FinanceService {
       }
       const canonicalProjectId = this.getMembershipProjectIdFromYear(yearNum) || projectId;
 
-      // 2. Fetch membership transactions for member (filter by year in memory — resilient to projectId variants)
-      // Single-field query avoids requiring a composite (memberId + category) index in Firestore
+      // 2. Fetch membership transactions and splits in parallel.
+      // Single-field tx query avoids requiring a composite (memberId + category) index in Firestore.
       const q = query(
         collection(db, COLLECTIONS.TRANSACTIONS),
         where('memberId', '==', memberId)
       );
-      const snapshot = await getDocs(q);
+      const splitQuery = query(
+        collection(db, COLLECTIONS.TRANSACTION_SPLITS),
+        where('memberId', '==', memberId),
+        where('category', '==', 'Membership'),
+        where('year', '==', yearNum)
+      );
+      const [snapshot, splitSnapshot] = await Promise.all([getDocs(q), getDocs(splitQuery)]);
       const queriedTransactions = snapshot.docs
         .map(d => {
           const data = d.data();
@@ -2531,13 +2539,6 @@ export class FinanceService {
 
       // Include split records too. Split membership payments carry year/memberId on the split,
       // while date/type/bank details live on the parent transaction.
-      const splitQuery = query(
-        collection(db, COLLECTIONS.TRANSACTION_SPLITS),
-        where('memberId', '==', memberId),
-        where('category', '==', 'Membership'),
-        where('year', '==', yearNum)
-      );
-      const splitSnapshot = await getDocs(splitQuery);
       const splitTransactions: Transaction[] = [];
       if (splitSnapshot.docs.length > 0) {
         // Fix 5: batch-read parent transactions instead of one getDoc per split (N+1 → ceil(N/30) reads)
@@ -3008,12 +3009,14 @@ export class FinanceService {
     byCategory: Record<string, { income: number; expenses: number }>;
   }> {
     try {
-      const transactions = await this.getAllTransactions(year);
+      const [transactions, allSplits] = await Promise.all([
+        this.getAllTransactions(year),
+        this.getAllTransactionSplits(year),
+      ]);
       const targetYear = year || getMYTYear();
 
       // Flatten transactions: regular transactions (excluding isSplit) + split children
       const flattenedTransactions: Transaction[] = [];
-      const allSplits = await this.getAllTransactionSplits(year);
       const splitsMap: Record<string, TransactionSplit[]> = {};
       allSplits.forEach(s => {
         if (!splitsMap[s.parentTransactionId]) splitsMap[s.parentTransactionId] = [];
@@ -4141,20 +4144,26 @@ export class FinanceService {
     bankImports: Transaction[];
     manualEntries: Transaction[];
   }> {
-    const snap = await getDocs(
-      query(
-        collection(db, COLLECTIONS.TRANSACTIONS),
-        where('bankAccountId', '==', accountId),
-        where('status', 'in', ['Pending', 'Cleared'])
-      )
+    return apiCache.getOrSet(
+      `${FINANCE_CACHE_PREFIX}unmatched:${accountId}`,
+      async () => {
+        const snap = await getDocs(
+          query(
+            collection(db, COLLECTIONS.TRANSACTIONS),
+            where('bankAccountId', '==', accountId),
+            where('status', 'in', ['Pending', 'Cleared'])
+          )
+        );
+        const unreconciled = snap.docs
+          .map(d => normalizeTransaction({ id: d.id, ...d.data() }))
+          .filter(t => !t.isSplitChild);
+        return {
+          bankImports: unreconciled.filter(t => t.source === 'bank_import'),
+          manualEntries: unreconciled.filter(t => t.source !== 'bank_import'),
+        };
+      },
+      60 * 1000
     );
-    const unreconciled = snap.docs
-      .map(d => normalizeTransaction({ id: d.id, ...d.data() }))
-      .filter(t => !t.isSplitChild);
-    return {
-      bankImports: unreconciled.filter(t => t.source === 'bank_import'),
-      manualEntries: unreconciled.filter(t => t.source !== 'bank_import'),
-    };
   }
 
   // Link a bank import transaction to a manually-entered transaction
@@ -5097,7 +5106,7 @@ export class FinanceService {
               } as FinanceAlert;
             });
           },
-          60 * 1000
+          90 * 1000
         );
       }
     );

@@ -27,7 +27,7 @@ export const FinanceAlertsPanel: React.FC<FinanceAlertsPanelProps> = ({ userId }
 
   useEffect(() => {
     load();
-    const interval = setInterval(() => { load(); }, 60000);
+    const interval = setInterval(() => { load(); }, 90000);
     return () => clearInterval(interval);
   }, [load]);
 
