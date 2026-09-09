@@ -1421,14 +1421,23 @@ export function useFinanceData(searchQuery?: string) {
       batch.delete(doc(db, COLLECTIONS.TRANSACTIONS, transactionId));
       await batch.commit();
 
+      // Optimistic update: remove from local state immediately so the row
+      // disappears without waiting for a full server reload.
+      setTransactions(prev => prev.filter(t => t.id !== transactionId));
+      setTransactionSplits(prev => {
+        const next = { ...prev };
+        delete next[transactionId];
+        return next;
+      });
+
       showToast('Transaction deleted successfully', 'success');
-      await loadData(reportYear, undefined, true);
+      loadData(reportYear, undefined, true);
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to delete transaction', 'error');
     } finally {
       isDeletingTransactionRef.current = false;
     }
-  }, [transactions, showToast, loadData]);
+  }, [transactions, showToast, loadData, setTransactions, setTransactionSplits]);
 
   const handleBatchDelete = useCallback(async () => {
     const totalCount = selectedTxIds.size + selectedSplitIds.size;
