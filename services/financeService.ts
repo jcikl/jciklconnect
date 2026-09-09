@@ -5201,22 +5201,24 @@ export class FinanceService {
     );
   }
 
-  // Returns distinct (loId, category, projectId) combos across all transactions,
-  // ordered by count descending so the most-common groups appear first.
+  // Returns distinct (loId, category, projectId, unmatchedProjectTitle) combos across all
+  // transactions, ordered by count descending so the most-common groups appear first.
   static async getReclassificationGroups(): Promise<{
     loId: string | null;
     category: string;
     projectId: string | null;
+    unmatchedProjectTitle: string | null;
     count: number;
   }[]> {
     return withDevMode(
       () => [],
       async () => {
         const snap = await getDocsFromServer(collection(db, COLLECTIONS.TRANSACTIONS));
-        const counts = new Map<string, { loId: string | null; category: string; projectId: string | null; count: number }>();
+        const counts = new Map<string, { loId: string | null; category: string; projectId: string | null; unmatchedProjectTitle: string | null; count: number }>();
         snap.forEach(d => {
           const data = d.data();
-          const key = `${data.loId ?? ''}|${data.category ?? ''}|${data.projectId ?? ''}`;
+          const unmatched = data.unmatchedProjectTitle ?? null;
+          const key = `${data.loId ?? ''}|${data.category ?? ''}|${data.projectId ?? ''}|${unmatched ?? ''}`;
           if (counts.has(key)) {
             counts.get(key)!.count++;
           } else {
@@ -5224,6 +5226,7 @@ export class FinanceService {
               loId: data.loId ?? null,
               category: data.category ?? '',
               projectId: data.projectId ?? null,
+              unmatchedProjectTitle: unmatched,
               count: 1,
             });
           }
@@ -5233,12 +5236,13 @@ export class FinanceService {
     );
   }
 
-  // Batch-updates all transactions matching each rule's (loId, category, projectId)
+  // Batch-updates all transactions matching each rule's (loId, category, projectId, unmatchedProjectTitle)
   // with the rule's new values. loId is always forced to DEFAULT_LO_ID.
   static async batchReclassifyTransactions(rules: {
     matchLoId: string | null;
     matchCategory: string;
     matchProjectId: string | null;
+    matchUnmatchedProjectTitle?: string | null;
     newCategory: string;
     newProjectId: string | null;
   }[]): Promise<{ updated: number }> {
@@ -5253,8 +5257,12 @@ export class FinanceService {
           const txLoId = data.loId ?? null;
           const txCat = data.category ?? '';
           const txProj = data.projectId ?? null;
+          const txUnmatched = data.unmatchedProjectTitle ?? null;
           for (const rule of rules) {
-            if (txLoId === rule.matchLoId && txCat === rule.matchCategory && txProj === rule.matchProjectId) {
+            const unmatchedMatches = rule.matchUnmatchedProjectTitle !== undefined
+              ? txUnmatched === rule.matchUnmatchedProjectTitle
+              : true;
+            if (txLoId === rule.matchLoId && txCat === rule.matchCategory && txProj === rule.matchProjectId && unmatchedMatches) {
               toUpdate.push({ id: d.id, newCategory: rule.newCategory, newProjectId: rule.newProjectId });
               break;
             }

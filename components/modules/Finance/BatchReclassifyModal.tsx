@@ -10,6 +10,7 @@ interface ReclassGroup {
   loId: string | null;
   category: string;
   projectId: string | null;
+  unmatchedProjectTitle: string | null;
   count: number;
 }
 
@@ -35,6 +36,7 @@ interface BatchReclassifyModalProps {
     matchLoId: string | null;
     matchCategory: string;
     matchProjectId: string | null;
+    matchUnmatchedProjectTitle?: string | null;
     newCategory: string;
     newProjectId: string | null;
   }[]) => Promise<{ updated: number }>;
@@ -110,6 +112,7 @@ export const BatchReclassifyModal: React.FC<BatchReclassifyModalProps> = ({
         matchLoId: r.loId,
         matchCategory: r.category,
         matchProjectId: r.projectId,
+        matchUnmatchedProjectTitle: r.unmatchedProjectTitle,
         newCategory: r.newCategory,
         newProjectId: r.newProjectId,
       }));
@@ -170,9 +173,9 @@ export const BatchReclassifyModal: React.FC<BatchReclassifyModalProps> = ({
         ) : rows.length === 0 ? (
           <p className="text-sm text-slate-500 text-center py-8">No transaction groups found.</p>
         ) : (
-          <div className="overflow-x-auto border border-slate-100 rounded-xl">
+          <div className="overflow-x-auto overflow-y-auto max-h-[50vh] border border-slate-100 rounded-xl">
             <table className="w-full text-xs">
-              <thead>
+              <thead className="sticky top-0 z-10">
                 <tr className="bg-slate-50 border-b border-slate-100">
                   <th className="py-2.5 px-3 text-left font-semibold text-slate-600 uppercase tracking-wide">LO</th>
                   <th className="py-2.5 px-3 text-left font-semibold text-slate-600 uppercase tracking-wide">Current Category</th>
@@ -187,10 +190,17 @@ export const BatchReclassifyModal: React.FC<BatchReclassifyModalProps> = ({
                   <tr key={i} className={row.dirty ? 'bg-blue-50/50' : 'hover:bg-slate-50/50'}>
                     <td className="py-2 px-3 font-mono text-slate-500">{row.loId || <span className="text-amber-500">—</span>}</td>
                     <td className="py-2 px-3 text-slate-600">{row.category || <span className="italic text-slate-400">none</span>}</td>
-                    <td className="py-2 px-3 text-slate-500 max-w-[120px] truncate">
+                    <td className="py-2 px-3 text-slate-500 max-w-[160px]">
                       {row.projectId
-                        ? (projectById.get(row.projectId) ?? row.projectId)
-                        : <span className="italic text-slate-400">—</span>}
+                        ? <span className="truncate block">{projectById.get(row.projectId) ?? row.projectId}</span>
+                        : row.unmatchedProjectTitle
+                          ? (
+                            <span className="flex flex-col gap-0.5">
+                              <span className="truncate text-amber-700 font-medium">{row.unmatchedProjectTitle}</span>
+                              <span className="text-[10px] text-amber-500">未匹配</span>
+                            </span>
+                          )
+                          : <span className="italic text-slate-400">—</span>}
                     </td>
                     <td className="py-2 px-3 text-right font-mono font-semibold text-slate-700">{row.count}</td>
                     <td className="py-2 px-3 min-w-[170px]">
