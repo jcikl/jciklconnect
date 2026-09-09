@@ -30,7 +30,7 @@ const CATEGORY_OPTIONS = [
 interface BatchReclassifyModalProps {
   isOpen: boolean;
   onClose: () => void;
-  projects: Array<{ id: string; name: string; hostingLo?: string; startDate?: string; endDate?: string; date?: string }>;
+  projects: Array<{ id: string; name: string; hostingLo?: string; startDate?: string; endDate?: string; eventStartDate?: string; eventEndDate?: string; date?: string }>;
   loadReclassificationGroups: () => Promise<ReclassGroup[]>;
   handleBatchReclassify: (rules: {
     matchLoId: string | null;
@@ -60,8 +60,8 @@ export const BatchReclassifyModal: React.FC<BatchReclassifyModalProps> = ({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [showMatched, setShowMatched] = useState(false);
 
-  const projectLabel = (p: { name?: string; hostingLo?: string; endDate?: string; startDate?: string; date?: string }) => {
-    const year = (p.endDate || p.startDate || p.date || '').slice(0, 4);
+  const projectLabel = (p: { name?: string; hostingLo?: string; endDate?: string; eventEndDate?: string; startDate?: string; eventStartDate?: string; date?: string }) => {
+    const year = (p.endDate || p.eventEndDate || p.startDate || p.eventStartDate || p.date || '').slice(0, 4);
     const lo = p.hostingLo ? ` [${p.hostingLo}]` : '';
     return year ? `${year} ${p.name}${lo}` : `${p.name}${lo}`;
   };
