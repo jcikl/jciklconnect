@@ -58,6 +58,7 @@ export const BatchReclassifyModal: React.FC<BatchReclassifyModalProps> = ({
   const [rows, setRows] = useState<RuleRow[]>([]);
   const [missingLoIdCount, setMissingLoIdCount] = useState<number | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [showMatched, setShowMatched] = useState(false);
 
   const projectOptions = projects.map(p => p.hostingLo ? `${p.name} [${p.hostingLo}]` : p.name);
   const projectByOption = new Map(projects.map(p => [p.hostingLo ? `${p.name} [${p.hostingLo}]` : p.name, p.id]));
@@ -88,6 +89,10 @@ export const BatchReclassifyModal: React.FC<BatchReclassifyModalProps> = ({
 
   const dirtyRows = rows.filter(r => r.dirty);
   const totalAffected = dirtyRows.reduce((s, r) => s + r.count, 0);
+  const matchedCount = rows.filter(r => r.projectId !== null).length;
+  const displayRows = showMatched
+    ? rows.map((r, i) => ({ row: r, originalIndex: i }))
+    : rows.map((r, i) => ({ row: r, originalIndex: i })).filter(({ row }) => row.projectId === null);
 
   const handleCategoryChange = (index: number, value: string) => {
     setRows(prev => prev.map((r, i) => i === index
@@ -174,6 +179,19 @@ export const BatchReclassifyModal: React.FC<BatchReclassifyModalProps> = ({
           <p className="text-sm text-slate-500 text-center py-8">No transaction groups found.</p>
         ) : (
           <>
+            {/* Toggle matched */}
+            {matchedCount > 0 && (
+              <div className="flex items-center justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowMatched(v => !v)}
+                  className="text-xs text-slate-500 hover:text-jci-blue transition-colors"
+                >
+                  {showMatched ? `隐藏已匹配项（${matchedCount}）` : `显示已匹配项（${matchedCount}）`}
+                </button>
+              </div>
+            )}
+
             {/* Desktop table */}
             <div className="hidden md:block overflow-x-auto overflow-y-auto max-h-[50vh] border border-slate-100 rounded-xl">
               <table className="w-full text-xs">
@@ -188,8 +206,8 @@ export const BatchReclassifyModal: React.FC<BatchReclassifyModalProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {rows.map((row, i) => (
-                    <tr key={i} className={row.dirty ? 'bg-blue-50/50' : 'hover:bg-slate-50/50'}>
+                  {displayRows.map(({ row, originalIndex }) => (
+                    <tr key={originalIndex} className={row.dirty ? 'bg-blue-50/50' : 'hover:bg-slate-50/50'}>
                       <td className="py-2 px-3 font-mono text-slate-500">{row.loId || <span className="text-amber-500">—</span>}</td>
                       <td className="py-2 px-3 text-slate-600">{row.category || <span className="italic text-slate-400">none</span>}</td>
                       <td className="py-2 px-3 text-slate-500 max-w-[160px]">
@@ -201,10 +219,10 @@ export const BatchReclassifyModal: React.FC<BatchReclassifyModalProps> = ({
                       </td>
                       <td className="py-2 px-3 text-right font-mono font-semibold text-slate-700">{row.count}</td>
                       <td className="py-2 px-3 min-w-[170px]">
-                        <Select name={`cat-${i}`} value={row.newCategory} onChange={e => handleCategoryChange(i, e.target.value)} options={CATEGORY_OPTIONS} label="" />
+                        <Select name={`cat-${originalIndex}`} value={row.newCategory} onChange={e => handleCategoryChange(originalIndex, e.target.value)} options={CATEGORY_OPTIONS} label="" />
                       </td>
                       <td className="py-2 px-3 min-w-[180px]">
-                        <Combobox options={projectOptions} value={row.newProjectId ? (projectById.get(row.newProjectId) ?? '') : ''} onChange={val => handleProjectChange(i, val)} placeholder="— no project —" />
+                        <Combobox options={projectOptions} value={row.newProjectId ? (projectById.get(row.newProjectId) ?? '') : ''} onChange={val => handleProjectChange(originalIndex, val)} placeholder="— no project —" />
                       </td>
                     </tr>
                   ))}
@@ -214,8 +232,8 @@ export const BatchReclassifyModal: React.FC<BatchReclassifyModalProps> = ({
 
             {/* Mobile cards */}
             <div className="md:hidden space-y-2 overflow-y-auto max-h-[55vh]">
-              {rows.map((row, i) => (
-                <div key={i} className={`rounded-xl border p-3 space-y-2.5 text-sm ${row.dirty ? 'border-blue-200 bg-blue-50/40' : 'border-slate-100 bg-white'}`}>
+              {displayRows.map(({ row, originalIndex }) => (
+                <div key={originalIndex} className={`rounded-xl border p-3 space-y-2.5 text-sm ${row.dirty ? 'border-blue-200 bg-blue-50/40' : 'border-slate-100 bg-white'}`}>
                   {/* Header row: LO + category + count */}
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
@@ -234,8 +252,8 @@ export const BatchReclassifyModal: React.FC<BatchReclassifyModalProps> = ({
                   </div>
                   {/* New selectors */}
                   <div className="space-y-1.5">
-                    <Select name={`cat-m-${i}`} value={row.newCategory} onChange={e => handleCategoryChange(i, e.target.value)} options={CATEGORY_OPTIONS} label="" />
-                    <Combobox options={projectOptions} value={row.newProjectId ? (projectById.get(row.newProjectId) ?? '') : ''} onChange={val => handleProjectChange(i, val)} placeholder="— no project —" />
+                    <Select name={`cat-m-${originalIndex}`} value={row.newCategory} onChange={e => handleCategoryChange(originalIndex, e.target.value)} options={CATEGORY_OPTIONS} label="" />
+                    <Combobox options={projectOptions} value={row.newProjectId ? (projectById.get(row.newProjectId) ?? '') : ''} onChange={val => handleProjectChange(originalIndex, val)} placeholder="— no project —" />
                   </div>
                 </div>
               ))}
