@@ -146,6 +146,9 @@ export function useFinanceData(searchQuery?: string) {
 
   // Tracks which projectIds have already been fetched for purpose autocomplete
   const fetchedProjectPurposesRef = useRef<Set<string>>(new Set());
+  // Tracks whether the first successful load has completed; suppresses the full
+  // spinner on subsequent year-switch reloads so old data stays visible.
+  const hasLoadedOnceRef = useRef(false);
 
   // ── Helper wrappers (close over local state) ──────────────────────────────
 
@@ -177,13 +180,19 @@ export function useFinanceData(searchQuery?: string) {
   const loadData = useCallback(async (targetYear: number = reportYear, getIgnore?: () => boolean, forceServer = false) => {
     const stale = () => getIgnore?.() ?? false;
     try {
-      setLoading(true);
+      // Show full spinner only on first load; subsequent year-switch reloads keep
+      // old data visible (stale-while-reloading) so the UI never goes blank.
+      if (!hasLoadedOnceRef.current) setLoading(true);
       setError(null);
-      const [txs, accts, summ, inventory, projList, histFlows, allYears, allSplits, projectAccountResult] = await Promise.all([
+      // Fast path: fire accounts + inventory in background so they can settle
+      // before the slower calls finish. Accounts updates arrive early for the
+      // Dashboard's bank-account cards; inventory is not on the critical path.
+      const acctPromise = FinanceService.getAllBankAccounts();
+      acctPromise.then(accts => { if (!stale()) setAccounts(accts); }).catch(() => {});
+      InventoryService.getAllItems().then(items => { if (!stale()) setInventoryItems(items); }).catch(() => {});
+      const [txs, summ, projList, histFlows, allYears, allSplits, projectAccountResult] = await Promise.all([
         FinanceService.getAllTransactions(targetYear, forceServer),
-        FinanceService.getAllBankAccounts(),
         FinanceService.getFinancialSummary(targetYear),
-        InventoryService.getAllItems(),
         ProjectsService.getAllProjects(),
         targetYear !== 0 ? FinanceService.getHistoricalNetFlowBeforeYear(targetYear) : Promise.resolve({}),
         FinanceService.getAllTransactionYears(),
@@ -197,10 +206,10 @@ export function useFinanceData(searchQuery?: string) {
         }),
       ]);
       if (stale()) return;
+      const accts = await acctPromise;
       setTransactions(txs);
       setAccounts(accts);
       setSummary(summ);
-      setInventoryItems(inventory);
       setProjects(projList);
       setAdministrativeProjectIds(getAdministrativeProjectIds());
       setHistoricalNetFlows(histFlows);
@@ -222,6 +231,7 @@ export function useFinanceData(searchQuery?: string) {
         }
       });
       setTransactionSplits(splitsMap);
+      hasLoadedOnceRef.current = true;
     } catch (err) {
       if (stale()) return;
       const errorMessage = err instanceof Error ? err.message : 'Failed to load financial data';
