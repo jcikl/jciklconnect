@@ -165,7 +165,7 @@ export const BatchReclassifyModal: React.FC<BatchReclassifyModalProps> = ({
           </div>
         )}
 
-        {/* Table */}
+        {/* Rows */}
         {loading ? (
           <div className="flex items-center justify-center py-10 text-slate-400 text-sm">
             <RefreshCw size={16} className="animate-spin mr-2" /> Loading groups…
@@ -173,72 +173,89 @@ export const BatchReclassifyModal: React.FC<BatchReclassifyModalProps> = ({
         ) : rows.length === 0 ? (
           <p className="text-sm text-slate-500 text-center py-8">No transaction groups found.</p>
         ) : (
-          <div className="overflow-x-auto overflow-y-auto max-h-[50vh] border border-slate-100 rounded-xl">
-            <table className="w-full text-xs">
-              <thead className="sticky top-0 z-10">
-                <tr className="bg-slate-50 border-b border-slate-100">
-                  <th className="py-2.5 px-3 text-left font-semibold text-slate-600 uppercase tracking-wide">LO</th>
-                  <th className="py-2.5 px-3 text-left font-semibold text-slate-600 uppercase tracking-wide">Current Category</th>
-                  <th className="py-2.5 px-3 text-left font-semibold text-slate-600 uppercase tracking-wide">Current Project</th>
-                  <th className="py-2.5 px-3 text-right font-semibold text-slate-600 uppercase tracking-wide">Txs</th>
-                  <th className="py-2.5 px-3 text-left font-semibold text-slate-600 uppercase tracking-wide">New Category</th>
-                  <th className="py-2.5 px-3 text-left font-semibold text-slate-600 uppercase tracking-wide">New Project</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {rows.map((row, i) => (
-                  <tr key={i} className={row.dirty ? 'bg-blue-50/50' : 'hover:bg-slate-50/50'}>
-                    <td className="py-2 px-3 font-mono text-slate-500">{row.loId || <span className="text-amber-500">—</span>}</td>
-                    <td className="py-2 px-3 text-slate-600">{row.category || <span className="italic text-slate-400">none</span>}</td>
-                    <td className="py-2 px-3 text-slate-500 max-w-[160px]">
-                      {row.projectId
-                        ? <span className="truncate block">{projectById.get(row.projectId) ?? row.projectId}</span>
-                        : row.unmatchedProjectTitle
-                          ? (
-                            <span className="flex flex-col gap-0.5">
-                              <span className="truncate text-amber-700 font-medium">{row.unmatchedProjectTitle}</span>
-                              <span className="text-[10px] text-amber-500">未匹配</span>
-                            </span>
-                          )
-                          : <span className="italic text-slate-400">—</span>}
-                    </td>
-                    <td className="py-2 px-3 text-right font-mono font-semibold text-slate-700">{row.count}</td>
-                    <td className="py-2 px-3 min-w-[170px]">
-                      <Select
-                        name={`cat-${i}`}
-                        value={row.newCategory}
-                        onChange={e => handleCategoryChange(i, e.target.value)}
-                        options={CATEGORY_OPTIONS}
-                        label=""
-                      />
-                    </td>
-                    <td className="py-2 px-3 min-w-[180px]">
-                      <Combobox
-                        options={projectOptions}
-                        value={row.newProjectId ? (projectById.get(row.newProjectId) ?? '') : ''}
-                        onChange={val => handleProjectChange(i, val)}
-                        placeholder="— no project —"
-                      />
-                    </td>
+          <>
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-x-auto overflow-y-auto max-h-[50vh] border border-slate-100 rounded-xl">
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-slate-50 border-b border-slate-100">
+                    <th className="py-2.5 px-3 text-left font-semibold text-slate-600 uppercase tracking-wide">LO</th>
+                    <th className="py-2.5 px-3 text-left font-semibold text-slate-600 uppercase tracking-wide">Current Category</th>
+                    <th className="py-2.5 px-3 text-left font-semibold text-slate-600 uppercase tracking-wide">Current Project</th>
+                    <th className="py-2.5 px-3 text-right font-semibold text-slate-600 uppercase tracking-wide">Txs</th>
+                    <th className="py-2.5 px-3 text-left font-semibold text-slate-600 uppercase tracking-wide">New Category</th>
+                    <th className="py-2.5 px-3 text-left font-semibold text-slate-600 uppercase tracking-wide">New Project</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {rows.map((row, i) => (
+                    <tr key={i} className={row.dirty ? 'bg-blue-50/50' : 'hover:bg-slate-50/50'}>
+                      <td className="py-2 px-3 font-mono text-slate-500">{row.loId || <span className="text-amber-500">—</span>}</td>
+                      <td className="py-2 px-3 text-slate-600">{row.category || <span className="italic text-slate-400">none</span>}</td>
+                      <td className="py-2 px-3 text-slate-500 max-w-[160px]">
+                        {row.projectId
+                          ? <span className="truncate block">{projectById.get(row.projectId) ?? row.projectId}</span>
+                          : row.unmatchedProjectTitle
+                            ? <span className="flex flex-col gap-0.5"><span className="truncate text-amber-700 font-medium">{row.unmatchedProjectTitle}</span><span className="text-[10px] text-amber-500">未匹配</span></span>
+                            : <span className="italic text-slate-400">—</span>}
+                      </td>
+                      <td className="py-2 px-3 text-right font-mono font-semibold text-slate-700">{row.count}</td>
+                      <td className="py-2 px-3 min-w-[170px]">
+                        <Select name={`cat-${i}`} value={row.newCategory} onChange={e => handleCategoryChange(i, e.target.value)} options={CATEGORY_OPTIONS} label="" />
+                      </td>
+                      <td className="py-2 px-3 min-w-[180px]">
+                        <Combobox options={projectOptions} value={row.newProjectId ? (projectById.get(row.newProjectId) ?? '') : ''} onChange={val => handleProjectChange(i, val)} placeholder="— no project —" />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile cards */}
+            <div className="md:hidden space-y-2 overflow-y-auto max-h-[55vh]">
+              {rows.map((row, i) => (
+                <div key={i} className={`rounded-xl border p-3 space-y-2.5 text-sm ${row.dirty ? 'border-blue-200 bg-blue-50/40' : 'border-slate-100 bg-white'}`}>
+                  {/* Header row: LO + category + count */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                      {row.loId || <span className="text-amber-500">—</span>}
+                    </span>
+                    <span className="text-xs text-slate-500">{row.category || <span className="italic text-slate-400">none</span>}</span>
+                    <span className="ml-auto font-mono font-bold text-slate-700 text-xs">{row.count} txs</span>
+                  </div>
+                  {/* Current project */}
+                  <div className="text-xs text-slate-500">
+                    {row.projectId
+                      ? <span className="truncate block">{projectById.get(row.projectId) ?? row.projectId}</span>
+                      : row.unmatchedProjectTitle
+                        ? <span className="text-amber-700 font-medium">{row.unmatchedProjectTitle} <span className="text-amber-400 font-normal">未匹配</span></span>
+                        : <span className="italic text-slate-400">— no project —</span>}
+                  </div>
+                  {/* New selectors */}
+                  <div className="space-y-1.5">
+                    <Select name={`cat-m-${i}`} value={row.newCategory} onChange={e => handleCategoryChange(i, e.target.value)} options={CATEGORY_OPTIONS} label="" />
+                    <Combobox options={projectOptions} value={row.newProjectId ? (projectById.get(row.newProjectId) ?? '') : ''} onChange={val => handleProjectChange(i, val)} placeholder="— no project —" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-2 gap-3">
+        <div className="flex flex-col gap-2 pt-2 md:flex-row md:items-center md:justify-between">
           <p className="text-xs text-slate-500">
             {dirtyRows.length > 0
               ? `${dirtyRows.length} group${dirtyRows.length !== 1 ? 's' : ''} modified — ${totalAffected} transaction${totalAffected !== 1 ? 's' : ''} will be updated`
               : 'Edit rows above to stage changes'}
           </p>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+            <Button variant="outline" onClick={onClose} disabled={saving} className="flex-1 md:flex-none">Cancel</Button>
             <Button
               onClick={() => setConfirmOpen(true)}
               disabled={dirtyRows.length === 0 || saving}
+              className="flex-1 md:flex-none"
             >
               {saving ? <><RefreshCw size={13} className="animate-spin mr-1.5" />Applying…</> : 'Apply Changes'}
             </Button>
