@@ -2,7 +2,7 @@ import React from 'react';
 import { BatchImportModal } from '../../shared/batchImport/BatchImportModal';
 import { bankTransactionImportConfig } from './config/bankTransactionImportConfig';
 import { FinanceService } from '../../../services/financeService';
-import { Project, BankAccount, Transaction } from '../../../types';
+import { Project, BankAccount } from '../../../types';
 import { Select } from '../../ui/Form';
 import { useToast } from '../../ui/Common';
 import { ProjectsService } from '../../../services/projectsService';
@@ -28,7 +28,6 @@ export const BankTransactionImportModal: React.FC<Props> = ({
   const [bankAccounts, setBankAccounts] = React.useState<BankAccount[]>([]);
   const [projects, setProjects] = React.useState<Project[]>([]);
   const [selectedBankAccountId, setSelectedBankAccountId] = React.useState<string>('');
-  const [existingTransactions, setExistingTransactions] = React.useState<Transaction[]>([]);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -46,14 +45,6 @@ export const BankTransactionImportModal: React.FC<Props> = ({
       });
     }
   }, [isOpen]);
-
-  // Load existing transactions for selected bank account (情景 A — duplicate detection)
-  React.useEffect(() => {
-    if (!selectedBankAccountId) { setExistingTransactions([]); return; }
-    FinanceService.getAllTransactions()
-      .then(all => setExistingTransactions(all.filter(t => t.bankAccountId === selectedBankAccountId && !t.isSplitChild)))
-      .catch(() => setExistingTransactions([]));
-  }, [selectedBankAccountId]);
 
   // After a bank statement import, try to auto-match any pending event-registration
   // income transactions against the freshly-imported rows — otherwise runAutoMatch
@@ -74,11 +65,11 @@ export const BankTransactionImportModal: React.FC<Props> = ({
       onClose={onClose}
       config={bankTransactionImportConfig}
       onImported={handleImported}
+      importBlockedReason={!selectedBankAccountId ? 'Please select a bank account before importing' : undefined}
       context={{
         bankAccountId: selectedBankAccountId,
         loId: bankAccounts.find(a => a.id === selectedBankAccountId)?.loId,
         projects: projects,
-        existingTransactions: existingTransactions,
       }}
     >
       <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-2">

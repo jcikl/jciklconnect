@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Search } from 'lucide-react';
 import { Card, Tabs, Pagination } from '../../ui/Common';
 import { AsyncErrorBoundary } from '../../ui/AsyncErrorBoundary';
 import { Project } from '../../../types';
@@ -12,7 +13,7 @@ const DEFAULT_PAGE_SIZE = 20;
 type ProjectsTab = 'projects' | 'past-projects' | 'templates';
 type HostingFilter = 'all' | 'hosting' | 'cohosting' | 'other';
 
-const KL_RE = /kuala\s*lumpur|jci\s*kl\b/i;
+const KL = 'jci kuala lumpur';
 
 const HOSTING_TABS: { key: HostingFilter; label: string; short: string }[] = [
   { key: 'all',       label: 'All Events',                    short: 'All'      },
@@ -91,23 +92,33 @@ export const ProjectsListShell: React.FC<ProjectsListShellProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(DEFAULT_PAGE_SIZE);
   const [hostingFilter, setHostingFilter] = useState<HostingFilter>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const filteredByHosting = React.useMemo(() => {
-    if (hostingFilter === 'all') return projects;
-    return projects.filter(p => {
+    const q = searchQuery.trim().toLowerCase();
+    const bySearch = q
+      ? projects.filter(p =>
+          (p.name ?? p.title ?? '').toLowerCase().includes(q) ||
+          ((p as any).roadmapId ?? '').toString().toLowerCase().includes(q)
+        )
+      : projects;
+    if (hostingFilter === 'all') return bySearch;
+    return bySearch.filter(p => {
       const lo = ((p as any).hostingLo ?? '') as string;
-      const co = ((p as any).coHosting ?? '') as string;
-      const isHosting = KL_RE.test(lo);
-      const isCo = KL_RE.test(co);
+      const coRaw = (p as any).coHosting;
+      const isHosting = lo.trim().toLowerCase() === KL;
+      const isCo = Array.isArray(coRaw)
+        ? coRaw.some((c: string) => typeof c === 'string' && c.trim().toLowerCase() === KL)
+        : typeof coRaw === 'string' && coRaw.trim().toLowerCase() === KL;
       if (hostingFilter === 'hosting') return isHosting;
       if (hostingFilter === 'cohosting') return isCo;
       return !isHosting && !isCo;
     });
-  }, [projects, hostingFilter]);
+  }, [projects, hostingFilter, searchQuery]);
 
-  // Reset to page 1 whenever the filtered list or tab changes; clear selection on filter switch
-  useEffect(() => { setCurrentPage(1); }, [filteredByHosting.length, activeTab, hostingFilter]);
-  useEffect(() => { onClearSelection(); }, [hostingFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Reset to page 1 whenever the filtered list or tab changes; clear selection on filter/search switch
+  useEffect(() => { setCurrentPage(1); }, [filteredByHosting.length, activeTab, hostingFilter, searchQuery]);
+  useEffect(() => { onClearSelection(); }, [hostingFilter, searchQuery]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const totalPages = Math.max(1, Math.ceil(filteredByHosting.length / itemsPerPage));
   const pagedProjects = filteredByHosting.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -205,6 +216,18 @@ export const ProjectsListShell: React.FC<ProjectsListShellProps> = ({
         />
         {activeTab !== 'templates' && yearFilter(true)}
       </div>
+      {showProjects && (
+        <div className="md:hidden relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search events…"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 rounded-xl bg-white shadow-sm outline-none focus:border-jci-blue focus:ring-1 focus:ring-jci-blue/30 transition-all"
+          />
+        </div>
+      )}
 
       <div className="md:hidden">
         {showProjects ? projectGrid : templatesTab(true)}
@@ -247,7 +270,19 @@ export const ProjectsListShell: React.FC<ProjectsListShellProps> = ({
                 />
               </div>
               {activeTab !== 'templates' && (
-                <div className="flex items-center gap-2 pb-2">
+                <div className="flex items-center gap-3 pb-2">
+                  {showProjects && (
+                    <div className="relative">
+                      <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                      <input
+                        type="text"
+                        placeholder="Search…"
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        className="pl-7 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white outline-none focus:border-jci-blue focus:ring-1 focus:ring-jci-blue/30 transition-all w-44"
+                      />
+                    </div>
+                  )}
                   <span className="text-xs font-semibold text-slate-500">Year:</span>
                   {yearFilter()}
                 </div>

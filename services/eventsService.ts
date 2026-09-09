@@ -73,6 +73,10 @@ export class EventsService {
       organizerId: data.organizerId ?? undefined,
       registeredMembers: data.registeredMembers as string[] ?? [],
       committee: data.committee as ProjectCommitteeMember[] | undefined ?? undefined,
+      area: data.area ?? undefined,
+      level: data.level ?? undefined,
+      hostingLo: data.hostingLo ?? undefined,
+      coHosting: data.coHosting ?? undefined,
     } as Event;
   }
 

@@ -761,9 +761,25 @@ export function useFinanceData(searchQuery?: string) {
   }, [projects]);
 
   const filteredProjectAccounts = useMemo(() => {
-    if (projectAccountYearFilter === 0) return projectAccounts;
+    const KL = 'jci kuala lumpur';
+    const isKlProject = (p: Project) => {
+      const lo = ((p as any).hostingLo ?? '').trim().toLowerCase();
+      const coRaw = (p as any).coHosting;
+      const isHosting = lo === KL;
+      const isCo = Array.isArray(coRaw)
+        ? coRaw.some((c: string) => typeof c === 'string' && c.trim().toLowerCase() === KL)
+        : typeof coRaw === 'string' && coRaw.trim().toLowerCase() === KL;
+      return isHosting || isCo;
+    };
 
-    return projectAccounts.filter(acc => {
+    const byKl = projectAccounts.filter(acc => {
+      const project = projects.find(p => p.id === acc.projectId);
+      return project ? isKlProject(project) : false;
+    });
+
+    if (projectAccountYearFilter === 0) return byKl;
+
+    return byKl.filter(acc => {
       const project = projects.find(p => p.id === acc.projectId);
       if (!project) return false;
 
@@ -795,11 +811,21 @@ export function useFinanceData(searchQuery?: string) {
   }, [projects]);
 
   const filteredProjectsForModal = useMemo(() => {
-    if (editingModalYear === 'All') return projects;
+    const KL = 'jci kuala lumpur';
+    const isKlProject = (p: Project) => {
+      const lo = ((p as any).hostingLo ?? '').trim().toLowerCase();
+      const coRaw = (p as any).coHosting;
+      const isHosting = lo === KL;
+      const isCo = Array.isArray(coRaw)
+        ? coRaw.some((c: string) => typeof c === 'string' && c.trim().toLowerCase() === KL)
+        : typeof coRaw === 'string' && coRaw.trim().toLowerCase() === KL;
+      return isHosting || isCo;
+    };
+    const klProjects = projects.filter(isKlProject);
+    if (editingModalYear === 'All') return klProjects;
     const yearInt = parseInt(editingModalYear, 10);
     const currentYear = new Date().getFullYear();
-
-    return projects.filter(p => {
+    return klProjects.filter(p => {
       const pDate = p.eventStartDate || p.startDate || p.date || p.proposedDate || p.createdAt || p.updatedAt;
       const pYear = pDate ? new Date(pDate).getFullYear() : currentYear;
       return pYear === yearInt;
@@ -807,26 +833,26 @@ export function useFinanceData(searchQuery?: string) {
   }, [projects, editingModalYear]);
 
   const groupedProjectsForModal = useMemo(() => {
-    const filtered = editingModalYear === 'All' ? projects : filteredProjectsForModal;
-    const grouped: Record<number, string[]> = {};
-    const currentYear = new Date().getFullYear();
+    const filtered = filteredProjectsForModal;
+    const now = new Date();
+    // key: "YYYY-MM" for sorting; label: "MMM YYYY"
+    const grouped: Record<string, string[]> = {};
 
     filtered.forEach(p => {
       const pDate = p.eventStartDate || p.startDate || p.date || p.proposedDate || p.createdAt || p.updatedAt;
-      const year = pDate ? new Date(pDate).getFullYear() : currentYear;
-
-      if (!grouped[year]) grouped[year] = [];
-      grouped[year].push(p.name || p.title || p.id);
+      const d = pDate ? new Date(pDate) : now;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(p.name || p.title || p.id);
     });
 
-    const sortedYears = Object.keys(grouped)
-      .map(y => parseInt(y, 10))
-      .sort((a, b) => b - a);
-
-    return sortedYears.map(year => ({
-      label: String(year),
-      options: grouped[year].sort()
-    }));
+    return Object.keys(grouped)
+      .sort((a, b) => b.localeCompare(a))
+      .map(key => {
+        const [y, m] = key.split('-');
+        const label = new Date(Number(y), Number(m) - 1, 1).toLocaleString('default', { month: 'short', year: 'numeric' });
+        return { label, options: grouped[key].sort() };
+      });
   }, [projects, filteredProjectsForModal, editingModalYear]);
 
   const dynamicAdministrativeProjectIds = useMemo(() => {

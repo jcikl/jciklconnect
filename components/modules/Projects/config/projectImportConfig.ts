@@ -350,10 +350,30 @@ export const projectImportConfig: BatchImportConfig = {
     loaders: [
         {
             label: 'JCI Malaysia',
-            load: async (onProgress) => {
+            params: [
+                {
+                    key: 'year',
+                    label: 'Year',
+                    type: 'select' as const,
+                    options: (() => {
+                        const cur = new Date().getFullYear();
+                        return [String(cur + 1), String(cur), String(cur - 1), String(cur - 2)];
+                    })(),
+                    default: String(new Date().getFullYear()),
+                },
+                {
+                    key: 'skip_step3',
+                    label: 'Skip poster/pillar/price',
+                    type: 'select' as const,
+                    options: ['No', 'Yes'],
+                    default: 'Yes',
+                },
+            ],
+            load: async (onProgress, params) => {
+                const year = params?.year ?? String(new Date().getFullYear());
                 // Step 1: fetch merged event list from all 4 levels
-                onProgress?.('1/3 · 获取活动列表…');
-                const listRes = await fetch('/api/jci-events-proxy');
+                onProgress?.(`1/3 · 获取 ${year} 年活动列表…`);
+                const listRes = await fetch(`/api/jci-events-proxy?year=${year}`);
                 if (!listRes.ok) throw new Error(`Server error ${listRes.status}`);
                 const listData = await listRes.json();
                 if (listData.error) throw new Error(listData.error);
@@ -389,23 +409,27 @@ export const projectImportConfig: BatchImportConfig = {
                     onProgress?.(`2/3 · 加载详情 ${done}/${ids.length}…`);
                 }
 
-                // Step 3: batch-fetch HTML pages for logo, pillar and pricing
+                // Step 3: batch-fetch HTML pages for logo, pillar and pricing (optional)
                 const PAGE_CHUNK = 50;
                 const pageMap: Record<string, { logoUrl: string; pillar: string; priceMin?: number; priceMax?: number }> = {};
-                done = 0;
-                onProgress?.(`3/3 · 同步海报/Pillar/价格 0/${ids.length}…`);
-                for (let i = 0; i < ids.length; i += PAGE_CHUNK) {
-                    const chunk = ids.slice(i, i + PAGE_CHUNK);
-                    try {
-                        const res = await fetch('/api/jci-page-details', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ ids: chunk }),
-                        });
-                        if (res.ok) Object.assign(pageMap, await res.json());
-                    } catch { /* non-blocking — missing logo/pillar/price is acceptable */ }
-                    done += chunk.length;
-                    onProgress?.(`3/3 · 同步海报/Pillar/价格 ${done}/${ids.length}…`);
+                if (params?.skip_step3 !== 'Yes') {
+                    done = 0;
+                    onProgress?.(`3/3 · 同步海报/Pillar/价格 0/${ids.length}…`);
+                    for (let i = 0; i < ids.length; i += PAGE_CHUNK) {
+                        const chunk = ids.slice(i, i + PAGE_CHUNK);
+                        try {
+                            const res = await fetch('/api/jci-page-details', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ ids: chunk }),
+                            });
+                            if (res.ok) Object.assign(pageMap, await res.json());
+                        } catch { /* non-blocking — missing logo/pillar/price is acceptable */ }
+                        done += chunk.length;
+                        onProgress?.(`3/3 · 同步海报/Pillar/价格 ${done}/${ids.length}…`);
+                    }
+                } else {
+                    onProgress?.('3/3 · 已跳过海报/Pillar/价格');
                 }
 
                 // Merge all enriched data into events

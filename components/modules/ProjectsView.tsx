@@ -13,6 +13,7 @@ import type { ProjectFinancialAccount as ProjectFinancialAccountType, ProjectTra
 import { useBatchMode } from '../../contexts/BatchModeContext';
 import { projectFinancialService } from '../../services/projectFinancialService';
 import { PENDING_USE_TEMPLATE_KEY } from '../../utils/roadmapUtils';
+import { LO_ID_TO_NAME } from '../../config/constants';
 import { ProjectsService } from '../../services/projectsService';
 import { ProjectDetailTabs } from './Projects/ProjectDetailTabs';
 import { TemplatePreviewModal } from './Projects/TemplatePreviewModal';
@@ -109,11 +110,17 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
 
     let filtered = projects;
 
-    if (!isPrivileged && member) {
+    if (!isAdmin && member) {
+      const loName = (LO_ID_TO_NAME[(member as any).loId ?? ''] ?? '').trim().toLowerCase();
       filtered = filtered.filter(p => {
-        const isCreator = p.organizerId === member.id || p.submittedBy === member.id;
-        const isCommittee = p.committee?.some(c => c.memberId === member.id) ?? false;
-        return isCreator || isCommittee;
+        if (!loName) return true;
+        const hosting = ((p as any).hostingLo ?? '').trim().toLowerCase();
+        const coRaw = (p as any).coHosting;
+        const isHosting = hosting === loName;
+        const isCo = Array.isArray(coRaw)
+          ? coRaw.some((c: string) => typeof c === 'string' && c.trim().toLowerCase() === loName)
+          : typeof coRaw === 'string' && coRaw.trim().toLowerCase() === loName;
+        return isHosting || isCo;
       });
     }
 
@@ -153,7 +160,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
     }
 
     return filtered;
-  }, [projects, activeTab, searchQuery, selectedYear, isPrivileged, member]);
+  }, [projects, activeTab, searchQuery, selectedYear, isAdmin, member]);
 
   const handleBatchDelete = () => {
     if (selectedProjectIds.size === 0) return;

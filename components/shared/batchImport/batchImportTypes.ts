@@ -100,8 +100,16 @@ export interface BatchImportConfig {
   /** External data loaders — each adds a button next to Template/Upload */
   loaders?: Array<{
     label: string;
+    /** Optional inline params shown next to the loader button */
+    params?: Array<{
+      key: string;
+      label: string;
+      type: 'select';
+      options: string[];
+      default: string;
+    }>;
     /** Returns TSV text (tab-separated, first row = headers) */
-    load: (onProgress?: (msg: string) => void) => Promise<string>;
+    load: (onProgress?: (msg: string) => void, params?: Record<string, string>) => Promise<string>;
   }>;
 }
 
@@ -114,6 +122,8 @@ export interface ImportRow {
   parsed: Partial<any>;
   /** 验证错误列表 */
   errors: string[];
+  /** 警告列表：不阻止导入，但需要事后处理（如待匹配项目） */
+  warnings?: string[];
   /** 是否有效 */
   valid: boolean;
   /** （额外状态）当系统内已经存在记录时标记为更新 (Update) 而非新建 */

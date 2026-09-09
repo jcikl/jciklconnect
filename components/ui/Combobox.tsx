@@ -160,7 +160,7 @@ export const Combobox: React.FC<ComboboxProps> = ({
                 ) : isGrouped && filteredOptions && (filteredOptions as { label: string; options: string[] }[]).length > 0 ? (
                     (filteredOptions as { label: string; options: string[] }[]).map((group, groupIndex) => (
                         <div key={groupIndex}>
-                            <div className="px-3 py-1 text-xs font-semibold text-slate-500 bg-slate-50 sticky top-0">
+                            <div className="px-3 py-1.5 text-xs font-bold text-jci-blue bg-blue-50 border-b border-blue-100 sticky top-0 tracking-wide uppercase">
                                 {group.label}
                             </div>
                             {group.options.map((opt, optIndex) => (

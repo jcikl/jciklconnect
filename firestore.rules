@@ -440,7 +440,7 @@ service cloud.firestore {
          resource.data.get('loId', null) == null ||
          resource.data.get('loId', null) == getMyLoId());
       allow list: if isAdmin() || canAccessFinance();
-      allow create, update, delete: if isFinanceOperator();
+      allow create, update, delete: if isAdmin() || isFinanceOperator();
     }
     
     // Payment Requests (Story 2.1): applicantId, amount, purpose, activityRef, referenceNumber, status, loId, 审计

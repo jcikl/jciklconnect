@@ -54,6 +54,21 @@ const ProjectAccountTabBase: React.FC<ProjectAccountTabProps> = ({
 }) => {
   const [mobileTab, setMobileTab] = useState<'projects' | 'stats'>('projects');
   const [confirmDelete, setConfirmDelete] = useState<{ transactionId: string } | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<number>(0); // 0 = all
+
+  const MONTHS = ['1','2','3','4','5','6','7','8','9','10','11','12'];
+
+  const getProjectMonth = (projectId: string): number | null => {
+    const p = projects.find(proj => proj.id === projectId);
+    if (!p) return null;
+    const d = (p as any).eventStartDate || (p as any).startDate || (p as any).date || (p as any).proposedDate;
+    if (!d) return null;
+    return new Date(d).getMonth() + 1; // 1-12
+  };
+
+  const monthFilteredAccounts = selectedMonth === 0
+    ? filteredProjectAccounts
+    : filteredProjectAccounts.filter(acc => getProjectMonth(acc.projectId) === selectedMonth);
 
   const cardList = [
     ...(uncategorizedProjectTxCount > 0 ? [{
@@ -64,7 +79,7 @@ const ProjectAccountTabBase: React.FC<ProjectAccountTabProps> = ({
       totalIncome: 0,
       totalExpenses: 0,
     }] : []),
-    ...filteredProjectAccounts,
+    ...monthFilteredAccounts,
   ];
 
   const filteredProjectTx = (selectedProjectFilter && selectedProjectFilter !== UNASSIGNED_PROJECT_ID)
@@ -163,8 +178,42 @@ const ProjectAccountTabBase: React.FC<ProjectAccountTabProps> = ({
         />
       </div>
 
+      {/* Month bookmark tabs */}
+      <div className="flex gap-1 overflow-x-auto no-scrollbar pb-0.5">
+        <button
+          onClick={() => setSelectedMonth(0)}
+          className={`shrink-0 px-2.5 py-1 rounded text-xs font-bold tracking-wide transition-all ${
+            selectedMonth === 0
+              ? 'bg-jci-blue text-white shadow-sm'
+              : 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700'
+          }`}
+        >
+          All
+        </button>
+        {MONTHS.map((label, i) => {
+          const m = i + 1;
+          const hasItems = filteredProjectAccounts.some(acc => getProjectMonth(acc.projectId) === m);
+          return (
+            <button
+              key={m}
+              onClick={() => setSelectedMonth(selectedMonth === m ? 0 : m)}
+              className={`shrink-0 px-2.5 py-1 rounded text-xs font-bold tracking-wide transition-all ${
+                selectedMonth === m
+                  ? 'bg-jci-blue text-white shadow-sm'
+                  : hasItems
+                    ? 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-700'
+                    : 'bg-slate-50 text-slate-300 cursor-default'
+              }`}
+              disabled={!hasItems && selectedMonth !== m}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Project Account Cards */}
-      <LoadingState loading={loadingProjectAccounts} error={null} empty={filteredProjectAccounts.length === 0 && uncategorizedProjectTxCount === 0} emptyMessage="No project accounts found. Create a project in the 'Projects' section and set up its financial account.">
+      <LoadingState loading={loadingProjectAccounts} error={null} empty={cardList.length === 0 && uncategorizedProjectTxCount === 0} emptyMessage="No project accounts found. Create a project in the 'Projects' section and set up its financial account.">
         {/* Mobile: horizontal scroll */}
         <div className={`md:hidden flex gap-2.5 overflow-x-auto pb-1 no-scrollbar -mx-1 px-1 ${mobileTab !== 'projects' ? 'hidden' : ''}`}>
           {cardList.map(renderCard)}

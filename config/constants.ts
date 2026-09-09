@@ -2,6 +2,11 @@
 /** Default LO id when single-LO (MVP). Override via env or auth for multi-LO. */
 export const DEFAULT_LO_ID = 'jcikl';
 
+/** Maps loId → canonical LO display name (used for hosting/co-hosting comparisons). */
+export const LO_ID_TO_NAME: Record<string, string> = {
+  jcikl: 'JCI Kuala Lumpur',
+};
+
 export const COLLECTIONS = {
   MEMBERS: 'members',
   ZOOM_BOOKINGS: 'zoomBookings',

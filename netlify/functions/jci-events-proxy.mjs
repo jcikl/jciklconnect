@@ -26,8 +26,13 @@ async function fetchLevel(level) {
   }
 }
 
-export default async () => {
+export default async (req) => {
   try {
+    const url = new URL(req.url);
+    const yearParam = url.searchParams.get('year');
+    const currentYear = new Date().getFullYear();
+    const targetYear = yearParam && /^\d{4}$/.test(yearParam) ? yearParam : String(currentYear);
+
     const results = await Promise.all(LEVELS.map(fetchLevel));
     const merged = results.flat();
 
@@ -38,11 +43,7 @@ export default async () => {
       );
     }
 
-    // Filter to current + next year only — the full list contains thousands of
-    // historical events which would cause the detail-fetch step to time out.
-    const currentYear = new Date().getFullYear();
-    const validYears = new Set([String(currentYear), String(currentYear + 1)]);
-    const filtered = merged.filter(ev => validYears.has(String(ev.year)));
+    const filtered = merged.filter(ev => String(ev.year) === targetYear);
 
     return new Response(JSON.stringify({ data: filtered.length > 0 ? filtered : merged }), {
       status: 200,

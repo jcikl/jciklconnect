@@ -1,5 +1,5 @@
-import React from 'react';
-import { CheckCircle, Plus } from 'lucide-react';
+import React, { useState } from 'react';
+import { CheckCircle, Plus, RefreshCw } from 'lucide-react';
 import type { BankAccount } from '../../../types';
 import { formatDate } from '../../../utils/dateUtils';
 import { formatCurrency } from '../../../utils/formatUtils';
@@ -11,6 +11,7 @@ interface FinanceBankAccountsCardProps {
   onAddAccount: () => void;
   onOpenAccount: (account: BankAccount) => void;
   onMatchAccount: (account: BankAccount) => void;
+  onRecalculate?: () => Promise<void>;
 }
 
 export const FinanceBankAccountsCard: React.FC<FinanceBankAccountsCardProps> = ({
@@ -19,11 +20,28 @@ export const FinanceBankAccountsCard: React.FC<FinanceBankAccountsCardProps> = (
   onAddAccount,
   onOpenAccount,
   onMatchAccount,
-}) => (
+  onRecalculate,
+}) => {
+  const [recalculating, setRecalculating] = useState(false);
+
+  const handleRecalculate = async () => {
+    if (!onRecalculate || recalculating) return;
+    setRecalculating(true);
+    try { await onRecalculate(); } finally { setRecalculating(false); }
+  };
+
+  return (
   <Card title="Bank Accounts" action={canOperateFinance ? (
-    <Button variant="ghost" size="sm" onClick={onAddAccount}>
-      <Plus size={14} className="mr-1" /> Add
-    </Button>
+    <div className="flex items-center gap-1">
+      {onRecalculate && (
+        <Button variant="ghost" size="sm" onClick={handleRecalculate} disabled={recalculating} title="Recalculate balances from transactions">
+          <RefreshCw size={13} className={recalculating ? 'animate-spin' : ''} />
+        </Button>
+      )}
+      <Button variant="ghost" size="sm" onClick={onAddAccount}>
+        <Plus size={14} className="mr-1" /> Add
+      </Button>
+    </div>
   ) : undefined}>
     {accounts.length === 0 ? (
       <p className="text-sm text-slate-500 text-center py-4">No bank accounts configured</p>
@@ -89,4 +107,5 @@ export const FinanceBankAccountsCard: React.FC<FinanceBankAccountsCardProps> = (
       </>
     )}
   </Card>
-);
+  );
+};

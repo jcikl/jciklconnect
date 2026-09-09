@@ -72,7 +72,7 @@ const EventRowBase: React.FC<{
         onClick={onClick}
       >
         {/* Left: Poster */}
-        <div className="relative w-28 flex-shrink-0 bg-gradient-to-br from-blue-50 to-slate-100 overflow-hidden">
+        <div className="relative h-[150px] aspect-[4/5] flex-shrink-0 bg-gradient-to-br from-blue-50 to-slate-100 overflow-hidden">
           {event.imageUrl ? (
             <img src={event.imageUrl} alt={event.title} className="w-full h-full object-cover" />
           ) : (

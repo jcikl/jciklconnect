@@ -1,5 +1,5 @@
-import React from 'react';
-import { Card, Button, Tabs } from '../../ui/Common';
+import React, { useState, useMemo } from 'react';
+import { Card, Button } from '../../ui/Common';
 import { LoadingState } from '../../ui/Loading';
 import type { Event, Member } from '../../../types';
 import { EventRow } from './EventRow';
@@ -22,7 +22,41 @@ interface EventsListPanelProps {
   markAttendance: (eventId: string, memberId: string) => void;
 }
 
-const EVENT_TABS: EventsListTab[] = ['Upcoming', 'Completed'];
+type HostingTab = 'all' | 'jcikl' | 'central' | 'other-area' | 'national';
+
+const HOSTING_TABS: { key: HostingTab; label: string }[] = [
+  { key: 'all',        label: 'All'        },
+  { key: 'jcikl',      label: 'JCI KL'     },
+  { key: 'central',    label: 'Central'    },
+  { key: 'other-area', label: 'Other Area' },
+  { key: 'national',   label: 'National'   },
+];
+
+const KL = 'jci kuala lumpur';
+const OTHER_AREA_VALUES = new Set(['area south', 'area sabah', 'area sarawak', 'area north']);
+
+function matchesHostingTab(e: Event, tab: HostingTab): boolean {
+  if (tab === 'all') return true;
+
+  const lo    = ((e as any).hostingLo ?? '').trim().toLowerCase();
+  const coRaw = (e as any).coHosting;
+  const area  = ((e as any).area  ?? '').trim().toLowerCase();
+  const level = ((e as any).level ?? '').trim().toLowerCase();
+
+  const isKL = lo === KL || (
+    Array.isArray(coRaw)
+      ? coRaw.some((c: string) => typeof c === 'string' && c.trim().toLowerCase() === KL)
+      : typeof coRaw === 'string' && coRaw.trim().toLowerCase() === KL
+  );
+
+  switch (tab) {
+    case 'jcikl':      return isKL;
+    case 'central':    return area === 'area central';
+    case 'other-area': return OTHER_AREA_VALUES.has(area);
+    case 'national':   return level === 'national';
+  }
+}
+
 const EMPTY_MESSAGE = 'No events found in this category.';
 
 export const EventsListPanel: React.FC<EventsListPanelProps> = ({
@@ -41,15 +75,42 @@ export const EventsListPanel: React.FC<EventsListPanelProps> = ({
   registerForEvent,
   markAttendance,
 }) => {
-  const visibleEvents = activeTab === 'Completed'
-    ? events.slice(0, completedLimit)
-    : events.slice(0, upcomingLimit);
+  const [hostingTab, setHostingTab] = useState<HostingTab>('all');
 
-  const hasMoreCompleted = activeTab === 'Completed' && events.length > completedLimit;
-  const hasMoreUpcoming = activeTab === 'Upcoming' && events.length > upcomingLimit;
+  const filteredEvents = useMemo(
+    () => events
+      .filter(e => matchesHostingTab(e, hostingTab))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+    [events, hostingTab]
+  );
+
+  const visibleEvents = activeTab === 'Completed'
+    ? filteredEvents.slice(0, completedLimit)
+    : filteredEvents.slice(0, upcomingLimit);
+
+  const hasMoreCompleted = activeTab === 'Completed' && filteredEvents.length > completedLimit;
+  const hasMoreUpcoming  = activeTab === 'Upcoming'  && filteredEvents.length > upcomingLimit;
+
+  const filterBar = (
+    <div className="flex gap-1.5 flex-wrap px-4 pt-3 pb-1 md:px-6 md:pt-4 md:pb-0">
+      {HOSTING_TABS.map(({ key, label }) => (
+        <button
+          key={key}
+          onClick={() => setHostingTab(key)}
+          className={`px-3 py-1 rounded-full text-xs font-bold tracking-wide transition-all ${
+            hostingTab === key
+              ? 'bg-jci-blue text-white shadow-sm'
+              : 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700'
+          }`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
 
   const eventGrid = (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
       {visibleEvents.map(event => (
         <EventRow
           key={event.id}
@@ -63,76 +124,59 @@ export const EventsListPanel: React.FC<EventsListPanelProps> = ({
     </div>
   );
 
-  const loadMoreCompletedButton = hasMoreCompleted && (
-    <Button variant="outline" size="sm" onClick={onLoadMoreCompleted}>
-      Load more ({events.length - completedLimit} remaining)
+  const loadMoreUpcomingButton = hasMoreUpcoming && (
+    <Button variant="outline" size="sm" onClick={onLoadMoreUpcoming}>
+      Load more ({filteredEvents.length - upcomingLimit} remaining)
     </Button>
   );
 
-  const loadMoreUpcomingButton = hasMoreUpcoming && (
-    <Button variant="outline" size="sm" onClick={onLoadMoreUpcoming}>
-      Load more ({events.length - upcomingLimit} remaining)
+  const loadMoreCompletedButton = hasMoreCompleted && (
+    <Button variant="outline" size="sm" onClick={onLoadMoreCompleted}>
+      Load more ({filteredEvents.length - completedLimit} remaining)
     </Button>
   );
 
   return (
     <div className="space-y-4">
-      <div className="md:hidden p-1.5 bg-white rounded-xl border border-slate-200 shadow-sm">
-        <Tabs
-          fullWidth
-          tabs={EVENT_TABS}
-          activeTab={activeTab}
-          onTabChange={(tab) => onTabChange(tab as EventsListTab)}
-        />
-      </div>
-
+      {/* Desktop */}
       <Card noPadding className="hidden md:block overflow-hidden">
-        <div className="px-6 pt-4">
-          <Tabs
-            tabs={EVENT_TABS}
-            activeTab={activeTab}
-            onTabChange={(tab) => onTabChange(tab as EventsListTab)}
-          />
-        </div>
+        {filterBar}
         <LoadingState
           loading={loading}
           error={error}
-          empty={events.length === 0}
+          empty={filteredEvents.length === 0}
           emptyMessage={EMPTY_MESSAGE}
           onRetry={onRetry}
         >
           <div className="p-6">
             {eventGrid}
           </div>
-          {hasMoreCompleted && (
-            <div className="hidden md:flex justify-center pb-4">
-              {loadMoreCompletedButton}
-            </div>
-          )}
           {hasMoreUpcoming && (
-            <div className="hidden md:flex justify-center pb-4">
+            <div className="flex justify-center pb-4">
               {loadMoreUpcomingButton}
             </div>
           )}
         </LoadingState>
       </Card>
 
+      {/* Mobile */}
       <div className="md:hidden">
+        {filterBar}
         <LoadingState
           loading={loading}
           error={error}
-          empty={events.length === 0}
+          empty={filteredEvents.length === 0}
           emptyMessage={EMPTY_MESSAGE}
           onRetry={onRetry}
         >
           {eventGrid}
           {hasMoreCompleted && (
-            <div className="md:hidden flex justify-center pt-2">
+            <div className="flex justify-center pt-2">
               {loadMoreCompletedButton}
             </div>
           )}
           {hasMoreUpcoming && (
-            <div className="md:hidden flex justify-center pt-2">
+            <div className="flex justify-center pt-2">
               {loadMoreUpcomingButton}
             </div>
           )}

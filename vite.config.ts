@@ -14,8 +14,13 @@ function jciMalaysiaDevProxy(): Plugin {
     Accept: 'application/json, text/plain, */*',
   };
 
-  async function handleEventsProxy(_req: IncomingMessage, res: ServerResponse) {
+  async function handleEventsProxy(req: IncomingMessage, res: ServerResponse) {
     try {
+      const urlObj = new URL(req.url ?? '', 'http://localhost');
+      const yearParam = urlObj.searchParams.get('year');
+      const currentYear = new Date().getFullYear();
+      const targetYear = yearParam && /^\d{4}$/.test(yearParam) ? yearParam : String(currentYear);
+
       const BASE = 'https://jcimalaysia.cc/roadmap/functions/event.php?role=administrator&view=&stat=event-level-manage&level=';
       const LEVELS = ['national', 'area', 'local', 'jci'];
       const results = await Promise.all(LEVELS.map(async (level) => {
@@ -29,9 +34,7 @@ function jciMalaysiaDevProxy(): Plugin {
         } catch { return []; }
       }));
       const merged = results.flat();
-      const currentYear = new Date().getFullYear();
-      const validYears = new Set([String(currentYear), String(currentYear + 1)]);
-      const filtered = merged.filter((ev: any) => validYears.has(String(ev.year)));
+      const filtered = merged.filter((ev: any) => String(ev.year) === targetYear);
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({ data: filtered.length > 0 ? filtered : merged }));
     } catch (err: any) {
