@@ -115,7 +115,11 @@ export interface BatchImportConfig {
       onProgress?: (msg: string) => void,
       params?: Record<string, string>,
       waitForConfirm?: (
-        info: { found: number; newCount: number; skipped: number; yearOptions: string[] },
+        info: {
+          found: number; newCount: number; skipped: number;
+          yearOptions: string[];
+          countByYear: Record<string, { found: number; newCount: number; skipped: number }>;
+        },
         currentParams: Record<string, string>
       ) => Promise<Record<string, string> | null>
     ) => Promise<string>;

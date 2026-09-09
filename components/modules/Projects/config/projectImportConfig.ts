@@ -368,6 +368,7 @@ export const projectImportConfig: BatchImportConfig = {
                     type: 'select' as const,
                     options: ['No', 'Yes'],
                     default: 'Yes',
+                    confirmOnly: true,
                 },
             ],
             load: async (onProgress, params, waitForConfirm) => {
@@ -390,24 +391,22 @@ export const projectImportConfig: BatchImportConfig = {
 
                 const existingIds = await ProjectsService.getExistingRoadmapIds();
 
-                // Confirm loop: re-filter in memory when user changes year (no re-fetch)
-                let events: JciMalaysiaEvent[] = [];
-                while (true) {
-                    const selectedYear = workingParams.year;
-                    const yearEvents = allEvents.filter(ev => String(ev.year) === selectedYear);
-                    events = yearEvents.filter(ev => !existingIds.has(ev.id));
-                    const skippedCount = yearEvents.length - events.length;
-                    onProgress?.(skippedCount > 0
-                        ? `1/3 · ${selectedYear} 年共 ${yearEvents.length} 个，跳过 ${skippedCount} 个已存在，新增 ${events.length} 个…`
-                        : `1/3 · ${selectedYear} 年共 ${yearEvents.length} 个活动，全部为新项目…`);
+                // Pre-compute counts for every year so the confirm panel can update reactively
+                const countByYear: Record<string, { found: number; newCount: number; skipped: number }> = {};
+                for (const yr of yearOptions) {
+                    const yEvs = allEvents.filter(ev => String(ev.year) === yr);
+                    const newEvs = yEvs.filter(ev => !existingIds.has(ev.id));
+                    countByYear[yr] = { found: yEvs.length, newCount: newEvs.length, skipped: yEvs.length - newEvs.length };
+                }
 
-                    if (!waitForConfirm) {
-                        await new Promise(r => setTimeout(r, 800));
-                        break;
-                    }
+                const defaultCounts = countByYear[workingParams.year] ?? { found: 0, newCount: 0, skipped: 0 };
+                onProgress?.(defaultCounts.skipped > 0
+                    ? `1/3 · ${workingParams.year} 年共 ${defaultCounts.found} 个，跳过 ${defaultCounts.skipped} 个已存在，新增 ${defaultCounts.newCount} 个…`
+                    : `1/3 · ${workingParams.year} 年共 ${defaultCounts.found} 个活动，全部为新项目…`);
 
+                if (waitForConfirm) {
                     const confirmed = await waitForConfirm(
-                        { found: yearEvents.length, newCount: events.length, skipped: skippedCount, yearOptions },
+                        { ...defaultCounts, yearOptions, countByYear },
                         workingParams
                     );
                     if (confirmed === null) {
@@ -415,12 +414,13 @@ export const projectImportConfig: BatchImportConfig = {
                         (err as any).cancelled = true;
                         throw err;
                     }
-                    const yearChanged = confirmed.year !== workingParams.year;
                     workingParams = confirmed;
-                    if (yearChanged) continue; // re-filter with new year, no API call
-                    break;
+                } else {
+                    await new Promise(r => setTimeout(r, 800));
                 }
 
+                const selectedYear = workingParams.year;
+                const events = allEvents.filter(ev => String(ev.year) === selectedYear).filter(ev => !existingIds.has(ev.id));
                 if (!events.length) throw new Error(`所有活动已存在于数据库，无需重新导入`);
 
                 // Step 2: batch-fetch detail (desc, lg_desc, cohosting, start/end time) in chunks

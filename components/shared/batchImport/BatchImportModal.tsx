@@ -62,12 +62,14 @@ export const BatchImportModal: React.FC<Props> = ({
   });
   // Step-1 confirm panel state (pause between Step 1 and Steps 2+3)
   const [step1Confirm, setStep1Confirm] = useState<{
-    info: { found: number; newCount: number; skipped: number; yearOptions: string[] };
+    info: { found: number; newCount: number; skipped: number; yearOptions: string[]; countByYear: Record<string, { found: number; newCount: number; skipped: number }> };
     resolve: (params: Record<string, string> | null) => void;
     loaderLabel: string;
     originalParams: Record<string, string>;
   } | null>(null);
   const [confirmParams, setConfirmParams] = useState<Record<string, string>>({});
+  // Reactive counts that update immediately when year selector changes
+  const [confirmCounts, setConfirmCounts] = useState<{ found: number; newCount: number; skipped: number } | null>(null);
 
   // Inline row editing (情景 LL)
   const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
@@ -789,10 +791,11 @@ export const BatchImportModal: React.FC<Props> = ({
                   try {
                     const params = loaderParams[loader.label];
                     const waitForConfirm = (
-                      info: { found: number; newCount: number; skipped: number; yearOptions: string[] },
+                      info: { found: number; newCount: number; skipped: number; yearOptions: string[]; countByYear: Record<string, { found: number; newCount: number; skipped: number }> },
                       currentParams: Record<string, string>
                     ) => new Promise<Record<string, string> | null>(resolve => {
                       setConfirmParams({ ...currentParams });
+                      setConfirmCounts(info.countByYear[currentParams.year ?? ''] ?? { found: info.found, newCount: info.newCount, skipped: info.skipped });
                       setStep1Confirm({ info, resolve, loaderLabel: loader.label, originalParams: { ...currentParams } });
                     });
                     const tsv = await loader.load((msg) => setLoadingMessage(msg), params, waitForConfirm);
@@ -846,13 +849,13 @@ export const BatchImportModal: React.FC<Props> = ({
       {loadingSource !== null && (
         step1Confirm !== null ? (() => {
           const loaderDef = config.loaders?.find(l => l.label === step1Confirm.loaderLabel);
-          const { found, newCount, skipped } = step1Confirm.info;
+          const counts = confirmCounts ?? { found: step1Confirm.info.found, newCount: step1Confirm.info.newCount, skipped: step1Confirm.info.skipped };
           return (
             <div className="rounded-lg bg-blue-50 border border-blue-200 px-4 py-3 space-y-3 text-sm">
               <div className="font-semibold text-blue-900">
-                Step 1 完成 — 共找到 <strong>{found}</strong> 个活动
-                {skipped > 0 && <span className="text-blue-700">，跳过 <strong>{skipped}</strong> 个已存在</span>}
-                ，将导入 <strong>{newCount}</strong> 个新项目
+                Step 1 完成 — 共找到 <strong>{counts.found}</strong> 个活动
+                {counts.skipped > 0 && <span className="text-blue-700">，跳过 <strong>{counts.skipped}</strong> 个已存在</span>}
+                ，将导入 <strong>{counts.newCount}</strong> 个新项目
               </div>
               {(loaderDef?.params ?? []).length > 0 && (
                 <div className="flex flex-wrap gap-3 items-center text-xs">
@@ -866,7 +869,13 @@ export const BatchImportModal: React.FC<Props> = ({
                         {p.label}:
                         <select
                           value={confirmParams[p.key] ?? p.default}
-                          onChange={e => setConfirmParams(prev => ({ ...prev, [p.key]: e.target.value }))}
+                          onChange={e => {
+                            const newVal = e.target.value;
+                            setConfirmParams(prev => ({ ...prev, [p.key]: newVal }));
+                            if (p.key === 'year' && step1Confirm.info.countByYear) {
+                              setConfirmCounts(step1Confirm.info.countByYear[newVal] ?? { found: 0, newCount: 0, skipped: 0 });
+                            }
+                          }}
                           className="rounded border border-blue-300 text-xs px-2 py-0.5 bg-white text-slate-700"
                         >
                           {opts.map(opt => <option key={opt} value={opt}>{opt}</option>)}
@@ -876,27 +885,22 @@ export const BatchImportModal: React.FC<Props> = ({
                   })}
                 </div>
               )}
-              {(() => {
-                const yearChanged = confirmParams.year !== undefined && confirmParams.year !== step1Confirm.originalParams.year;
-                return (
-                  <div className="flex gap-2 justify-end">
-                    <button
-                      type="button"
-                      onClick={() => { step1Confirm.resolve(null); setStep1Confirm(null); }}
-                      className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 transition-colors"
-                    >
-                      取消
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { const p = { ...confirmParams }; setStep1Confirm(null); step1Confirm.resolve(p); }}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium"
-                    >
-                      {yearChanged ? `切换到 ${confirmParams.year} 年重新查询 →` : '继续导入 Steps 2–3 →'}
-                    </button>
-                  </div>
-                );
-              })()}
+              <div className="flex gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={() => { step1Confirm.resolve(null); setStep1Confirm(null); }}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { const p = { ...confirmParams }; setStep1Confirm(null); step1Confirm.resolve(p); }}
+                  className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium"
+                >
+                  继续导入 Steps 2–3 →
+                </button>
+              </div>
             </div>
           );
         })() : (() => {
