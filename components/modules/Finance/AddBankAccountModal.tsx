@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Button, Modal, useToast } from '../../ui/Common';
 import { Input, Select } from '../../ui/Form';
 import { FinanceService } from '../../../services/financeService';
+import { DEFAULT_LO_ID } from '../../../config/constants';
 
 // Add Bank Account Modal
 export interface AddBankAccountModalProps {
@@ -21,6 +22,7 @@ export const AddBankAccountModal: React.FC<AddBankAccountModalProps> = ({ isOpen
     try {
       setLoading(true);
       await FinanceService.createBankAccount({
+        loId: DEFAULT_LO_ID,
         bankName: formData.get('bankName') as string,
         name: formData.get('name') as string,
         accountType: formData.get('type') as 'Current' | 'Savings' | 'Investment' | 'Fixed Deposit' | 'Cash' | 'Other',
