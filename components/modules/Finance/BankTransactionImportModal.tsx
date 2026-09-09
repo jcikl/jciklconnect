@@ -7,7 +7,6 @@ import { Select } from '../../ui/Form';
 import { useToast } from '../../ui/Common';
 import { ProjectsService } from '../../../services/projectsService';
 import { EventPaymentMatchingService } from '../../../services/eventPaymentMatchingService';
-import { useAuth } from '../../../hooks/useAuth';
 
 interface Props {
   isOpen: boolean;
@@ -26,7 +25,6 @@ export const BankTransactionImportModal: React.FC<Props> = ({
   onImported,
 }) => {
   const { showToast } = useToast();
-  const { member } = useAuth();
   const [bankAccounts, setBankAccounts] = React.useState<BankAccount[]>([]);
   const [projects, setProjects] = React.useState<Project[]>([]);
   const [selectedBankAccountId, setSelectedBankAccountId] = React.useState<string>('');
@@ -70,7 +68,7 @@ export const BankTransactionImportModal: React.FC<Props> = ({
       importBlockedReason={!selectedBankAccountId ? 'Please select a bank account before importing' : undefined}
       context={{
         bankAccountId: selectedBankAccountId,
-        loId: member?.loId,
+        loId: bankAccounts.find(a => a.id === selectedBankAccountId)?.loId,
         projects: projects,
       }}
     >
