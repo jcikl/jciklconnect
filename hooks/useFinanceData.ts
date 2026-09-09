@@ -179,14 +179,22 @@ export function useFinanceData(searchQuery?: string) {
     try {
       setLoading(true);
       setError(null);
-      const [txs, accts, summ, inventory, projList, histFlows, allYears] = await Promise.all([
+      const [txs, accts, summ, inventory, projList, histFlows, allYears, allSplits, projectAccountResult] = await Promise.all([
         FinanceService.getAllTransactions(targetYear, forceServer),
         FinanceService.getAllBankAccounts(),
         FinanceService.getFinancialSummary(targetYear),
         InventoryService.getAllItems(),
         ProjectsService.getAllProjects(),
         targetYear !== 0 ? FinanceService.getHistoricalNetFlowBeforeYear(targetYear) : Promise.resolve({}),
-        FinanceService.getAllTransactionYears()
+        FinanceService.getAllTransactionYears(),
+        FinanceService.getAllTransactionSplits(targetYear, forceServer),
+        projectFinancialService.getAllProjectAccounts(targetYear).catch((projectAccountError: unknown) => {
+          errorLoggingService.logError(
+            projectAccountError instanceof Error ? projectAccountError : new Error(String(projectAccountError)),
+            { component: 'useFinanceData', action: 'loadData.projectAccounts' }
+          );
+          return null;
+        }),
       ]);
       if (stale()) return;
       setTransactions(txs);
@@ -197,18 +205,11 @@ export function useFinanceData(searchQuery?: string) {
       setAdministrativeProjectIds(getAdministrativeProjectIds());
       setHistoricalNetFlows(histFlows);
       setAllTransactionYears(allYears);
-      try {
-        const projectAccountList = await projectFinancialService.getAllProjectAccounts(targetYear);
-        if (!stale()) setProjectAccounts(projectAccountList);
-      } catch (projectAccountError) {
-        errorLoggingService.logError(
-          projectAccountError instanceof Error ? projectAccountError : new Error(String(projectAccountError)),
-          { component: 'useFinanceData', action: 'loadData.projectAccounts' }
-        );
-        if (!stale()) showToast('Failed to load project accounts', 'error');
+      if (projectAccountResult !== null) {
+        setProjectAccounts(projectAccountResult);
+      } else {
+        showToast('Failed to load project accounts', 'error');
       }
-
-      const allSplits = await FinanceService.getAllTransactionSplits(targetYear, forceServer);
       if (stale()) return;
       const splitsMap: Record<string, TransactionSplit[]> = {};
       const txIdsSet = new Set(txs.map(t => t.id));

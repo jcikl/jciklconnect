@@ -240,53 +240,58 @@ export class FinanceService {
         });
         return netFlows;
       },
-      async () => {
-        try {
-          const { Timestamp } = await import('firebase/firestore');
-          const boundaryDate = new Date(year, 0, 1, 0, 0, 0, 0);
-          const boundaryTimestamp = Timestamp.fromDate(boundaryDate);
+      () => apiCache.getOrSet(
+        `${FINANCE_CACHE_PREFIX}historicalFlow:${year}`,
+        async () => {
+          try {
+            const { Timestamp } = await import('firebase/firestore');
+            const boundaryDate = new Date(year, 0, 1, 0, 0, 0, 0);
+            const boundaryTimestamp = Timestamp.fromDate(boundaryDate);
 
-          // EXPORT-001: intentionally fetch ALL historical transactions without a limit so that
-          // the computed opening balance is accurate regardless of how many transactions exist.
-          // Paginate in batches of 500 to avoid Firestore's 1 MiB response limit.
-          const PAGE_SIZE = 500;
-          const netFlows: Record<string, number> = {};
-          let lastDoc: import('firebase/firestore').QueryDocumentSnapshot | null = null;
-          while (true) {
-            const pageQuery = lastDoc
-              ? query(
-                  collection(db, COLLECTIONS.TRANSACTIONS),
-                  where('date', '<', boundaryTimestamp),
-                  orderBy('date', 'desc'),
-                  limit(PAGE_SIZE),
-                  startAfter(lastDoc)
-                )
-              : query(
-                  collection(db, COLLECTIONS.TRANSACTIONS),
-                  where('date', '<', boundaryTimestamp),
-                  orderBy('date', 'desc'),
-                  limit(PAGE_SIZE)
-                );
-            const pageSnap = await getDocs(pageQuery);
-            pageSnap.docs.forEach(d => {
-              const data = d.data() as RawTransactionDoc;
-              const type = data.type;
-              const amount = data.amount || 0;
-              const bankAccountId = data.bankAccountId;
-              if (!bankAccountId) return;
-              const change = type === 'Income' ? amount : -amount;
-              netFlows[bankAccountId] = (netFlows[bankAccountId] || 0) + change;
-            });
-            if (pageSnap.docs.length < PAGE_SIZE) break;
-            lastDoc = pageSnap.docs[pageSnap.docs.length - 1];
+            // EXPORT-001: intentionally fetch ALL historical transactions without a limit so that
+            // the computed opening balance is accurate regardless of how many transactions exist.
+            // Paginate in batches of 500 to avoid Firestore's 1 MiB response limit.
+            const PAGE_SIZE = 500;
+            const netFlows: Record<string, number> = {};
+            let lastDoc: import('firebase/firestore').QueryDocumentSnapshot | null = null;
+            while (true) {
+              const pageQuery = lastDoc
+                ? query(
+                    collection(db, COLLECTIONS.TRANSACTIONS),
+                    where('date', '<', boundaryTimestamp),
+                    orderBy('date', 'desc'),
+                    limit(PAGE_SIZE),
+                    startAfter(lastDoc)
+                  )
+                : query(
+                    collection(db, COLLECTIONS.TRANSACTIONS),
+                    where('date', '<', boundaryTimestamp),
+                    orderBy('date', 'desc'),
+                    limit(PAGE_SIZE)
+                  );
+              const pageSnap = await getDocs(pageQuery);
+              pageSnap.docs.forEach(d => {
+                const data = d.data() as RawTransactionDoc;
+                const type = data.type;
+                const amount = data.amount || 0;
+                const bankAccountId = data.bankAccountId;
+                if (!bankAccountId) return;
+                const change = type === 'Income' ? amount : -amount;
+                netFlows[bankAccountId] = (netFlows[bankAccountId] || 0) + change;
+              });
+              if (pageSnap.docs.length < PAGE_SIZE) break;
+              lastDoc = pageSnap.docs[pageSnap.docs.length - 1];
+            }
+
+            return netFlows;
+          } catch (error) {
+            errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.calculateHistoricalNetFlows' });
+            return {};
           }
-
-          return netFlows;
-        } catch (error) {
-          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.calculateHistoricalNetFlows' });
-          return {};
-        }
-      }
+        },
+        TX_CACHE_TTL,
+        'financeService.getHistoricalNetFlowBeforeYear'
+      )
     );
   }
 
@@ -1190,31 +1195,36 @@ export class FinanceService {
         }
         return devModeSplits;
       },
-      async () => {
-        try {
-          let q;
-          if (year) {
-            q = query(
-              collection(db, COLLECTIONS.TRANSACTION_SPLITS),
-              where('year', '==', year)
-            );
-          } else {
-            q = collection(db, COLLECTIONS.TRANSACTION_SPLITS);
+      () => apiCache.getOrSet(
+        `${FINANCE_CACHE_PREFIX}splits:${year ?? 'all'}`,
+        async () => {
+          try {
+            let q;
+            if (year) {
+              q = query(
+                collection(db, COLLECTIONS.TRANSACTION_SPLITS),
+                where('year', '==', year)
+              );
+            } else {
+              q = collection(db, COLLECTIONS.TRANSACTION_SPLITS);
+            }
+            const snapshot = await (forceServer ? getDocsFromServer(q) : getDocs(q));
+            return snapshot.docs.map(doc => {
+              const data = doc.data() as RawTransactionDoc;
+              return {
+                id: doc.id,
+                ...data,
+                createdAt: (data.createdAt as any)?.toDate?.()?.toISOString() || data.createdAt,
+              } as TransactionSplit;
+            });
+          } catch (error) {
+            errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.getAllTransactionSplits' });
+            throw error;
           }
-          const snapshot = await (forceServer ? getDocsFromServer(q) : getDocs(q));
-          return snapshot.docs.map(doc => {
-            const data = doc.data() as RawTransactionDoc;
-            return {
-              id: doc.id,
-              ...data,
-              createdAt: (data.createdAt as any)?.toDate?.()?.toISOString() || data.createdAt,
-            } as TransactionSplit;
-          });
-        } catch (error) {
-          errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.getAllTransactionSplits' });
-          throw error;
-        }
-      }
+        },
+        TX_CACHE_TTL,
+        'financeService.getAllTransactionSplits'
+      )
     );
   }
 
@@ -1454,42 +1464,26 @@ export class FinanceService {
   }
 
   // Get transactions by type (including splits)
-  // TODO: Replace getAllTransactions/getAllTransactionSplits fan-out with a targeted composite
-  // index query on (category, date) to avoid O(N) full-collection scans.
+  // Uses cached getAllTransactions + getAllTransactionSplits to avoid redundant Firestore calls.
   static async getTransactionsByType(filter: TransactionType | 'Projects & Activities' | 'Membership' | 'Administrative'): Promise<Transaction[]> {
     return withDevMode(
       () => localMockTransactions.filter(t => t.transactionType === filter),
       async () => {
         try {
-          // Get transactions with matching primary type
-          const q = query(
-            collection(db, COLLECTIONS.TRANSACTIONS),
-            where('category', '==', filter),
-            orderBy('date', 'desc')
-          );
-          const snapshot = await getDocs(q);
-          const transactions = snapshot.docs.map(doc => normalizeTransaction({
-            id: doc.id,
-            ...doc.data(),
-            date: doc.data().date?.toDate?.()?.toISOString() || doc.data().date,
-          }));
-
-          // Also get transactions that have splits of this type
           const [allTransactions, allSplits] = await Promise.all([
             this.getAllTransactions(),
             this.getAllTransactionSplits()
           ]);
 
+          const directMatches = allTransactions.filter(t => t.category === filter);
+
           const parentIdsWithMatchingSplits = new Set(
             allSplits.filter(split => split.category === filter).map(s => s.parentTransactionId)
           );
-
           const transactionsWithSplits = allTransactions.filter(t => parentIdsWithMatchingSplits.has(t.id));
 
-          // Combine and deduplicate
-          const combined = [...transactions, ...transactionsWithSplits];
+          const combined = [...directMatches, ...transactionsWithSplits];
           const unique = Array.from(new Map(combined.map(t => [t.id, t])).values());
-
           return unique.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         } catch (error) {
           errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'financeService.getTransactionsByType' });
