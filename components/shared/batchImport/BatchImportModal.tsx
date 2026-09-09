@@ -16,6 +16,7 @@ interface Props {
   onImported: () => void;
   context?: ImportContext;
   children?: React.ReactNode;
+  importBlockedReason?: string;
 }
 
 export const BatchImportModal: React.FC<Props> = ({
@@ -25,6 +26,7 @@ export const BatchImportModal: React.FC<Props> = ({
   onImported,
   context,
   children,
+  importBlockedReason,
 }) => {
   const { showToast } = useToast();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -48,6 +50,16 @@ export const BatchImportModal: React.FC<Props> = ({
   const [failedImportRows, setFailedImportRows] = useState<Set<number>>(new Set());
   const [loadingSource, setLoadingSource] = useState<string | null>(null);
   const [loadingMessage, setLoadingMessage] = useState<string | null>(null);
+  const [loaderParams, setLoaderParams] = useState<Record<string, Record<string, string>>>(() => {
+    const init: Record<string, Record<string, string>> = {};
+    config.loaders?.forEach(loader => {
+      if (loader.params) {
+        init[loader.label] = {};
+        loader.params.forEach(p => { init[loader.label][p.key] = p.default; });
+      }
+    });
+    return init;
+  });
   // Inline row editing (情景 LL)
   const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
   const [editingRowValues, setEditingRowValues] = useState<Record<string, any>>({});
@@ -122,11 +134,11 @@ export const BatchImportModal: React.FC<Props> = ({
           return;
         }
 
-        // Convert rows to TSV format
+        // Convert rows to TSV format (cells are already trimmed by PapaParse)
         const tsvData = rows.map(row => row.join('\t')).join('\n');
 
-        // Set pasted text with TSV data
-        setPastedText(tsvData);
+        // Route through handleTextChange so trimming/cleaning is consistent
+        handleTextChange(tsvData);
         // no upload state kept; pastedText is authoritative
 
         showToast('CSV imported. Paste TSV data is ready.', 'success');
@@ -239,6 +251,7 @@ export const BatchImportModal: React.FC<Props> = ({
   );
   const validRows = useMemo(() => parsedRows.filter(r => r.valid), [parsedRows]);
   const invalidRows = useMemo(() => parsedRows.filter(r => !r.valid), [parsedRows]);
+  const warnRows = useMemo(() => parsedRows.filter(r => r.valid && r.warnings && r.warnings.length > 0), [parsedRows]);
 
   const tableDisplayRows = useMemo(() => {
     if (tablePreviewType === 'valid') return validRows;
@@ -414,8 +427,17 @@ export const BatchImportModal: React.FC<Props> = ({
     textareaRef.current.scrollTop = actualLineIndex * 20;
   };
 
+  // Trim including non-breaking space (U+00A0), zero-width space (U+200B), BOM (U+FEFF)
+  const cellTrim = (s: string) => s.replace(/^[\s ​﻿]+|[\s ​﻿]+$/g, '');
+
   const handleTextChange = (text: string) => {
-    const cleanedText = text.replace(/"/g, '');
+    // Strip quotes, trim the whole block, then trim whitespace from each cell
+    const cleanedText = text
+      .replace(/"/g, '')
+      .trim()
+      .split('\n')
+      .map(line => line.split('\t').map(cell => cellTrim(cell)).join('\t'))
+      .join('\n');
     setPastedText(cleanedText);
 
     if (config.autoMapColumns && cleanedText.trim()) {
@@ -602,31 +624,39 @@ export const BatchImportModal: React.FC<Props> = ({
       bottomSheet
       drawerOnMobile
       footer={
-        <div className="flex gap-2 w-full">
-          <Button variant="outline" onClick={onClose} disabled={importing} className="flex-none px-5">
-            Cancel
-          </Button>
-          <Button
-            onClick={handleImport}
-            disabled={validRows.length === 0 || importing}
-            isLoading={importing}
-            className="flex-1"
-          >
-            {importing
-              ? 'Importing…'
-              : validRows.length === 0
-                ? `Import ${config.name}`
-                : (
-                  <span className="flex items-center justify-center gap-2">
-                    Import
-                    <span className="bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                      {validRows.length}
+        <div className="flex flex-col gap-2 w-full">
+          {importBlockedReason && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700 font-medium">
+              <AlertCircle size={13} className="shrink-0" />
+              {importBlockedReason}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onClose} disabled={importing} className="flex-none px-5">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleImport}
+              disabled={!!importBlockedReason || validRows.length === 0 || importing}
+              isLoading={importing}
+              className="flex-1"
+            >
+              {importing
+                ? 'Importing…'
+                : validRows.length === 0
+                  ? `Import ${config.name}`
+                  : (
+                    <span className="flex items-center justify-center gap-2">
+                      Import
+                      <span className="bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                        {validRows.length}
+                      </span>
+                      {config.name}
                     </span>
-                    {config.name}
-                  </span>
-                )
-            }
-          </Button>
+                  )
+              }
+            </Button>
+          </div>
         </div>
       }
     >
@@ -726,33 +756,49 @@ export const BatchImportModal: React.FC<Props> = ({
         {/* Actions right — always visible */}
         <div className="flex items-center gap-1.5 shrink-0">
           {config.loaders?.map((loader) => (
-            <button
-              key={loader.label}
-              type="button"
-              disabled={loadingSource !== null}
-              onClick={async () => {
-                setLoadingSource(loader.label);
-                setLoadingMessage(null);
-                try {
-                  const tsv = await loader.load((msg) => setLoadingMessage(msg));
-                  handleTextChange(tsv);
-                  setActiveTab('paste');
-                  showToast(`Loaded from ${loader.label}`, 'success');
-                } catch (err: any) {
-                  showToast(`Failed to load: ${err.message}`, 'error');
-                } finally {
-                  setLoadingSource(null);
+            <div key={loader.label} className="flex items-center gap-1">
+              {loader.params?.map(p => (
+                <select
+                  key={p.key}
+                  value={loaderParams[loader.label]?.[p.key] ?? p.default}
+                  onChange={e => setLoaderParams(prev => ({
+                    ...prev,
+                    [loader.label]: { ...prev[loader.label], [p.key]: e.target.value },
+                  }))}
+                  disabled={loadingSource !== null}
+                  className="text-xs border border-emerald-200 bg-emerald-50 text-emerald-700 rounded-lg px-1.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-400 disabled:opacity-50"
+                >
+                  {p.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                </select>
+              ))}
+              <button
+                type="button"
+                disabled={loadingSource !== null}
+                onClick={async () => {
+                  setLoadingSource(loader.label);
                   setLoadingMessage(null);
-                }
-              }}
-              title={`Load data from ${loader.label}`}
-              className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 hover:text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5 hover:bg-emerald-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Globe size={13} className={loadingSource === loader.label ? 'animate-spin' : ''} />
-              <span className="hidden sm:inline">
-                {loadingSource === loader.label ? 'Loading…' : loader.label}
-              </span>
-            </button>
+                  try {
+                    const params = loaderParams[loader.label];
+                    const tsv = await loader.load((msg) => setLoadingMessage(msg), params);
+                    handleTextChange(tsv);
+                    setActiveTab('paste');
+                    showToast(`Loaded from ${loader.label}`, 'success');
+                  } catch (err: any) {
+                    showToast(`Failed to load: ${err.message}`, 'error');
+                  } finally {
+                    setLoadingSource(null);
+                    setLoadingMessage(null);
+                  }
+                }}
+                title={`Load data from ${loader.label}`}
+                className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 hover:text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5 hover:bg-emerald-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Globe size={13} className={loadingSource === loader.label ? 'animate-spin' : ''} />
+                <span className="hidden sm:inline">
+                  {loadingSource === loader.label ? 'Loading…' : loader.label}
+                </span>
+              </button>
+            </div>
           ))}
           {config.supportCsv && (
             <>
@@ -1082,6 +1128,12 @@ export const BatchImportModal: React.FC<Props> = ({
               <CheckCircle size={11} />
               {validRows.length} valid
             </span>
+            {warnRows.length > 0 && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold">
+                <AlertCircle size={11} />
+                {warnRows.length} warning{warnRows.length !== 1 ? 's' : ''}
+              </span>
+            )}
             {invalidRows.length > 0 && (
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-100 text-red-700 text-xs font-semibold">
                 <AlertCircle size={11} />
@@ -1169,7 +1221,11 @@ export const BatchImportModal: React.FC<Props> = ({
                               ? 'bg-blue-50/60'
                               : importFailed
                               ? 'bg-red-50 dark:bg-red-900/20 hover:bg-red-100/80 dark:hover:bg-red-900/30'
-                              : row.valid ? 'bg-white hover:bg-green-50' : 'bg-red-50/60 hover:bg-red-100/60'
+                              : !row.valid
+                              ? 'bg-red-50/60 hover:bg-red-100/60'
+                              : row.warnings?.length
+                              ? 'bg-amber-50/50 hover:bg-amber-50'
+                              : 'bg-white hover:bg-green-50'
                           } ${selectedRowIndex === row.index ? 'ring-2 ring-blue-400 ring-inset' : ''}`}
                         >
                           <td className="px-2 py-1.5 border-r border-slate-100 w-8 text-center" onClick={e => e.stopPropagation()}>
@@ -1198,19 +1254,21 @@ export const BatchImportModal: React.FC<Props> = ({
                                   <span className="inline-flex items-center gap-1 text-red-600 font-semibold">
                                     <AlertCircle size={11} />导入失败
                                   </span>
-                                ) : row.valid ? (
-                                  row.isUpdate ? (
-                                    <span className="inline-flex items-center gap-1 text-blue-600 font-semibold">
-                                      <CheckCircle size={11} />Update
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-1 text-green-600 font-semibold">
-                                      <CheckCircle size={11} />Valid
-                                    </span>
-                                  )
-                                ) : (
+                                ) : !row.valid ? (
                                   <span className="inline-flex items-center gap-1 text-red-600 font-semibold">
                                     <AlertCircle size={11} />Error
+                                  </span>
+                                ) : row.warnings?.length ? (
+                                  <span className="inline-flex items-center gap-1 text-amber-600 font-semibold">
+                                    <AlertCircle size={11} />Warning
+                                  </span>
+                                ) : row.isUpdate ? (
+                                  <span className="inline-flex items-center gap-1 text-blue-600 font-semibold">
+                                    <CheckCircle size={11} />Update
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-green-600 font-semibold">
+                                    <CheckCircle size={11} />Valid
                                   </span>
                                 )
                               ) : (() => {
@@ -1281,6 +1339,20 @@ export const BatchImportModal: React.FC<Props> = ({
                                   ))}
                                 </ul>
                               )}
+                            </td>
+                          </tr>
+                        )}
+                        {row.valid && row.warnings && row.warnings.length > 0 && (
+                          <tr className="bg-amber-50 border-b border-amber-100">
+                            <td colSpan={config.tableColumns.length + 3} className="px-3 py-1.5">
+                              <ul className="space-y-0.5">
+                                {row.warnings.map((w, i) => (
+                                  <li key={i} className="text-xs text-amber-700 flex items-start gap-1.5">
+                                    <AlertCircle size={11} className="shrink-0 mt-0.5" />
+                                    {w}
+                                  </li>
+                                ))}
+                              </ul>
                             </td>
                           </tr>
                         )}

@@ -36,6 +36,7 @@ interface FinanceBottomOverlaysProps {
   showBatchDeleteConfirm: boolean;
   onCloseAccountDetail: () => void;
   onAccountDetailYearChange: (year: number) => void;
+  onAccountDetailUpdated?: () => Promise<void>;
   onOpenBatchCategory: () => void;
   onOpenBatchDeleteConfirm: () => void;
   onClearSelection: () => void;
@@ -65,6 +66,7 @@ export const FinanceBottomOverlays: React.FC<FinanceBottomOverlaysProps> = ({
   showBatchDeleteConfirm,
   onCloseAccountDetail,
   onAccountDetailYearChange,
+  onAccountDetailUpdated,
   onOpenBatchCategory,
   onOpenBatchDeleteConfirm,
   onClearSelection,
@@ -88,6 +90,7 @@ export const FinanceBottomOverlays: React.FC<FinanceBottomOverlaysProps> = ({
         monthlyAccountSummary={monthlyAccountSummary}
         onClose={onCloseAccountDetail}
         onYearChange={onAccountDetailYearChange}
+        onUpdated={onAccountDetailUpdated}
       />
 
       {canOperateFinance && activeTab === 'Transactions' && hasDisplayTransactions && selectedRecordCount > 1 && (

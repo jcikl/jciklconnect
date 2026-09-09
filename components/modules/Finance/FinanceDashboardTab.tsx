@@ -31,6 +31,7 @@ interface FinanceDashboardTabProps {
   onAddAccount: () => void;
   onOpenAccount: (account: BankAccount) => void;
   onMatchAccount: (account: BankAccount) => void;
+  onRecalculateBalances?: () => Promise<void>;
 }
 
 export const FinanceDashboardTab: React.FC<FinanceDashboardTabProps> = ({
@@ -47,6 +48,7 @@ export const FinanceDashboardTab: React.FC<FinanceDashboardTabProps> = ({
   onAddAccount,
   onOpenAccount,
   onMatchAccount,
+  onRecalculateBalances,
 }) => (
   <div className="space-y-6">
     {canViewFinance && userId && <FinanceAlertsPanel userId={userId} />}
@@ -77,6 +79,7 @@ export const FinanceDashboardTab: React.FC<FinanceDashboardTabProps> = ({
           onAddAccount={onAddAccount}
           onOpenAccount={onOpenAccount}
           onMatchAccount={onMatchAccount}
+          onRecalculate={onRecalculateBalances}
         />
       </div>
     </div>

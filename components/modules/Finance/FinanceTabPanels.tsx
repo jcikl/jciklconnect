@@ -1,9 +1,11 @@
-import React, { lazy, Suspense, useState, useEffect } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useCallback } from 'react';
 import type { BankAccount } from '../../../types';
 import type { useFinanceData } from '../../../hooks/useFinanceData';
 import { usePermissions } from '../../../hooks/usePermissions';
+import { useToast } from '../../ui/Common';
 import { LoadingState } from '../../ui/Loading';
 import { AsyncErrorBoundary } from '../../ui/AsyncErrorBoundary';
+import { FinanceService } from '../../../services/financeService';
 import { AdministrativeTab } from './AdministrativeTab';
 import { FinanceDashboardTab } from './FinanceDashboardTab';
 import { FinanceMembershipTab } from './FinanceMembershipTab';
@@ -39,8 +41,19 @@ export const FinanceTabPanels: React.FC<FinanceTabPanelsProps> = ({
   onHelpClick,
 }) => {
   const { isAdmin } = usePermissions();
+  const { showToast } = useToast();
   const [membershipYear, setMembershipYear] = useState(financeData.detailYear);
   useEffect(() => { setMembershipYear(financeData.detailYear); }, [financeData.detailYear]);
+
+  const handleRecalculateBalances = useCallback(async () => {
+    try {
+      await FinanceService.recalculateAllBankAccountBalances();
+      await financeData.loadData(financeData.reportYear, undefined, true);
+      showToast('Bank account balances recalculated', 'success');
+    } catch {
+      showToast('Failed to recalculate balances', 'error');
+    }
+  }, [financeData, showToast]);
 
   const {
     accounts,
@@ -148,6 +161,7 @@ export const FinanceTabPanels: React.FC<FinanceTabPanelsProps> = ({
           onAddAccount={onOpenAddAccount}
           onOpenAccount={onOpenAccountDetail}
           onMatchAccount={financeData.setMatchingAccount}
+          onRecalculateBalances={handleRecalculateBalances}
         />
       )}
 

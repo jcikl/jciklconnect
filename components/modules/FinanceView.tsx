@@ -414,6 +414,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
         showBatchDeleteConfirm={showBatchDeleteConfirm}
         onCloseAccountDetail={() => setIsAccountDetailOpen(false)}
         onAccountDetailYearChange={handleAccountDetailYearChange}
+        onAccountDetailUpdated={() => loadData(reportYear, undefined, true)}
         onOpenBatchCategory={() => setIsBatchCategoryModalOpen(true)}
         onOpenBatchDeleteConfirm={() => setShowBatchDeleteConfirm(true)}
         onClearSelection={handleClearSelection}

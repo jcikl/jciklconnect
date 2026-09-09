@@ -46,12 +46,17 @@ export const preprocessRow = (
   return processed;
 };
 
+// Trim standard whitespace + non-breaking space (U+00A0), zero-width space (U+200B),
+// and BOM (U+FEFF) which bank statement copy-paste often carries.
+const robustTrim = (s: string): string =>
+  s.replace(/^[\s ​﻿]+|[\s ​﻿]+$/g, '');
+
 /**
- * Generic preprocessor: trim whitespace
+ * Generic preprocessor: trim whitespace (including non-breaking and zero-width spaces)
  */
 export const trimPreprocessor = (value: any): any => {
   if (typeof value === 'string') {
-    return value.trim();
+    return robustTrim(value);
   }
   return value;
 };
