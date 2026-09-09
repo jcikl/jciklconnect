@@ -62,8 +62,8 @@ export const BatchReclassifyModal: React.FC<BatchReclassifyModalProps> = ({
 
   const projectLabel = (p: { name?: string; hostingLo?: string; endDate?: string; eventEndDate?: string; startDate?: string; eventStartDate?: string; date?: string }) => {
     const year = (p.endDate || p.eventEndDate || p.startDate || p.eventStartDate || p.date || '').slice(0, 4);
-    const lo = p.hostingLo ? ` [${p.hostingLo}]` : '';
-    return year ? `${year} ${p.name}${lo}` : `${p.name}${lo}`;
+    const prefix = [year, p.hostingLo].filter(Boolean).join(' ');
+    return prefix ? `[${prefix}] ${p.name}` : `${p.name}`;
   };
   const projectOptions = projects.map(projectLabel);
   const projectByOption = new Map(projects.map(p => [projectLabel(p), p.id]));
