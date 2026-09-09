@@ -3,6 +3,7 @@ import { useHelpModal } from '../../contexts/HelpModalContext';
 import { ADMINISTRATIVE_PURPOSES } from '../../config/constants';
 import { useFinanceData } from '../../hooks/useFinanceData';
 import { FinanceAuxiliaryModals } from './Finance/FinanceAuxiliaryModals';
+import { BatchReclassifyModal } from './Finance/BatchReclassifyModal';
 import { FinanceBottomOverlays } from './Finance/FinanceBottomOverlays';
 import { FinanceHeader } from './Finance/FinanceHeader';
 import { FinanceProjectTrackerModalContainer } from './Finance/FinanceProjectTrackerModalContainer';
@@ -171,7 +172,12 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
     handleUpdateProjectTrx,
     handleDeleteProjectTrx,
     handleProjectTrxPaste,
+    loadReclassificationGroups,
+    handleBatchReclassify,
+    handleBackfillLoId,
   } = financeData;
+
+  const [isReclassifyModalOpen, setIsReclassifyModalOpen] = useState(false);
 
   // P1: submit-guard states
   const [isAddingTransaction, setIsAddingTransaction] = useState(false);
@@ -275,6 +281,16 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
         onOpenImport={() => setIsImportModalOpen(true)}
         onOpenTransaction={handleOpenTransaction}
       />
+      {hasPermission('canManageSettings') && (
+        <div className="flex justify-end">
+          <button
+            onClick={() => setIsReclassifyModalOpen(true)}
+            className="text-xs text-slate-400 hover:text-slate-600 underline underline-offset-2"
+          >
+            Batch Reclassify / Fix LO ID
+          </button>
+        </div>
+      )}
 
       <FinanceTabPanels
         financeData={financeData}
@@ -396,6 +412,17 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
         showToast={showToast}
         loadData={loadData}
       />
+
+      {isReclassifyModalOpen && (
+        <BatchReclassifyModal
+          isOpen={isReclassifyModalOpen}
+          onClose={() => setIsReclassifyModalOpen(false)}
+          projects={projects}
+          loadReclassificationGroups={loadReclassificationGroups}
+          handleBatchReclassify={handleBatchReclassify}
+          handleBackfillLoId={handleBackfillLoId}
+        />
+      )}
 
       <FinanceBottomOverlays
         canOperateFinance={canOperateFinance}

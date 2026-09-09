@@ -2021,5 +2021,16 @@ export function useFinanceData(searchQuery?: string) {
     handleUpdateProjectTrx,
     handleDeleteProjectTrx,
     handleProjectTrxPaste,
+    loadReclassificationGroups: () => FinanceService.getReclassificationGroups(),
+    handleBatchReclassify: async (rules: Parameters<typeof FinanceService.batchReclassifyTransactions>[0]) => {
+      const result = await FinanceService.batchReclassifyTransactions(rules);
+      await loadData(reportYear, undefined, true);
+      return result;
+    },
+    handleBackfillLoId: async () => {
+      const result = await FinanceService.backfillMissingLoId();
+      await loadData(reportYear, undefined, true);
+      return result;
+    },
   };
 }

@@ -24,7 +24,7 @@ import {
   DocumentSnapshot,
 } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
-import { COLLECTIONS } from '../config/constants';
+import { COLLECTIONS, DEFAULT_LO_ID } from '../config/constants';
 import { Transaction, BankAccount, ReconciliationRecord, ReconciliationDiscrepancy, TransactionSplit, TransactionType, MembershipDues, MembershipRecord, MembershipStatus, MembershipType, FinanceAlert, TransactionReconciliation, TransactionReversal, TransactionOriginal } from '../types';
 import { withDevMode, isDevMode } from '../utils/devMode';
 import { getMYTYear } from '../utils/dateUtils';
@@ -5197,6 +5197,114 @@ export class FinanceService {
         await voidBatch.commit();
 
         invalidateFinanceCache();
+      }
+    );
+  }
+
+  // Returns distinct (loId, category, projectId) combos across all transactions,
+  // ordered by count descending so the most-common groups appear first.
+  static async getReclassificationGroups(): Promise<{
+    loId: string | null;
+    category: string;
+    projectId: string | null;
+    count: number;
+  }[]> {
+    return withDevMode(
+      () => [],
+      async () => {
+        const snap = await getDocsFromServer(collection(db, COLLECTIONS.TRANSACTIONS));
+        const counts = new Map<string, { loId: string | null; category: string; projectId: string | null; count: number }>();
+        snap.forEach(d => {
+          const data = d.data();
+          const key = `${data.loId ?? ''}|${data.category ?? ''}|${data.projectId ?? ''}`;
+          if (counts.has(key)) {
+            counts.get(key)!.count++;
+          } else {
+            counts.set(key, {
+              loId: data.loId ?? null,
+              category: data.category ?? '',
+              projectId: data.projectId ?? null,
+              count: 1,
+            });
+          }
+        });
+        return Array.from(counts.values()).sort((a, b) => b.count - a.count);
+      }
+    );
+  }
+
+  // Batch-updates all transactions matching each rule's (loId, category, projectId)
+  // with the rule's new values. loId is always forced to DEFAULT_LO_ID.
+  static async batchReclassifyTransactions(rules: {
+    matchLoId: string | null;
+    matchCategory: string;
+    matchProjectId: string | null;
+    newCategory: string;
+    newProjectId: string | null;
+  }[]): Promise<{ updated: number }> {
+    return withDevMode(
+      () => ({ updated: 0 }),
+      async () => {
+        if (rules.length === 0) return { updated: 0 };
+        const snap = await getDocsFromServer(collection(db, COLLECTIONS.TRANSACTIONS));
+        const toUpdate: { id: string; newCategory: string; newProjectId: string | null }[] = [];
+        snap.forEach(d => {
+          const data = d.data();
+          const txLoId = data.loId ?? null;
+          const txCat = data.category ?? '';
+          const txProj = data.projectId ?? null;
+          for (const rule of rules) {
+            if (txLoId === rule.matchLoId && txCat === rule.matchCategory && txProj === rule.matchProjectId) {
+              toUpdate.push({ id: d.id, newCategory: rule.newCategory, newProjectId: rule.newProjectId });
+              break;
+            }
+          }
+        });
+        const chunks = chunkArray(toUpdate, 499);
+        for (const chunk of chunks) {
+          const batch = writeBatch(db);
+          for (const item of chunk) {
+            const ref = doc(db, COLLECTIONS.TRANSACTIONS, item.id);
+            const update: Record<string, unknown> = {
+              loId: DEFAULT_LO_ID,
+              category: item.newCategory,
+              updatedAt: Timestamp.now(),
+            };
+            if (item.newProjectId !== undefined) update.projectId = item.newProjectId;
+            batch.update(ref, update);
+          }
+          await batch.commit();
+        }
+        invalidateFinanceCache();
+        return { updated: toUpdate.length };
+      }
+    );
+  }
+
+  // Backfills loId = DEFAULT_LO_ID on all transactions where loId is missing or null.
+  static async backfillMissingLoId(): Promise<{ updated: number }> {
+    return withDevMode(
+      () => ({ updated: 0 }),
+      async () => {
+        const snap = await getDocsFromServer(collection(db, COLLECTIONS.TRANSACTIONS));
+        const missing: string[] = [];
+        snap.forEach(d => {
+          const data = d.data();
+          if (!data.loId) missing.push(d.id);
+        });
+        const chunks = chunkArray(missing, 499);
+        for (const chunk of chunks) {
+          const batch = writeBatch(db);
+          for (const id of chunk) {
+            batch.update(doc(db, COLLECTIONS.TRANSACTIONS, id), {
+              loId: DEFAULT_LO_ID,
+              updatedAt: Timestamp.now(),
+            });
+          }
+          await batch.commit();
+        }
+        invalidateFinanceCache();
+        return { updated: missing.length };
       }
     );
   }
