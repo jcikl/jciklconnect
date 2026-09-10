@@ -87,6 +87,9 @@ export const MemberSelector: React.FC<MemberSelectorProps> = ({
     setHighlight(0);
   };
 
+  // Index of the currently selected value in displayList (for highlight init and visual marker).
+  const selectedIndex = displayList.findIndex((m) => m.id === value);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!open) {
       if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
@@ -135,7 +138,12 @@ export const MemberSelector: React.FC<MemberSelectorProps> = ({
             setOpen(true);
             setHighlight(0);
           }}
-          onFocus={() => setOpen(true)}
+          onFocus={() => {
+            // When reopening, jump the keyboard cursor to the currently selected item
+            // so the user can immediately see which option is active.
+            setHighlight(selectedIndex >= 0 ? selectedIndex : 0);
+            setOpen(true);
+          }}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}
@@ -162,21 +170,42 @@ export const MemberSelector: React.FC<MemberSelectorProps> = ({
             {displayList.length === 0 ? (
               <li className="px-3 py-2 text-sm text-slate-500">No matching members</li>
             ) : (
-              displayList.map((m, i) => (
-                <li
-                  key={m.id || 'self'}
-                  id={`member-opt-${m.id || 'self'}`}
-                  role="option"
-                  aria-selected={value === m.id}
-                  className={`px-3 py-2 text-sm cursor-pointer ${i === highlight ? 'bg-jci-blue/10 text-jci-navy' : 'text-slate-700 hover:bg-slate-50'
+              displayList.map((m, i) => {
+                const isSelected = value === m.id;
+                const isHighlighted = i === highlight;
+                return (
+                  <li
+                    key={m.id || 'self'}
+                    id={`member-opt-${m.id || 'self'}`}
+                    role="option"
+                    aria-selected={isSelected}
+                    className={`px-3 py-2 text-sm cursor-pointer flex items-center justify-between ${
+                      isHighlighted
+                        ? 'bg-jci-blue/10 text-jci-navy'
+                        : isSelected
+                        ? 'bg-jci-blue/5 text-jci-blue'
+                        : 'text-slate-700 hover:bg-slate-50'
                     }`}
-                  onMouseEnter={() => setHighlight(i)}
-                  onClick={() => handleSelect(m.id)}
-                >
-                  {getOptionLabel ? getOptionLabel(m) : m.general?.name}
-                  {!m.id && selfOption && <span className="text-slate-400 ml-1">(current user)</span>}
-                </li>
-              ))
+                    onMouseEnter={() => setHighlight(i)}
+                    onMouseDown={(e) => {
+                      // Prevent the input from losing focus on click so that onFocus
+                      // does not immediately reopen the dropdown after handleSelect closes it.
+                      e.preventDefault();
+                      handleSelect(m.id);
+                    }}
+                  >
+                    <span>
+                      {getOptionLabel ? getOptionLabel(m) : m.general?.name}
+                      {!m.id && selfOption && <span className="text-slate-400 ml-1">(current user)</span>}
+                    </span>
+                    {isSelected && (
+                      <svg className="w-4 h-4 shrink-0 ml-2" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="2,8 6,12 14,4" />
+                      </svg>
+                    )}
+                  </li>
+                );
+              })
             )}
           </ul>
         )}

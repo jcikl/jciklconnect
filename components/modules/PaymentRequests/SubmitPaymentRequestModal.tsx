@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plus, RefreshCw, FileText, Trash2, Paperclip, X } from 'lucide-react';
 import { Button, Modal, useToast, ProgressBar } from '../../ui/Common';
 import { Input, Select } from '../../ui/Form';
@@ -76,6 +76,10 @@ export const SubmitPaymentRequestModal: React.FC<SubmitPaymentRequestModalProps>
   const loId = (member as { loId?: string })?.loId ?? DEFAULT_LO_ID;
   const { members: memberOptions } = useMembers(loId);
 
+  // Prevents Firestore onSnapshot (which recreates `member` on every update) from
+  // re-running the modal-open reset while the user is mid-fill.
+  const modalResetDoneRef = useRef(false);
+
   const [submitStep, setSubmitStep] = useState<1 | 2 | 3>(1);
   const [submitting, setSubmitting] = useState(false);
   const [attachmentUploadProgress, setAttachmentUploadProgress] = useState(0);
@@ -100,10 +104,20 @@ export const SubmitPaymentRequestModal: React.FC<SubmitPaymentRequestModalProps>
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [adminAccountOptions, setAdminAccountOptions] = useState<string[]>([]);
 
-  // Reset & pre-fill when modal opens
+  // Reset & pre-fill when modal opens.
+  // Guard with modalResetDoneRef: Firestore's onSnapshot recreates the `member` object
+  // reference on every update, which would otherwise re-trigger this effect while the
+  // modal is open and silently reset the applicant the user already selected.
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      modalResetDoneRef.current = false;
+      return;
+    }
+    if (modalResetDoneRef.current) return;
+    modalResetDoneRef.current = true;
+
     setSubmitStep(1);
+    setFormApplicantId('');
     setFormCategory(preselectedCategory ?? 'administrative');
     setFormActivityId(preselectedProjectId ?? '');
     setFormItems([{ purpose: '', amount: 0 }]);
