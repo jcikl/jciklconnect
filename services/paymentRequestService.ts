@@ -55,12 +55,14 @@ export class PaymentRequestService {
     return withDevMode(
       () => {
         const ym = new Date().toISOString().slice(0, 7).replace(/-/g, ''); // YYYYMM
-        const seq = devPaymentRequests.filter((p) => p.referenceNumber.startsWith(`${REFERENCE_NUMBER_PREFIX}-${loId}-`)).length + 1;
-        return `${REFERENCE_NUMBER_PREFIX}-${loId}-${ym}-${String(seq).padStart(3, '0')}`;
+        const loIdUpper = loId.toUpperCase();
+        const seq = devPaymentRequests.filter((p) => p.referenceNumber.startsWith(`${REFERENCE_NUMBER_PREFIX}-${loIdUpper}-`)).length + 1;
+        return `${REFERENCE_NUMBER_PREFIX}-${loIdUpper}-${ym}-${String(seq).padStart(3, '0')}`;
       },
       async () => {
     // Global atomic counter per LO — never resets, so running number is independent of date prefix.
     const ym = new Date().toISOString().slice(0, 7).replace(/-/g, ''); // YYYYMM for display only
+    const loIdUpper = loId.toUpperCase();
     const counterRef = doc(db, COLLECTIONS.COUNTERS, `pr_${loId}`);
     let seq = 1;
     await runTransaction(db, async (txn) => {
@@ -71,7 +73,7 @@ export class PaymentRequestService {
       txn.set(counterRef, { value: seq });
     });
     const seqStr = String(seq).padStart(3, '0');
-    return `${REFERENCE_NUMBER_PREFIX}-${loId}-${ym}-${seqStr}`;
+    return `${REFERENCE_NUMBER_PREFIX}-${loIdUpper}-${ym}-${seqStr}`;
   });
   }
 
