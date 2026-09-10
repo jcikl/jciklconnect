@@ -17,12 +17,14 @@ import { generatePaymentRequestPdfPreview } from './paymentRequestPdf';
 
 interface DriveFolder { year: string; month: string; projectName: string; }
 
+interface DriveUploadResult { url: string; fileId: string; }
+
 async function uploadReceiptToDrive(
   file: File,
   folder: DriveFolder,
   idToken: string,
   onProgress?: (p: number) => void
-): Promise<string> {
+): Promise<DriveUploadResult> {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('year', folder.year);
@@ -40,8 +42,8 @@ async function uploadReceiptToDrive(
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           const data = JSON.parse(xhr.responseText);
-          if (data.url) resolve(data.url);
-          else reject(new Error(data.error ?? 'No URL returned'));
+          if (data.url && data.fileId) resolve({ url: data.url, fileId: data.fileId });
+          else reject(new Error(data.error ?? 'No URL/fileId returned'));
         } catch { reject(new Error('Invalid response from upload function')); }
       } else {
         reject(new Error(`Upload failed: HTTP ${xhr.status}`));
@@ -204,7 +206,7 @@ export const SubmitPaymentRequestModal: React.FC<SubmitPaymentRequestModalProps>
             } catch { /* use original */ }
           }
           const baseProgress = (i / formAttachments.length) * 100;
-          const url = await uploadReceiptToDrive(
+          const { url } = await uploadReceiptToDrive(
             fileToUpload,
             driveFolder,
             idToken,
@@ -214,7 +216,7 @@ export const SubmitPaymentRequestModal: React.FC<SubmitPaymentRequestModalProps>
         }
       }
 
-      const { referenceNumber } = await PaymentRequestService.create({
+      const { id: prId, referenceNumber } = await PaymentRequestService.create({
         applicantId,
         applicantName: formApplicantName,
         applicantEmail: formApplicantEmail,
@@ -238,41 +240,41 @@ export const SubmitPaymentRequestModal: React.FC<SubmitPaymentRequestModalProps>
         attachmentUrls,
       }, user.uid);
 
-      // Generate combined PDF (PR form + all attachments) and upload to the same Drive folder
-      if (formAttachments.length > 0) {
-        try {
-          const blobUrls = formAttachments.map(f => URL.createObjectURL(f));
-          const prForPdf = {
-            referenceNumber,
-            applicantName: formApplicantName,
-            applicantPosition: formApplicantPosition,
-            date: now.toISOString().split('T')[0],
-            category: formCategory,
-            activityId: formActivityId || null,
-            activityRef: formActivityId || null,
-            totalAmount,
-            amount: totalAmount,
-            items: formItems,
-            remark: formRemark,
-            bankName: formBankName,
-            accountHolder: formAccountHolder,
-            accountNumber: formAccountNumber,
-            claimFromBankAccountId: formClaimFromBankAccountId || null,
-            attachmentUrls: blobUrls,
-          } as any;
-          const { url: pdfBlobUrl, fileName } = await generatePaymentRequestPdfPreview({
-            request: prForPdf,
-            projects,
-            bankAccounts,
-          });
-          const pdfBlob = await fetch(pdfBlobUrl).then(r => r.blob());
-          const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
-          const idToken = await user.getIdToken();
-          await uploadReceiptToDrive(pdfFile, driveFolder, idToken);
-          blobUrls.forEach(u => URL.revokeObjectURL(u));
-          URL.revokeObjectURL(pdfBlobUrl);
-        } catch { /* non-fatal — PR is already saved */ }
-      }
+      // Generate combined PDF (PR form + all attachments) and upload to the same Drive folder.
+      // Files are still in memory as blobs so we use createObjectURL to avoid Drive URL fetch issues.
+      try {
+        const blobUrls = formAttachments.map(f => URL.createObjectURL(f));
+        const prForPdf = {
+          referenceNumber,
+          applicantName: formApplicantName,
+          applicantPosition: formApplicantPosition,
+          date: now.toISOString().split('T')[0],
+          category: formCategory,
+          activityId: formActivityId || null,
+          activityRef: formActivityId || null,
+          totalAmount,
+          amount: totalAmount,
+          items: formItems,
+          remark: formRemark,
+          bankName: formBankName,
+          accountHolder: formAccountHolder,
+          accountNumber: formAccountNumber,
+          claimFromBankAccountId: formClaimFromBankAccountId || null,
+          attachmentUrls: blobUrls,
+        } as any;
+        const { url: pdfBlobUrl, fileName } = await generatePaymentRequestPdfPreview({
+          request: prForPdf,
+          projects,
+          bankAccounts,
+        });
+        const pdfBlob = await fetch(pdfBlobUrl).then(r => r.blob());
+        const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
+        const pdfIdToken = await user.getIdToken();
+        const { fileId: combinedPdfFileId } = await uploadReceiptToDrive(pdfFile, driveFolder, pdfIdToken);
+        await PaymentRequestService.setCombinedPdfFileId(prId, combinedPdfFileId);
+        blobUrls.forEach(u => URL.revokeObjectURL(u));
+        URL.revokeObjectURL(pdfBlobUrl);
+      } catch { /* non-fatal — PR is already saved */ }
 
       // SEC-A-003: Bank account details (name, holder, number) are NOT stored in localStorage.
       localStorage.setItem('pr_claim_from_bank_account_id', formClaimFromBankAccountId || '');

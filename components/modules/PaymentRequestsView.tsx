@@ -323,6 +323,28 @@ export const PaymentRequestsView: React.FC<{ searchQuery?: string }> = ({ search
   };
 
   const handlePreviewPDF = async (pr: PaymentRequest) => {
+    // If a pre-generated combined PDF (with attachments) was stored at submission time,
+    // fetch it via the download proxy so Drive auth is handled server-side.
+    if (pr.combinedPdfFileId) {
+      try {
+        const idToken = await user!.getIdToken();
+        const res = await fetch(
+          `/.netlify/functions/download-from-drive?fileId=${encodeURIComponent(pr.combinedPdfFileId)}`,
+          { headers: { Authorization: `Bearer ${idToken}` } }
+        );
+        if (res.ok) {
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          setPdfPreviewFileName(`PR_${pr.referenceNumber}.pdf`);
+          setPdfPreviewUrl(url);
+          return;
+        }
+      } catch {
+        // fall through to regenerate below
+      }
+    }
+
+    // Fallback: regenerate from Firestore data (attachments may be missing if stored on Drive)
     const preview = await generatePaymentRequestPdfPreview({
       request: pr,
       projects,

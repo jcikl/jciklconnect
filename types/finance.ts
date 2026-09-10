@@ -160,6 +160,7 @@ export interface PaymentRequest {
   referenceNumber: string;
   status: PaymentRequestStatus;
   attachmentUrls?: string[];
+  combinedPdfFileId?: string;
   loId: string;
   createdAt: string;
   updatedAt: string;

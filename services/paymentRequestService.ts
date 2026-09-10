@@ -764,6 +764,21 @@ export class PaymentRequestService {
     );
   }
 
+  static async setCombinedPdfFileId(id: string, fileId: string): Promise<void> {
+    return withDevMode(
+      () => {
+        const idx = devPaymentRequests.findIndex((p) => p.id === id);
+        if (idx >= 0) {
+          devPaymentRequests = [...devPaymentRequests];
+          devPaymentRequests[idx] = { ...devPaymentRequests[idx], combinedPdfFileId: fileId };
+        }
+      },
+      async () => {
+        await updateDoc(doc(db, COLLECTIONS.PAYMENT_REQUESTS, id), { combinedPdfFileId: fileId });
+      }
+    );
+  }
+
   static async cancel(id: string, userId: string): Promise<void> {
     return withDevMode(
       async () => {
