@@ -3,13 +3,11 @@ import { Plus, RefreshCw, FileText, Trash2, Paperclip, X } from 'lucide-react';
 import { Button, Modal, useToast, ProgressBar } from '../../ui/Common';
 import { Input, Select } from '../../ui/Form';
 import { Combobox } from '../../ui/Combobox';
-import { MemberSelector } from '../../ui/MemberSelector';
 import { PaymentRequestService } from '../../../services/paymentRequestService';
 import { FinanceService } from '../../../services/financeService';
 import { ProjectsService } from '../../../services/projectsService';
-import { PaymentRequestItem, BankAccount, Project, UserRole } from '../../../types';
+import { PaymentRequestItem, BankAccount, Project } from '../../../types';
 import { useAuth } from '../../../hooks/useAuth';
-import { useMembers } from '../../../hooks/useMembers';
 import { DEFAULT_LO_ID } from '../../../config/constants';
 import { formatCurrency } from '../../../utils/formatUtils';
 import imageCompression from 'browser-image-compression';
@@ -73,16 +71,7 @@ export const SubmitPaymentRequestModal: React.FC<SubmitPaymentRequestModalProps>
 }) => {
   const { showToast } = useToast();
   const { user, member } = useAuth();
-  // Only BOARD / ADMIN / SUPER_ADMIN may submit on behalf of another member.
-  // Direct role check mirrors Firestore rules (isAdmin() || isBoard()) without going
-  // through usePermissions which has extra board-position requirements that are
-  // irrelevant here.
-  const canSelectApplicant =
-    member?.role === UserRole.ADMIN ||
-    member?.role === UserRole.SUPER_ADMIN ||
-    member?.role === UserRole.BOARD;
   const loId = (member as { loId?: string })?.loId ?? DEFAULT_LO_ID;
-  const { members: memberOptions } = useMembers(loId);
 
   // Prevents Firestore onSnapshot (which recreates `member` on every update) from
   // re-running the modal-open reset while the user is mid-fill.
@@ -92,7 +81,6 @@ export const SubmitPaymentRequestModal: React.FC<SubmitPaymentRequestModalProps>
   const [submitting, setSubmitting] = useState(false);
   const [attachmentUploadProgress, setAttachmentUploadProgress] = useState(0);
 
-  const [formApplicantId, setFormApplicantId] = useState('');
   const [formApplicantName, setFormApplicantName] = useState('');
   const [formApplicantEmail, setFormApplicantEmail] = useState('');
   const [formApplicantPosition, setFormApplicantPosition] = useState('');
@@ -125,7 +113,6 @@ export const SubmitPaymentRequestModal: React.FC<SubmitPaymentRequestModalProps>
     modalResetDoneRef.current = true;
 
     setSubmitStep(1);
-    setFormApplicantId('');
     setFormCategory(preselectedCategory ?? 'administrative');
     setFormActivityId(preselectedProjectId ?? '');
     setFormItems([{ purpose: '', amount: 0 }]);
@@ -205,7 +192,7 @@ export const SubmitPaymentRequestModal: React.FC<SubmitPaymentRequestModalProps>
     setSubmitting(true);
     try {
       const now = new Date();
-      const applicantId = formApplicantId || user.uid;
+      const applicantId = user.uid;
       const attachmentUrls: string[] = [];
 
       const year = String(now.getFullYear());
@@ -376,21 +363,12 @@ export const SubmitPaymentRequestModal: React.FC<SubmitPaymentRequestModalProps>
         {submitStep === 1 && (
           <div className="space-y-5">
             <div className="grid md:grid-cols-2 gap-4">
-              <MemberSelector
-                label="Applicant"
-                members={memberOptions}
-                value={formApplicantId}
-                onChange={(id) => {
-                  setFormApplicantId(id);
-                  const sel = memberOptions.find(m => m.id === id);
-                  if (sel) { setFormApplicantName(sel.general?.name); setFormApplicantEmail(sel.contact?.email ?? (sel as any).email); }
-                  else if (id === '') { setFormApplicantName(member?.general?.name || user?.displayName || ''); setFormApplicantEmail(user?.email || ''); }
-                }}
-                selfOption
-                selfLabel="Self"
-                placeholder="Select applicant..."
-                disabled={!canSelectApplicant || !!preselectedProjectId}
-              />
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Applicant</label>
+                <div className="block w-full rounded-lg border border-slate-300 bg-slate-50 py-2 pl-3 pr-3 text-sm text-slate-500 cursor-not-allowed select-none">
+                  {member?.general?.name || user?.displayName || '—'}
+                </div>
+              </div>
               <Input label="Applicant Position" value={formApplicantPosition} onChange={(e) => { if (!preselectedProjectId) setFormApplicantPosition(e.target.value); }} placeholder="e.g. Project Lead / Secretary" required readOnly={!!preselectedProjectId} className={preselectedProjectId ? 'bg-slate-50 cursor-not-allowed' : ''} />
             </div>
 
