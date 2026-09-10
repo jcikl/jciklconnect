@@ -479,7 +479,11 @@ service cloud.firestore {
          canAccessFinance() && paymentRequestInMyScope() &&
            // Fix 9 (P2): added 'projectBudgetSyncFailed' and 'expenseTxFailed' so finance staff
            // can write these flag fields without needing admin rights.
-           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt', 'updatedAt', 'updatedBy', 'remark', 'rejectionReason', 'paidAt', 'projectBudgetSyncFailed', 'expenseTxFailed']));
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt', 'updatedAt', 'updatedBy', 'remark', 'rejectionReason', 'paidAt', 'projectBudgetSyncFailed', 'expenseTxFailed']) ||
+         // Allow applicant to set combinedPdfFileId (Drive file ID of the combined PDF)
+         // after PR creation — this fires server-side immediately after submission.
+         resource.data.get('applicantId', null) == request.auth.uid &&
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['combinedPdfFileId']));
       allow delete: if isAuthenticated() && (
         (resource.data.get('applicantId', null) == request.auth.uid && resource.data.get('status', null) == 'draft') ||
         isAdmin() || isDeveloper());

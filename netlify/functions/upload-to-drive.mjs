@@ -180,6 +180,18 @@ export default async (req, context) => {
       return Response.json({ error: 'Drive upload failed' }, { status: 500, headers: cors });
     }
 
+    // Set file-level "anyone with link can view" permission so the Drive /preview URL
+    // works in an iframe without requiring the viewer to be signed in to Google.
+    // Folder-level sharing does NOT cascade to files uploaded via the API.
+    await fetch(
+      `https://www.googleapis.com/drive/v3/files/${driveFile.id}/permissions?supportsAllDrives=true`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'anyone', role: 'reader' }),
+      }
+    );
+
     return Response.json(
       { url: driveFile.webViewLink, fileId: driveFile.id, name: driveFile.name },
       { headers: cors }
