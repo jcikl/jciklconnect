@@ -9,6 +9,7 @@ import { FinanceService } from '../../../services/financeService';
 import { ProjectsService } from '../../../services/projectsService';
 import { PaymentRequestItem, BankAccount, Project } from '../../../types';
 import { useAuth } from '../../../hooks/useAuth';
+import { usePermissions } from '../../../hooks/usePermissions';
 import { useMembers } from '../../../hooks/useMembers';
 import { DEFAULT_LO_ID } from '../../../config/constants';
 import { formatCurrency } from '../../../utils/formatUtils';
@@ -73,6 +74,9 @@ export const SubmitPaymentRequestModal: React.FC<SubmitPaymentRequestModalProps>
 }) => {
   const { showToast } = useToast();
   const { user, member } = useAuth();
+  const { isAdmin, isBoard, canOperateFinance } = usePermissions();
+  // Only admin, board, and finance roles may submit on behalf of another member.
+  const canSelectApplicant = isAdmin || isBoard || canOperateFinance;
   const loId = (member as { loId?: string })?.loId ?? DEFAULT_LO_ID;
   const { members: memberOptions } = useMembers(loId);
 
@@ -381,7 +385,7 @@ export const SubmitPaymentRequestModal: React.FC<SubmitPaymentRequestModalProps>
                 selfOption
                 selfLabel="Self"
                 placeholder="Select applicant..."
-                disabled={!!preselectedProjectId}
+                disabled={!canSelectApplicant || !!preselectedProjectId}
               />
               <Input label="Applicant Position" value={formApplicantPosition} onChange={(e) => { if (!preselectedProjectId) setFormApplicantPosition(e.target.value); }} placeholder="e.g. Project Lead / Secretary" required readOnly={!!preselectedProjectId} className={preselectedProjectId ? 'bg-slate-50 cursor-not-allowed' : ''} />
             </div>
