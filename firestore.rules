@@ -460,7 +460,9 @@ service cloud.firestore {
       allow list: if isAuthenticated() &&
         (isAdmin() || canAccessFinance() || isMember());
       allow create: if isAuthenticated() &&
-        request.resource.data.get('applicantId', null) == request.auth.uid &&
+        // Admin/finance/board may submit on behalf of another member; regular members can only submit for themselves.
+        (isAdmin() || canAccessFinance() || isBoard() ||
+          request.resource.data.get('applicantId', null) == request.auth.uid) &&
         request.resource.data.get('loId', null) is string &&
         request.resource.data.get('referenceNumber', null) is string &&
         request.resource.data.get('status', null) in ['draft', 'submitted'];
@@ -480,9 +482,9 @@ service cloud.firestore {
            // Fix 9 (P2): added 'projectBudgetSyncFailed' and 'expenseTxFailed' so finance staff
            // can write these flag fields without needing admin rights.
            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt', 'updatedAt', 'updatedBy', 'remark', 'rejectionReason', 'paidAt', 'projectBudgetSyncFailed', 'expenseTxFailed']) ||
-         // Allow applicant to set combinedPdfFileId (Drive file ID of the combined PDF)
-         // after PR creation — this fires server-side immediately after submission.
-         resource.data.get('applicantId', null) == request.auth.uid &&
+         // Allow the submitter (applicant or admin acting on their behalf) to set combinedPdfFileId
+         // immediately after PR creation. Admins who submitted on behalf of others are also permitted.
+         (resource.data.get('applicantId', null) == request.auth.uid || isAdmin() || canAccessFinance() || isBoard()) &&
            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['combinedPdfFileId']));
       allow delete: if isAuthenticated() && (
         (resource.data.get('applicantId', null) == request.auth.uid && resource.data.get('status', null) == 'draft') ||
