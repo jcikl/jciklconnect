@@ -130,23 +130,26 @@ export const SubmitPaymentRequestModal: React.FC<SubmitPaymentRequestModalProps>
       if (paymentInfo?.accountNumber) setFormAccountNumber(paymentInfo.accountNumber);
       const savedClaimFromBankAccountId = localStorage.getItem('pr_claim_from_bank_account_id');
 
-      // Auto-fill position from project committee role when opened from budget tab
+      // Position priority: project committee role → member's board position → localStorage
+      const memberBoardPosition =
+        (member as { jciCareer?: { currentBoardPosition?: string } })?.jciCareer?.currentBoardPosition ||
+        (member as { currentBoardPosition?: string })?.currentBoardPosition ||
+        '';
+      const savedPosition = localStorage.getItem('pr_applicant_position') || '';
+
       if (preselectedProjectId && member?.id) {
         ProjectsService.getProjectById(preselectedProjectId).then(project => {
           const entry = project?.committee?.find(c => c.memberId === member.id);
           if (entry?.role) {
             setFormApplicantPosition(entry.role);
           } else {
-            const savedPosition = localStorage.getItem('pr_applicant_position');
-            if (savedPosition) setFormApplicantPosition(savedPosition);
+            setFormApplicantPosition(memberBoardPosition || savedPosition);
           }
         }).catch(() => {
-          const savedPosition = localStorage.getItem('pr_applicant_position');
-          if (savedPosition) setFormApplicantPosition(savedPosition);
+          setFormApplicantPosition(memberBoardPosition || savedPosition);
         });
       } else {
-        const savedPosition = localStorage.getItem('pr_applicant_position');
-        if (savedPosition) setFormApplicantPosition(savedPosition);
+        setFormApplicantPosition(memberBoardPosition || savedPosition);
       }
     }
   }, [isOpen, preselectedProjectId, preselectedCategory, user, member]);
