@@ -13,16 +13,21 @@ import { useMembers } from '../../../hooks/useMembers';
 import { DEFAULT_LO_ID } from '../../../config/constants';
 import { formatCurrency } from '../../../utils/formatUtils';
 import imageCompression from 'browser-image-compression';
+import { generatePaymentRequestPdfPreview } from './paymentRequestPdf';
+
+interface DriveFolder { year: string; month: string; projectName: string; }
 
 async function uploadReceiptToDrive(
   file: File,
-  loId: string,
+  folder: DriveFolder,
   idToken: string,
   onProgress?: (p: number) => void
 ): Promise<string> {
   const formData = new FormData();
   formData.append('file', file);
-  formData.append('loId', loId);
+  formData.append('year', folder.year);
+  formData.append('month', folder.month);
+  formData.append('projectName', folder.projectName);
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/.netlify/functions/upload-to-drive');
@@ -179,6 +184,13 @@ export const SubmitPaymentRequestModal: React.FC<SubmitPaymentRequestModalProps>
       const applicantId = formApplicantId || user.uid;
       const attachmentUrls: string[] = [];
 
+      const year = String(now.getFullYear());
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const projectName = formCategory === 'projects_activities'
+        ? (projects.find(p => p.id === formActivityId)?.name || projects.find(p => p.id === formActivityId)?.title || 'General')
+        : 'Administrative';
+      const driveFolder: DriveFolder = { year, month, projectName };
+
       if (formAttachments.length > 0) {
         setAttachmentUploadProgress(0);
         const idToken = await user.getIdToken();
@@ -194,7 +206,7 @@ export const SubmitPaymentRequestModal: React.FC<SubmitPaymentRequestModalProps>
           const baseProgress = (i / formAttachments.length) * 100;
           const url = await uploadReceiptToDrive(
             fileToUpload,
-            loId,
+            driveFolder,
             idToken,
             (progress) => setAttachmentUploadProgress(Math.round(baseProgress + (progress / formAttachments.length)))
           );
@@ -225,6 +237,42 @@ export const SubmitPaymentRequestModal: React.FC<SubmitPaymentRequestModalProps>
         loId,
         attachmentUrls,
       }, user.uid);
+
+      // Generate combined PDF (PR form + all attachments) and upload to the same Drive folder
+      if (formAttachments.length > 0) {
+        try {
+          const blobUrls = formAttachments.map(f => URL.createObjectURL(f));
+          const prForPdf = {
+            referenceNumber,
+            applicantName: formApplicantName,
+            applicantPosition: formApplicantPosition,
+            date: now.toISOString().split('T')[0],
+            category: formCategory,
+            activityId: formActivityId || null,
+            activityRef: formActivityId || null,
+            totalAmount,
+            amount: totalAmount,
+            items: formItems,
+            remark: formRemark,
+            bankName: formBankName,
+            accountHolder: formAccountHolder,
+            accountNumber: formAccountNumber,
+            claimFromBankAccountId: formClaimFromBankAccountId || null,
+            attachmentUrls: blobUrls,
+          } as any;
+          const { url: pdfBlobUrl, fileName } = await generatePaymentRequestPdfPreview({
+            request: prForPdf,
+            projects,
+            bankAccounts,
+          });
+          const pdfBlob = await fetch(pdfBlobUrl).then(r => r.blob());
+          const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
+          const idToken = await user.getIdToken();
+          await uploadReceiptToDrive(pdfFile, driveFolder, idToken);
+          blobUrls.forEach(u => URL.revokeObjectURL(u));
+          URL.revokeObjectURL(pdfBlobUrl);
+        } catch { /* non-fatal — PR is already saved */ }
+      }
 
       // SEC-A-003: Bank account details (name, holder, number) are NOT stored in localStorage.
       localStorage.setItem('pr_claim_from_bank_account_id', formClaimFromBankAccountId || '');

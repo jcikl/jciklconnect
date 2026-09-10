@@ -120,7 +120,9 @@ export default async (req, context) => {
   }
 
   const file = formData.get('file');
-  const loId = String(formData.get('loId') ?? 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const year = String(formData.get('year') ?? new Date().getFullYear());
+  const month = String(formData.get('month') ?? String(new Date().getMonth() + 1).padStart(2, '0'));
+  const projectName = String(formData.get('projectName') ?? 'General').replace(/[^\w\s\-().&]/g, '').trim() || 'General';
 
   if (!file || typeof file === 'string') {
     return Response.json({ error: 'file is required' }, { status: 400, headers: cors });
@@ -134,7 +136,10 @@ export default async (req, context) => {
 
   try {
     const accessToken = await getGoogleAccessToken();
-    const subfolderId = await getOrCreateSubfolder(accessToken, rootFolderId, loId);
+    // Build year / month / project folder hierarchy
+    const yearFolderId = await getOrCreateSubfolder(accessToken, rootFolderId, year);
+    const monthFolderId = await getOrCreateSubfolder(accessToken, yearFolderId, month);
+    const subfolderId = await getOrCreateSubfolder(accessToken, monthFolderId, projectName);
 
     const date = new Date().toISOString().split('T')[0];
     const fileName = `${date}_${file.name}`;

@@ -1164,6 +1164,16 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create, update, delete: if isBoard();
     }
+
+    // Atomic sequence counters (e.g. PR reference number generation).
+    // Any authenticated member may run the generateReferenceNumber transaction
+    // (read + set a {value: number} document). Field whitelist prevents arbitrary writes.
+    match /counters/{counterId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() &&
+                      request.resource.data.keys().hasOnly(['value']) &&
+                      request.resource.data.value is int;
+    }
     
     // Publications (E-Newsletters): public read for guest page; Board/Admin can manage
     match /publications/{docId} {
