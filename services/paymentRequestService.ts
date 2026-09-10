@@ -54,17 +54,14 @@ export class PaymentRequestService {
   static async generateReferenceNumber(loId: string): Promise<string> {
     return withDevMode(
       () => {
-        const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-        const sameDay = devPaymentRequests.filter((p) => p.referenceNumber.startsWith(`${REFERENCE_NUMBER_PREFIX}-${loId}-${today}`));
-        const seq = sameDay.length + 1;
-        return `${REFERENCE_NUMBER_PREFIX}-${loId}-${today}-${String(seq).padStart(3, '0')}`;
+        const ym = new Date().toISOString().slice(0, 7).replace(/-/g, ''); // YYYYMM
+        const seq = devPaymentRequests.filter((p) => p.referenceNumber.startsWith(`${REFERENCE_NUMBER_PREFIX}-${loId}-`)).length + 1;
+        return `${REFERENCE_NUMBER_PREFIX}-${loId}-${ym}-${String(seq).padStart(3, '0')}`;
       },
       async () => {
-    // Fix 4: use an atomic counter document to avoid race conditions when two PRs
-    // are created simultaneously on the same day.
-    const dateStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-    const today = dateStr.replace(/-/g, '');
-    const counterRef = doc(db, COLLECTIONS.COUNTERS, `pr_${loId}_${dateStr}`);
+    // Global atomic counter per LO — never resets, so running number is independent of date prefix.
+    const ym = new Date().toISOString().slice(0, 7).replace(/-/g, ''); // YYYYMM for display only
+    const counterRef = doc(db, COLLECTIONS.COUNTERS, `pr_${loId}`);
     let seq = 1;
     await runTransaction(db, async (txn) => {
       const counterSnap = await txn.get(counterRef);
@@ -74,7 +71,7 @@ export class PaymentRequestService {
       txn.set(counterRef, { value: seq });
     });
     const seqStr = String(seq).padStart(3, '0');
-    return `${REFERENCE_NUMBER_PREFIX}-${loId}-${today}-${seqStr}`;
+    return `${REFERENCE_NUMBER_PREFIX}-${loId}-${ym}-${seqStr}`;
   });
   }
 
