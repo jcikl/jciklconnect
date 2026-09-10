@@ -178,22 +178,6 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
   } = financeData;
 
   const [isReclassifyModalOpen, setIsReclassifyModalOpen] = useState(false);
-  const [isBackfillingLoId, setIsBackfillingLoId] = useState(false);
-
-  const handleTempBackfillLoId = async () => {
-    if (isBackfillingLoId) return;
-    setIsBackfillingLoId(true);
-    try {
-      const { FinanceService } = await import('../../services/financeService');
-      const { updated } = await FinanceService.backfillLoIdFromBankAccount();
-      showToast(`已补全 ${updated} 条交易的 LO ID`, 'success');
-      await loadData(reportYear, undefined, true);
-    } catch (err) {
-      showToast('补全失败，请重试', 'error');
-    } finally {
-      setIsBackfillingLoId(false);
-    }
-  };
 
   // P1: submit-guard states
   const [isAddingTransaction, setIsAddingTransaction] = useState(false);
@@ -298,14 +282,7 @@ export const FinanceView: React.FC<{ searchQuery?: string }> = React.memo(({ sea
         onOpenTransaction={handleOpenTransaction}
       />
       {hasPermission('canManageSettings') && (
-        <div className="flex justify-end gap-3">
-          <button
-            onClick={handleTempBackfillLoId}
-            disabled={isBackfillingLoId}
-            className="text-xs text-amber-500 hover:text-amber-700 underline underline-offset-2 disabled:opacity-50"
-          >
-            {isBackfillingLoId ? '补全中…' : '[临时] 补全 LO ID'}
-          </button>
+        <div className="flex justify-end">
           <button
             onClick={() => setIsReclassifyModalOpen(true)}
             className="text-xs text-slate-400 hover:text-slate-600 underline underline-offset-2"

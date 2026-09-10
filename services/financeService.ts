@@ -5289,47 +5289,6 @@ export class FinanceService {
     );
   }
 
-  // Backfills loId on transactions where loId is missing, deriving it from the
-  // transaction's bankAccountId → bankAccount.loId. Falls back to DEFAULT_LO_ID
-  // for transactions whose bank account has no loId or no bankAccountId.
-  static async backfillLoIdFromBankAccount(): Promise<{ updated: number; skipped: number }> {
-    return withDevMode(
-      () => ({ updated: 0, skipped: 0 }),
-      async () => {
-        const [txSnap, acctSnap] = await Promise.all([
-          getDocsFromServer(collection(db, COLLECTIONS.TRANSACTIONS)),
-          getDocsFromServer(collection(db, COLLECTIONS.BANK_ACCOUNTS)),
-        ]);
-        const loIdByAccount = new Map<string, string>();
-        acctSnap.forEach(d => {
-          const data = d.data();
-          if (data.loId) loIdByAccount.set(d.id, data.loId);
-        });
-        const toUpdate: Array<{ id: string; loId: string }> = [];
-        let skipped = 0;
-        txSnap.forEach(d => {
-          const data = d.data();
-          if (data.loId) return;
-          const loId = (data.bankAccountId && loIdByAccount.get(data.bankAccountId)) || DEFAULT_LO_ID;
-          toUpdate.push({ id: d.id, loId });
-        });
-        const chunks = chunkArray(toUpdate, 499);
-        for (const chunk of chunks) {
-          const batch = writeBatch(db);
-          for (const item of chunk) {
-            batch.update(doc(db, COLLECTIONS.TRANSACTIONS, item.id), {
-              loId: item.loId,
-              updatedAt: Timestamp.now(),
-            });
-          }
-          await batch.commit();
-        }
-        invalidateFinanceCache();
-        return { updated: toUpdate.length, skipped };
-      }
-    );
-  }
-
   // Backfills loId = DEFAULT_LO_ID on all transactions where loId is missing or null.
   static async backfillMissingLoId(): Promise<{ updated: number }> {
     return withDevMode(
