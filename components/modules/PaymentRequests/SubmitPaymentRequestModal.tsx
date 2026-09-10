@@ -274,7 +274,10 @@ export const SubmitPaymentRequestModal: React.FC<SubmitPaymentRequestModalProps>
         await PaymentRequestService.setCombinedPdfFileId(prId, combinedPdfFileId);
         blobUrls.forEach(u => URL.revokeObjectURL(u));
         URL.revokeObjectURL(pdfBlobUrl);
-      } catch { /* non-fatal — PR is already saved */ }
+      } catch (pdfErr) {
+        console.error('[PR] Combined PDF generation/upload failed:', pdfErr);
+        showToast('PR submitted. Combined PDF could not be generated — attachments will not appear in PDF preview.', 'warning');
+      }
 
       // SEC-A-003: Bank account details (name, holder, number) are NOT stored in localStorage.
       localStorage.setItem('pr_claim_from_bank_account_id', formClaimFromBankAccountId || '');
