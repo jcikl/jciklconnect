@@ -7,9 +7,8 @@ import { MemberSelector } from '../../ui/MemberSelector';
 import { PaymentRequestService } from '../../../services/paymentRequestService';
 import { FinanceService } from '../../../services/financeService';
 import { ProjectsService } from '../../../services/projectsService';
-import { PaymentRequestItem, BankAccount, Project } from '../../../types';
+import { PaymentRequestItem, BankAccount, Project, UserRole } from '../../../types';
 import { useAuth } from '../../../hooks/useAuth';
-import { usePermissions } from '../../../hooks/usePermissions';
 import { useMembers } from '../../../hooks/useMembers';
 import { DEFAULT_LO_ID } from '../../../config/constants';
 import { formatCurrency } from '../../../utils/formatUtils';
@@ -74,9 +73,14 @@ export const SubmitPaymentRequestModal: React.FC<SubmitPaymentRequestModalProps>
 }) => {
   const { showToast } = useToast();
   const { user, member } = useAuth();
-  const { isAdmin, isBoard, canOperateFinance } = usePermissions();
-  // Only admin, board, and finance roles may submit on behalf of another member.
-  const canSelectApplicant = isAdmin || isBoard || canOperateFinance;
+  // Only BOARD / ADMIN / SUPER_ADMIN may submit on behalf of another member.
+  // Direct role check mirrors Firestore rules (isAdmin() || isBoard()) without going
+  // through usePermissions which has extra board-position requirements that are
+  // irrelevant here.
+  const canSelectApplicant =
+    member?.role === UserRole.ADMIN ||
+    member?.role === UserRole.SUPER_ADMIN ||
+    member?.role === UserRole.BOARD;
   const loId = (member as { loId?: string })?.loId ?? DEFAULT_LO_ID;
   const { members: memberOptions } = useMembers(loId);
 
