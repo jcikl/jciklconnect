@@ -12,8 +12,41 @@ import { useAuth } from '../../../hooks/useAuth';
 import { useMembers } from '../../../hooks/useMembers';
 import { DEFAULT_LO_ID } from '../../../config/constants';
 import { formatCurrency } from '../../../utils/formatUtils';
-import { uploadToCloudinary } from '../../../services/cloudinaryService';
 import imageCompression from 'browser-image-compression';
+
+async function uploadReceiptToDrive(
+  file: File,
+  loId: string,
+  idToken: string,
+  onProgress?: (p: number) => void
+): Promise<string> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('loId', loId);
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/.netlify/functions/upload-to-drive');
+    xhr.setRequestHeader('Authorization', `Bearer ${idToken}`);
+    xhr.timeout = 120_000;
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          if (data.url) resolve(data.url);
+          else reject(new Error(data.error ?? 'No URL returned'));
+        } catch { reject(new Error('Invalid response from upload function')); }
+      } else {
+        reject(new Error(`Upload failed: HTTP ${xhr.status}`));
+      }
+    };
+    xhr.onerror = () => reject(new Error('Network error during upload'));
+    xhr.ontimeout = () => reject(new Error('Upload timed out'));
+    xhr.send(formData);
+  });
+}
 import { getAdministrativeProjectIds } from '../../../utils/administrativeProjectsStorage';
 
 interface SubmitPaymentRequestModalProps {
@@ -148,6 +181,7 @@ export const SubmitPaymentRequestModal: React.FC<SubmitPaymentRequestModalProps>
 
       if (formAttachments.length > 0) {
         setAttachmentUploadProgress(0);
+        const idToken = await user.getIdToken();
         for (let i = 0; i < formAttachments.length; i++) {
           const file = formAttachments[i];
           let fileToUpload = file;
@@ -158,11 +192,11 @@ export const SubmitPaymentRequestModal: React.FC<SubmitPaymentRequestModalProps>
             } catch { /* use original */ }
           }
           const baseProgress = (i / formAttachments.length) * 100;
-          const url = await uploadToCloudinary(
+          const url = await uploadReceiptToDrive(
             fileToUpload,
-            `payment-requests/${loId}`,
-            (progress) => setAttachmentUploadProgress(Math.round(baseProgress + (progress / formAttachments.length))),
-            { resourceType: 'auto' }
+            loId,
+            idToken,
+            (progress) => setAttachmentUploadProgress(Math.round(baseProgress + (progress / formAttachments.length)))
           );
           attachmentUrls.push(url);
         }
