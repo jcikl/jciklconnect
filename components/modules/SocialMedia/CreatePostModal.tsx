@@ -30,7 +30,7 @@ const MOCK_DATA: Record<SocialPostContentType, { title: string; keyInfo: Record<
       'What participants gained': 'New high-value connections, ESG business frameworks, investor introductions',
       'Photo / video reference': 'Photos uploaded to Drive; highlight reel by video team',
       'Next step': 'Follow-up coffee sessions in October; post-event survey by 20 Sep',
-      'Preferred CTA': 'Tag someone who should have been there! 👇',
+      'Preferred CTA': 'Tag someone below 👇',
     },
     referenceContent: '',
     hashtags: '#JCIKL #BusinessMixer #YouthLeadership #JCIMalaysia',
@@ -45,7 +45,7 @@ const MOCK_DATA: Record<SocialPostContentType, { title: string; keyInfo: Record<
       'Why this deserves recognition': 'First JCI KL member to win TOYP in Leadership Development in 5 years; led 3 national-level programmes',
       'Meaning for JCI KL / youth leadership': 'Inspires the next generation of servant leaders and puts JCI KL on the national map',
       'People to tag or thank': 'JCI Malaysia, JCI KL BOD, Sarah\'s mentor VP Jason Wong',
-      'Preferred CTA': 'Drop a 🎉 to congratulate Sarah!',
+      'Preferred CTA': 'Congratulate in the comments 🎉',
     },
     referenceContent: '',
     hashtags: '#JCIKL #TOYP #YouthLeadership #JCIMalaysia',
@@ -62,7 +62,7 @@ const MOCK_DATA: Record<SocialPostContentType, { title: string; keyInfo: Record<
       'Growth / transformation': 'Now a certified JCI trainer, mentoring 15 new members; promoted to VP Training',
       'Current status': 'VP Training 2026, JCI Certified Trainer, finalist for TOYP 2027',
       'Lesson or inspiration for readers': 'Growth lives 3 seconds outside your comfort zone. Take the step.',
-      'Preferred CTA': 'Share your JCI turning-point moment below 👇',
+      'Preferred CTA': 'Comment your thoughts 💬',
     },
     referenceContent: '',
     hashtags: '#JCIKL #MemberStory #GrowthMindset #YoungProfessionals',
@@ -77,7 +77,7 @@ const MOCK_DATA: Record<SocialPostContentType, { title: string; keyInfo: Record<
       'Reveal date': '1 October 2026',
       'Biggest highlight': 'Surprise headline performer + JCI KL Excellence Awards ceremony',
       'Why people should care': 'Biggest JCI KL annual gathering — networking, awards, and an unforgettable night',
-      'Preferred CTA': 'Save the date 🗓️ and watch this space — you won\'t want to miss this.',
+      'Preferred CTA': 'Follow us for more updates',
     },
     referenceContent: '',
     hashtags: '#JCIKL #GalaDinner2026 #SaveTheDate #ComingSoon',
@@ -93,7 +93,7 @@ const MOCK_DATA: Record<SocialPostContentType, { title: string; keyInfo: Record<
       'Common mistakes': 'Monopolising conversations; staying in your comfort group; forgetting to follow up; handing out cards without context',
       'Example / experience / data': 'JCI KL members who actively networked at Business Mixer 2025 reported 3× more referrals within 90 days',
       'Save-worthy takeaway': '"Your network is your net worth — but only if you water it." 💡',
-      'Preferred CTA': 'Save this post before your next event. Which tip do you need most? 👇',
+      'Preferred CTA': 'Save this for later 🔖',
     },
     referenceContent: '',
     hashtags: '#JCIKL #NetworkingTips #YoungProfessionals #Leadership',
@@ -109,7 +109,7 @@ const MOCK_DATA: Record<SocialPostContentType, { title: string; keyInfo: Record<
       'Human story / field moment': 'Amirah, 22, cried when she received her first architecture firm offer — she had been rejected 14 times before the programme',
       'Long-term meaning': 'Building a generation of self-sufficient young Malaysians who pay it forward',
       'SDG / community value': 'SDG 8 — Decent Work and Economic Growth; SDG 10 — Reduced Inequalities',
-      'Preferred CTA': 'Share this with someone who needs it. Together we build better futures. 🌱',
+      'Preferred CTA': 'Share with your network 🔁',
     },
     referenceContent: '',
     hashtags: '#JCIKL #CareerLaunch #YouthEmpowerment #SDG8 #Malaysia',
@@ -126,7 +126,7 @@ const MOCK_DATA: Record<SocialPostContentType, { title: string; keyInfo: Record<
       'Registration link / method': 'DM "JOIN" to this page or visit jcikl.com/join',
       'Deadline': '15 October 2026 (limited seats)',
       'Seat limit / urgency': 'Only 30 seats — 18 already taken!',
-      'Preferred CTA': 'DM "JOIN" now or tag a friend who is ready to lead! 🔥',
+      'Preferred CTA': 'DM us to learn more 📩',
     },
     referenceContent: '',
     hashtags: '#JCIKL #JoinJCI #YoungLeaders #Recruitment #KualaLumpur',
@@ -141,6 +141,7 @@ const MOCK_DATA: Record<SocialPostContentType, { title: string; keyInfo: Record<
       'Concrete outcome': 'MOU signed 10 September 2026; 3 co-hosted workshops confirmed; 500 youth target beneficiaries for 2027',
       'Meaning for members / stakeholders': 'JCI KL members gain exclusive access to Bursa resources, expert speakers, and exchange floor visits',
       'Next step': 'First joint workshop "Invest Young, Lead Well" — January 2027 at Bursa Malaysia HQ',
+      'Preferred CTA': 'Follow us for more updates',
     },
     referenceContent: '',
     hashtags: '#JCIKL #BursaMalaysia #FinancialLiteracy #Partnership #YouthLeadership',
@@ -230,7 +231,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClos
         {activeFormTab === 'event_details' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-2">
-              <label className="block text-sm font-medium text-slate-700">Title *</label>
+              <label className="block text-sm font-medium text-slate-700">Title</label>
               <button
                 type="button"
                 onClick={fillMockData}
@@ -259,9 +260,6 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClos
                 placeholder="Paste poster copy, draft notes, links, photo/video context, or any extra details here."
                 rows={4}
               />
-              <p className="text-[11px] text-slate-400 mt-1">
-                Optional supporting material. AI will use key information and reference content as source material.
-              </p>
             </div>
             <Input
               label="Hashtags (optional)"
