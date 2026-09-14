@@ -4,7 +4,6 @@ import {
   SOCIAL_POST_CONTENT_TYPE_KEY_FIELDS,
   SOCIAL_POST_CONTENT_TYPE_LABELS,
   SOCIAL_POST_PLATFORM_LABELS,
-  PREFERRED_CTA_OPTIONS,
 } from '../../../types/socialPost';
 import { PLATFORM_ICONS } from './socialMediaUi';
 
@@ -43,8 +42,6 @@ export function buildReferenceMaterial(contentType: SocialPostContentType, keyIn
   return sections.join('\n\n');
 }
 
-const INPUT_CLS = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 outline-none';
-
 export const KeyInformationFields: React.FC<{
   contentType: SocialPostContentType;
   values: KeyInfoValues;
@@ -52,33 +49,19 @@ export const KeyInformationFields: React.FC<{
   onBlur?: () => void;
 }> = ({ contentType, values, onChange, onBlur }) => (
   <div>
-    <label className="block text-sm font-medium text-slate-700 mb-2">Key Information</label>
+    <label className="block text-sm font-medium text-slate-700 mb-2">Key Information *</label>
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-      {SOCIAL_POST_CONTENT_TYPE_KEY_FIELDS[contentType].map(field =>
-        field === 'Preferred CTA' ? (
-          <select
-            key={field}
-            value={values[field] ?? ''}
-            onChange={e => { onChange(field, e.target.value); onBlur?.(); }}
-            className={INPUT_CLS + ' bg-white'}
-          >
-            <option value="">Preferred CTA</option>
-            {PREFERRED_CTA_OPTIONS.map(opt => (
-              <option key={opt} value={opt}>{opt}</option>
-            ))}
-          </select>
-        ) : (
-          <input
-            key={field}
-            type="text"
-            value={values[field] ?? ''}
-            onChange={e => onChange(field, e.target.value)}
-            onBlur={onBlur}
-            placeholder={field}
-            className={INPUT_CLS}
-          />
-        )
-      )}
+      {SOCIAL_POST_CONTENT_TYPE_KEY_FIELDS[contentType].map(field => (
+        <input
+          key={field}
+          type="text"
+          value={values[field] ?? ''}
+          onChange={e => onChange(field, e.target.value)}
+          onBlur={onBlur}
+          placeholder={field}
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 outline-none"
+        />
+      ))}
     </div>
   </div>
 );

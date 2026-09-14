@@ -136,19 +136,6 @@ export const SOCIAL_POST_CONTENT_TYPE_KEY_FIELDS: Record<SocialPostContentType, 
   ],
 };
 
-export const PREFERRED_CTA_OPTIONS: string[] = [
-  'Tag someone below 👇',
-  'Comment your thoughts 💬',
-  'Share with your network 🔁',
-  'Save this for later 🔖',
-  'DM us to learn more 📩',
-  'Register now — link in bio',
-  'Follow us for more updates',
-  'Congratulate in the comments 🎉',
-  'Join us at the next event',
-  'Like and share to spread the word',
-];
-
 export interface SocialPost {
   id: string;
   title: string;
