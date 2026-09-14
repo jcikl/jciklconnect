@@ -35,6 +35,23 @@ import {
 const ALL_PLATFORMS: SocialPostPlatform[] = ['facebook', 'instagram', 'linkedin', 'xiaohongshu'];
 const ALL_CONTENT_TYPES = Object.keys(SOCIAL_POST_CONTENT_TYPE_LABELS) as SocialPostContentType[];
 
+function parseHooksAndBody(content: string): { hooks: string[]; body: string } | null {
+  if (!/\*\*Hook\s+options?\*\*/i.test(content)) return null;
+  const sepIdx = content.search(/\n-{3,}\n/);
+  if (sepIdx === -1) return null;
+  const hookSection = content.slice(0, sepIdx);
+  const body = content.slice(sepIdx).replace(/^\n?-{3,}\n?/, '').trim();
+  const hooks = hookSection
+    .split('\n')
+    .map(l => l.replace(/\s+$/, ''))
+    .filter(l => l.length > 0 && !/^\*\*Hook\s+options?\*\*/i.test(l));
+  return hooks.length > 0 ? { hooks, body } : null;
+}
+
+function stripMarkdown(text: string): string {
+  return text.replace(/\*\*(.*?)\*\*/g, '$1');
+}
+
 interface ReviewDrawerProps {
   post: SocialPost;
   isBod: boolean;
@@ -118,6 +135,11 @@ export const ReviewDrawer: React.FC<ReviewDrawerProps> = ({ post, isBod, isAdmin
   const activePlatformContent = isMultiPlatform
     ? (platformContent[activePlatform] ?? post.rawContent)
     : editedContent;
+
+  const parsedHooksAndBody = parseHooksAndBody(activePlatformContent);
+  const captionDisplayValue = parsedHooksAndBody
+    ? stripMarkdown(parsedHooksAndBody.body)
+    : stripMarkdown(activePlatformContent);
 
   const setActivePlatformContent = (value: string) => {
     if (isMultiPlatform) {
@@ -454,12 +476,38 @@ export const ReviewDrawer: React.FC<ReviewDrawerProps> = ({ post, isBod, isAdmin
                   </div>
                 )}
 
+                {parsedHooksAndBody && (
+                  <div className="mb-3">
+                    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Select a hook</p>
+                    <div className="space-y-1.5">
+                      {parsedHooksAndBody.hooks.map((hook, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setActivePlatformContent(
+                            stripMarkdown(hook) + '\n\n' + stripMarkdown(parsedHooksAndBody.body)
+                          )}
+                          className="w-full text-left px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 hover:border-jci-blue hover:bg-jci-blue/5 hover:text-jci-blue transition-colors"
+                        >
+                          {stripMarkdown(hook)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <textarea
-                  value={activePlatformContent}
+                  value={captionDisplayValue}
                   onChange={e => setActivePlatformContent(e.target.value)}
-                  onBlur={() => {
-                    if (isMultiPlatform) onUpdatePlatformContent({ ...platformContent, [activePlatform]: activePlatformContent });
-                    else onUpdateContent(editedContent);
+                  onBlur={(e) => {
+                    const value = e.currentTarget.value;
+                    if (isMultiPlatform) {
+                      const updated = { ...platformContent, [activePlatform]: value };
+                      setPlatformContent(updated);
+                      onUpdatePlatformContent(updated);
+                    } else {
+                      setEditedContent(value);
+                      onUpdateContent(value);
+                    }
                   }}
                   rows={6}
                   className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 resize-none"
