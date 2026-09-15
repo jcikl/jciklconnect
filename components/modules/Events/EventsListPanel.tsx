@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { Card, Button } from '../../ui/Common';
 import { LoadingState } from '../../ui/Loading';
 import type { Event, Member } from '../../../types';
@@ -22,41 +22,21 @@ interface EventsListPanelProps {
   markAttendance: (eventId: string, memberId: string) => void;
 }
 
-type HostingTab = 'jcikl' | 'central' | 'other-area' | 'national';
-
-const HOSTING_TABS: { key: HostingTab; label: string }[] = [
-  { key: 'jcikl',      label: 'JCI KL'     },
-  { key: 'central',    label: 'Central'    },
-  { key: 'other-area', label: 'Other Area' },
-  { key: 'national',   label: 'National'   },
-];
-
 const KL = 'jci kuala lumpur';
-const OTHER_AREA_VALUES = new Set(['area south', 'area sabah', 'area sarawak', 'area north']);
 
-function matchesHostingTab(e: Event, tab: HostingTab): boolean {
+function isJCIKLRelevant(e: Event): boolean {
   const lo    = ((e as any).hostingLo ?? '').trim().toLowerCase();
   const coRaw = (e as any).coHosting;
-  const area  = ((e as any).area  ?? '').trim().toLowerCase();
   const level = ((e as any).level ?? '').trim().toLowerCase();
-
   const isKL = lo === KL || (
     Array.isArray(coRaw)
       ? coRaw.some((c: string) => typeof c === 'string' && c.trim().toLowerCase() === KL)
       : typeof coRaw === 'string' && coRaw.trim().toLowerCase() === KL
   );
-
-  const isNationalOrAbove = level === 'national' || level === 'jci' || level === 'area' || level.startsWith('area');
-
-  switch (tab) {
-    case 'jcikl':      return isKL || isNationalOrAbove;
-    case 'central':    return area === 'area central';
-    case 'other-area': return OTHER_AREA_VALUES.has(area);
-    case 'national':   return level === 'national';
-  }
+  return isKL || level === 'national' || level === 'jci' || level === 'area' || level.startsWith('area');
 }
 
-const EMPTY_MESSAGE = 'No events found in this category.';
+const EMPTY_MESSAGE = 'No events found.';
 
 export const EventsListPanel: React.FC<EventsListPanelProps> = ({
   activeTab,
@@ -74,13 +54,11 @@ export const EventsListPanel: React.FC<EventsListPanelProps> = ({
   registerForEvent,
   markAttendance,
 }) => {
-  const [hostingTab, setHostingTab] = useState<HostingTab>('jcikl');
-
   const filteredEvents = useMemo(
     () => events
-      .filter(e => matchesHostingTab(e, hostingTab))
+      .filter(isJCIKLRelevant)
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
-    [events, hostingTab]
+    [events]
   );
 
   const visibleEvents = activeTab === 'Completed'
@@ -89,24 +67,6 @@ export const EventsListPanel: React.FC<EventsListPanelProps> = ({
 
   const hasMoreCompleted = activeTab === 'Completed' && filteredEvents.length > completedLimit;
   const hasMoreUpcoming  = activeTab === 'Upcoming'  && filteredEvents.length > upcomingLimit;
-
-  const filterBar = (
-    <div className="flex gap-1.5 flex-wrap px-4 pt-3 pb-1 md:px-6 md:pt-4 md:pb-0">
-      {HOSTING_TABS.map(({ key, label }) => (
-        <button
-          key={key}
-          onClick={() => setHostingTab(key)}
-          className={`px-3 py-1 rounded-full text-xs font-bold tracking-wide transition-all ${
-            hostingTab === key
-              ? 'bg-jci-blue text-white shadow-sm'
-              : 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700'
-          }`}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  );
 
   const eventGrid = (
     <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
@@ -139,7 +99,6 @@ export const EventsListPanel: React.FC<EventsListPanelProps> = ({
     <div className="space-y-4">
       {/* Desktop */}
       <Card noPadding className="hidden md:block overflow-hidden">
-        {filterBar}
         <LoadingState
           loading={loading}
           error={error}
@@ -160,7 +119,6 @@ export const EventsListPanel: React.FC<EventsListPanelProps> = ({
 
       {/* Mobile */}
       <div className="md:hidden">
-        {filterBar}
         <LoadingState
           loading={loading}
           error={error}

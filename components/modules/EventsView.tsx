@@ -45,7 +45,18 @@ export const EventsView: React.FC<{ searchQuery?: string; initialSelectedEventId
 
       {viewMode === 'calendar' ? (
         <EventCalendarView
-          events={events}
+          events={events.filter(e => {
+            const KL = 'jci kuala lumpur';
+            const lo = ((e as any).hostingLo ?? '').trim().toLowerCase();
+            const coRaw = (e as any).coHosting;
+            const level = ((e as any).level ?? '').trim().toLowerCase();
+            const isKL = lo === KL || (
+              Array.isArray(coRaw)
+                ? coRaw.some((c: string) => typeof c === 'string' && c.trim().toLowerCase() === KL)
+                : typeof coRaw === 'string' && coRaw.trim().toLowerCase() === KL
+            );
+            return isKL || level === 'national' || level === 'jci' || level === 'area' || level.startsWith('area');
+          })}
           onEventClick={setSelectedEvent}
           onEventUpdate={updateEvent}
         />

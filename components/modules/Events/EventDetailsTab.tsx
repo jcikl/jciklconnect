@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, Info, Users } from 'lucide-react';
+import { Calendar, Info, Users, Building2 } from 'lucide-react';
 import type { Event } from '../../../types';
 
 interface EventDetailsTabProps {
@@ -54,6 +54,31 @@ export const EventDetailsTab: React.FC<EventDetailsTabProps> = ({
           )}
         </div>
       </div>
+      {(() => {
+        const hostingLo = (event as any).hostingLo as string | undefined;
+        const coHosting = (event as any).coHosting as string | string[] | undefined;
+        const level = (event as any).level as string | undefined;
+        const area = (event as any).area as string | undefined;
+        const coHostingStr = Array.isArray(coHosting) ? coHosting.join(', ') : coHosting;
+        if (!hostingLo && !coHostingStr && !level && !area) return null;
+        return (
+          <div className="flex items-start gap-3 px-3.5 py-3 bg-white">
+            <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0 mt-0.5">
+              <Building2 size={14} className="text-jci-blue" />
+            </div>
+            <div className="min-w-0 space-y-0.5">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Organisation</p>
+              {hostingLo && <p className="text-sm font-semibold text-slate-800">{hostingLo}</p>}
+              {coHostingStr && <p className="text-xs text-slate-500">Co-host: {coHostingStr}</p>}
+              {(level || area) && (
+                <p className="text-xs text-slate-500">
+                  {[level, area].filter(Boolean).join(' · ')}
+                </p>
+              )}
+            </div>
+          </div>
+        );
+      })()}
       {localEvent.maxAttendees && (
         <div className="flex items-center gap-3 px-3.5 py-3 bg-white">
           <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
