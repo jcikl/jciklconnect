@@ -49,8 +49,10 @@ function matchesHostingTab(e: Event, tab: HostingTab): boolean {
       : typeof coRaw === 'string' && coRaw.trim().toLowerCase() === KL
   );
 
+  const isNationalOrAbove = level === 'national' || level === 'jci' || level === 'area' || level.startsWith('area');
+
   switch (tab) {
-    case 'jcikl':      return isKL;
+    case 'jcikl':      return isKL || isNationalOrAbove;
     case 'central':    return area === 'area central';
     case 'other-area': return OTHER_AREA_VALUES.has(area);
     case 'national':   return level === 'national';
