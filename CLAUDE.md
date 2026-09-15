@@ -74,6 +74,61 @@ Collection names are all in `config/constants.ts`. There are 48+ collections. Th
 Firestore security rules are in `firestore.rules` (34 KB). Composite indexes are in `firestore.indexes.json`.
 > **Schema reference（字段清单）：** 见 [`SCHEMA.md`](SCHEMA.md) — 自动生成，按集合列出所有 TS 字段。
 > **权限矩阵：** 见 [`SCHEMA-PERMISSIONS.md`](SCHEMA-PERMISSIONS.md) — 所有集合的 get/list/create/update/delete 权限，含 P0 缺陷速查。
+> **自动推进协议：** 见 [`AGENT-EXECUTION.md`](AGENT-EXECUTION.md) — 任务选择、连续执行、暂停条件和停止条件。
+> **启动命令：** 使用 `/start` 读取并执行 [`TODO.md`](TODO.md) 中的当前目标。
+
+### Project alignment and task scope
+
+The project goal is to keep the code, actual system behavior, and the three governing documents aligned. `CLAUDE.md` defines how work is performed; `TODO.md` defines the current goal and boundary; the code and `firestore.rules` are the primary evidence of current behavior; `SCHEMA.md` documents data structure and field flows; `SCHEMA-PERMISSIONS.md` documents the permission contract.
+
+#### Document responsibilities and read order
+
+At the start of every task, read the documents in this order:
+
+1. `CLAUDE.md` — standing development rules and safety constraints.
+2. `AGENT-EXECUTION.md` — autonomous task loop and approval gates.
+3. `TODO.md` — current objective, in-scope work, and known follow-up items.
+4. Relevant code and `firestore.rules` — actual implementation and access behavior.
+5. `SCHEMA.md` — collection fields, types, and field flows.
+6. `SCHEMA-PERMISSIONS.md` — role and operation permissions.
+
+When sources disagree, do not silently choose one. Treat code and `firestore.rules` as evidence of current behavior, record the discrepancy in `TODO.md`, and update the implementation or documentation according to the user's confirmed intent.
+
+#### Scope control and change registration
+
+- Work only on the user's request and the items marked as current or in progress in `TODO.md`.
+- New out-of-scope findings must be recorded under `待确认` or `后续任务` with source, impact, affected files, and an objective completion criterion.
+- Do not add unrelated features, refactor broadly, or change architecture merely because an adjacent issue was found.
+- Before changing schema, permissions, deleting fields, migrating data, or changing cross-collection behavior, require explicit confirmation unless the user already specified that exact change.
+- After implementation, update affected schema, permission, and TODO entries in the same change when applicable.
+
+#### Agent and model boundary
+
+This file controls agent behavior and verification steps; it does not select the model, reasoning level, tool permissions, or parallel-agent capacity. Those are controlled by the host configuration, workflow configuration, or command invocation. An agent must not claim that a model or tool setting was changed unless it was changed through that configuration surface.
+
+#### Documentation governance
+
+Global rules must be stored in the document that owns the rule:
+
+- `CLAUDE.md`: long-lived agent behavior, development workflow, scope control, validation, and documentation governance.
+- `TODO.md`: current objectives, task boundaries, acceptance criteria, discovered follow-up work, and completion records.
+- `SCHEMA.md`: data collections, field paths, types, requiredness, enums, and verified “来 / 往” field flows.
+- `SCHEMA-PERMISSIONS.md`: roles, permission operations, field restrictions, and permission-related risks.
+- `firestore.rules`: executable Firestore access behavior; documentation must not claim permissions that these rules do not enforce.
+
+An agent may create a necessary Markdown document when the information has a distinct long-term owner and does not belong in an existing document. Before creating it, the agent must:
+
+1. Search for an existing document that already owns the topic.
+2. Define the new document's purpose and scope in its opening section.
+3. Add a link to it from `CLAUDE.md` or the most relevant index/document.
+4. Record the creation in `TODO.md`, including why an existing document was insufficient.
+5. Keep the new document focused; do not duplicate rules, schema, permissions, or task status across files.
+
+When a new document contains project-wide rules, the agent must place the authoritative rule in `CLAUDE.md` and use the new document only for detailed procedures or reference material. When a rule belongs to schema, permissions, or task tracking, update the corresponding document instead of copying it into `CLAUDE.md`.
+
+#### Autonomous task loop
+
+When the user asks to continue, the agent must read `TODO.md`, select the first unfinished in-scope task, inspect the relevant implementation, make the smallest necessary change, update affected documentation, run applicable validation, and record the result in `TODO.md`. The agent must stop for explicit confirmation when the task requires a destructive change, data migration, permission broadening, architecture change, or work outside the stated scope.
 
 ### Schema “来 / 往”字段流规则
 
