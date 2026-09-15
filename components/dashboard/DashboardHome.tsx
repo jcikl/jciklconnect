@@ -229,14 +229,11 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       if (new Date(e.date) < now || e.status === 'Cancelled') return false;
       const lo = ((e as any).hostingLo ?? '').trim().toLowerCase();
       const coRaw = (e as any).coHosting;
-      const level = ((e as any).level ?? '').trim().toLowerCase();
-      const isKL = lo === KL || (
+      return lo === KL || (
         Array.isArray(coRaw)
           ? coRaw.some((c: string) => typeof c === 'string' && c.trim().toLowerCase() === KL)
           : typeof coRaw === 'string' && coRaw.trim().toLowerCase() === KL
       );
-      const isNationalOrAbove = level === 'national' || level === 'jci' || level === 'area' || level.startsWith('area');
-      return isKL || isNationalOrAbove;
     });
   }, [events]);
 

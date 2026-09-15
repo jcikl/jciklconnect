@@ -42,20 +42,17 @@ export const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
   }, [events]);
 
   const KL = 'jci kuala lumpur';
-  const isKLRelevant = (e: Event) => {
+  const isKLEvent = (e: Event) => {
     const lo = ((e as any).hostingLo ?? '').trim().toLowerCase();
     const coRaw = (e as any).coHosting;
-    const level = ((e as any).level ?? '').trim().toLowerCase();
-    const isKL = lo === KL || (
+    return lo === KL || (
       Array.isArray(coRaw)
         ? coRaw.some((c: string) => typeof c === 'string' && c.trim().toLowerCase() === KL)
         : typeof coRaw === 'string' && coRaw.trim().toLowerCase() === KL
     );
-    const isNationalOrAbove = level === 'national' || level === 'jci' || level === 'area' || level.startsWith('area');
-    return isKL || isNationalOrAbove;
   };
-  const publicEvents = upcomingEvents.filter(isKLRelevant);
-  const allPublishedEvents = events.filter(isKLRelevant);
+  const publicEvents = upcomingEvents.filter(isKLEvent);
+  const allPublishedEvents = events.filter(isKLEvent);
 
   return (
     <div className="min-h-screen bg-slate-50">
