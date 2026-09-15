@@ -22,10 +22,9 @@ interface EventsListPanelProps {
   markAttendance: (eventId: string, memberId: string) => void;
 }
 
-type HostingTab = 'all' | 'jcikl' | 'central' | 'other-area' | 'national';
+type HostingTab = 'jcikl' | 'central' | 'other-area' | 'national';
 
 const HOSTING_TABS: { key: HostingTab; label: string }[] = [
-  { key: 'all',        label: 'All'        },
   { key: 'jcikl',      label: 'JCI KL'     },
   { key: 'central',    label: 'Central'    },
   { key: 'other-area', label: 'Other Area' },
@@ -36,8 +35,6 @@ const KL = 'jci kuala lumpur';
 const OTHER_AREA_VALUES = new Set(['area south', 'area sabah', 'area sarawak', 'area north']);
 
 function matchesHostingTab(e: Event, tab: HostingTab): boolean {
-  if (tab === 'all') return true;
-
   const lo    = ((e as any).hostingLo ?? '').trim().toLowerCase();
   const coRaw = (e as any).coHosting;
   const area  = ((e as any).area  ?? '').trim().toLowerCase();
