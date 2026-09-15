@@ -1,4 +1,4 @@
-# JCI KL — Firestore 权限矩阵
+﻿# JCI KL — Firestore 权限矩阵
 
 > 数据来源：irestore.rules（1414 行）
 > 更新时重读规则文件并重跑本文档生成。
@@ -133,19 +133,19 @@ udges | — | — | — | — | — | ⚠️ P0：无Firestore规则，dismiss�
 |---|------|---------|------|
 | 1 | 
 udges | 无 Firestore 规则块，dismiss 写入永久失败 | 待修 |
-| 2 | counters | 无规则块，paymentRequests 创建时序号生成 PERMISSION_DENIED | 待修 |
+| 2 | counters | 无规则块，paymentRequests 创建时序号生成 PERMISSION_DENIED | 已修（rules L1177-1182） |
 | 5 | conversations | 无规则块，任意登录用户可读所有私信 | 待修 |
 | 6 | 
 otifications | list 用 resource.data → 会员永远看不到自己的通知 | 已修 |
 | 7 | 	ransactionSplits | get 规则缺少 loId 字段导致跨LO数据泄露 | 已修 |
 | 8 | pointsRuleExecutions | getDoc→setDoc 竞态 → 双倍积分；全部写入无原子保障 | 部分修 |
 | 9 | chievementProgress | list 原 resource.data 失效已修为 isAuthenticated() | 已修 |
-| 10 | certificates | 任意已登录用户可自颁证书（create: isAuthenticated） | 待修 |
-| 11 | uditLog | AuditLogService 从未被调用（死代码）| 待修 |
-| 12 | emailLogs | 无写入者，集合永远为空，邮件无审计记录 | 待修 |
-| 13 | sponsorships | financeService 赞助收入硬编码为 0 | 待修 |
-| 14 | RegistrationHistory | COLLECTIONS.RADAR_CONTRIBUTIONS 常量不存在 → 运行时崩溃 | 待修 |
+| 10 | certificates | 任意已登录用户可自颁证书（create: isAuthenticated） | 待修（需确认正确权限范围后修改规则） |
+| 11 | auditLog | AuditLogService 从未被调用（死代码）| 已修（financeService L2176、membersService L1281、paymentRequestService L467） |
+| 12 | emailLogs | 无写入者，集合永远为空，邮件无审计记录 | 已修（emailService.logEmail() L90/130/145） |
+| 13 | sponsorships | financeService 赞助收入硬编码为 0 | 已修（financeService L4579-4585 查 SponsorshipsService） |
+| 14 | RADAR_CONTRIBUTIONS | COLLECTIONS.RADAR_CONTRIBUTIONS 常量不存在 → TypeScript 编译错误 + 运行时崩溃 | 待修（需确认集合名称） |
 
 ---
 
-*生成时间：2026-09-03 · 规则来源：irestore.rules · 分析框架版本：v6*
+*生成时间：2026-09-03 · 规则来源：firestore.rules · 分析框架版本：v6 · P0状态最后同步：2026-09-16（基线扫描）*

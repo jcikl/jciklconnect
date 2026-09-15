@@ -38,20 +38,46 @@
 
 ## 进行中
 
-- [ ] P0 建立当前一致性基线
-  - 来源：项目一致性总目标
-  - 范围：扫描已废弃字段、代码与 schema 字段路径、权限文档与 `firestore.rules` 的差异
-  - 不包含：修改业务逻辑、数据迁移、权限扩大
-  - 完成标准：输出差异清单；将可安全修复项拆成后续任务；将需要确认项登记到“待确认”
-  - 状态：已批准，可由 `/start` 执行
+<!-- 当前无进行中任务；下一步见”待确认”和”后续任务” -->
 
 ## 待确认
 
-<!-- 需要用户决定范围、方案或风险接受度的事项。 -->
+> 以下事项涉及 Firestore 安全规则变更，需用户确认后才能执行。
+
+- [ ] **P0 nudges：为 `nudges` 集合添加 Firestore 规则块**
+  - 来源：SCHEMA-PERMISSIONS.md #1；基线扫描 2026-09-16 确认规则块缺失
+  - 现状：`firestore.rules` 中无 `match /nudges/{docId}` 块，所有客户端写入（包括 dismiss 标记）均 PERMISSION_DENIED 静默失败
+  - 建议修复：添加规则允许登录用户读取自己的 nudge，Board/Admin 创建，用户自己可更新 `dismissed` 字段
+  - 涉及文件：`firestore.rules`、`services/nudgesService.ts`（如存在）
+  - 完成标准：`firestore.rules` 有 nudges 规则块；dismiss 操作不再静默失败
+
+- [ ] **P0 conversations：为 `conversations` 集合添加 Firestore 规则块**
+  - 来源：SCHEMA-PERMISSIONS.md #5；基线扫描 2026-09-16 确认规则块缺失
+  - 现状：`firestore.rules` 中无 `match /conversations/{docId}` 块；无规则 = 默认拒绝，但 SCHEMA-PERMISSIONS.md 记录为”任意用户可读所有私信”（可能已是默认拒绝而非 allow true，需确认实际行为）
+  - 建议修复：添加规则，仅允许会话参与双方读取，Board/Admin 可管理
+  - 涉及文件：`firestore.rules`、`services/messagingService.ts`（如存在）
+  - 完成标准：`firestore.rules` 有 conversations 规则块；只有参与方可访问
+
+- [ ] **P0 certificates：收紧 `certificates` 集合 create 规则**
+  - 来源：SCHEMA-PERMISSIONS.md #10；基线扫描 2026-09-16 确认 `allow create: if isAuthenticated()` 仍存在
+  - 现状：`firestore.rules` L1011 任意已登录用户可自颁证书，绕过课程完成校验
+  - 建议修复：限制 create 为 Admin 或通过 Netlify/Cloud Function 生成（服务端签发）；或增加必填字段校验（courseId、completionDate）
+  - 涉及文件：`firestore.rules` L1009-1013
+  - 完成标准：create 规则收紧；普通用户无法自颁证书
+
+- [ ] **P0 RADAR_CONTRIBUTIONS：确认 `pointsService.ts` L2438 使用的集合名称**
+  - 来源：SCHEMA-PERMISSIONS.md #14；基线扫描 2026-09-16 确认 `COLLECTIONS.RADAR_CONTRIBUTIONS` 不存在于 `config/constants.ts`
+  - 现状：`services/pointsService.ts:2438` 引用 `COLLECTIONS.RADAR_CONTRIBUTIONS`，但该 key 未在 `config/constants.ts` 中定义；TypeScript `as const` 会报编译错误；运行时会崩溃导致雷达统计永不更新
+  - 需要确认：此集合的实际 Firestore 集合名称是什么？是 `radarContributions`，还是应改用 `COLLECTIONS.REGISTRATION_HISTORY`？
+  - 涉及文件：`services/pointsService.ts:2438`、`config/constants.ts`
+  - 完成标准：`COLLECTIONS.RADAR_CONTRIBUTIONS` 存在于 constants.ts，或代码改用正确常量；TypeScript 编译不报错
 
 ## 后续任务
 
-<!-- 已发现但不属于当前任务范围的事项。注明来源、影响、涉及文件和完成标准。 -->
+- [ ] 同步更新 `SCHEMA-PERMISSIONS.md` 汇总表中已修复的行（nudges/conversations/certificates 规则修复后）
+  - 来源：基线扫描 2026-09-16
+  - 涉及文件：`SCHEMA-PERMISSIONS.md`
+  - 完成标准：汇总表与 `firestore.rules` 和代码权限判断一致
 
 ## 文档创建记录
 
@@ -59,4 +85,4 @@
 
 ## 已完成
 
-<!-- 格式：- [x] 任务（日期；验证结果） -->
+- [x] P0 建立当前一致性基线（2026-09-16；扫描验证：4条P0已修（counters/auditLog/emailLogs/sponsorships），4条P0待确认，SCHEMA-PERMISSIONS.md P0速查表已同步更新）
