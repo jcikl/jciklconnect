@@ -125,6 +125,7 @@ export class MembersService {
     apiCache.delete(CACHE_KEY_ALL_MEMBERS);
     apiCache.deleteByPrefix('members:lo:');
     apiCache.deleteByPrefix('members:byRole:');
+    apiCache.deleteByPrefix('member:id:');
   }
 
   /** Get all members, optionally filtered by loId (for multi-LO). */
@@ -177,18 +178,20 @@ export class MembersService {
       return MOCK_MEMBERS.find(m => m.id === memberId) || null;
     }
 
-    try {
-      const docRef = doc(db, COLLECTIONS.MEMBERS, memberId);
-      const docSnap = await getDoc(docRef);
-
-      if (docSnap.exists()) {
-        return { ...docSnap.data(), id: docSnap.id } as Member;
+    const cacheKey = `member:id:${memberId}`;
+    return apiCache.getOrSet(cacheKey, async () => {
+      try {
+        const docRef = doc(db, COLLECTIONS.MEMBERS, memberId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          return { ...docSnap.data(), id: docSnap.id } as Member;
+        }
+        return null;
+      } catch (error) {
+        errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MembersService.getMemberById' });
+        throw error;
       }
-      return null;
-    } catch (error) {
-      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MembersService.getMemberById' });
-      throw error;
-    }
+    }, MEMBERS_TTL);
   }
 
   // Helper to recalculate radar stats for an introducer (dynamic import to avoid circular dependency)

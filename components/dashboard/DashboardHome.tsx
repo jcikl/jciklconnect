@@ -204,10 +204,10 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     setShowJourneyModal(true);
   };
 
-  // Load personalized recommendations
+  // Load personalized recommendations — deferred so the dashboard renders first
   useEffect(() => {
-    const loadRecommendations = async () => {
-      if (!member) return;
+    if (!member) return;
+    const timer = setTimeout(async () => {
       try {
         const recs = await AIPredictionService.getPersonalizedRecommendations(member.id, 5);
         setRecommendations(recs);
@@ -217,12 +217,22 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       } catch (err) {
         console.error('Failed to load recommendations:', err);
       }
-    };
-    loadRecommendations();
+    }, 300);
+    return () => clearTimeout(timer);
   }, [member]);
 
   // Calculate stats from real data
-  const upcomingEvents = events.filter(e => new Date(e.date) >= new Date() && e.status !== 'Cancelled');
+  const upcomingEvents = events.filter(e => {
+    if (new Date(e.date) < new Date() || e.status === 'Cancelled') return false;
+    const lo = ((e as any).hostingLo ?? '').trim().toLowerCase();
+    const coRaw = (e as any).coHosting;
+    const KL = 'jci kuala lumpur';
+    return lo === KL || (
+      Array.isArray(coRaw)
+        ? coRaw.some((c: string) => typeof c === 'string' && c.trim().toLowerCase() === KL)
+        : typeof coRaw === 'string' && coRaw.trim().toLowerCase() === KL
+    );
+  });
   const myProjects = projects.filter(p => p.lead === member?.id);
   const pendingTasks = myProjects.length; // Simplified - would need to fetch tasks
   // Guest: only events this member has registered for

@@ -509,7 +509,7 @@ export const ReviewDrawer: React.FC<ReviewDrawerProps> = ({ post, isBod, isAdmin
                       onUpdateContent(value);
                     }
                   }}
-                  rows={6}
+                  rows={14}
                   className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20 resize-none"
                 />
                 {post.hashtags && post.hashtags.length > 0 && (

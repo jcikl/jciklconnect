@@ -75,7 +75,7 @@ export const EventsListPanel: React.FC<EventsListPanelProps> = ({
   registerForEvent,
   markAttendance,
 }) => {
-  const [hostingTab, setHostingTab] = useState<HostingTab>('all');
+  const [hostingTab, setHostingTab] = useState<HostingTab>('jcikl');
 
   const filteredEvents = useMemo(
     () => events
