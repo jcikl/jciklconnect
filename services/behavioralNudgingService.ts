@@ -63,6 +63,16 @@ export class BehavioralNudgingService {
           const member = await MembersService.getMemberById(memberId);
           if (!member) return [];
 
+          const needsProjects = !!(member.skills && member.skills.length > 0);
+          const [allProjects, recentPoints, storedRules] = await Promise.all([
+            needsProjects ? ProjectsService.getAllProjects() : Promise.resolve([] as import('../types').Project[]),
+            PointsService.getMemberPointHistory(memberId, 7),
+            BehavioralNudgingService.getAllNudgeRules().catch((ruleError: unknown) => {
+              errorLoggingService.logError(ruleError as Error, { action: 'BehavioralNudgingService.checkAndGenerateNudges:storedRules', additionalData: { memberId } });
+              return [] as NudgeRule[];
+            }),
+          ]);
+
       const nudges: Nudge[] = [];
 
       // 1. Positive Reinforcement - Points milestones
@@ -96,8 +106,7 @@ export class BehavioralNudgingService {
       }
 
       // 3. Opportunity Suggestion - Based on skills
-      if (member.skills && member.skills.length > 0) {
-        const allProjects = await ProjectsService.getAllProjects();
+      if (needsProjects) {
         const relevantProjects = allProjects.filter(p =>
           p.status === 'Active' &&
           member.skills.some(skill => p.description?.toLowerCase().includes(skill.toLowerCase()))
@@ -140,7 +149,6 @@ export class BehavioralNudgingService {
       }
 
       // 5. Positive Reinforcement - Recent activity
-      const recentPoints = await PointsService.getMemberPointHistory(memberId, 7); // Last 7 days
       if (recentPoints.length >= 3) {
         nudges.push({
           id: `nudge-${memberId}-recent-activity`,
@@ -154,9 +162,8 @@ export class BehavioralNudgingService {
         });
       }
 
-      // P1 FIX: evaluate stored NudgeRules from Firestore and generate nudges from them
-      try {
-        const storedRules = await BehavioralNudgingService.getAllNudgeRules();
+      // Evaluate stored NudgeRules from Firestore (fetched in parallel above)
+      {
         const activeRules = storedRules.filter(r => r.isActive);
         const existingNudgeIds = new Set(nudges.map(n => n.id));
 
@@ -195,9 +202,6 @@ export class BehavioralNudgingService {
             dismissed: false,
           });
         }
-      } catch (ruleError) {
-        // Rule evaluation failure must not suppress already-generated nudges
-        errorLoggingService.logError(ruleError as Error, { action: 'BehavioralNudgingService.checkAndGenerateNudges:storedRules', additionalData: { memberId } });
       }
 
           return nudges;
