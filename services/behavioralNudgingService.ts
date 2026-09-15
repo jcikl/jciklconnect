@@ -12,6 +12,8 @@ import { COLLECTIONS } from '../config/constants';
 
 const CACHE_KEY_NUDGE_RULES = 'nudgeRules:all';
 const NUDGE_RULES_TTL = CACHE_TTL_5MIN;
+const NUDGE_MEMBER_PREFIX = 'nudges:member:';
+const NUDGE_MEMBER_TTL = CACHE_TTL_5MIN;
 
 export interface Nudge {
   id: string;
@@ -46,6 +48,10 @@ export class BehavioralNudgingService {
   // --- cache helpers ---
   private static invalidateNudgeRulesCache(): void {
     apiCache.delete(CACHE_KEY_NUDGE_RULES);
+  }
+
+  private static invalidateMemberNudgesCache(memberId: string): void {
+    apiCache.delete(NUDGE_MEMBER_PREFIX + memberId);
   }
 
   // Check and generate nudges for a member
@@ -208,9 +214,12 @@ export class BehavioralNudgingService {
     return withDevMode(
       () => this.getMockNudges(memberId),
       async () => {
-        // In production, this would fetch from a 'nudges' collection
-        // For now, we generate them on-the-fly
-        return this.checkAndGenerateNudges(memberId);
+        return apiCache.getOrSet(
+          NUDGE_MEMBER_PREFIX + memberId,
+          () => this.checkAndGenerateNudges(memberId),
+          NUDGE_MEMBER_TTL,
+          'BehavioralNudgingService.getMemberNudges'
+        );
       }
     );
   }
@@ -236,6 +245,7 @@ export class BehavioralNudgingService {
             },
             { merge: true }
           );
+          BehavioralNudgingService.invalidateMemberNudgesCache(memberId);
         } catch (error) {
           errorLoggingService.logError(error as Error, { action: 'BehavioralNudgingService.dismissNudge', additionalData: { nudgeId, memberId } });
           throw error;
