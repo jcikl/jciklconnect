@@ -222,27 +222,48 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   }, [member]);
 
   // Calculate stats from real data
-  const upcomingEvents = events.filter(e => {
-    if (new Date(e.date) < new Date() || e.status === 'Cancelled') return false;
-    const lo = ((e as any).hostingLo ?? '').trim().toLowerCase();
-    const coRaw = (e as any).coHosting;
+  const upcomingEvents = React.useMemo(() => {
+    const now = new Date();
     const KL = 'jci kuala lumpur';
-    return lo === KL || (
-      Array.isArray(coRaw)
-        ? coRaw.some((c: string) => typeof c === 'string' && c.trim().toLowerCase() === KL)
-        : typeof coRaw === 'string' && coRaw.trim().toLowerCase() === KL
-    );
-  });
-  const myProjects = projects.filter(p => p.lead === member?.id);
+    return events.filter(e => {
+      if (new Date(e.date) < now || e.status === 'Cancelled') return false;
+      const lo = ((e as any).hostingLo ?? '').trim().toLowerCase();
+      const coRaw = (e as any).coHosting;
+      return lo === KL || (
+        Array.isArray(coRaw)
+          ? coRaw.some((c: string) => typeof c === 'string' && c.trim().toLowerCase() === KL)
+          : typeof coRaw === 'string' && coRaw.trim().toLowerCase() === KL
+      );
+    });
+  }, [events]);
+
+  const myProjects = React.useMemo(
+    () => projects.filter(p => p.lead === member?.id),
+    [projects, member?.id]
+  );
   const pendingTasks = myProjects.length; // Simplified - would need to fetch tasks
+
   // Guest: only events this member has registered for
-  const myRegisteredEvents = events.filter((e) => myRegistrationEventIds.includes(e.id));
-  const pastRegisteredEvents = myRegisteredEvents
-    .filter((e) => new Date(e.date) < new Date())
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  const upcomingRegisteredEvents = myRegisteredEvents
-    .filter((e) => new Date(e.date) >= new Date())
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const myRegistrationEventIdSet = React.useMemo(
+    () => new Set(myRegistrationEventIds),
+    [myRegistrationEventIds]
+  );
+  const myRegisteredEvents = React.useMemo(
+    () => events.filter(e => myRegistrationEventIdSet.has(e.id)),
+    [events, myRegistrationEventIdSet]
+  );
+  const pastRegisteredEvents = React.useMemo(
+    () => myRegisteredEvents
+      .filter(e => new Date(e.date) < new Date())
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+    [myRegisteredEvents]
+  );
+  const upcomingRegisteredEvents = React.useMemo(
+    () => myRegisteredEvents
+      .filter(e => new Date(e.date) >= new Date())
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+    [myRegisteredEvents]
+  );
 
 
   // Birthday calculation — all comparisons use MYT midnight to avoid UTC-offset misfires

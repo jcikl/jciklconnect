@@ -23,7 +23,7 @@ import { isDevMode, withDevMode } from '../utils/devMode';
 import { MOCK_POSTS, MOCK_NOTIFICATIONS } from './mockData';
 import { EmailService, EmailMessage } from './emailService';
 import { errorLoggingService } from './errorLoggingService';
-import { apiCache as cacheService } from './cacheService';
+import { apiCache as cacheService, CACHE_TTL_3MIN } from './cacheService';
 
 export class CommunicationService {
   // Get all posts
@@ -31,23 +31,26 @@ export class CommunicationService {
     return withDevMode(
       () => { console.log('[DEV MODE] getAllPosts: Returning mock posts'); return MOCK_POSTS; },
       async () => {
-        try {
-          const snapshot = await getDocs(
-            query(collection(db, COLLECTIONS.COMMUNICATION), orderBy('timestamp', 'desc'))
-          );
-          return snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            timestamp: doc.data().timestamp?.toDate?.()?.toISOString() || doc.data().timestamp,
-          } as NewsPost));
-        } catch (error) {
-          if (isDevMode()) {
-            console.log('[DEV MODE] getAllPosts: Error occurred, returning mock posts');
-            return MOCK_POSTS;
+        const cacheKey = `${COLLECTIONS.COMMUNICATION}:posts`;
+        return cacheService.getOrSet(cacheKey, async () => {
+          try {
+            const snapshot = await getDocs(
+              query(collection(db, COLLECTIONS.COMMUNICATION), orderBy('timestamp', 'desc'))
+            );
+            return snapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data(),
+              timestamp: doc.data().timestamp?.toDate?.()?.toISOString() || doc.data().timestamp,
+            } as NewsPost));
+          } catch (error) {
+            if (isDevMode()) {
+              console.log('[DEV MODE] getAllPosts: Error occurred, returning mock posts');
+              return MOCK_POSTS;
+            }
+            errorLoggingService.logError(error as Error, { action: 'CommunicationService.getAllPosts' });
+            throw error;
           }
-          errorLoggingService.logError(error as Error, { action: 'CommunicationService.getAllPosts' });
-          throw error;
-        }
+        }, CACHE_TTL_3MIN);
       }
     );
   }
@@ -145,24 +148,26 @@ export class CommunicationService {
     return withDevMode(
       () => MOCK_NOTIFICATIONS,
       async () => {
-        try {
-          const q = query(
-            collection(db, COLLECTIONS.NOTIFICATIONS),
-            where('memberId', '==', memberId),
-            orderBy('timestamp', 'desc'),
-            orderBy('read', 'asc')
-          );
-
-          const snapshot = await getDocs(q);
-          return snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            timestamp: doc.data().timestamp?.toDate?.()?.toISOString() || doc.data().timestamp,
-          } as Notification));
-        } catch (error) {
-          errorLoggingService.logError(error as Error, { action: 'CommunicationService.getNotifications' });
-          throw error;
-        }
+        const cacheKey = `${COLLECTIONS.NOTIFICATIONS}:${memberId}`;
+        return cacheService.getOrSet(cacheKey, async () => {
+          try {
+            const q = query(
+              collection(db, COLLECTIONS.NOTIFICATIONS),
+              where('memberId', '==', memberId),
+              orderBy('timestamp', 'desc'),
+              orderBy('read', 'asc')
+            );
+            const snapshot = await getDocs(q);
+            return snapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data(),
+              timestamp: doc.data().timestamp?.toDate?.()?.toISOString() || doc.data().timestamp,
+            } as Notification));
+          } catch (error) {
+            errorLoggingService.logError(error as Error, { action: 'CommunicationService.getNotifications' });
+            throw error;
+          }
+        }, CACHE_TTL_3MIN);
       }
     );
   }
