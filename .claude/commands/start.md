@@ -1,6 +1,16 @@
-# start
+# start jciklconnect
 
-启动项目目标的自动推进流程。
+启动 JCI KL Connect 项目的自动推进流程。
+
+## 启动参数
+
+本命令必须以以下形式调用：
+
+```text
+/start jciklconnect
+```
+
+如果参数不是 `jciklconnect` 或缺少参数，停止执行并提示正确用法，不得自行猜测项目或目标。
 
 ## 执行协议
 
@@ -28,4 +38,4 @@
 
 开始时简要报告当前目标和选中的任务；执行过程中报告关键阻塞；结束时报告已完成任务、验证结果、剩余任务和需要确认的事项。
 
-`/start` 只能驱动当前已启动的 agent 会话；它不会在 Claude Code 关闭后自行唤醒新会话。
+`/start jciklconnect` 只能驱动当前已启动的 agent 会话；它不会在 Claude Code 关闭后自行唤醒新会话。

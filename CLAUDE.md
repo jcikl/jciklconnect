@@ -75,7 +75,7 @@ Firestore security rules are in `firestore.rules` (34 KB). Composite indexes are
 > **Schema reference（字段清单）：** 见 [`SCHEMA.md`](SCHEMA.md) — 自动生成，按集合列出所有 TS 字段。
 > **权限矩阵：** 见 [`SCHEMA-PERMISSIONS.md`](SCHEMA-PERMISSIONS.md) — 所有集合的 get/list/create/update/delete 权限，含 P0 缺陷速查。
 > **自动推进协议：** 见 [`AGENT-EXECUTION.md`](AGENT-EXECUTION.md) — 任务选择、连续执行、暂停条件和停止条件。
-> **启动命令：** 使用 `/start` 读取并执行 [`TODO.md`](TODO.md) 中的当前目标。
+> **启动命令：** 使用 `/start jciklconnect` 读取并执行 [`TODO.md`](TODO.md) 中的当前目标。
 
 ### Project alignment and task scope
 
@@ -125,6 +125,10 @@ An agent may create a necessary Markdown document when the information has a dis
 5. Keep the new document focused; do not duplicate rules, schema, permissions, or task status across files.
 
 When a new document contains project-wide rules, the agent must place the authoritative rule in `CLAUDE.md` and use the new document only for detailed procedures or reference material. When a rule belongs to schema, permissions, or task tracking, update the corresponding document instead of copying it into `CLAUDE.md`.
+
+#### Documentation completeness check
+
+For every task, the agent must identify all affected code modules, collections, permissions, workflows, and documents, then map each fact to its authoritative owner. The agent must check for missing, stale, duplicated, contradictory, or unlinked documentation. If no existing document owns a necessary topic, the agent may create a focused Markdown document according to the documentation governance rules above. A task must not be marked complete until required documentation is updated, or the remaining gap is explicitly recorded in `TODO.md` with a reason and follow-up task.
 
 #### Autonomous task loop
 
