@@ -3,8 +3,6 @@ import React from 'react';
 import { Skeleton } from '../ui/Common';
 import { useAuth } from '../../hooks/useAuth';
 import { useEvents } from '../../hooks/useEvents';
-import { useProjects } from '../../hooks/useProjects';
-import { useMembers } from '../../hooks/useMembers';
 import { useBehavioralNudging } from '../../hooks/useBehavioralNudging';
 import { NudgeBanner } from '../ui/NudgeBanner';
 import { AIPredictionService, PersonalizedRecommendation } from '../../services/aiPredictionService';
@@ -14,7 +12,7 @@ import { PromotionService, type MemberEngagementProgressSummary } from '../../se
 import { MembersService } from '../../services/membersService';
 import { MemberJourneyService, MemberJourney } from '../../services/memberJourneyService';
 import { AdvertisementService, Advertisement } from '../../services/advertisementService';
-import type { Event } from '../../types';
+import type { Event, Member, Project } from '../../types';
 import { UserRole } from '../../types';
 import { EventDetailModal } from '../modules/EventsView';
 import { PartnershipDetailModal } from './PartnershipDetailModal';
@@ -32,11 +30,13 @@ import { DashboardUpgradeModal } from './DashboardUpgradeModal';
 import { getMemberDob, getProfileCompleteness, normalizeMembership } from './dashboardHomeUtils';
 
 interface DashboardHomeProps {
-  userRole: import('../../types').UserRole;
+  userRole: UserRole;
   onNavigate?: (view: string) => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
   scrollRef?: React.RefObject<HTMLDivElement>;
+  projects: Project[];
+  members: Member[];
 }
 
 export const DashboardHome: React.FC<DashboardHomeProps> = ({
@@ -44,13 +44,13 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   onNavigate,
   searchQuery,
   onSearchChange,
-  scrollRef
+  scrollRef,
+  projects,
+  members,
 }) => {
 
   const { member } = useAuth();
   const { events, loading: eventsLoading, registerForEvent, markAttendance, cancelRegistration } = useEvents();
-  const { projects, loading: projectsLoading } = useProjects();
-  const { members, loading: membersLoading } = useMembers();
   const { nudges, dismissNudge } = useBehavioralNudging();
   const [recommendations, setRecommendations] = useState<PersonalizedRecommendation[]>([]);
   const [topRecommendation, setTopRecommendation] = useState<PersonalizedRecommendation | null>(null);

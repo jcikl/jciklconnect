@@ -482,6 +482,8 @@ export const JCIKLApp: React.FC = () => {
       clearSelectedProject,
       clearSelectedBusiness,
       wrapErrorBoundary: wrapEB,
+      members,
+      projects,
     });
   };
 

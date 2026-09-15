@@ -38,6 +38,54 @@ interface BoardDashboardProps {
   scrollRef?: React.RefObject<HTMLDivElement>;
 }
 
+const HobbyClubsCard: React.FC = () => {
+  const { clubs } = useHobbyClubs();
+  const totalClubs = clubs.length;
+  const totalClubMembers = clubs.reduce((sum, club) => sum + (club.membersCount || 0), 0);
+  const activeClubs = clubs.filter(c => c.membersCount > 0).length;
+  return (
+    <Card noPadding noHeaderPadding className="mb-2" title={<div className="px-4 py-3 font-semibold text-slate-800 text-base">Hobby Clubs Activity</div>}>
+      <div className="p-4">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+            <div className="flex items-center gap-3">
+              <Heart size={20} className="text-jci-blue" />
+              <div>
+                <p className="text-sm font-medium text-slate-700">Total Clubs</p>
+                <p className="text-2xl font-bold text-slate-900">{totalClubs}</p>
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+              <p className="text-xs text-green-700 mb-1">Active Clubs</p>
+              <p className="text-lg font-bold text-green-900">{activeClubs}</p>
+            </div>
+            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <p className="text-xs text-blue-700 mb-1">Total Members</p>
+              <p className="text-lg font-bold text-blue-900">{totalClubMembers}</p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            {clubs.slice(0, 3).map(club => (
+              <div key={club.id} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
+                <div>
+                  <p className="text-sm font-medium text-slate-900">{club.name}</p>
+                  <p className="text-xs text-slate-500">{club.category}</p>
+                </div>
+                <Badge variant="neutral">{club.membersCount || 0} members</Badge>
+              </div>
+            ))}
+            {clubs.length === 0 && (
+              <div className="text-center py-4 text-slate-400 text-sm">No clubs</div>
+            )}
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+};
+
 export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, searchQuery, onSearchChange, scrollRef }) => {
   const { member, isDevMode, simulatedRole, simulateRole } = useAuth();
   const { members: rawMembers, loading: membersLoading } = useMembers();
@@ -72,7 +120,6 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
   const { projects, loading: projectsLoading } = useProjects();
   const { leaderboard, pointHistory } = usePoints();
   const { items: inventoryItems, loading: inventoryLoading } = useInventory();
-  const { clubs: hobbyClubs, loading: clubsLoading } = useHobbyClubs();
   const { businesses, loading: businessesLoading } = useBusinessDirectory();
   const [financialSummary, setFinancialSummary] = useState<any>(null);
   const [bankAccounts, setBankAccounts] = useState<any[]>([]);
@@ -295,11 +342,6 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
     const checkedOutItems = inventoryItems.filter(i => i.status === 'Checked Out').length;
     const totalInventoryValue = inventoryItems.reduce((sum, item) => sum + (item.currentValue || item.purchasePrice || 0), 0);
 
-    // Hobby clubs metrics
-    const totalClubs = hobbyClubs.length;
-    const totalClubMembers = hobbyClubs.reduce((sum, club) => sum + (club.membersCount || 0), 0);
-    const activeClubs = hobbyClubs.filter(c => c.membersCount > 0).length;
-
     // Business directory metrics
     const totalBusinesses = businesses.length;
     const verifiedBusinesses = businesses.filter(b => b.globalNetworkEnabled).length;
@@ -325,15 +367,12 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
       availableItems,
       checkedOutItems,
       totalInventoryValue,
-      totalClubs,
-      totalClubMembers,
-      activeClubs,
       totalBusinesses,
       verifiedBusinesses,
       totalBankBalance,
       lowBalanceAccounts,
     };
-  }, [members, events, projects, leaderboard, inventoryItems, hobbyClubs, businesses, bankAccounts]);
+  }, [members, events, projects, leaderboard, inventoryItems, businesses, bankAccounts]);
 
   // Calculate analytics data for charts
   const engagementTrendData = useMemo(() => {
@@ -808,45 +847,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
                   </Card>
 
                   {/* Hobby Clubs Activity */}
-                  <Card noPadding noHeaderPadding className="mb-2" title={<div className="px-4 py-3 font-semibold text-slate-800 text-base">Hobby Clubs Activity</div>}>
-                    <div className="p-4">
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <Heart size={20} className="text-jci-blue" />
-                            <div>
-                              <p className="text-sm font-medium text-slate-700">Total Clubs</p>
-                              <p className="text-2xl font-bold text-slate-900">{metrics.totalClubs}</p>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                            <p className="text-xs text-green-700 mb-1">Active Clubs</p>
-                            <p className="text-lg font-bold text-green-900">{metrics.activeClubs}</p>
-                          </div>
-                          <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                            <p className="text-xs text-blue-700 mb-1">Total Members</p>
-                            <p className="text-lg font-bold text-blue-900">{metrics.totalClubMembers}</p>
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          {hobbyClubs.slice(0, 3).map(club => (
-                            <div key={club.id} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
-                              <div>
-                                <p className="text-sm font-medium text-slate-900">{club.name}</p>
-                                <p className="text-xs text-slate-500">{club.category}</p>
-                              </div>
-                              <Badge variant="neutral">{club.membersCount || 0} members</Badge>
-                            </div>
-                          ))}
-                          {hobbyClubs.length === 0 && (
-                            <div className="text-center py-4 text-slate-400 text-sm">No clubs</div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </Card>
+                  <HobbyClubsCard />
 
                   {/* Business Directory Engagement */}
                   <Card noPadding noHeaderPadding className="mb-2" title={<div className="px-4 py-3 font-semibold text-slate-800 text-base">Business Directory</div>}>
