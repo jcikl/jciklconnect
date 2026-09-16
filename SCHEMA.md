@@ -1050,26 +1050,26 @@
 | galleryUrls | string[] | — | | 角色: B+；系统: 项目媒体上传 | 项目图库展示 |
 | lead | string | — | | 角色: B+ / Board；系统: 项目表单 | 项目负责人展示 |
 | organizerId | string \| null | — | | 系统: `createProject(currentUserId)` / 当前 `auth.uid` | 项目负责人识别与权限 |
-| level | enum | — | `JCI` \| `National` \| `Area` \| `Local` |
-| pillar | enum | — | `Individual` \| `Community` \| `Business` \| `International` \| `LOM` \| `Chapter` |
-| category | string | — | |
-| type | enum | — | `program` \| `skill_development` \| `event` \| `project` |
-| date | string | — | |
-| startDate | string | — | |
-| endDate | string | — | |
-| time | string | — | |
-| proposedDate | string | — | |
-| eventStartDate | string | — | |
-| eventEndDate | string | — | |
-| eventStartTime | string | — | |
-| eventEndTime | string | — | |
-| budget | number | — | |
-| spent | number | — | |
-| proposedBudget | number | — | |
-| priceMin | number | — | |
-| priceMax | number | — | |
+| level | enum | — | `JCI` \| `National` \| `Area` \| `Local` | 角色: B+；系统: 项目表单 | 项目分类展示与筛选 |
+| pillar | enum | — | `Individual` \| `Community` \| `Business` \| `International` \| `LOM` \| `Chapter` | 角色: B+；系统: 项目表单 | 项目分类展示与筛选 |
+| category | string | — | | 角色: B+；系统: 项目表单 | 项目分类展示 |
+| type | enum | — | `program` \| `skill_development` \| `event` \| `project` | 角色: B+；系统: 项目表单 | 项目类型展示与分支逻辑 |
+| date | string | — | | 角色: B+；系统: 项目表单 | 项目时间展示 |
+| startDate | string | — | | 角色: B+；系统: 项目表单 | 项目时间线与日历展示 |
+| endDate | string | — | | 角色: B+；系统: 项目表单 | 项目时间线与日历展示 |
+| time | string | — | | 角色: B+；系统: 项目表单 | 活动时间展示 |
+| proposedDate | string | — | | 角色: B+；系统: 项目申请表单 | 审核排期展示 |
+| eventStartDate | string | — | | 角色: B+；系统: 项目表单 | 活动报名开放控制、日历展示 |
+| eventEndDate | string | — | | 角色: B+；系统: 项目表单 | 活动报名截止控制、日历展示 |
+| eventStartTime | string | — | | 角色: B+；系统: 项目表单 | 活动时间展示 |
+| eventEndTime | string | — | | 角色: B+；系统: 项目表单 | 活动时间展示 |
+| budget | number | — | | 角色: B+；系统: 项目表单 | 财务展示、`financialSummary.budget` |
+| spent | number | — | | 系统: `transactions` / 财务统计更新 | 预算使用展示 |
+| proposedBudget | number | — | | 角色: B+；系统: 项目申请表单 | 审核财务评估 |
+| priceMin | number | — | | 角色: B+；系统: 项目表单 | 报名费用展示与收款参考 |
+| priceMax | number | — | | 角色: B+；系统: 项目表单 | 报名费用展示与收款参考 |
 | completion | number | — | | 系统: `tasks.status` 汇总 / `updateProjectCompletion()` | 项目进度与报告 |
-| teamSize | number | — | |
+| teamSize | number | — | | 角色: B+；系统: 项目表单 | 项目容量展示 |
 | team | string[] | — | | 角色: B+ / Project Lead；系统: 项目表单 | 项目团队展示与权限 |
 | financialAccountId | string | — | | 系统: `bankAccounts` / 项目财务配置 | 项目财务关联 |
 | objectives | string | — | | 角色: B+；系统: 项目表单 | 项目详情与报告上下文 |
@@ -1085,25 +1085,25 @@
 | version | number | — | | 系统: 项目版本更新 | 版本展示与审计 |
 | previousVersionId | string | — | | 系统: 项目版本创建 | 版本链追踪 |
 | attachments | string[] | — | | 角色: B+；系统: 附件上传 | 项目资料展示 |
-| attendees | number | — | |
-| maxAttendees | number | — | |
-| location | string | — | |
-| predictedDemand | enum | — | `Low` \| `Medium` \| `High` |
-| registeredMembers | string[] | — | |
-| committee | ProjectCommitteeMember[] | — | 见子字段 |
-| committee[].role | string | ✓ | |
-| committee[].memberId | string | ✓ | |
-| committee[].tasks | ProjectCommitteeTask[] | — | |
-| committee[].tasks[].taskId | string | — | |
-| committee[].tasks[].title | string | ✓ | |
-| committee[].tasks[].dueDate | string | — | |
+| attendees | number | — | | 系统: `eventRegistrations` 统计，或手动录入 | 活动出席统计展示 |
+| maxAttendees | number | — | | 角色: B+；系统: 项目表单 | 报名容量限制 |
+| location | string | — | | 角色: B+；系统: 项目表单 | 活动地点展示 |
+| predictedDemand | enum | — | `Low` \| `Medium` \| `High` | 角色: B+；系统: 项目表单 | 活动规划参考 |
+| registeredMembers | string[] | — | | 系统: `eventRegistrations` 确认后写入 | 报名成员展示与权限判断 |
+| committee | ProjectCommitteeMember[] | — | 见子字段 | 角色: B+ / Project Lead；系统: 项目表单 | 委员会职责展示与任务分配 |
+| committee[].role | string | ✓ | | 角色: Project Lead；系统: 项目表单 | 委员会角色展示 |
+| committee[].memberId | string | ✓ | | 角色: Project Lead；系统: 项目表单 | 委员会成员解析与展示 |
+| committee[].tasks | ProjectCommitteeTask[] | — | | 角色: Project Lead / 委员；系统: 任务表单 | 任务分配展示 |
+| committee[].tasks[].taskId | string | — | | 系统: `tasks` 集合 ID | 任务解析 |
+| committee[].tasks[].title | string | ✓ | | 角色: Project Lead；系统: 任务表单 | 任务标题展示 |
+| committee[].tasks[].dueDate | string | — | | 角色: Project Lead；系统: 任务表单 | 任务截止日展示 |
 | trainers | ProjectTrainer[] | — | 见子字段 | 角色: Project Lead；系统: 项目表单 | 项目培训安排与展示 |
-| trainers[].name | string | ✓ | |
-| trainers[].memberId | string | — | |
-| trainers[].role | string | — | |
-| trainers[].durationHours | number | — | |
-| createdAt | string | — | |
-| updatedAt | string | — | |
+| trainers[].name | string | ✓ | | 角色: Project Lead；系统: 项目表单 | 培训师姓名展示 |
+| trainers[].memberId | string | — | | 角色: Project Lead；系统: 项目表单 | 内部成员解析 |
+| trainers[].role | string | — | | 角色: Project Lead；系统: 项目表单 | 培训师职责展示 |
+| trainers[].durationHours | number | — | | 角色: Project Lead；系统: 项目表单 | 培训时长展示 |
+| createdAt | string | — | | 系统: 项目创建时写入 | 排序与审计 |
+| updatedAt | string | — | | 系统: 每次项目更新时写入 | 排序与审计 |
 
 ---
 
@@ -1119,56 +1119,56 @@
 | reportType | enum | ✓ | `status` \| `progress` \| `financial` \| `comprehensive` | 角色: Project Lead / Board；系统: 报告生成服务 | 报告模板与展示分支 |
 | generatedAt | string | ✓ | | 系统: 报告生成时间 | 报告排序与审计 |
 | period | object | ✓ | | 角色: 报告筛选；系统: 报告生成参数 | 报告时间范围 |
-| period.start | string | ✓ | |
-| period.end | string | ✓ | |
+| period.start | string | ✓ | | 来自 `period`（见父字段） | 报告起始时间展示 |
+| period.end | string | ✓ | | 来自 `period`（见父字段） | 报告截止时间展示 |
 | executiveSummary | object | ✓ | | 系统: `projects`、`tasks`、财务数据汇总 | 项目报告摘要展示 |
-| executiveSummary.status | string | ✓ | |
-| executiveSummary.completionPercentage | number | ✓ | |
-| executiveSummary.totalTasks | number | ✓ | |
-| executiveSummary.completedTasks | number | ✓ | |
-| executiveSummary.inProgressTasks | number | ✓ | |
-| executiveSummary.pendingTasks | number | ✓ | |
-| executiveSummary.budgetStatus | object | — | |
-| executiveSummary.budgetStatus.allocated | number | ✓ | |
-| executiveSummary.budgetStatus.spent | number | ✓ | |
-| executiveSummary.budgetStatus.remaining | number | ✓ | |
-| executiveSummary.budgetStatus.utilizationPercentage | number | ✓ | |
+| executiveSummary.status | string | ✓ | | 来自 `projects.status` | 报告状态展示 |
+| executiveSummary.completionPercentage | number | ✓ | | 来自 `projects.completion` | 报告完成度展示 |
+| executiveSummary.totalTasks | number | ✓ | | 系统: `tasks` 集合统计 | 任务总数展示 |
+| executiveSummary.completedTasks | number | ✓ | | 系统: `tasks.status=completed` 统计 | 完成任务展示 |
+| executiveSummary.inProgressTasks | number | ✓ | | 系统: `tasks.status=in_progress` 统计 | 进行中任务展示 |
+| executiveSummary.pendingTasks | number | ✓ | | 系统: `tasks.status=pending` 统计 | 待开始任务展示 |
+| executiveSummary.budgetStatus | object | — | | 来自 `financialSummary`（见父字段） | 预算状态摘要 |
+| executiveSummary.budgetStatus.allocated | number | ✓ | | 来自 `projects.budget` | 预算分配展示 |
+| executiveSummary.budgetStatus.spent | number | ✓ | | 系统: `transactions` 支出统计 | 已使用预算展示 |
+| executiveSummary.budgetStatus.remaining | number | ✓ | | 系统: allocated − spent | 剩余预算展示 |
+| executiveSummary.budgetStatus.utilizationPercentage | number | ✓ | | 系统: spent / allocated | 预算使用率展示 |
 | teamPerformance | object | ✓ | | 系统: `tasks` 与项目团队数据汇总 | 团队绩效展示 |
-| teamPerformance.totalMembers | number | ✓ | |
-| teamPerformance.activeMembers | number | ✓ | |
-| teamPerformance.memberContributions | array | ✓ | 见子字段 |
-| teamPerformance.memberContributions[].memberId | string | ✓ | |
-| teamPerformance.memberContributions[].memberName | string | ✓ | |
-| teamPerformance.memberContributions[].tasksCompleted | number | ✓ | |
-| teamPerformance.memberContributions[].tasksInProgress | number | ✓ | |
-| teamPerformance.memberContributions[].contributionPercentage | number | ✓ | |
+| teamPerformance.totalMembers | number | ✓ | | 来自 `projects.committee` 成员数 | 团队规模展示 |
+| teamPerformance.activeMembers | number | ✓ | | 系统: 有任务且状态非 completed 的成员数 | 活跃成员展示 |
+| teamPerformance.memberContributions | array | ✓ | 见子字段 | 系统: 按成员汇总 `tasks` 完成情况 | 成员贡献展示 |
+| teamPerformance.memberContributions[].memberId | string | ✓ | | 来自 `committee[].memberId` | 成员解析 |
+| teamPerformance.memberContributions[].memberName | string | ✓ | | 来自 `members.name` 冗余 | 成员姓名展示 |
+| teamPerformance.memberContributions[].tasksCompleted | number | ✓ | | 系统: 该成员 `tasks.status=completed` 数 | 贡献统计展示 |
+| teamPerformance.memberContributions[].tasksInProgress | number | ✓ | | 系统: 该成员 `tasks.status=in_progress` 数 | 贡献统计展示 |
+| teamPerformance.memberContributions[].contributionPercentage | number | ✓ | | 系统: 该成员完成任务 / 总完成任务 | 贡献占比展示 |
 | timeline | object | ✓ | | 系统: `projects`、`tasks` 时间线汇总 | 项目时间线展示 |
-| timeline.startDate | string | ✓ | |
-| timeline.expectedEndDate | string | — | |
-| timeline.actualProgress | number | ✓ | |
-| timeline.milestones | array | ✓ | |
-| timeline.milestones[].name | string | ✓ | |
-| timeline.milestones[].targetDate | string | ✓ | |
-| timeline.milestones[].status | enum | ✓ | `completed` \| `pending` \| `overdue` |
-| timeline.upcomingDeadlines | array | ✓ | |
-| timeline.upcomingDeadlines[].taskId | string | ✓ | |
-| timeline.upcomingDeadlines[].taskName | string | ✓ | |
-| timeline.upcomingDeadlines[].dueDate | string | ✓ | |
-| timeline.upcomingDeadlines[].assignee | string | — | |
-| timeline.upcomingDeadlines[].priority | string | ✓ | |
+| timeline.startDate | string | ✓ | | 来自 `projects.startDate` | 时间线起点展示 |
+| timeline.expectedEndDate | string | — | | 来自 `projects.endDate` | 时间线终点展示 |
+| timeline.actualProgress | number | ✓ | | 来自 `projects.completion` | 进度展示 |
+| timeline.milestones | array | ✓ | | 系统: 关键 `tasks` 作为里程碑 | 里程碑展示 |
+| timeline.milestones[].name | string | ✓ | | 来自 `tasks.title` | 里程碑名称展示 |
+| timeline.milestones[].targetDate | string | ✓ | | 来自 `tasks.dueDate` | 里程碑日期展示 |
+| timeline.milestones[].status | enum | ✓ | `completed` \| `pending` \| `overdue` | 来自 `tasks.status` 映射 | 里程碑状态展示 |
+| timeline.upcomingDeadlines | array | ✓ | | 系统: 未完成且 dueDate 临近的 `tasks` | 即将到期任务展示 |
+| timeline.upcomingDeadlines[].taskId | string | ✓ | | 来自 `tasks.id` | 任务解析 |
+| timeline.upcomingDeadlines[].taskName | string | ✓ | | 来自 `tasks.title` | 任务名称展示 |
+| timeline.upcomingDeadlines[].dueDate | string | ✓ | | 来自 `tasks.dueDate` | 截止日展示 |
+| timeline.upcomingDeadlines[].assignee | string | — | | 来自 `tasks.assignee` | 负责人展示 |
+| timeline.upcomingDeadlines[].priority | string | ✓ | | 来自 `tasks.priority` | 优先级展示 |
 | financialSummary | object | — | | 系统: `transactions` / 项目预算汇总 | 项目财务报告 |
-| financialSummary.budget | number | ✓ | |
-| financialSummary.totalIncome | number | ✓ | |
-| financialSummary.totalExpenses | number | ✓ | |
-| financialSummary.currentBalance | number | ✓ | |
-| financialSummary.budgetUtilization | number | ✓ | |
-| financialSummary.categoryBreakdown | array | ✓ | |
-| financialSummary.varianceAnalysis | object | ✓ | |
+| financialSummary.budget | number | ✓ | | 来自 `projects.budget` | 预算展示 |
+| financialSummary.totalIncome | number | ✓ | | 系统: `transactions` 收入汇总 | 收入展示 |
+| financialSummary.totalExpenses | number | ✓ | | 系统: `transactions` 支出汇总 | 支出展示 |
+| financialSummary.currentBalance | number | ✓ | | 系统: totalIncome − totalExpenses | 余额展示 |
+| financialSummary.budgetUtilization | number | ✓ | | 系统: totalExpenses / budget | 预算使用率展示 |
+| financialSummary.categoryBreakdown | array | ✓ | | 系统: `transactions` 按类别汇总 | 分类财务展示 |
+| financialSummary.varianceAnalysis | object | ✓ | | 系统: 实际 vs 预算差异分析 | 预算偏差展示 |
 | risksAndIssues | array | ✓ | | 角色: Project Lead / Board；系统: 报告分析 | 风险与问题展示 |
-| risksAndIssues[].type | enum | ✓ | `risk` \| `issue` |
-| risksAndIssues[].description | string | ✓ | |
-| risksAndIssues[].severity | enum | ✓ | `low` \| `medium` \| `high` |
-| risksAndIssues[].mitigation | string | — | |
+| risksAndIssues[].type | enum | ✓ | `risk` \| `issue` | 角色: Project Lead / Board；系统: 报告生成 | 风险类型展示 |
+| risksAndIssues[].description | string | ✓ | | 角色: Project Lead / Board；系统: 报告生成 | 风险描述展示 |
+| risksAndIssues[].severity | enum | ✓ | `low` \| `medium` \| `high` | 系统: 报告分析 | 严重程度展示与过滤 |
+| risksAndIssues[].mitigation | string | — | | 角色: Project Lead / Board | 缓解措施展示 |
 | recommendations | string[] | ✓ | | 系统: 报告分析；角色: Project Lead / Board | 报告建议展示 |
 | nextSteps | string[] | ✓ | | 角色: Project Lead / Board；系统: 报告生成 | 后续行动展示 |
 

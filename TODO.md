@@ -38,8 +38,8 @@
 
 | # | 批次 | 集合 | 状态 |
 |---|------|------|------|
-| 1 | 成员与身份 | `members`（补完来/往）、`memberEmails`、`boardMembers`、`boardTransitions`、`boardTermSettings`、`promotionHistory`、`manualPromotionRequests`、`guestRegistrations` | ⬜ 未开始 |
-| 2 | 活动与项目 | `events`、`eventBudgets`、`eventRegistrations`、`eventFeedback`、`projects`、`flagship_projects`、`activityPlans`、`projectReports`、`projectTrx` | ⬜ 未开始 |
+| 1 | 成员与身份 | `members`（补完来/往）、`memberEmails`、`boardMembers`、`boardTransitions`、`boardTermSettings`、`promotionHistory`、`manualPromotionRequests`、`guestRegistrations` | ✅ 完成（2026-09-16：SCHEMA.md 已覆盖全部集合含来/往；已清理已删除功能残留；SCHEMA-PERMISSIONS.md 同步更新；commit 41f65f7） |
+| 2 | 活动与项目 | `events`、`eventBudgets`、`eventRegistrations`、`eventFeedback`、`projects`、`flagship_projects`、`activityPlans`、`projectReports`、`projectTrx` | ✅ 完成（2026-09-16：7/9 已完整；补写 `projects` 18行来/往、`projectReports` 36行子字段来/往） |
 | 3 | 财务核心 | `transactions`、`transactionSplits`、`bankAccounts`、`reconciliations`、`paymentRequests`、`toyyibBills`、`toyyibCategories`、`toyyibpay_webhooks` | ⬜ 未开始 |
 | 4 | 财务延伸 | `contracts`、`pointEscrow`、`sponsorships`、`inventoryItems`、`stock_movements`、`maintenance_schedules`、`inventory_alerts`、`finance_alerts` | ⬜ 未开始 |
 | 5 | 积分与游戏化 | `points`、`pointsRules`、`pointsRuleExecutions`、`badges`、`badgeAwards`、`achievements`、`achievementAwards`、`achievementProgress`、`incentivePrograms`、`incentiveStandards`、`incentiveSubmissions`、`loStarProgress` | ⬜ 未开始 |
@@ -80,3 +80,6 @@
 - [x] P0 建立当前一致性基线（2026-09-16；扫描验证：4条P0已修（counters/auditLog/emailLogs/sponsorships），4条P0待确认，SCHEMA-PERMISSIONS.md P0速查表已同步更新）
 - [x] 移除 nudges、certificates、conversations 全部相关代码（2026-09-16；commit 65599ca；13文件 -1268行）
 - [x] 关闭待确认 nudges/conversations/certificates（代码已删除，对应 Firestore 规则无需单独修复）
+- [x] SCHEMA.md + SCHEMA-PERMISSIONS.md 清理已删除功能残留（2026-09-16；commit 41f65f7；移除 certificates/nudges/nudgeRules/conversations 的集合节、权限行和 P0 条目）
+- [x] 批次 1 成员与身份验证（2026-09-16；SCHEMA.md 已有完整来/往记录，无需补写）
+- [x] 批次 2 活动与项目（2026-09-16；补写 projects 18行、projectReports 36行子字段来/往；其余7个集合已完整）
