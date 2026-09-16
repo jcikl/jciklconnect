@@ -17,7 +17,8 @@
 > | × | 完全禁止（allow if false，仅 Admin SDK 可访问）|
 > | — | 规则文件中无对应 allow 块（等同 × ）|
 >
-> **注：** Firestore get 与 list 分别对应单文档读取与集合级查询；esource.data 仅在 get 中可用，因此部分集合的 list 权限会比 get 更宽松（无法用文档字段做过滤）。
+> **注：** Firestore get 与 list 分别对应单文档读取与集合级查询；
+esource.data 仅在 get 中可用，因此部分集合的 list 权限会比 get 更宽松（无法用文档字段做过滤）。
 
 ---
 
@@ -71,7 +72,8 @@ otifications | 自己 或 B+ | B+/A+ | B+ 或 M+(特定类型) | 自己(仅read�
 | enefitUsage | 登 | 登 | 登(自己，字段白名单) | B+ | B+ | |
 | webhooks | B+ | B+ | B+ | B+ | B+ | |
 | webhook_logs | B+ | B+ | B+(字段白名单) | × (不可变) | A+ | |
-| econciliations | B+/A+ | B+/A+ | B+/A+(必填字段) | A+ 或 B+(仅notes字段) | A+ | |
+| 
+econciliations | B+/A+ | B+/A+ | B+/A+(必填字段) | A+ 或 B+(仅notes字段) | A+ | |
 | eventBudgets | B+/A+/创建者 | B+/A+ | B+/A+ | A+ 或 B+(字段白名单) | B+/A+ | |
 | eventFeedback | B+/A+/自己 | B+/A+ | 登(自己，必填字段) | B+/A+ | B+/A+ | P0：匿名反馈对所有人可读 |
 | projectReports | B+/A+ | B+/A+ | B+/A+ | B+/A+ | A+ | |
@@ -83,13 +85,6 @@ otifications | 自己 或 B+ | B+/A+ | B+ 或 M+(特定类型) | 自己(仅read�
 | mentorMatches | B+/A+/自己(师/学) | 登 | B+/A+ 或 自己(师/学) | B+/A+ 或 当事人(字段白名单) | B+/A+ | |
 | mentorshipFeedback | B+/A+ | B+/A+ | 登 | B+/A+ | B+/A+ | |
 | 	rainingModules | G+ | G+ | B+ | B+ | B+ | |
-| learningPaths | 登 | 登 | B+ | B+ | B+ | |
-| learningProgress | 自己/B+/A+ | M+/B+/A+ | 登(自己) | B+/A+ 或 自己 | B+/A+ 或 自己 | |
-| certificates | 登 | 登 | 登 | A+ | A+ | P0：任意用户可自颁证书 |
-| 
-udgeRules | M+ | M+ | B+ | B+ | B+ | |
-| 
-udges | — | — | — | — | — | ⚠️ P0：无Firestore规则，dismiss永久失败 |
 | contracts | 自己/B+/A+ | B+/A+ | M+(Draft/Pending) | A+/B+ 或 M+(签名字段) | A+ | |
 | pointEscrow | 自己/B+/A+ | B+/A+ | A+ 或 M+(自己，Locked，字段白名单) | A+ 或 B+(字段白名单) | A+ | |
 | incentivePrograms | 登 | 登 | A+ | B+/A+ | A+ | P0：多程序同时active |
@@ -123,7 +118,6 @@ udges | — | — | — | — | — | ⚠️ P0：无Firestore规则，dismiss�
 | socialPosts | M+(自己或B+) | M+ | M+(自己，draft，字段验证) | B+/A+ 或 自己(draft/rejected) | A+ | |
 | socialPersonas | M+ | M+ | B+ | B+ | B+ | |
 | counters | — | — | — | — | — | ⚠️ P0：无Firestore规则→付款申请创建失败 |
-| conversations | — | — | — | — | — | ⚠️ P0：无规则→任意用户读所有私信 |
 
 ---
 
@@ -131,16 +125,12 @@ udges | — | — | — | — | — | ⚠️ P0：无Firestore规则，dismiss�
 
 | # | 集合 | 缺陷描述 | 状态 |
 |---|------|---------|------|
-| 1 | 
-udges | 无 Firestore 规则块，dismiss 写入永久失败 | 待修 |
 | 2 | counters | 无规则块，paymentRequests 创建时序号生成 PERMISSION_DENIED | 已修（rules L1177-1182） |
-| 5 | conversations | 无规则块，任意登录用户可读所有私信 | 待修 |
 | 6 | 
 otifications | list 用 resource.data → 会员永远看不到自己的通知 | 已修 |
 | 7 | 	ransactionSplits | get 规则缺少 loId 字段导致跨LO数据泄露 | 已修 |
 | 8 | pointsRuleExecutions | getDoc→setDoc 竞态 → 双倍积分；全部写入无原子保障 | 部分修 |
 | 9 | chievementProgress | list 原 resource.data 失效已修为 isAuthenticated() | 已修 |
-| 10 | certificates | 任意已登录用户可自颁证书（create: isAuthenticated） | 待修（需确认正确权限范围后修改规则） |
 | 11 | auditLog | AuditLogService 从未被调用（死代码）| 已修（financeService L2176、membersService L1281、paymentRequestService L467） |
 | 12 | emailLogs | 无写入者，集合永远为空，邮件无审计记录 | 已修（emailService.logEmail() L90/130/145） |
 | 13 | sponsorships | financeService 赞助收入硬编码为 0 | 已修（financeService L4579-4585 查 SponsorshipsService） |

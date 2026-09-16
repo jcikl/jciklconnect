@@ -1832,15 +1832,14 @@
 
 | 字段路径 | 类型 | 必填 | 枚举值 / 说明 | 来 | 往 |
 |--------|------|:----:|------------|----|----|
-| id | string | — | Firestore doc ID | 系统: Firestore doc id | `learningProgress.pathId`、`certificates.pathId` |
-| name | string | ✓ | | 学习路径管理表单 | 路径列表、`certificates.pathName` |
+| id | string | — | Firestore doc ID | 系统: Firestore doc id | `learningProgress.pathId` |
+| name | string | ✓ | | 学习路径管理表单 | 路径列表与详情 |
 | description | string | ✓ | | 学习路径管理表单 | 路径详情 |
 | category | enum | ✓ | `JCI Official` \| `Leadership` \| `Business` \| `Personal Development` \| `Technical` | 角色: 学习管理员；系统: 路径配置 | 路径分类筛选 |
 | modules | string[] | ✓ | 按顺序排列的 trainingModule ID 数组 | 路径模块配置 | 学习内容、进度计算 |
 | estimatedDuration | number | ✓ | 小时数 | 角色: 学习管理员；系统: 路径配置 | 学习计划展示 |
 | difficulty | enum | ✓ | `Foundation` \| `Intermediate` \| `Advance` |
 | pointsReward | number | ✓ | 完成后奖励积分 | 角色: 学习管理员；系统: 路径配置 | 完成奖励计算 |
-| certificateIssued | boolean | ✓ | 是否颁发证书 | 角色: 学习管理员；系统: 路径配置 | 证书发放流程 |
 | prerequisites | string[] | — | 前置 learningPath ID 数组 | 路径配置 | 开始学习资格校验 |
 | materials | string[] | — | 外部资源 URL 数组 | 角色: 学习管理员；系统: 路径配置 | 学习材料展示 |
 | status | enum | ✓ | `Active` \| `Draft` \| `Archived` | 角色: 学习管理员；系统: 路径状态操作 | 学习路径可用性筛选 |
@@ -1860,29 +1859,8 @@
 | currentModuleIndex | number | ✓ | 当前进行到第几个模块（0-indexed） | 系统: 学习模块进度更新 | 当前模块展示 |
 | completedModules | string[] | ✓ | 已完成的 trainingModule ID 数组 | 模块完成操作 | 学习进度、奖励计算 |
 | startedAt | Date \| Timestamp | ✓ | | 系统: 开始学习操作 | 学习记录排序 |
-| completedAt | Date \| Timestamp | — | 学习路径完成时间 | 系统: 所有模块完成 | 证书发放触发 |
+| completedAt | Date \| Timestamp | — | 学习路径完成时间 | 系统: 所有模块完成 | 完成展示与积分奖励触发 |
 | progress | number | ✓ | 0-100 百分比 | 系统: `learningPaths.modules` 完成度计算 | 进度条与完成判断 |
-| certificateIssued | boolean | ✓ | 证书是否已颁发 | 系统: 学习路径完成与证书发放流程 | 证书状态展示 |
-| certificateId | string | — | 对应的 certificate doc ID | `certificates.id` | 证书详情入口 |
-
----
-
-## `certificates`
-> **TS Interface:** `Certificate` (`services/learningPathsService.ts`) | **Constants key:** `COLLECTIONS.CERTIFICATES`
-
-| 字段路径 | 类型 | 必填 | 枚举值 / 说明 | 来 | 往 |
-|--------|------|:----:|------------|----|----|
-| id | string | — | Firestore doc ID | 系统: Firestore doc id | `learningProgress.certificateId` |
-| memberId | string | ✓ | | `learningProgress.memberId` | 成员证书列表 |
-| pathId | string | ✓ | 关联的 learningPath doc ID | `learningProgress.pathId` / `learningPaths.id` | 证书对应路径 |
-| pathName | string | ✓ | 证书对应的课程名称 | `learningPaths.name` | 证书展示 |
-| issuedAt | Date \| Timestamp | ✓ | | 系统: 学习路径完成流程 | 证书排序与展示 |
-| issuedBy | string | ✓ | 颁发者 member ID | 系统: 证书颁发人的 `auth.uid` | 证书审计 |
-| certificateNumber | string | ✓ | 证书编号 | 系统: 证书生成流程 | 证书展示与检索 |
-| verificationCode | string | ✓ | 验证码 | 系统: 证书生成流程 | 证书验证 |
-| fileUrl | string | — | PDF 文件 URL | 系统: 证书 PDF 生成/上传 | 证书下载 |
-| status | enum | ✓ | `Active` \| `Revoked` | 系统: 颁发/撤销流程 | 证书有效性判断 |
-| isDeleted | boolean | — | 软删除标记；learningPath 删除时级联软删 | 系统: `learningPaths` 删除同步 | 证书列表过滤 |
 
 ---
 
@@ -1969,44 +1947,6 @@
 | isEnabled | boolean | ✓ | | 角色: 内容管理员；系统: Persona 启停操作 | 生成前平台筛选 |
 | updatedAt | string | ✓ | ISO timestamp | 系统: Persona 配置更新时间 | 缓存与审计 |
 | updatedBy | string | — | 最后修改者 member ID | 系统: 修改人的 `auth.uid` | 配置审计 |
-
----
-
-## `nudges`
-> **TS Interface:** `Nudge` (`services/behavioralNudgingService.ts`) | **Constants key:** `COLLECTIONS.NUDGES`
-
-| 字段路径 | 类型 | 必填 | 枚举值 / 说明 | 来 | 往 |
-|--------|------|:----:|------------|----|----|
-| id | string | ✓ | Firestore doc ID | 系统: Firestore doc id | 会员 Nudge 查询 |
-| memberId | string | ✓ | | 系统: 行为评估目标 `members.id` | 会员 Nudge 列表 |
-| type | enum | ✓ | `positive_reinforcement` \| `inactivity_warning` \| `opportunity_suggestion` \| `goal_reminder` | 系统: `nudgeRules` 匹配结果 | Nudge 类型渲染与筛选 |
-| title | string | ✓ | | 系统: `nudgeRules.title` 模板 | Nudge 展示 |
-| message | string | ✓ | | 系统: `nudgeRules.message` 模板 | Nudge 展示 |
-| priority | enum | ✓ | `low` \| `medium` \| `high` | 系统: `nudgeRules.priority` | Nudge 排序 |
-| actionUrl | string | — | 点击跳转 URL | 系统: 行为建议生成流程 | Nudge 操作入口 |
-| actionLabel | string | — | 按钮文字 | 系统: 行为建议生成流程 | Nudge 操作入口 |
-| createdAt | Date | ✓ | | 系统: Nudge 创建时间 | Nudge 排序 |
-| dismissed | boolean | ✓ | 是否已关闭 | 角色: 会员关闭操作 | Nudge 列表过滤 |
-
----
-
-## `nudgeRules`
-> **TS Interface:** `NudgeRule` (`services/behavioralNudgingService.ts`) | **Constants key:** `COLLECTIONS.NUDGE_RULES`
-
-| 字段路径 | 类型 | 必填 | 枚举值 / 说明 | 来 | 往 |
-|--------|------|:----:|------------|----|----|
-| id | string | ✓ | Firestore doc ID | 系统: Firestore doc id | 规则查询 |
-| name | string | ✓ | | 角色: Admin；系统: 规则表单 | 规则列表展示 |
-| description | string | ✓ | | 角色: Admin；系统: 规则表单 | 规则详情展示 |
-| condition | object | ✓ | 触发条件 | 角色: Admin；系统: 规则表单 | 行为数据评估 |
-| condition.type | enum | ✓ | `points_threshold` \| `attendance_rate` \| `days_inactive` \| `goal_progress` \| `tier_upgrade` | 角色: Admin；系统: 规则表单 | 行为数据匹配 |
-| condition.value | number | ✓ | 阈值 | 角色: Admin；系统: 规则表单 | 阈值判断 |
-| condition.operator | enum | ✓ | `greater_than` \| `less_than` \| `equals` | 角色: Admin；系统: 规则表单 | 阈值判断 |
-| nudgeType | enum | ✓ | 同 Nudge.type：`positive_reinforcement` \| `inactivity_warning` \| `opportunity_suggestion` \| `goal_reminder` | 角色: Admin；系统: 规则表单 | Nudge 类型生成 |
-| title | string | ✓ | 生成 Nudge 的标题模板 | 角色: Admin；系统: 规则表单 | Nudge 标题生成 |
-| message | string | ✓ | 生成 Nudge 的消息模板 | 角色: Admin；系统: 规则表单 | Nudge 内容生成 |
-| priority | enum | ✓ | `low` \| `medium` \| `high` | 角色: Admin；系统: 规则表单 | Nudge 排序 |
-| isActive | boolean | ✓ | | 角色: Admin；系统: 规则启停操作 | 规则执行前筛选 |
 
 ---
 
@@ -2295,7 +2235,3 @@
 
 ---
 
-## `conversations`（含 messages 子集合）
-> **TS Interface:** 无专属接口（私信功能，无服务层）| **Constants key:** 无（collection name `conversations`，仅见于 firestoreLogger.ts 注释）
-
-CLAUDE.md 分析记录为 `conversations+messages`，P0 × 2（任意用户可读所有私信；resource.data in list → 对话列表永远为空）。整个代码库无对应 Service 层、Hook 或 TypeScript 接口定义。`firestoreLogger.ts` 仅在示例注释中提及该集合名称，属于死代码或未完成功能。
