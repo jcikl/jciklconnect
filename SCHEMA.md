@@ -1283,7 +1283,7 @@
 | conditions | PointsRuleCondition[] | ✓ | 见子字段 | 角色: A+；系统: 规则配置 | 条件评估器 |
 | conditions[].id | string | ✓ | | 角色: A+；系统: 规则配置 | 条件编辑与执行日志 |
 | conditions[].field | string | ✓ | | 角色: A+；系统: 规则配置 | 条件评估器 |
-| conditions[].operator | enum | ✓ | `equals` \| `not_equals` \| `greater_than` \| `less_than` \| `contains` \| `not_contains` \| `in` \| `not_in` |
+| conditions[].operator | enum | ✓ | `equals` \| `not_equals` \| `greater_than` \| `less_than` \| `contains` \| `not_contains` \| `in` \| `not_in` | 角色: A+；系统: 规则配置 | 条件评估器 |
 | conditions[].value | any | ✓ | | 角色: A+；系统: 规则配置 | 条件评估器 |
 | conditions[].logicalOperator | enum | — | `AND` \| `OR` | 角色: A+；系统: 规则配置 | 条件组合 |
 | pointValue | number | ✓ | | 角色: A+；系统: 规则配置 | 最终积分计算 |
@@ -1291,16 +1291,16 @@
 | weight | number | ✓ | | 角色: A+；系统: 规则配置 | 最终积分计算 |
 | enabled | boolean | ✓ | | 角色: A+；系统: 启用/停用操作 | 执行前规则筛选 |
 | isRepeatable | boolean | — | true 时同一会员可多次触发 | 角色: A+；系统: 规则配置 | 重复触发校验 |
-| createdAt | string | — | |
-| updatedAt | string | — | |
-| createdBy | string | — | |
+| createdAt | string | — | | 系统: 规则创建时写入 | 审计与排序 |
+| updatedAt | string | — | | 系统: 规则更新时写入 | 审计与排序 |
+| createdBy | string | — | | 系统: 当前 `auth.uid` | 规则创建审计 |
 
 ### PointRule（简化接口，同集合）
 
 | 字段路径 | 类型 | 必填 | 枚举值 / 说明 | 来 | 往 |
 |--------|------|:----:|------------|----|----|
-| id | string | — | Firestore doc ID |
-| category | string | ✓ | |
+| id | string | — | Firestore doc ID | 系统: Firestore doc id | 执行记录关联 |
+| category | string | ✓ | | 角色: A+；系统: 规则配置 | 积分分类统计 |
 | name | string | ✓ | | 角色: A+；系统: 规则配置 | 规则展示与执行 |
 | basePoints | number | ✓ | | 角色: A+；系统: 规则配置 | 基础积分计算 |
 | multiplier | number | — | | 角色: A+；系统: 规则配置 | 最终积分计算 |
@@ -1308,7 +1308,7 @@
 | active | boolean | ✓ | | 角色: A+；系统: 启用/停用操作 | 执行前规则筛选 |
 | priority | number | — | | 角色: A+；系统: 规则配置 | 规则执行顺序 |
 | createdAt | string \| Date \| Timestamp | — | | 系统: 规则创建时间 | 审计与排序 |
-| updatedAt | string \| Date \| Timestamp | — | |
+| updatedAt | string \| Date \| Timestamp | — | | 系统: 规则更新时写入 | 审计与排序 |
 
 ---
 
@@ -1378,9 +1378,9 @@
 | awardId | string | ✓ | 关联 badges 文档 ID | 系统: `badges.id` | 徽章详情查询 |
 | memberId | string | ✓ | | 系统: 徽章授予流程 | 关联 `members.id`、会员徽章列表 |
 | earnedAt | string \| Timestamp \| Date | ✓ | | 系统: 达成条件时生成 | 徽章历史 |
-| progress | number | — | |
-| completedMilestones | string[] | — | |
-| awardedBy | string | — | |
+| progress | number | — | | 系统: 徽章进度追踪 | 进度展示 |
+| completedMilestones | string[] | — | | 系统: 达成里程碑时写入 | 里程碑展示 |
+| awardedBy | string | — | | 系统: 当前 `auth.uid` / 自动化授予 | 授予审计 |
 | reason | string | — | | 系统: 成就达成流程；角色: 管理员说明 | 进度详情与审计 |
 | metadata | map | — | | 系统: 成就计算上下文 | 详情展示与审计 |
 
@@ -1750,7 +1750,7 @@
 | description | string | ✓ | | 创建/编辑调查表单 | 调查详情、填写页 |
 | questions | SurveyQuestion[] | ✓ | 见下方子字段 | 调查设计器 | 填写页、`surveyResponses.responses` |
 | questions[].id | string | ✓ | | 系统: 调查设计器生成 | `surveyResponses.responses` 键 |
-| questions[].type | enum | ✓ | `text` \| `multiple-choice` \| `rating` \| `yes-no` \| `date` \| `number` \| `email` \| `phone` \| `matrix` \| `ranking` \| `file-upload` |
+| questions[].type | enum | ✓ | `text` \| `multiple-choice` \| `rating` \| `yes-no` \| `date` \| `number` \| `email` \| `phone` \| `matrix` \| `ranking` \| `file-upload` | 角色: 调查创建者；系统: 调查设计器 | 填写页渲染分支、响应校验 |
 | questions[].question | string | ✓ | | 角色: 调查创建者；系统: 调查设计器 | 填写页题目展示 |
 | questions[].options | string[] | — | 用于 multiple-choice / matrix / ranking | 角色: 调查创建者；系统: 调查设计器 | 填写页选项与响应校验 |
 | questions[].matrixRows | string[] | — | matrix 题行标签 | 系统: 调查设计器 | 矩阵题渲染 |
@@ -1761,20 +1761,20 @@
 | questions[].step | number | — | number 步长 | 系统: 调查设计器 | 数值输入控制 |
 | questions[].required | boolean | ✓ | | 系统: 调查设计器 | 提交前响应校验 |
 | questions[].conditionalLogic | ConditionalLogic | — | 条件显示逻辑 | 系统: 调查设计器 | 填写页条件渲染 |
-| questions[].conditionalLogic.showIf.questionId | string | ✓ | 依赖的问题 ID |
-| questions[].conditionalLogic.showIf.operator | enum | ✓ | `equals` \| `not_equals` \| `contains` \| `greater_than` \| `less_than` \| `is_empty` \| `is_not_empty` |
-| questions[].conditionalLogic.showIf.value | any | ✓ | 比对值 |
+| questions[].conditionalLogic.showIf.questionId | string | ✓ | 依赖的问题 ID | 角色: 调查创建者；系统: 调查设计器 | 条件渲染判断 |
+| questions[].conditionalLogic.showIf.operator | enum | ✓ | `equals` \| `not_equals` \| `contains` \| `greater_than` \| `less_than` \| `is_empty` \| `is_not_empty` | 角色: 调查创建者；系统: 调查设计器 | 条件渲染判断 |
+| questions[].conditionalLogic.showIf.value | any | ✓ | 比对值 | 角色: 调查创建者；系统: 调查设计器 | 条件渲染判断 |
 | questions[].helpText | string | — | | 角色: 调查创建者；系统: 调查设计器 | 填写页辅助说明 |
 | targetAudience | enum | ✓ | `All Members` \| `Board` \| `Project Leads` \| `Specific Group` | 调查发布设置 | 调查分发目标筛选 |
 | specificMemberIds | string[] | — | 当 targetAudience = Specific Group 时使用 | 分组/成员选择器 | 指定成员调查入口 |
 | status | enum | ✓ | `Draft` \| `Active` \| `Closed` | 发布、关闭调查操作 | 列表状态、填写权限 |
-| startDate | string | ✓ | ISO date string |
-| endDate | string | ✓ | ISO date string |
+| startDate | string | ✓ | ISO date string | 调查发布设置 | 调查开放时间校验 |
+| endDate | string | ✓ | ISO date string | 调查发布设置 | 调查截止时间校验 |
 | responsesCount | number | ✓ | 统计快照 | `surveyResponses` 提交后计数 | 调查统计页 |
 | createdBy | string | ✓ | 创建者 member ID | 当前登录 `members.id` | 权限校验、审计 |
-| createdAt | string | ✓ | ISO date string |
-| distributionChannels | enum[] | — | `email` \| `in-app` \| `link` |
-| shareableLink | string | — | 分享链接 |
+| createdAt | string | ✓ | ISO date string | 系统: 调查创建时写入 | 审计与排序 |
+| distributionChannels | enum[] | — | `email` \| `in-app` \| `link` | 角色: 调查创建者；系统: 调查发布设置 | 分发渠道展示 |
+| shareableLink | string | — | 分享链接 | 系统: 调查发布时生成 | 外部分享入口 |
 
 ---
 
@@ -1838,7 +1838,7 @@
 | category | enum | ✓ | `JCI Official` \| `Leadership` \| `Business` \| `Personal Development` \| `Technical` | 角色: 学习管理员；系统: 路径配置 | 路径分类筛选 |
 | modules | string[] | ✓ | 按顺序排列的 trainingModule ID 数组 | 路径模块配置 | 学习内容、进度计算 |
 | estimatedDuration | number | ✓ | 小时数 | 角色: 学习管理员；系统: 路径配置 | 学习计划展示 |
-| difficulty | enum | ✓ | `Foundation` \| `Intermediate` \| `Advance` |
+| difficulty | enum | ✓ | `Foundation` \| `Intermediate` \| `Advance` | 角色: 学习管理员；系统: 路径配置 | 路径难度展示与筛选 |
 | pointsReward | number | ✓ | 完成后奖励积分 | 角色: 学习管理员；系统: 路径配置 | 完成奖励计算 |
 | prerequisites | string[] | — | 前置 learningPath ID 数组 | 路径配置 | 开始学习资格校验 |
 | materials | string[] | — | 外部资源 URL 数组 | 角色: 学习管理员；系统: 路径配置 | 学习材料展示 |

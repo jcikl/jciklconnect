@@ -40,10 +40,10 @@
 |---|------|------|------|
 | 1 | 成员与身份 | `members`（补完来/往）、`memberEmails`、`boardMembers`、`boardTransitions`、`boardTermSettings`、`promotionHistory`、`manualPromotionRequests`、`guestRegistrations` | ✅ 完成（2026-09-16：SCHEMA.md 已覆盖全部集合含来/往；已清理已删除功能残留；SCHEMA-PERMISSIONS.md 同步更新；commit 41f65f7） |
 | 2 | 活动与项目 | `events`、`eventBudgets`、`eventRegistrations`、`eventFeedback`、`projects`、`flagship_projects`、`activityPlans`、`projectReports`、`projectTrx` | ✅ 完成（2026-09-16：7/9 已完整；补写 `projects` 18行来/往、`projectReports` 36行子字段来/往） |
-| 3 | 财务核心 | `transactions`、`transactionSplits`、`bankAccounts`、`reconciliations`、`paymentRequests`、`toyyibBills`、`toyyibCategories`、`toyyibpay_webhooks` | ⬜ 未开始 |
-| 4 | 财务延伸 | `contracts`、`pointEscrow`、`sponsorships`、`inventoryItems`、`stock_movements`、`maintenance_schedules`、`inventory_alerts`、`finance_alerts` | ⬜ 未开始 |
-| 5 | 积分与游戏化 | `points`、`pointsRules`、`pointsRuleExecutions`、`badges`、`badgeAwards`、`achievements`、`achievementAwards`、`achievementProgress`、`incentivePrograms`、`incentiveStandards`、`incentiveSubmissions`、`loStarProgress` | ⬜ 未开始 |
-| 6 | 知识与成长 | `learningPaths`、`learningProgress`、`trainingModules`、`documents`、`documentVersions`、`surveys`、`surveyResponses` | ⬜ 未开始 |
+| 3 | 财务核心 | `transactions`、`transactionSplits`、`bankAccounts`、`reconciliations`、`paymentRequests`、`toyyibBills`、`toyyibCategories`、`toyyibpay_webhooks` | ✅ 完成（2026-09-16：8/8 已完整，无需补写） |
+| 4 | 财务延伸 | `contracts`、`pointEscrow`、`sponsorships`、`inventoryItems`、`stock_movements`、`maintenance_schedules`、`inventory_alerts`、`finance_alerts` | ✅ 完成（2026-09-16：8/8 已完整，无需补写） |
+| 5 | 积分与游戏化 | `points`、`pointsRules`、`pointsRuleExecutions`、`badges`、`badgeAwards`、`achievements`、`achievementAwards`、`achievementProgress`、`incentivePrograms`、`incentiveStandards`、`incentiveSubmissions`、`loStarProgress` | ✅ 完成（2026-09-16：10/12 已完整；补写 pointsRules 7行、badgeAwards 3行来/往） |
+| 6 | 知识与成长 | `learningPaths`、`learningProgress`、`trainingModules`、`documents`、`documentVersions`、`surveys`、`surveyResponses` | ✅ 完成（2026-09-16：6/7 已完整；补写 surveys 9行、learningPaths 1行来/往） |
 | 7 | 社群与互动 | `hobbyClubs`、`communication`、`mentorMatches`、`mentorshipFeedback`、`zoomBookings`、`guestPageStats`、`memberBenefits`、`benefitUsage` | ⬜ 未开始 |
 | 8 | 商业与网络 | `businessProfiles`、`publicBusinessListings`、`advertisements`、`promotionPackages`、`publications`、`partnerships`、`sisterChapters`、`inquiries` | ⬜ 未开始 |
 | 9 | 自动化与治理 | `automationRules`、`workflows`、`workflow_executions`、`tasks`、`notifications`、`templates` | ⬜ 未开始 |
@@ -83,3 +83,7 @@
 - [x] SCHEMA.md + SCHEMA-PERMISSIONS.md 清理已删除功能残留（2026-09-16；commit 41f65f7；移除 certificates/nudges/nudgeRules/conversations 的集合节、权限行和 P0 条目）
 - [x] 批次 1 成员与身份验证（2026-09-16；SCHEMA.md 已有完整来/往记录，无需补写）
 - [x] 批次 2 活动与项目（2026-09-16；补写 projects 18行、projectReports 36行子字段来/往；其余7个集合已完整）
+- [x] 批次 3 财务核心（2026-09-16；8/8 已完整，无需补写）
+- [x] 批次 4 财务延伸（2026-09-16；8/8 已完整，无需补写）
+- [x] 批次 5 积分与游戏化（2026-09-16；补写 pointsRules 7行、badgeAwards 3行；其余10集合已完整）
+- [x] 批次 6 知识与成长（2026-09-16；补写 surveys 9行、learningPaths 1行；其余6集合已完整）
