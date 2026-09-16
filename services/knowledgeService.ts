@@ -229,44 +229,6 @@ export class KnowledgeService {
         }
       }
 
-      // P1 fix: check if all modules in any learning path containing this module are
-      // now complete, and trigger certificate issuance if so.
-      const pathsSnap = await getDocs(
-        query(
-          collection(db, COLLECTIONS.LEARNING_PATHS),
-          where('modules', 'array-contains', moduleId),
-          where('status', '==', 'Active')
-        )
-      );
-
-      if (!pathsSnap.empty) {
-        const completions = await this.getMemberModuleCompletions(
-          memberId,
-          // Gather all unique module IDs across matching paths
-          [...new Set(pathsSnap.docs.flatMap(d => (d.data().modules || []) as string[]))]
-        );
-
-        for (const pathDoc of pathsSnap.docs) {
-          const path = pathDoc.data();
-          const pathModules: string[] = path.modules || [];
-          const allDone = pathModules.length > 0 &&
-            pathModules.every(id => completions[id] === 'Completed');
-
-          if (allDone && path.certificateIssued) {
-            const { LearningPathsService } = await import('./learningPathsService');
-            await LearningPathsService.issueCertificate(
-              memberId,
-              pathDoc.id,
-              path.name || ''
-            ).catch(err =>
-              errorLoggingService.logError(err as Error, {
-                action: 'KnowledgeService.markModuleComplete.issueCertificate',
-                additionalData: { memberId, pathId: pathDoc.id },
-              })
-            );
-          }
-        }
-      }
     } catch (error) {
       errorLoggingService.logError(error as Error, { action: 'KnowledgeService.markModuleComplete', additionalData: { memberId, moduleId } });
       throw error;

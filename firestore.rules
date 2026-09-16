@@ -1005,13 +1005,6 @@ service cloud.firestore {
       allow create: if isAuthenticated() && request.resource.data.memberId == request.auth.uid;
       allow update, delete: if isBoard() || isAdmin() || (isAuthenticated() && resource.data.memberId == request.auth.uid);
     }
-    // Certificates: authenticated users can create their own (from course completion); Admin manages all
-    match /certificates/{docId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAdmin();
-    }
-    
     // Inventory: maintenance schedules, inventory alerts (InventoryView)
     match /maintenance_schedules/{docId} {
       // FIX: removed getUserRole()-in-list resource.data check that blocked list queries; simplified to isMember()
@@ -1045,12 +1038,6 @@ service cloud.firestore {
           'acknowledged','acknowledgedBy','acknowledgedAt','resolved','resolvedAt'
         ]);
       allow delete: if isFinanceOperator();
-    }
-    
-    // Behavioral nudging: nudge rules (Gamification — Behavioral Nudging config)
-    match /nudgeRules/{docId} {
-      allow read: if isMember();
-      allow create, update, delete: if isBoard();
     }
     
     // Finance: payment requests — superseded by the scoped rule above (line ~244);

@@ -3,8 +3,7 @@ import React from 'react';
 import { Skeleton } from '../ui/Common';
 import { useAuth } from '../../hooks/useAuth';
 import { useEvents } from '../../hooks/useEvents';
-import { useBehavioralNudging } from '../../hooks/useBehavioralNudging';
-import { NudgeBanner } from '../ui/NudgeBanner';
+
 import { AIPredictionService, PersonalizedRecommendation } from '../../services/aiPredictionService';
 import { EventRegistrationService } from '../../services/eventRegistrationService';
 import { ContractService, CommitmentContract } from '../../services/contractService';
@@ -51,7 +50,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
   const { member } = useAuth();
   const { events, loading: eventsLoading, registerForEvent, markAttendance, cancelRegistration } = useEvents();
-  const { nudges, dismissNudge } = useBehavioralNudging();
+
   const [recommendations, setRecommendations] = useState<PersonalizedRecommendation[]>([]);
   const [topRecommendation, setTopRecommendation] = useState<PersonalizedRecommendation | null>(null);
   const [myRegistrationEventIds, setMyRegistrationEventIds] = useState<string[]>([]);

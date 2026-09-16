@@ -47,7 +47,7 @@ export const COLLECTIONS = {
   DOCUMENT_VERSIONS: 'documentVersions',
   LEARNING_PATHS: 'learningPaths',
   LEARNING_PROGRESS: 'learningProgress',
-  CERTIFICATES: 'certificates',
+
   ADVERTISEMENTS: 'advertisements',
   PROMOTION_PACKAGES: 'promotionPackages',
   EVENT_FEEDBACK: 'eventFeedback',
@@ -66,7 +66,7 @@ export const COLLECTIONS = {
   POINTS_RULES: 'pointsRules',
   POINTS_RULE_EXECUTIONS: 'pointsRuleExecutions',
   EMAIL_LOGS: 'emailLogs',
-  NUDGE_RULES: 'nudgeRules',
+
   GUEST_REGISTRATIONS: 'guestRegistrations',
   /** Guest 页面访问统计（浏览次数/逗留时长/Sign Up 点击） */
   GUEST_PAGE_STATS: 'guestPageStats',
@@ -112,8 +112,7 @@ export const COLLECTIONS = {
   TOYYIBPAY_WEBHOOKS: 'toyyibpay_webhooks',
   /** Tracks which members have already received birthday notification emails on a given date */
   BIRTHDAY_NOTIFICATIONS_SENT: 'birthdayNotificationsSent',
-  /** Nudge dismiss records written by behavioralNudgingService */
-  NUDGES: 'nudges',
+
   /** Sister / partner JCI chapters from other countries */
   SISTER_CHAPTERS: 'sisterChapters',
   /** Atomic sequence counters (e.g. PR reference number generation) */

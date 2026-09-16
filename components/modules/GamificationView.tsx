@@ -3,7 +3,6 @@ import { Tabs } from '../ui/Common';
 import { AsyncErrorBoundary } from '../ui/AsyncErrorBoundary';
 import { LOStarDashboard } from './LOStarDashboard';
 import { IncentiveProgramManager } from './IncentiveProgramManager';
-import { BehavioralNudgingConfig } from './BehavioralNudgingConfig';
 import { AwardsView } from './AwardsView';
 import { usePermissions } from '../../hooks/usePermissions';
 
@@ -20,7 +19,6 @@ export const GamificationView: React.FC<{ searchQuery?: string }> = ({ searchQue
   if (canManagePoints) {
     availableTabs.push({ id: 'awards', label: 'Awards' });
     availableTabs.push({ id: 'rules', label: 'Program Config' });
-    availableTabs.push({ id: 'nudging', label: 'Behavioral Nudging' });
   }
 
   return (
@@ -35,8 +33,6 @@ export const GamificationView: React.FC<{ searchQuery?: string }> = ({ searchQue
         <IncentiveProgramManager />
       ) : activeTab === 'awards' ? (
         <AwardsView searchQuery={searchQuery} />
-      ) : activeTab === 'nudging' ? (
-        <BehavioralNudgingConfig />
       ) : (
         <AsyncErrorBoundary><LOStarDashboard /></AsyncErrorBoundary>
       )}

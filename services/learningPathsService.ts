@@ -1,10 +1,8 @@
-// Learning Paths, Learning Progress & Certificates Service
+// Learning Paths & Learning Progress Service
 // Fixes applied:
-//   P0 – issueCertificate now validates learningProgress completion before creating cert
-//   P1 – issueCertificate + progress update are atomic (writeBatch)
 //   P1 – startLearningPath uses runTransaction to prevent duplicate progress records
-//   P1 – updateProgress wraps cert creation + progress update in writeBatch
-//   P1 – deleteLearningPath cascades: batch-deletes all learningProgress + soft-deletes certs
+//   P1 – updateProgress uses writeBatch for atomic writes
+//   P1 – deleteLearningPath cascades: batch-deletes all learningProgress records
 //   P1 – isDevMode() guard + cacheService on every read; invalidate on every write
 import {
   collection,
@@ -38,7 +36,6 @@ export interface LearningPath {
   estimatedDuration: number; // in hours
   difficulty: 'Foundation' | 'Intermediate' | 'Advance';
   pointsReward: number;
-  certificateIssued: boolean;
   prerequisites?: string[]; // Path IDs that must be completed first
   materials?: string[]; // External resource URLs
   status: 'Active' | 'Draft' | 'Archived';
@@ -55,29 +52,13 @@ export interface LearningProgress {
   startedAt: Date | Timestamp;
   completedAt?: Date | Timestamp;
   progress: number; // 0-100
-  certificateIssued: boolean;
-  certificateId?: string;
-}
-
-export interface Certificate {
-  id?: string;
-  memberId: string;
-  pathId: string;
-  pathName: string;
-  issuedAt: Date | Timestamp;
-  issuedBy: string;
-  certificateNumber: string;
-  verificationCode: string;
-  fileUrl?: string;
-  status: 'Active' | 'Revoked';
-  isDeleted?: boolean;
 }
 
 // ─── Cache keys & TTLs ───────────────────────────────────────────────────────
 
 const CACHE_KEY_PATHS_ALL = 'learningPaths_all';
 const CACHE_KEY_PROGRESS = (memberId: string) => `learningProgress_${memberId}`;
-const CACHE_KEY_CERTS = (memberId: string) => `certificates_${memberId}`;
+
 const CACHE_TTL = CACHE_TTL_3MIN;
 
 // ─── Dev-mode mock data ───────────────────────────────────────────────────────
@@ -92,7 +73,6 @@ const MOCK_PATHS: LearningPath[] = [
     estimatedDuration: 40,
     difficulty: 'Foundation',
     pointsReward: 500,
-    certificateIssued: true,
     status: 'Active',
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
@@ -111,10 +91,6 @@ export class LearningPathsService {
 
   static invalidateProgressCache(memberId: string): void {
     apiCache.delete(CACHE_KEY_PROGRESS(memberId));
-  }
-
-  static invalidateCertificatesCache(memberId: string): void {
-    apiCache.delete(CACHE_KEY_CERTS(memberId));
   }
 
   // ── Read: Learning Paths ────────────────────────────────────────────────────
@@ -185,56 +161,6 @@ export class LearningPathsService {
     }, CACHE_TTL);
   }
 
-  // ── Read: Certificates ──────────────────────────────────────────────────────
-
-  static async getMemberCertificates(memberId: string): Promise<Certificate[]> {
-    if (isDevMode()) return [];
-    return apiCache.getOrSet(CACHE_KEY_CERTS(memberId), async () => {
-      try {
-        const snapshot = await getDocs(
-          query(
-            collection(db, COLLECTIONS.CERTIFICATES),
-            where('memberId', '==', memberId),
-            where('status', '==', 'Active'),
-            orderBy('issuedAt', 'desc')
-          )
-        );
-        return snapshot.docs.map(d => ({
-          id: d.id,
-          ...d.data(),
-          issuedAt: d.data().issuedAt?.toDate() || new Date(),
-        })) as Certificate[];
-      } catch (error) {
-        errorLoggingService.logError(error as Error, { action: 'LearningPathsService.getMemberCertificates', userId: memberId });
-        throw error;
-      }
-    }, CACHE_TTL);
-  }
-
-  static async verifyCertificate(certificateNumber: string, verificationCode: string): Promise<Certificate | null> {
-    if (isDevMode()) return null;
-    try {
-      const snapshot = await getDocs(
-        query(
-          collection(db, COLLECTIONS.CERTIFICATES),
-          where('certificateNumber', '==', certificateNumber),
-          where('verificationCode', '==', verificationCode),
-          where('status', '==', 'Active')
-        )
-      );
-      if (snapshot.empty) return null;
-      const certDoc = snapshot.docs[0];
-      return {
-        id: certDoc.id,
-        ...certDoc.data(),
-        issuedAt: certDoc.data().issuedAt?.toDate() || new Date(),
-      } as Certificate;
-    } catch (error) {
-      errorLoggingService.logError(error as Error, { action: 'LearningPathsService.verifyCertificate' });
-      throw error;
-    }
-  }
-
   // ── Write: Learning Paths ───────────────────────────────────────────────────
 
   static async createLearningPath(pathData: Omit<LearningPath, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
@@ -278,44 +204,20 @@ export class LearningPathsService {
   static async deleteLearningPath(pathId: string): Promise<void> {
     if (isDevMode()) return;
     try {
-      // Collect all progress records for this path
       const progressSnap = await getDocs(
         query(collection(db, COLLECTIONS.LEARNING_PROGRESS), where('pathId', '==', pathId))
       );
 
-      // Collect all active certificates for this path
-      const certSnap = await getDocs(
-        query(collection(db, COLLECTIONS.CERTIFICATES), where('pathId', '==', pathId))
-      );
-
-      // Build affected member IDs for cache invalidation
       const affectedMembers = new Set<string>();
       progressSnap.docs.forEach(d => affectedMembers.add(d.data().memberId as string));
-      certSnap.docs.forEach(d => affectedMembers.add(d.data().memberId as string));
 
-      // Batch all writes (500-op limit respected — typical counts are far below)
       const batch = writeBatch(db);
-
-      // Hard-delete progress records
       progressSnap.docs.forEach(d => batch.delete(d.ref));
-
-      // Soft-delete certificates (preserve audit trail)
-      const now = Timestamp.now();
-      certSnap.docs.forEach(d =>
-        batch.update(d.ref, { isDeleted: true, status: 'Revoked', deletedAt: now })
-      );
-
-      // Delete the path document itself
       batch.delete(doc(db, COLLECTIONS.LEARNING_PATHS, pathId));
-
       await batch.commit();
 
-      // Invalidate caches
       this.invalidateLearningPathsCache();
-      affectedMembers.forEach(memberId => {
-        this.invalidateProgressCache(memberId);
-        this.invalidateCertificatesCache(memberId);
-      });
+      affectedMembers.forEach(memberId => this.invalidateProgressCache(memberId));
     } catch (error) {
       errorLoggingService.logError(error as Error, { action: 'LearningPathsService.deleteLearningPath', additionalData: { pathId } });
       throw error;
@@ -351,7 +253,6 @@ export class LearningPathsService {
           completedModules: [],
           startedAt: Timestamp.now(),
           progress: 0,
-          certificateIssued: false,
         });
       });
       return progressId;
@@ -401,28 +302,6 @@ export class LearningPathsService {
 
       if (isCompleted) {
         updates.completedAt = Timestamp.now();
-
-        if (path.certificateIssued && !progress.certificateIssued) {
-          // P1 fix: create certificate doc in the same batch
-          const certRef = doc(collection(db, COLLECTIONS.CERTIFICATES));
-          const certificateNumber = `JCI-${Date.now()}-${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
-          const verificationCode = Math.random().toString(36).substring(2, 14).toUpperCase();
-
-          batch.set(certRef, {
-            memberId: progress.memberId,
-            pathId: progress.pathId,
-            pathName: path.name,
-            issuedAt: Timestamp.now(),
-            issuedBy: 'JCI Kuala Lumpur',
-            certificateNumber,
-            verificationCode,
-            status: 'Active',
-            isDeleted: false,
-          } satisfies Omit<Certificate, 'id'>);
-
-          updates.certificateIssued = true;
-          updates.certificateId = certRef.id;
-        }
       }
 
       batch.update(progressRef, updates);
@@ -450,87 +329,11 @@ export class LearningPathsService {
         }
       }
 
-      // Invalidate caches for the member
       this.invalidateProgressCache(progress.memberId);
-      if (isCompleted) this.invalidateCertificatesCache(progress.memberId);
     } catch (error) {
       errorLoggingService.logError(error as Error, { action: 'LearningPathsService.updateProgress', additionalData: { progressId, moduleId } });
       throw error;
     }
   }
 
-  /**
-   * P0 fix: validates that the member has actually completed the learning path
-   * before issuing a certificate. Throws if completion is not confirmed.
-   *
-   * This method is still exposed publicly (e.g. for admin re-issue), but it now
-   * performs the guard that prevents SDK-level certificate forgery.
-   *
-   * NOTE: When called from updateProgress the cert doc is written inside the
-   * shared writeBatch above — this standalone method is for admin/manual re-issue
-   * only and writes its own single-doc batch.
-   *
-   * Firestore rules allow any authenticated user to create a certificate document
-   * (allow create: if isAuthenticated()), so client-side writes from updateProgress
-   * succeed without needing an Admin SDK bypass.
-   */
-  static async issueCertificate(memberId: string, pathId: string, pathName: string): Promise<string> {
-    if (isDevMode()) return 'mock-cert-id';
-    try {
-      // P0 guard: verify completion before issuing
-      const progressSnap = await getDocs(
-        query(
-          collection(db, COLLECTIONS.LEARNING_PROGRESS),
-          where('memberId', '==', memberId),
-          where('pathId', '==', pathId)
-        )
-      );
-
-      const progressRecord = progressSnap.docs[0]?.data() as LearningProgress | undefined;
-      const isCompleted =
-        progressRecord &&
-        (progressRecord.progress >= 100 || progressRecord.completedAt !== undefined);
-
-      if (!isCompleted) {
-        throw new Error(
-          `Cannot issue certificate: member ${memberId} has not completed path ${pathId}`
-        );
-      }
-
-      const certRef = doc(collection(db, COLLECTIONS.CERTIFICATES));
-      const certificateNumber = `JCI-${Date.now()}-${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
-      const verificationCode = Math.random().toString(36).substring(2, 14).toUpperCase();
-
-      const batch = writeBatch(db);
-      batch.set(certRef, {
-        memberId,
-        pathId,
-        pathName,
-        issuedAt: Timestamp.now(),
-        issuedBy: 'JCI Kuala Lumpur',
-        certificateNumber,
-        verificationCode,
-        status: 'Active',
-        isDeleted: false,
-      } satisfies Omit<Certificate, 'id'>);
-
-      // Mark progress record as cert-issued (if not already)
-      if (progressSnap.docs[0] && progressRecord?.certificateIssued === false) {
-        batch.update(progressSnap.docs[0].ref, {
-          certificateIssued: true,
-          certificateId: certRef.id,
-        });
-      }
-
-      await batch.commit();
-
-      this.invalidateCertificatesCache(memberId);
-      this.invalidateProgressCache(memberId);
-
-      return certRef.id;
-    } catch (error) {
-      errorLoggingService.logError(error as Error, { action: 'LearningPathsService.issueCertificate', userId: memberId, additionalData: { pathId } });
-      throw error;
-    }
-  }
 }

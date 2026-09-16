@@ -24,8 +24,7 @@ import { useEvents } from './hooks/useEvents';
 import { useProjects } from './hooks/useProjects';
 import { useCommunication } from './hooks/useCommunication';
 import { usePoints } from './hooks/usePoints';
-import { useBehavioralNudging } from './hooks/useBehavioralNudging';
-import { NudgeBanner } from './components/ui/NudgeBanner';
+
 import { useInstallPrompt } from './hooks/useInstallPrompt';
 import { useAppNavigation } from './hooks/useAppNavigation';
 

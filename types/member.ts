@@ -414,7 +414,7 @@ export interface PromotionRequirementDetails {
   meetingDate?: Date;
   courseId?: string;
   courseName?: string;
-  completionCertificate?: string;
+
   role?: string;
 }
 

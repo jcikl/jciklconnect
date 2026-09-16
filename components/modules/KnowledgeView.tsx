@@ -8,7 +8,7 @@ import { useKnowledge } from '../../hooks/useKnowledge';
 import { useLearningPaths } from '../../hooks/useLearningPaths';
 import { useAuth } from '../../hooks/useAuth';
 import { usePermissions } from '../../hooks/usePermissions';
-import { LearningPathsService, LearningPath, LearningProgress, Certificate } from '../../services/learningPathsService';
+import { LearningPathsService, LearningPath, LearningProgress } from '../../services/learningPathsService';
 import { DocumentsService, DocumentWithVersions, DocumentVersion } from '../../services/documentsService';
 import { formatDate } from '../../utils/dateUtils';
 import { formatFileSize } from '../../utils/formatUtils';
@@ -218,7 +218,7 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                                     if (editingPathId) {
                                         await updatePath(editingPathId, { ...pathForm, materials });
                                     } else {
-                                        await createPath({ ...pathForm, modules: [], prerequisites: [], materials, pointsReward: 0, certificateIssued: false });
+                                        await createPath({ ...pathForm, modules: [], prerequisites: [], materials, pointsReward: 0 });
                                     }
                                     setIsPathModalOpen(false);
                                     setEditingPathId(null);
@@ -769,51 +769,6 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ documents, loading, error, 
     );
 };
 
-interface CertificatesTabProps {
-    certificates: Certificate[];
-    loading?: boolean;
-    error?: string | null;
-}
-
-const CertificatesTab: React.FC<CertificatesTabProps> = ({ certificates, loading = false, error = null }) => {
-    return (
-        <LoadingState loading={loading} error={error} empty={certificates.length === 0} emptyMessage="No certificates earned yet">
-            <div className="grid md:grid-cols-2 gap-6">
-                {certificates.map(cert => (
-                    <Card key={cert.id} className="hover:shadow-md transition-shadow">
-                        <div className="flex items-start justify-between mb-4">
-                            <div className="p-3 bg-gradient-to-br from-yellow-400 to-amber-500 rounded-lg">
-                                <Award className="text-white" size={24} />
-                            </div>
-                            <Badge variant="success">Verified</Badge>
-                        </div>
-                        <h3 className="font-bold text-lg text-slate-900 mb-2">{cert.pathName}</h3>
-                        <div className="space-y-2 text-sm text-slate-600 mb-4">
-                            <div>
-                                <span className="font-medium">Certificate #:</span> {cert.certificateNumber}
-                            </div>
-                            <div>
-                                <span className="font-medium">Issued:</span> {formatDate(cert.issuedAt as Date)}
-                            </div>
-                            <div>
-                                <span className="font-medium">Verification Code:</span> {cert.verificationCode}
-                            </div>
-                        </div>
-                        <div className="flex gap-2 pt-4 border-t">
-                            <Button variant="outline" size="sm" className="flex-1">
-                                <Download size={14} className="mr-2" />
-                                Download
-                            </Button>
-                            <Button variant="outline" size="sm">
-                                Verify
-                            </Button>
-                        </div>
-                    </Card>
-                ))}
-            </div>
-        </LoadingState>
-    );
-};
 
 interface LearningPathDetailModalProps {
     path: LearningPath;
@@ -941,11 +896,6 @@ const LearningPathDetailModal: React.FC<LearningPathDetailModalProps> = ({
                         }}>
                             <PlayCircle size={16} className="mr-2" />
                             Start Learning Path
-                        </Button>
-                    ) : progress.progress === 100 ? (
-                        <Button className="flex-1" variant="outline">
-                            <Award size={16} className="mr-2" />
-                            View Certificate
                         </Button>
                     ) : (
                         <Button className="flex-1">
