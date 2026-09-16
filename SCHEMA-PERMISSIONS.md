@@ -118,6 +118,7 @@ econciliations | B+/A+ | B+/A+ | B+/A+(必填字段) | A+ 或 B+(仅notes字段)
 | socialPosts | M+(自己或B+) | M+ | M+(自己，draft，字段验证) | B+/A+ 或 自己(draft/rejected) | A+ | |
 | socialPersonas | M+ | M+ | B+ | B+ | B+ | |
 | counters | — | — | — | — | — | ⚠️ P0：无Firestore规则→付款申请创建失败 |
+| postcodes | 登 | 登 | A+ | A+ | A+ | |
 
 ---
 

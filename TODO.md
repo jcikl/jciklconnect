@@ -20,7 +20,7 @@
 - 不包含：业务逻辑重写、数据迁移、新功能开发、服务代码修改。
 - 完成标准：
   - [x] SCHEMA.md 覆盖全部集合，每集合有完整字段表（字段路径、类型、必填、枚举、来、往）。（2026-09-16 全部11批次完成，新增 postcodes/webhooks/webhook_logs 集合节）
-  - [ ] SCHEMA-PERMISSIONS.md 汇总表覆盖全部集合，每行有 get/list/create/update/delete 五列。（已有 88+ 集合，下一步验证是否缺少 postcodes/webhooks/webhook_logs 三行）
+  - [x] SCHEMA-PERMISSIONS.md 汇总表覆盖全部集合，每行有 get/list/create/update/delete 五列。（2026-09-16：webhooks/webhook_logs 已有；补写 postcodes 行）
   - [x] 每批次分析完成后在本文件标记完成并记录验证结果。（2026-09-16 全部11批次已标记）
   - [ ] RADAR_CONTRIBUTIONS 常量问题在第一批次修复（P0）。（待确认集合名称）
 
