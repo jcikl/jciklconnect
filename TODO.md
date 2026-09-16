@@ -19,10 +19,10 @@
 - 范围：全部 88 个 Firestore 集合的字段路径、类型、枚举值、来/往流向、权限矩阵。
 - 不包含：业务逻辑重写、数据迁移、新功能开发、服务代码修改。
 - 完成标准：
-  - [ ] SCHEMA.md 覆盖全部集合，每集合有完整字段表（字段路径、类型、必填、枚举、来、往）。
-  - [ ] SCHEMA-PERMISSIONS.md 汇总表覆盖全部集合，每行有 get/list/create/update/delete 五列。
-  - [ ] 每批次分析完成后在本文件标记完成并记录验证结果。
-  - [ ] RADAR_CONTRIBUTIONS 常量问题在第一批次修复（P0）。
+  - [x] SCHEMA.md 覆盖全部集合，每集合有完整字段表（字段路径、类型、必填、枚举、来、往）。（2026-09-16 全部11批次完成，新增 postcodes/webhooks/webhook_logs 集合节）
+  - [ ] SCHEMA-PERMISSIONS.md 汇总表覆盖全部集合，每行有 get/list/create/update/delete 五列。（已有 88+ 集合，下一步验证是否缺少 postcodes/webhooks/webhook_logs 三行）
+  - [x] 每批次分析完成后在本文件标记完成并记录验证结果。（2026-09-16 全部11批次已标记）
+  - [ ] RADAR_CONTRIBUTIONS 常量问题在第一批次修复（P0）。（待确认集合名称）
 
 ---
 
@@ -44,11 +44,11 @@
 | 4 | 财务延伸 | `contracts`、`pointEscrow`、`sponsorships`、`inventoryItems`、`stock_movements`、`maintenance_schedules`、`inventory_alerts`、`finance_alerts` | ✅ 完成（2026-09-16：8/8 已完整，无需补写） |
 | 5 | 积分与游戏化 | `points`、`pointsRules`、`pointsRuleExecutions`、`badges`、`badgeAwards`、`achievements`、`achievementAwards`、`achievementProgress`、`incentivePrograms`、`incentiveStandards`、`incentiveSubmissions`、`loStarProgress` | ✅ 完成（2026-09-16：10/12 已完整；补写 pointsRules 7行、badgeAwards 3行来/往） |
 | 6 | 知识与成长 | `learningPaths`、`learningProgress`、`trainingModules`、`documents`、`documentVersions`、`surveys`、`surveyResponses` | ✅ 完成（2026-09-16：6/7 已完整；补写 surveys 9行、learningPaths 1行来/往） |
-| 7 | 社群与互动 | `hobbyClubs`、`communication`、`mentorMatches`、`mentorshipFeedback`、`zoomBookings`、`guestPageStats`、`memberBenefits`、`benefitUsage` | ⬜ 未开始 |
-| 8 | 商业与网络 | `businessProfiles`、`publicBusinessListings`、`advertisements`、`promotionPackages`、`publications`、`partnerships`、`sisterChapters`、`inquiries` | ⬜ 未开始 |
-| 9 | 自动化与治理 | `automationRules`、`workflows`、`workflow_executions`、`tasks`、`notifications`、`templates` | ⬜ 未开始 |
-| 10 | 会员旅程 | `socialPosts`、`socialPersonas`、`RegistrationHistory`、`postcodes`、`guestRegistrations` | ⬜ 未开始 |
-| 11 | 系统与审计 | `auditLog`、`errorLogs`、`emailLogs`、`systemLogs`、`webhooks`、`webhook_logs`、`counters`、`system`、`system_config`、`systemSettings`、`permissionCatalog`、`birthdayNotificationsSent` | ⬜ 未开始 |
+| 7 | 社群与互动 | `hobbyClubs`、`communication`、`mentorMatches`、`mentorshipFeedback`、`zoomBookings`、`guestPageStats`、`memberBenefits`、`benefitUsage` | ✅ 完成（2026-09-16：8/8 已完整，无需补写） |
+| 8 | 商业与网络 | `businessProfiles`、`publicBusinessListings`、`advertisements`、`promotionPackages`、`publications`、`partnerships`、`sisterChapters`、`inquiries` | ✅ 完成（2026-09-16：补写 advertisements 1行来/往；其余7集合已完整） |
+| 9 | 自动化与治理 | `automationRules`、`workflows`、`workflow_executions`、`tasks`、`notifications`、`templates` | ✅ 完成（2026-09-16：补写 workflows 3行、automationRules 3行、workflow_executions 21行、notifications 2行、templates 1行；tasks 已完整） |
+| 10 | 会员旅程 | `socialPosts`、`socialPersonas`、`RegistrationHistory`、`postcodes`、`guestRegistrations` | ✅ 完成（2026-09-16：补写 socialPosts 1行；新增 postcodes 集合节；其余3集合已完整） |
+| 11 | 系统与审计 | `auditLog`、`errorLogs`、`emailLogs`、`systemLogs`、`webhooks`、`webhook_logs`、`counters`、`system`、`system_config`、`systemSettings`、`permissionCatalog`、`birthdayNotificationsSent` | ✅ 完成（2026-09-16：补写 auditLog 2行、errorLogs 4行、emailLogs 1行、systemLogs 1行；新增 webhooks 和 webhook_logs 集合节；其余已完整） |
 
 ---
 
@@ -87,3 +87,8 @@
 - [x] 批次 4 财务延伸（2026-09-16；8/8 已完整，无需补写）
 - [x] 批次 5 积分与游戏化（2026-09-16；补写 pointsRules 7行、badgeAwards 3行；其余10集合已完整）
 - [x] 批次 6 知识与成长（2026-09-16；补写 surveys 9行、learningPaths 1行；其余6集合已完整）
+- [x] 批次 7 社群与互动（2026-09-16；8/8 已完整，无需补写）
+- [x] 批次 8 商业与网络（2026-09-16；补写 advertisements 1行；其余7集合已完整）
+- [x] 批次 9 自动化与治理（2026-09-16；补写 workflows 3行、automationRules 3行、workflow_executions 21行、notifications 2行、templates 1行）
+- [x] 批次 10 会员旅程（2026-09-16；补写 socialPosts 1行；新增 postcodes 集合节）
+- [x] 批次 11 系统与审计（2026-09-16；补写 auditLog 2行、errorLogs 4行、emailLogs 1行、systemLogs 1行；新增 webhooks 和 webhook_logs 集合节）

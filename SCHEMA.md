@@ -936,7 +936,7 @@
 | id | string | — | Firestore doc ID（接口标注 `id?`） | 系统: Firestore doc id | 广告查询与投放 |
 | title | string | ✓ | | 角色: 广告主；系统: 广告表单 | 广告展示 |
 | description | string | ✓ | | 角色: 广告主；系统: 广告表单 | 广告详情展示 |
-| type | enum | ✓ | `Banner` \| `Newsletter` \| `Event Sponsorship` \| `Social Media` \| `Website` |
+| type | enum | ✓ | `Banner` \| `Newsletter` \| `Event Sponsorship` \| `Social Media` \| `Website` | 角色: 广告主；系统: 广告表单 | 广告类型展示与投放配置 |
 | placement | enum[] | ✓ | `Homepage` \| `Events Page` \| `Newsletter Header` \| `Newsletter Footer` \| `Sidebar` \| `Popup` | 角色: 广告主；系统: 广告表单 | 广告位置筛选与投放 |
 | targetAudience | enum | — | `All Members` \| `Specific Tier` \| `Specific Role` \| `Custom` | 角色: 广告主；系统: 广告表单 | 受众筛选与投放 |
 | targetCriteria | object | — | | 系统: 受众配置表单 | 受众匹配 |
@@ -1026,7 +1026,7 @@
 | id | string | ✓ | Firestore doc ID | 系统: Firestore doc id | 邮件日志查询 |
 | recipientEmail | string | ✓ | | 系统: 邮件发送目标 | 邮件投递记录 |
 | recipientMemberId | string | — | | 系统: `members.id` 邮件目标 | 成员邮件历史 |
-| emailType | enum | ✓ | `invitation` \| `birthday` \| `promotion` \| `announcement` \| `payment` \| `other` |
+| emailType | enum | ✓ | `invitation` \| `birthday` \| `promotion` \| `announcement` \| `payment` \| `other` | 系统: 触发邮件的业务场景 | 邮件类型筛选与统计 |
 | sentAt | Date \| string | ✓ | | 系统: 邮件发送时间 | 邮件日志排序 |
 | success | boolean | ✓ | | 系统: 邮件服务返回结果 | 发送状态与重试 |
 | errorMessage | string | — | | 系统: 邮件服务错误 | 失败诊断 |
@@ -1539,11 +1539,11 @@
 | description | string | — | | 流程创建/编辑表单 | 流程详情展示 |
 | nodes | WorkflowNode[] | ✓ | 见子字段 | Workflow Designer 节点配置 | `executeWorkflow()` 执行步骤 |
 | nodes[].id | string | ✓ | | 系统: Workflow Designer 节点配置 | 节点执行与日志关联 |
-| nodes[].type | enum | ✓ | `trigger` \| `action` \| `condition` \| `delay` \| `email` \| `notification` \| `data_update` \| `task_create` \| `webhook` \| `approval` \| `loop` \| `end` |
+| nodes[].type | enum | ✓ | `trigger` \| `action` \| `condition` \| `delay` \| `email` \| `notification` \| `data_update` \| `task_create` \| `webhook` \| `approval` \| `loop` \| `end` | 系统: Workflow Designer 节点类型配置 | 节点渲染与执行分支 |
 | nodes[].position | object | ✓ | `{x: number; y: number}` | 系统: Workflow Designer 画布 | 流程编辑器布局 |
 | nodes[].data | WorkflowNodeData | ✓ | label、description、category、icon、configSchema 等 | 系统: 节点类型配置 | 节点渲染与执行配置 |
 | nodes[].connections | WorkflowConnection[] | ✓ | 见子字段 | 系统: Workflow Designer 连线配置 | 节点执行顺序 |
-| nodes[].status | enum | — | `idle` \| `running` \| `completed` \| `error` |
+| nodes[].status | enum | — | `idle` \| `running` \| `completed` \| `error` | 系统: `executeWorkflow()` 节点执行状态 | 流程可视化与错误定位 |
 | nodes[].config | map | — | | 系统: 节点配置表单 | 节点执行参数 |
 | connections | WorkflowConnection[] | ✓ | 见子字段 | Workflow Designer 连线配置 | 节点执行顺序 |
 | connections[].id | string | ✓ | | 系统: Workflow Designer 连线配置 | 连线查询与执行图构建 |
@@ -1554,7 +1554,7 @@
 | connections[].condition | WorkflowCondition | — | | 系统: 流程条件配置 | 条件分支执行 |
 | triggers | WorkflowTrigger[] | ✓ | 见子字段 | Workflow Designer 触发器配置 | 手动、事件、排程、Webhook 入口 |
 | triggers[].id | string | ✓ | | 系统: 触发器配置 | 触发器定位与日志 |
-| triggers[].type | enum | ✓ | `manual` \| `schedule` \| `event` \| `webhook` \| `data_change` |
+| triggers[].type | enum | ✓ | `manual` \| `schedule` \| `event` \| `webhook` \| `data_change` | 系统: Workflow Designer 触发器类型配置 | 触发器匹配与执行入口分支 |
 | triggers[].config | map | ✓ | | 角色: 流程管理员；系统: 触发器配置表单 | 触发条件匹配 |
 | triggers[].enabled | boolean | ✓ | | 角色: 流程管理员；系统: 触发器启停 | 触发前启用检查 |
 | status | enum | ✓ | `draft` \| `active` \| `paused` \| `archived` | 流程创建/编辑操作 | 执行前 active 状态检查 |
@@ -1582,13 +1582,13 @@
 | conditions | RuleCondition[] | — | 见子字段 | 角色: 规则管理员；系统: 规则配置表单 | 条件评估器 |
 | conditions[].id | string | ✓ | | 系统: 规则配置 | 条件定位与审计 |
 | conditions[].field | string | ✓ | | 角色: 规则管理员；系统: 规则配置 | 条件评估器 |
-| conditions[].operator | enum | ✓ | `equals` \| `not_equals` \| `greater_than` \| `less_than` \| `greater_equal` \| `less_equal` \| `contains` \| `not_contains` \| `starts_with` \| `ends_with` \| `exists` \| `not_exists` \| `in` \| `not_in` |
+| conditions[].operator | enum | ✓ | `equals` \| `not_equals` \| `greater_than` \| `less_than` \| `greater_equal` \| `less_equal` \| `contains` \| `not_contains` \| `starts_with` \| `ends_with` \| `exists` \| `not_exists` \| `in` \| `not_in` | 角色: 规则管理员；系统: 规则配置 | 条件评估器 |
 | conditions[].value | any | ✓ | | 角色: 规则管理员；系统: 规则配置 | 条件评估器 |
-| conditions[].dataType | enum | — | `string` \| `number` \| `boolean` \| `date` \| `array` \| `object` |
+| conditions[].dataType | enum | — | `string` \| `number` \| `boolean` \| `date` \| `array` \| `object` | 角色: 规则管理员；系统: 规则配置 | 条件值类型转换 |
 | conditions[].logicalOperator | enum | — | `AND` \| `OR` | 角色: 规则管理员；系统: 规则配置 | 条件组合 |
 | actions | RuleAction[] | — | 见子字段 | 角色: 规则管理员；系统: 规则配置表单 | 规则执行器 |
 | actions[].id | string | ✓ | | 系统: 规则配置 | 动作定位与审计 |
-| actions[].type | enum | ✓ | `send_email` \| `send_notification` \| `update_field` \| `update_member` \| `create_task` \| `award_points` \| `award_badge` \| `trigger_workflow` \| `webhook` \| `send_webhook` \| `log_event` |
+| actions[].type | enum | ✓ | `send_email` \| `send_notification` \| `update_field` \| `update_member` \| `create_task` \| `award_points` \| `award_badge` \| `trigger_workflow` \| `webhook` \| `send_webhook` \| `log_event` | 角色: 规则管理员；系统: 规则配置 | 动作执行器分支选择 |
 | actions[].config | map | ✓ | | 角色: 规则管理员；系统: 规则配置 | 动作执行参数 |
 | actions[].enabled | boolean | — | | 角色: 规则管理员；系统: 动作启停 | 执行前动作筛选 |
 | actions[].order | number | — | | 系统: 规则配置 | 动作执行顺序 |
@@ -1610,34 +1610,34 @@
 | duration | number | — | 毫秒 | 系统: 开始与完成时间计算 | 执行性能统计 |
 | triggeredBy | enum | ✓ | `manual` \| `event` \| `schedule` \| `webhook` \| `condition` | 系统: 触发器上下文 | 执行统计与审计 |
 | triggerData | map | — | | 系统: 触发器上下文 | 条件评估与审计 |
-| nodeExecutions | WorkflowNodeExecution[] | ✓ | 见子字段 |
-| nodeExecutions[].id | string | — | |
-| nodeExecutions[].nodeId | string | ✓ | |
-| nodeExecutions[].nodeType | string | ✓ | |
-| nodeExecutions[].status | enum | ✓ | `success` \| `failed` \| `running` \| `pending` \| `skipped` \| `completed` |
-| nodeExecutions[].startedAt | string | — | |
-| nodeExecutions[].completedAt | string | — | |
-| nodeExecutions[].input | map | — | |
-| nodeExecutions[].output | map | — | |
-| nodeExecutions[].error | string | — | |
-| nodeExecutions[].duration | number | — | |
-| executedSteps | WorkflowExecutionStep[] | ✓ | 见子字段 |
-| executedSteps[].stepId | string | ✓ | |
-| executedSteps[].stepType | string | ✓ | |
-| executedSteps[].stepOrder | number | ✓ | |
-| executedSteps[].status | enum | ✓ | `pending` \| `running` \| `completed` \| `success` \| `failed` \| `skipped` |
-| executedSteps[].startedAt | string | — | |
-| executedSteps[].completedAt | string | — | |
-| executedSteps[].duration | number | — | |
-| executedSteps[].error | string | — | |
-| executedSteps[].output | map | — | |
+| nodeExecutions | WorkflowNodeExecution[] | ✓ | 见子字段 | 系统: `executeWorkflow()` 逐节点执行 | 节点执行日志展示与失败定位 |
+| nodeExecutions[].id | string | — | | 系统: 节点执行标识 | 执行记录查询 |
+| nodeExecutions[].nodeId | string | ✓ | | 系统: `workflows.nodes[].id` | 关联节点定位 |
+| nodeExecutions[].nodeType | string | ✓ | | 系统: `workflows.nodes[].type` | 节点类型展示 |
+| nodeExecutions[].status | enum | ✓ | `success` \| `failed` \| `running` \| `pending` \| `skipped` \| `completed` | 系统: 节点执行结果 | 执行状态展示 |
+| nodeExecutions[].startedAt | string | — | | 系统: 节点开始执行时间 | 执行耗时展示 |
+| nodeExecutions[].completedAt | string | — | | 系统: 节点完成时间 | 执行耗时展示 |
+| nodeExecutions[].input | map | — | | 系统: 节点输入上下文 | 调试与审计 |
+| nodeExecutions[].output | map | — | | 系统: 节点执行结果 | 下游节点输入与审计 |
+| nodeExecutions[].error | string | — | | 系统: 节点错误信息 | 失败诊断 |
+| nodeExecutions[].duration | number | — | | 系统: 节点执行耗时（毫秒）| 性能统计 |
+| executedSteps | WorkflowExecutionStep[] | ✓ | 见子字段 | 系统: `executeWorkflow()` 步骤追踪 | 步骤级执行日志展示 |
+| executedSteps[].stepId | string | ✓ | | 系统: 步骤标识 | 步骤定位 |
+| executedSteps[].stepType | string | ✓ | | 系统: 步骤类型 | 步骤类型展示 |
+| executedSteps[].stepOrder | number | ✓ | | 系统: 步骤顺序索引 | 执行顺序展示 |
+| executedSteps[].status | enum | ✓ | `pending` \| `running` \| `completed` \| `success` \| `failed` \| `skipped` | 系统: 步骤执行结果 | 步骤状态展示 |
+| executedSteps[].startedAt | string | — | | 系统: 步骤开始时间 | 执行耗时展示 |
+| executedSteps[].completedAt | string | — | | 系统: 步骤完成时间 | 执行耗时展示 |
+| executedSteps[].duration | number | — | | 系统: 步骤耗时（毫秒）| 性能统计 |
+| executedSteps[].error | string | — | | 系统: 步骤错误信息 | 失败诊断 |
+| executedSteps[].output | map | — | | 系统: 步骤执行输出 | 审计与下游传递 |
 | error | object | — | | 系统: 工作流运行时错误 | 失败详情展示与重试 |
 | error.message | string | ✓ | | 系统: 错误处理器 | 失败详情展示 |
 | error.stepId | string | — | | 系统: 步骤执行器 | 失败步骤定位 |
 | error.stepType | string | — | | 系统: 步骤执行器 | 失败类型展示 |
 | error.stack | string | — | | 系统: 错误处理器 | 错误诊断 |
 | context | map | — | | 系统: 工作流执行上下文 | 调试与审计 |
-| createdAt | string | — | |
+| createdAt | string | — | | 系统: 执行记录创建时写入 | 审计与排序 |
 
 ---
 
@@ -1650,11 +1650,11 @@
 | memberId | string | ✓ | | 系统: 通知流程传入目标 `members.id` | 会员通知列表 |
 | title | string | ✓ | | 会费、晋升、活动、生日或自动化流程 | Notification Drawer |
 | message | string | ✓ | | 对应业务流程生成 | Notification Drawer |
-| type | enum | ✓ | `info` \| `success` \| `warning` \| `error` \| `ai` \| `dues_reminder` \| `event_reminder` \| `payment_request_cancelled` \| `payment_request_submitted` \| `payment_request_updated` \| `event_registration_cancelled` |
+| type | enum | ✓ | `info` \| `success` \| `warning` \| `error` \| `ai` \| `dues_reminder` \| `event_reminder` \| `payment_request_cancelled` \| `payment_request_submitted` \| `payment_request_updated` \| `event_registration_cancelled` | 系统: 业务事件类型决定 | 通知图标与分类展示 |
 | read | boolean | ✓ | | 系统: 创建时 false；`markNotificationRead()` 更新 | 已读/未读显示 |
 | timestamp | string | ✓ | | 系统: 通知创建时间 | 通知排序 |
 | readAt | string | — | | 系统: `markNotificationRead()` | 已读时间展示 |
-| isDismissible | boolean | — | |
+| isDismissible | boolean | — | | 系统: 通知类型决定 | 通知关闭按钮显示 |
 
 ---
 
@@ -1669,12 +1669,12 @@
 | timestamp | string | ✓ | | 系统: 错误捕获时间 | 错误日志排序 |
 | message | string | ✓ | | 系统: 错误处理器 | 错误详情展示 |
 | stack | string | — | | 系统: JavaScript 错误对象 | 错误诊断 |
-| componentStack | string | — | React 组件堆栈 |
-| url | string | ✓ | 发生错误时的页面 URL |
+| componentStack | string | — | React 组件堆栈 | 系统: React ErrorBoundary | 组件错误诊断 |
+| url | string | ✓ | 发生错误时的页面 URL | 系统: 错误捕获时浏览器 location | 错误来源页面诊断 |
 | userAgent | string | ✓ | | 系统: 浏览器运行时 | 错误诊断 |
 | userId | string | — | | 系统: 当前登录 `auth.uid` | 用户范围错误查询 |
-| sessionId | string | ✓ | |
-| level | enum | ✓ | `error` \| `warning` \| `info` |
+| sessionId | string | ✓ | | 系统: 错误捕获时的会话标识 | 会话范围错误聚合 |
+| level | enum | ✓ | `error` \| `warning` \| `info` | 系统: 错误严重程度分级 | 错误过滤与告警 |
 | context | map | — | 附加上下文数据 | 系统: 错误捕获上下文 | 错误诊断 |
 | resolved | boolean | — | | 角色: Admin；系统: 错误处理操作 | 错误处理状态 |
 
@@ -1692,7 +1692,7 @@
 | windowMs | number | ✓ | 批次时间窗口（毫秒） | 系统: 日志缓冲配置 | 批次性能统计 |
 | totalOps | number | ✓ | 批次内原始操作条数 | 系统: 缓冲操作计数 | 日志统计展示 |
 | entries | array | ✓ | 按 (operation, source, caller) 聚合后的条目 | 系统: 日志聚合流程 | 操作统计与诊断 |
-| entries[].operation | enum | ✓ | `READ` \| `WRITE` \| `DELETE` \| `LISTENER` \| `PERF` \| `ERROR` |
+| entries[].operation | enum | ✓ | `READ` \| `WRITE` \| `DELETE` \| `LISTENER` \| `PERF` \| `ERROR` | 系统: Firestore 操作拦截器 | 操作类型统计与诊断 |
 | entries[].source | string | ✓ | 操作的集合或资源名称 | 系统: Firestore 操作拦截器 | 来源集合统计 |
 | entries[].caller | string | ✓ | 调用方标识（服务方法名） | 系统: 操作调用上下文 | 调用方诊断 |
 | entries[].count | number | ✓ | 聚合次数 | 系统: 日志聚合流程 | 操作统计 |
@@ -1716,8 +1716,8 @@
 | before | map | — | 操作前快照 | 系统: 写入前文档读取 | 变更审计与回溯 |
 | after | map | — | 操作后快照 | 系统: 写入后文档数据 | 变更审计与回溯 |
 | metadata | map | — | 附加信息 | 系统: 审计上下文 | 审计详情展示 |
-| timestamp | Date \| string | — | 写入时间（types/misc.ts 版本含此字段） |
-| loId | string | — | LO 归属（types/misc.ts 版本含此字段） |
+| timestamp | Date \| string | — | 写入时间（types/misc.ts 版本含此字段） | 系统: 审计操作时间 | 审计日志排序 |
+| loId | string | — | LO 归属（types/misc.ts 版本含此字段） | 系统: `members.loId` / 操作上下文 | 跨 LO 审计隔离 |
 
 ---
 
@@ -1916,7 +1916,7 @@
 | editedContent | string | — | 人工修改后的内容 | 角色: 内容编辑者；系统: 编辑器 | 审核与发布内容 |
 | platformContent | map | — | `Partial<Record<platform, string>>` 各平台生成的内容 | 系统: AI/社交内容生成流程 | 平台发布内容 |
 | platforms | enum[] | ✓ | `facebook` \| `instagram` \| `linkedin` \| `xiaohongshu` | 角色: 内容创建者；系统: 发布配置 | 平台发布路由 |
-| status | enum | ✓ | `draft` \| `pending_review` \| `approved` \| `scheduled` \| `published` \| `rejected` |
+| status | enum | ✓ | `draft` \| `pending_review` \| `approved` \| `scheduled` \| `published` \| `rejected` | 角色: 内容创建者 / 审核者；系统: 审核/发布操作 | 内容列表筛选与发布入口控制 |
 | submittedBy | string | ✓ | 提交者 member ID | 系统: 当前 `members.id` | 内容审核审计 |
 | submittedByName | string | ✓ | 提交者姓名（冗余） | 系统: `members.general.name` 复制 | 内容列表展示 |
 | reviewedBy | string | — | 审核者 member ID | 系统: 审核人的 `auth.uid` | 审核审计 |
@@ -2095,7 +2095,7 @@
 | id | string | — | | 系统: Firestore doc id | 活动计划模板查询 |
 | name | string | ✓ | | 角色: Admin / Board；系统: 模板表单 | 模板列表展示 |
 | description | string | — | | 角色: Admin / Board；系统: 模板表单 | 模板详情展示 |
-| type | enum | ✓ | `Community` \| `Business` \| `Individual` \| `International` |
+| type | enum | ✓ | `Community` \| `Business` \| `Individual` \| `International` | 角色: Admin / Board；系统: 模板表单 | 模板分类筛选与 `activityPlans` 默认类型 |
 | defaultObjectives | string | — | | 角色: Admin / Board；系统: 模板表单 | `activityPlans.objectives` 默认值 |
 | defaultExpectedImpact | string | — | | 角色: Admin / Board；系统: 模板表单 | `activityPlans.expectedImpact` 默认值 |
 | defaultResources | string[] | — | | 角色: Admin / Board；系统: 模板表单 | `activityPlans.resources` 默认值 |
@@ -2232,6 +2232,71 @@
 | sentAt | Timestamp | ✓ | 服务器时间戳 | 系统: `sendBirthdayNotifications` 写入时间 | 当日通知去重与发送审计 |
 | type | string | — | `personal`（个人文档）；公告文档无此字段 | 系统: 生日通知流程 | 个人/公告通知类型判断 |
 | count | number | — | 仅公告文档有：通知发送的其他会员数 | 系统: 公告通知发送统计 | 生日公告统计展示 |
+
+---
+
+## `postcodes`
+> **TS Interface:** `PostcodeEntry` (`services/postcodeService.ts`) | **Constants key:** `COLLECTIONS.POSTCODES`
+>
+> 邮政编码 → 地区/州属映射表，用于地址自动解析。有三种条目类型：精确匹配（exact）、区间匹配（range）、关键字匹配（keyword）。
+
+| 字段路径 | 类型 | 必填 | 枚举值 / 说明 | 来 | 往 |
+|--------|------|:----:|------------|----|----|
+| id | string | ✓ | Firestore doc ID，精确条目用邮编字符串 | 系统: Firestore doc id / 导入脚本 | 邮编查询与匹配 |
+| postcode | string | — | 5位数字，仅 exact 类型有效 | 角色: Admin；系统: 导入脚本 | 精确邮编匹配 |
+| minPrefix | number | — | 仅 range 类型：邮编前缀最小值 | 角色: Admin；系统: 导入脚本 | 区间匹配下界 |
+| maxPrefix | number | — | 仅 range 类型：邮编前缀最大值 | 角色: Admin；系统: 导入脚本 | 区间匹配上界 |
+| pattern | string | — | 仅 keyword 类型：正则表达式字符串 | 角色: Admin；系统: 导入脚本 | 关键字匹配模式 |
+| area | string | ✓ | 地区名称 | 角色: Admin；系统: 导入脚本 | 成员注册地区展示、表单自动填充 |
+| state | string | ✓ | 州属名称 | 角色: Admin；系统: 导入脚本 | 成员注册州属展示、表单自动填充 |
+| type | enum | ✓ | `exact` \| `range` \| `keyword` | 角色: Admin；系统: 导入脚本 | `resolveAreaFromAddress()` 匹配分支选择 |
+
+---
+
+## `webhooks`
+> **TS Interface:** `Webhook` (`services/webhookService.ts`) | **Constants key:** `COLLECTIONS.WEBHOOKS`
+>
+> 出站 Webhook 配置，由 Board+ 角色管理，系统事件触发时发送 HTTP 请求至外部端点。
+
+| 字段路径 | 类型 | 必填 | 枚举值 / 说明 | 来 | 往 |
+|--------|------|:----:|------------|----|----|
+| id | string | — | Firestore doc ID | 系统: Firestore doc id | Webhook 配置查询 |
+| name | string | ✓ | | 角色: B+；系统: Webhook 配置表单 | Webhook 列表展示 |
+| description | string | — | | 角色: B+；系统: Webhook 配置表单 | Webhook 详情展示 |
+| url | string | ✓ | 目标 HTTP 端点 | 角色: B+；系统: Webhook 配置表单 | `triggerWebhook()` 发送目标 |
+| method | enum | ✓ | `GET` \| `POST` \| `PUT` \| `DELETE` | 角色: B+；系统: Webhook 配置表单 | HTTP 请求方法 |
+| headers | map | — | 自定义请求头 | 角色: B+；系统: Webhook 配置表单 | HTTP 请求头注入 |
+| payload | map | — | 自定义请求体 | 角色: B+；系统: Webhook 配置表单 | HTTP 请求体 |
+| events | string[] | ✓ | 触发事件类型列表 | 角色: B+；系统: Webhook 配置表单 | 事件过滤与触发匹配 |
+| active | boolean | ✓ | | 角色: B+；系统: 启用/停用操作 | 触发前活跃状态检查 |
+| secret | string | — | 签名校验密钥 | 角色: B+；系统: Webhook 配置表单 | 请求签名验证 |
+| retryPolicy | object | — | 见子字段 | 角色: B+；系统: Webhook 配置表单 | 重试逻辑参数 |
+| retryPolicy.maxRetries | number | ✓ | | 角色: B+；系统: Webhook 配置 | 最大重试次数 |
+| retryPolicy.retryDelay | number | ✓ | 毫秒 | 角色: B+；系统: Webhook 配置 | 重试间隔 |
+| createdAt | Date \| Timestamp | ✓ | | 系统: Webhook 创建时写入 | 审计与排序 |
+| updatedAt | Date \| Timestamp | ✓ | | 系统: Webhook 更新时写入 | 审计与排序 |
+| lastTriggered | Date \| Timestamp | — | | 系统: `triggerWebhook()` 成功/失败后更新 | Webhook 状态展示 |
+| successCount | number | ✓ | | 系统: `increment(1)` on success | Webhook 统计展示 |
+| failureCount | number | ✓ | | 系统: `increment(1)` on failure | Webhook 统计展示 |
+
+---
+
+## `webhook_logs`
+> **TS Interface:** `WebhookLog` (`services/webhookService.ts`) | **Constants key:** `COLLECTIONS.WEBHOOK_LOGS`
+>
+> Webhook 触发日志，每次触发写入一条，保留指定天数后可按批次清理。
+
+| 字段路径 | 类型 | 必填 | 枚举值 / 说明 | 来 | 往 |
+|--------|------|:----:|------------|----|----|
+| id | string | — | Firestore doc ID | 系统: Firestore doc id | Webhook 日志查询 |
+| webhookId | string | ✓ | 关联的 Webhook 配置 ID | 系统: `webhooks.id` | Webhook 日志列表关联 |
+| event | string | ✓ | 触发的事件类型 | 系统: 触发事件上下文 | 日志事件筛选 |
+| status | enum | ✓ | `success` \| `failed` \| `pending` | 系统: `triggerWebhook()` 执行结果 | 日志状态展示与失败统计 |
+| responseCode | number | — | HTTP 响应码 | 系统: HTTP 请求响应 | 请求诊断 |
+| responseBody | string | — | HTTP 响应体 | 系统: HTTP 请求响应 | 请求诊断 |
+| error | string | — | 错误信息 | 系统: 请求失败捕获 | 失败诊断 |
+| triggeredAt | Date \| Timestamp | ✓ | | 系统: Webhook 触发时间 | 日志排序与清理窗口 |
+| duration | number | — | 毫秒 | 系统: 请求耗时计算 | 性能统计 |
 
 ---
 
