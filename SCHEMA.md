@@ -2300,3 +2300,53 @@
 
 ---
 
+## `finance`
+
+> **Purpose:** 财务年度摘要（PERF-001 优化）— 单文档集合，仅有 `finance/meta` 一个文档，记录已有交易的年份列表，避免全集合扫描。 | **Constants key:** `COLLECTIONS.FINANCE_META`
+
+| 字段 | 类型 | 必填 | 枚举/格式 | 来 | 往 |
+|------|------|:----:|------------|----|----|
+| id | — | — | 文档 ID 固定为 `meta` | 系统: 常量硬编码 | `financeService.getAllTransactionYears()` |
+| years | number[] | ✓ | 四位年份整数，如 2024 | 系统: `financeService.createTransaction()` 于事务中 `arrayUnion(txYear)` 写入 | `getAllTransactionYears()` 年份选择器；财务报表年度过滤 |
+
+---
+
+## `nonMemberLeads`
+
+> **TS Interface:** 无（字段结构由 Firestore 规则 hasAll / hasOnly 约束） | **Constants key:** 无（未定义为 COLLECTIONS 常量）
+> 来宾或潜在会员通过公开表单提交的线索，无需登录。B+ 管理跟进。
+
+| 字段 | 类型 | 必填 | 枚举/格式 | 来 | 往 |
+|------|------|:----:|------------|----|----|
+| id | string | — | Firestore doc ID | 系统: Firestore doc id | 线索列表查询 |
+| name | string | ✓ | | 公: 表单提交 | B+ 线索管理展示 |
+| email | string | ✓ | | 公: 表单提交 | B+ 跟进联系 |
+| phone | string | — | | 公: 表单提交 | B+ 跟进联系 |
+| source | string | ✓ | 来源页面或渠道标识 | 公: 表单提交 | B+ 线索来源分析 |
+| message | string | — | | 公: 表单提交 | B+ 线索备注 |
+| createdAt | Timestamp | ✓ | | 系统: 表单提交时间 | 线索排序与跟进优先级 |
+| eventId | string | — | 关联 `events.id` | 公: 活动来源传入（可选） | 线索关联活动追踪 |
+| loId | string | — | | 系统/公: 提交时传入 | 多 LO 线索分类 |
+
+---
+
+## `userRolePermissions` / `membershipTypePermissions` / `positionPermissions`
+
+> **TS Interface:** `PermissionRule` (`services/permissionConfigService.ts`) | **Constants key:** 无（三集合直接以字符串字面量引用）
+> 可配置权限规则引擎的三张规则表，由 `permissionConfigService.ts` 统一读写，在 AccessConfigView 中配置。`userRolePermissions` 按用户角色、`membershipTypePermissions` 按会员类型、`positionPermissions` 按担任职位匹配权限。
+
+| 字段 | 类型 | 必填 | 枚举/格式 | 来 | 往 |
+|------|------|:----:|------------|----|----|
+| id | string | — | Firestore doc ID，由 `permissionRuleId(principal, key)` 生成 | 系统: `permissionConfigService.saveRule()` | 规则查询与更新 |
+| permissionKey | string | ✓ | 关联 `permissionCatalog.key` | 角色: A+；系统: AccessConfigView 配置 | `permissionConfigService.getSnapshot()` 权限判断 |
+| allowed | boolean | ✓ | | 角色: A+；系统: AccessConfigView 配置 | 权限判断（true=允许，false=拒绝） |
+| active | boolean | ✓ | | 角色: A+；系统: AccessConfigView 配置 | 规则是否参与评估 |
+| priority | number | ✓ | 数值越小优先级越高 | 角色: A+；系统: AccessConfigView 配置 | 规则优先级排序 |
+| userRole | string | — | 仅 `userRolePermissions` 使用 | 角色: A+；系统: AccessConfigView 配置 | 按角色匹配规则 |
+| membershipType | string | — | 仅 `membershipTypePermissions` 使用 | 角色: A+；系统: AccessConfigView 配置 | 按会员类型匹配规则 |
+| position | string | — | 仅 `positionPermissions` 使用 | 角色: A+；系统: AccessConfigView 配置 | 按担任职位匹配规则 |
+| scope | string | — | 可选范围限定符 | 角色: A+；系统: AccessConfigView 配置 | 细粒度权限范围 |
+| updatedAt | Timestamp | — | | 系统: `saveRule()` 写入时间戳 | 审计与排序 |
+
+---
+

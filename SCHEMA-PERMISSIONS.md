@@ -1,4 +1,4 @@
-﻿# JCI KL — Firestore 权限矩阵
+# JCI KL — Firestore 权限矩阵
 
 > 数据来源：irestore.rules（1414 行）
 > 更新时重读规则文件并重跑本文档生成。
@@ -37,8 +37,6 @@ esource.data 仅在 get 中可用，因此部分集合的 list 权限会比 get 
 | projectTrx | B+/A+ | B+/A+ | B+(字段白名单) | B+(非对账，字段白名单) | B+(非对账) | |
 | ankAccounts | Finance(同LO) | A+/Finance | Finance | Finance | Finance | get 限同LO |
 | paymentRequests | 登(自己/Finance/A+) | M+/Finance/A+ | 登(自己) | 自己(draft/cancel/resubmit) 或 Finance | 自己(draft) 或 A+ | |
-| 
-onMemberLeads | B+ | B+ | 公(字段验证) | B+ | B+ | 匿名提交，B+ 管理 |
 | eventRegistrations | 登(自己/B+) | M+/B+ | 登(自己或B+) | B+(字段白名单) 或 自己(非财务字段) | B+ | |
 | points | 登 | 登 | B+ | B+/A+ | B+/A+ | |
 | 
@@ -93,7 +91,7 @@ econciliations | B+/A+ | B+/A+ | B+/A+(必填字段) | A+ 或 B+(仅notes字段)
 | loStarProgress | 自己(M+)/B+/A+ | M+ | B+/A+ | B+/A+ | B+/A+ | |
 | system_config | 登 | 登 | B+/A+ | B+/A+ | B+/A+ | |
 | systemSettings | 登 | 登 | A+ | A+ | A+ | |
-| RegistrationHistory | 登 | 登 | B+ | B+ | B+ | P0：COLLECTIONS常量不存在 |
+| RegistrationHistory | 登 | 登 | B+ | B+ | B+ | P0已修：改用 COLLECTIONS.REGISTRATION_HISTORY（commit a3e19a9）|
 | sponsorships | 登 | 登 | B+/A+ | B+/A+ | B+/A+ | P0：financeService硬编码0 |
 | system | 登 | 登 | B+ | B+ | B+ | |
 | publications | 公 | 公 | B+ | B+ | B+ | |
@@ -119,6 +117,11 @@ econciliations | B+/A+ | B+/A+ | B+/A+(必填字段) | A+ 或 B+(仅notes字段)
 | socialPersonas | M+ | M+ | B+ | B+ | B+ | |
 | counters | — | — | — | — | — | ⚠️ P0：无Firestore规则→付款申请创建失败 |
 | postcodes | 登 | 登 | A+ | A+ | A+ | |
+| finance | 登 | 登 | Finance/A+ | Finance/A+ | Finance/A+ | 单文档 finance/meta，记录已有交易年份列表 |
+| nonMemberLeads | B+ | B+ | 公(字段验证) | B+ | B+ | 匿名提交，B+ 管理 |
+| userRolePermissions | 登 | 登 | A+ | A+ | A+ | 可配置权限规则引擎：按用户角色 |
+| membershipTypePermissions | 登 | 登 | A+ | A+ | A+ | 可配置权限规则引擎：按会员类型 |
+| positionPermissions | 登 | 登 | A+ | A+ | A+ | 可配置权限规则引擎：按担任职位 |
 
 ---
 

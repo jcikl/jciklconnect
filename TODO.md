@@ -16,11 +16,11 @@
 ## 当前目标
 
 - **目标：完整拆解全系统，将所有 Firestore 集合的字段结构与权限规则记录到 SCHEMA.md 和 SCHEMA-PERMISSIONS.md，供系统复制使用。**
-- 范围：全部 88 个 Firestore 集合的字段路径、类型、枚举值、来/往流向、权限矩阵。
+- 范围：全部 Firestore 集合（含 constants.ts + firestore.rules 中的全部集合）的字段路径、类型、枚举值、来/往流向、权限矩阵。
 - 不包含：业务逻辑重写、数据迁移、新功能开发、服务代码修改。
 - 完成标准：
-  - [x] SCHEMA.md 覆盖全部集合，每集合有完整字段表（字段路径、类型、必填、枚举、来、往）。（2026-09-16 全部11批次完成，新增 postcodes/webhooks/webhook_logs 集合节）
-  - [x] SCHEMA-PERMISSIONS.md 汇总表覆盖全部集合，每行有 get/list/create/update/delete 五列。（2026-09-16：webhooks/webhook_logs 已有；补写 postcodes 行）
+  - [x] SCHEMA.md 覆盖全部集合，每集合有完整字段表（字段路径、类型、必填、枚举、来、往）。（2026-09-19：新增 finance/nonMemberLeads/userRolePermissions/membershipTypePermissions/positionPermissions 5个集合节，总覆盖率 100%）
+  - [x] SCHEMA-PERMISSIONS.md 汇总表覆盖全部集合，每行有 get/list/create/update/delete 五列。（2026-09-19：新增 finance/nonMemberLeads/userRolePermissions/membershipTypePermissions/positionPermissions 行；修正 RegistrationHistory P0 备注）
   - [x] 每批次分析完成后在本文件标记完成并记录验证结果。（2026-09-16 全部11批次已标记）
   - [x] RADAR_CONTRIBUTIONS 常量问题已修复（2026-09-19：`COLLECTIONS.RADAR_CONTRIBUTIONS` → `COLLECTIONS.REGISTRATION_HISTORY`，依据代码注释 L2435 "from RegistrationHistory"）
 
@@ -73,6 +73,8 @@
 ## 已完成
 
 - [x] P0 RADAR_CONTRIBUTIONS 修复（2026-09-19；`pointsService.ts:2438` 改用 `COLLECTIONS.REGISTRATION_HISTORY`；TypeScript 编译错误和运行时崩溃均消除）
+- [x] SCHEMA.md 覆盖率验证与补全（2026-09-19；对比 constants.ts 全集合 + firestore.rules 全 match 块，发现并补写 5 个缺失集合节：finance、nonMemberLeads、userRolePermissions、membershipTypePermissions、positionPermissions）
+- [x] SCHEMA-PERMISSIONS.md 覆盖率验证与补全（2026-09-19；新增 finance/nonMemberLeads/userRolePermissions/membershipTypePermissions/positionPermissions 行；修正 RegistrationHistory P0 备注；移除 nonMemberLeads 旧破损行）
 - [x] P0 建立当前一致性基线（2026-09-16；扫描验证：4条P0已修（counters/auditLog/emailLogs/sponsorships），4条P0待确认，SCHEMA-PERMISSIONS.md P0速查表已同步更新）
 - [x] 移除 nudges、certificates、conversations 全部相关代码（2026-09-16；commit 65599ca；13文件 -1268行）
 - [x] 关闭待确认 nudges/conversations/certificates（代码已删除，对应 Firestore 规则无需单独修复）
