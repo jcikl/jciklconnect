@@ -22,7 +22,7 @@
   - [x] SCHEMA.md 覆盖全部集合，每集合有完整字段表（字段路径、类型、必填、枚举、来、往）。（2026-09-16 全部11批次完成，新增 postcodes/webhooks/webhook_logs 集合节）
   - [x] SCHEMA-PERMISSIONS.md 汇总表覆盖全部集合，每行有 get/list/create/update/delete 五列。（2026-09-16：webhooks/webhook_logs 已有；补写 postcodes 行）
   - [x] 每批次分析完成后在本文件标记完成并记录验证结果。（2026-09-16 全部11批次已标记）
-  - [ ] RADAR_CONTRIBUTIONS 常量问题在第一批次修复（P0）。（待确认集合名称）
+  - [x] RADAR_CONTRIBUTIONS 常量问题已修复（2026-09-19：`COLLECTIONS.RADAR_CONTRIBUTIONS` → `COLLECTIONS.REGISTRATION_HISTORY`，依据代码注释 L2435 "from RegistrationHistory"）
 
 ---
 
@@ -54,12 +54,7 @@
 
 ## 待确认
 
-- [ ] **P0 RADAR_CONTRIBUTIONS：确认 `pointsService.ts` L2438 使用的集合名称**
-  - 来源：基线扫描 2026-09-16
-  - 现状：`COLLECTIONS.RADAR_CONTRIBUTIONS` 不存在于 `config/constants.ts`，雷达统计运行时崩溃
-  - 需要确认：实际集合名是 `radarContributions` 还是应改用 `COLLECTIONS.REGISTRATION_HISTORY`？
-  - 涉及文件：`services/pointsService.ts:2438`、`config/constants.ts`
-  - 完成标准：TypeScript 编译不报错；雷达统计不再崩溃
+<!-- 当前无待确认项 -->
 
 ---
 
@@ -77,6 +72,7 @@
 
 ## 已完成
 
+- [x] P0 RADAR_CONTRIBUTIONS 修复（2026-09-19；`pointsService.ts:2438` 改用 `COLLECTIONS.REGISTRATION_HISTORY`；TypeScript 编译错误和运行时崩溃均消除）
 - [x] P0 建立当前一致性基线（2026-09-16；扫描验证：4条P0已修（counters/auditLog/emailLogs/sponsorships），4条P0待确认，SCHEMA-PERMISSIONS.md P0速查表已同步更新）
 - [x] 移除 nudges、certificates、conversations 全部相关代码（2026-09-16；commit 65599ca；13文件 -1268行）
 - [x] 关闭待确认 nudges/conversations/certificates（代码已删除，对应 Firestore 规则无需单独修复）

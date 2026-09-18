@@ -135,7 +135,7 @@ otifications | list 用 resource.data → 会员永远看不到自己的通知 |
 | 11 | auditLog | AuditLogService 从未被调用（死代码）| 已修（financeService L2176、membersService L1281、paymentRequestService L467） |
 | 12 | emailLogs | 无写入者，集合永远为空，邮件无审计记录 | 已修（emailService.logEmail() L90/130/145） |
 | 13 | sponsorships | financeService 赞助收入硬编码为 0 | 已修（financeService L4579-4585 查 SponsorshipsService） |
-| 14 | RADAR_CONTRIBUTIONS | COLLECTIONS.RADAR_CONTRIBUTIONS 常量不存在 → TypeScript 编译错误 + 运行时崩溃 | 待修（需确认集合名称） |
+| 14 | RADAR_CONTRIBUTIONS | COLLECTIONS.RADAR_CONTRIBUTIONS 常量不存在 → TypeScript 编译错误 + 运行时崩溃 | 已修（pointsService.ts L2438 改用 COLLECTIONS.REGISTRATION_HISTORY） |
 
 ---
 

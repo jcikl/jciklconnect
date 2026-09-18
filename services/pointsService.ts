@@ -2435,7 +2435,7 @@ export class PointsService {
       // 4. Calculate Events Points (from RegistrationHistory)
       let events = 0;
       const contributionsSnap = await getDocs(
-        query(collection(db, COLLECTIONS.RADAR_CONTRIBUTIONS), where('memberId', '==', memberId))
+        query(collection(db, COLLECTIONS.REGISTRATION_HISTORY), where('memberId', '==', memberId))
       );
       contributionsSnap.forEach(cDoc => {
         const c = cDoc.data();
