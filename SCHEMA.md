@@ -17,49 +17,49 @@
 | general.name | string | ✓ | | name | 角色: 自注册GUEST / 自己(非锁定字段) / B+；系统: 导入 normalize | `publicBusinessListings.ownerName`、`boardMembers.memberName`；`eventRegistrations.memberName` 仅创建快照 |
 | general.fullName | string | — | | fullName | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | `publicBusinessListings.ownerName`、`boardMembers.memberName` |
 | general.chineseName | string | — | |  | 角色: 自己(非锁定字段) 或 B+ | 会员资料详情、会员目录展示 |
-| general.idNumber | string | ✓ | | idNumber / nationalId | 角色: GUEST 自己 / B+；MEMBER+ 自己不可改 |  |
+| general.idNumber | string | ✓ | | idNumber / nationalId | 角色: GUEST 自己 / B+；MEMBER+ 自己不可改 | 身份核验、唯一性检查 |
 | general.dob | string | ✓ | | dob / dateOfBirth | 角色: GUEST 自己 / B+；MEMBER+ 自己不可改；系统: 导入 normalize | 系统生成查询索引 `birthdayMMDD` |
-| general.birthPlace | string | — | |  | 角色: 自己(非锁定字段) 或 B+ |  |
+| general.birthPlace | string | — | |  | 角色: 自己(非锁定字段) 或 B+ | 会员资料详情展示 |
 | general.gender | enum | ✓ | `Male` \| `Female` | gender | 角色: 自己(非锁定字段) 或 B+ | 会员资料详情、统计筛选 |
-| general.race | enum | ✓ | `Chinese` \| `Malay` \| `Indian` \| `Others` | race / ethnicity | 角色: 自己(非锁定字段) 或 B+ |  |
-| general.nationality | string | ✓ | | nationality | 角色: GUEST 自己 / B+；MEMBER+ 自己不可改 |  |
+| general.race | enum | ✓ | `Chinese` \| `Malay` \| `Indian` \| `Others` | race / ethnicity | 角色: 自己(非锁定字段) 或 B+ | 会员资料详情、统计筛选 |
+| general.nationality | string | ✓ | | nationality | 角色: GUEST 自己 / B+；MEMBER+ 自己不可改 | 会员资料详情展示 |
 | general.avatarUrl | string | — | | avatarUrl / avatar | 角色: 自己(非锁定字段) 或 B+；系统: 头像上传/导入 normalize | `boardMembers.avatarUrl` |
-| general.avatar | string | — | | avatar | 角色: 自己(非锁定字段) 或 B+ |  |
-| general.ethnicity | string | — | | ethnicity | 角色: 自己(非锁定字段) 或 B+ |  |
-| general.age | number | — | | age | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize |  |
-| general.dietaryPreference | enum | — | `vegetarian` \| `halal` \| `normal` \| null | dietaryPreference | 角色: 自己(非锁定字段) 或 B+ |  |
+| general.avatar | string | — | | avatar | 角色: 自己(非锁定字段) 或 B+ | 会员头像展示（旧字段兼容）|
+| general.ethnicity | string | — | | ethnicity | 角色: 自己(非锁定字段) 或 B+ | 会员资料详情、统计筛选（旧字段兼容）|
+| general.age | number | — | | age | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | 会员资料详情展示 |
+| general.dietaryPreference | enum | — | `vegetarian` \| `halal` \| `normal` \| null | dietaryPreference | 角色: 自己(非锁定字段) 或 B+ | 活动餐饮安排、会员资料展示 |
 | contact | object | — | 联系信息 nested object |  | 会员资料表单 / 导入 normalize | 联系信息展示、隐私筛选 |
 | contact.email | string | ✓ | | email | 角色: 自注册GUEST / 自己(非锁定字段) / B+；系统: 导入 normalize | `memberEmails/{sanitizedEmail}` 唯一索引；Auth email sync |
-| contact.phone | string | ✓ | | phone | 角色: 自己(非锁定字段) 或 B+ |  |
-| contact.alternatePhone | string | — | | alternatePhone | 角色: 自己(非锁定字段) 或 B+ |  |
+| contact.phone | string | ✓ | | phone | 角色: 自己(非锁定字段) 或 B+ | 联系信息展示（受隐私设置控制）|
+| contact.alternatePhone | string | — | | alternatePhone | 角色: 自己(非锁定字段) 或 B+ | 联系信息展示（受隐私设置控制）|
 | contact.address | string | ✓ | | address | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | `PostcodeService` 解析生成 `contact.area/state` |
 | contact.area | string | — | |  | 系统: `contact.address` 解析 | 地区筛选/展示 |
 | contact.state | string | — | |  | 系统: `contact.address` 解析 | 地区筛选/展示 |
-| contact.whatsappJoined | boolean | ✓ | | whatsappJoined / whatsappGroup / whatsappgroup | 角色: 自己(非锁定字段) 或 B+ |  |
+| contact.whatsappJoined | boolean | ✓ | | whatsappJoined / whatsappGroup / whatsappgroup | 角色: 自己(非锁定字段) 或 B+ | WhatsApp 群管理、会员联系展示 |
 | contact.socials | object | ✓ | |  | 社交资料表单 / 导入 normalize | 会员资料展示（受 privacy 控制） |
-| contact.socials.linkedin | string | — | | linkedin / linkedIn | 角色: 自己(非锁定字段) 或 B+ |  |
-| contact.socials.facebook | string | — | | facebook | 角色: 自己(非锁定字段) 或 B+ |  |
-| contact.socials.instagram | string | — | | instagram | 角色: 自己(非锁定字段) 或 B+ |  |
-| contact.socials.wechat | string | — | | wechat / weChat | 角色: 自己(非锁定字段) 或 B+ |  |
+| contact.socials.linkedin | string | — | | linkedin / linkedIn | 角色: 自己(非锁定字段) 或 B+ | 会员社交资料展示（受隐私设置控制）|
+| contact.socials.facebook | string | — | | facebook | 角色: 自己(非锁定字段) 或 B+ | 会员社交资料展示（受隐私设置控制）|
+| contact.socials.instagram | string | — | | instagram | 角色: 自己(非锁定字段) 或 B+ | 会员社交资料展示（受隐私设置控制）|
+| contact.socials.wechat | string | — | | wechat / weChat | 角色: 自己(非锁定字段) 或 B+ | 会员社交资料展示（受隐私设置控制）|
 | contact.emergency | object | ✓ | |  | 会员资料表单 | 紧急联系人信息展示 |
-| contact.emergency.name | string | ✓ | | emergencyContactName / emergencyContact | 角色: 自己(非锁定字段) 或 B+ |  |
-| contact.emergency.relationship | string | ✓ | | emergencyContactRelationship | 角色: 自己(非锁定字段) 或 B+ |  |
-| contact.emergency.phone | string | ✓ | | emergencyContactPhone | 角色: 自己(非锁定字段) 或 B+ |  |
-| contact.privacy | object | — | | privacy | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize |  |
-| contact.privacy.showPhone | boolean | — | | privacy.showPhone | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize |  |
-| contact.privacy.showAlternatePhone | boolean | — | | privacy.showAlternatePhone | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize |  |
-| contact.privacy.showSocials | boolean | — | | privacy.showSocials | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize |  |
+| contact.emergency.name | string | ✓ | | emergencyContactName / emergencyContact | 角色: 自己(非锁定字段) 或 B+ | 紧急联系人信息展示 |
+| contact.emergency.relationship | string | ✓ | | emergencyContactRelationship | 角色: 自己(非锁定字段) 或 B+ | 紧急联系人信息展示 |
+| contact.emergency.phone | string | ✓ | | emergencyContactPhone | 角色: 自己(非锁定字段) 或 B+ | 紧急联系人信息展示 |
+| contact.privacy | object | — | | privacy | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | 控制 contact.* 字段对其他会员的可见性 |
+| contact.privacy.showPhone | boolean | — | | privacy.showPhone | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | 控制 phone/alternatePhone 字段可见性 |
+| contact.privacy.showAlternatePhone | boolean | — | | privacy.showAlternatePhone | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | 控制 alternatePhone 字段可见性 |
+| contact.privacy.showSocials | boolean | — | | privacy.showSocials | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | 控制 contact.socials.* 字段可见性 |
 | others | object | — | 衣服/个性信息 nested object |  | 会员资料表单 / 导入 normalize | 会员资料、服装订单与个性化展示 |
-| others.bio | string | — | | bio | 角色: 自己(非锁定字段) 或 B+ |  |
-| others.shirtStyle | enum | ✓ | `Unisex` \| `Lady Cut` | shirtStyle / cutStyle | 角色: 自己(非锁定字段) 或 B+ |  |
-| others.tshirtSize | enum | ✓ | `XS` \| `S` \| `M` \| `L` \| `XL` \| `2XL` \| `3XL` \| `5XL` \| `7XL` | tshirtSize | 角色: 自己(非锁定字段) 或 B+ |  |
-| others.jacketSize | enum | ✓ | 同 tshirtSize 枚举值 | jacketSize | 角色: 自己(非锁定字段) 或 B+ |  |
-| others.embroideredName | string | ✓ | | embroideredName | 角色: 自己(非锁定字段) 或 B+ |  |
-| others.tshirtStatus | enum | ✓ | `NA` \| `Requested` \| `Sent` \| `Delivered` \| `Received` | tshirtStatus | 角色: 自己(非锁定字段) 或 B+ |  |
-| others.hobbies | string[] | ✓ | | hobbies | 角色: 自己(非锁定字段) 或 B+ |  |
-| others.surveyAnswers | map | — | Record\<string, string \| string[]\> | surveyAnswers | 角色: 自己(非锁定字段) 或 B+；系统: survey/profile sync |  |
-| others.personaType | string | — | | personaType | 系统: behavioral/persona service；角色: B+ |  |
-| others.tendencyTags | string[] | — | | tendencyTags | 系统: behavioral/persona service；角色: B+ |  |
+| others.bio | string | — | | bio | 角色: 自己(非锁定字段) 或 B+ | 会员资料展示、个性化推荐 |
+| others.shirtStyle | enum | ✓ | `Unisex` \| `Lady Cut` | shirtStyle / cutStyle | 角色: 自己(非锁定字段) 或 B+ | 服装订单管理展示 |
+| others.tshirtSize | enum | ✓ | `XS` \| `S` \| `M` \| `L` \| `XL` \| `2XL` \| `3XL` \| `5XL` \| `7XL` | tshirtSize | 角色: 自己(非锁定字段) 或 B+ | 服装订单管理展示 |
+| others.jacketSize | enum | ✓ | 同 tshirtSize 枚举值 | jacketSize | 角色: 自己(非锁定字段) 或 B+ | 服装订单管理展示 |
+| others.embroideredName | string | ✓ | | embroideredName | 角色: 自己(非锁定字段) 或 B+ | 服装订单管理展示 |
+| others.tshirtStatus | enum | ✓ | `NA` \| `Requested` \| `Sent` \| `Delivered` \| `Received` | tshirtStatus | 角色: 自己(非锁定字段) 或 B+ | 服装订单状态跟踪与管理 |
+| others.hobbies | string[] | ✓ | | hobbies | 角色: 自己(非锁定字段) 或 B+ | 会员资料展示、兴趣社群匹配 |
+| others.surveyAnswers | map | — | Record\<string, string \| string[]\> | surveyAnswers | 角色: 自己(非锁定字段) 或 B+；系统: survey/profile sync | Survey 结果展示与分析 |
+| others.personaType | string | — | | personaType | 系统: behavioral/persona service；角色: B+ | 个性化推荐与成员分析 |
+| others.tendencyTags | string[] | — | | tendencyTags | 系统: behavioral/persona service；角色: B+ | 个性化推荐与成员分析 |
 | business | object | — | 商业信息 nested object |  | 商业资料表单 / 导入 normalize | Business Directory 与国际网络展示 |
 | business.companyName | string | ✓ | | companyName | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | `publicBusinessListings.companyName`、`boardMembers.companyName` |
 | business.companyWebsite | string | — | | companyWebsite | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | `publicBusinessListings.website` |
@@ -73,27 +73,27 @@
 | business.acceptInternationalBusiness | enum | ✓ | `Yes` \| `No` \| `Willing to Explore` | acceptInternationalBusiness | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | `publicBusinessListings.acceptsInternationalBusiness` |
 | business.idealReferrals | string[] | — | | idealReferral / idealReferrals / idealReferralIndustry | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | `publicBusinessListings.idealReferralTypes` fallback |
 | business.connections | InternationalConnection[] | — | | connections / internationalConnections | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | business directory / international network 展示 |
-| business.levelOfManagement | string | — | | levelOfManagement | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize |  |
-| business.departmentAndPosition | string | — | | departmentAndPosition | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize |  |
+| business.levelOfManagement | string | — | | levelOfManagement | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | 商业资料展示 |
+| business.departmentAndPosition | string | — | | departmentAndPosition | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | 商业资料展示 |
 | business.companyDescription | string | — | | companyDescription | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | `publicBusinessListings.description` fallback |
 | business.interestedIndustries | string[] | — | | interestedIndustries | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | Business Directory 匹配与行业筛选 |
 | business.idealReferralTypes | string[] | — | | idealReferralTypes | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | `publicBusinessListings.idealReferralTypes` |
 | business.bookmarkedBusinessIds | string[] | — | | bookmarkedBusinessIds | 角色: 自己(非锁定字段) 或 B+；系统: Business Directory 收藏操作 | Business Directory 书签状态 |
 | jciCareer | object | — | JCI 会员生涯 nested object |  | 会员、财务、董事会及晋升服务 | 权限判断、会员统计、晋升与会费流程 |
 | jciCareer.membershipType | enum | ✓ | `Guest` \| `Probation` \| `Official` \| `Honorary` \| `Senator` \| `Visiting` \| `Associate` | membershipType | 角色: B+；系统: 注册/审批/晋升/会费同步/导入 | `members.role` 推导；会费记录同步依据 |
-| jciCareer.membershipStatus | enum | ✓ | `paid_due` \| `unpaid_due` \| `terminated` \| `pending` \| `paid` \| `overdue` \| `partial` \| `over paid` |  | 角色: B+；系统: membership/finance sync |  |
-| jciCareer.joinDate | string | ✓ | | joinDate / joinedDate | 角色: B+；系统: 注册/审批/导入 |  |
+| jciCareer.membershipStatus | enum | ✓ | `paid_due` \| `unpaid_due` \| `terminated` \| `pending` \| `paid` \| `overdue` \| `partial` \| `over paid` |  | 角色: B+；系统: membership/finance sync | 会员状态过滤、权限判断、会费仪表盘 |
+| jciCareer.joinDate | string | ✓ | | joinDate / joinedDate | 角色: B+；系统: 注册/审批/导入 | 会员年资计算、晋升条件判断 |
 | jciCareer.introducer | string | — | | introducer | 角色: B+；系统: 导入 normalize | introducer stats recalculation |
 | jciCareer.senatorship | object | ✓ | |  | B+ 操作 / senatorship validation | Senator 资格、编号及董事会验证 |
-| jciCareer.senatorship.certified | boolean | ✓ | | senatorCertified | 角色: B+；系统: senatorship validation |  |
-| jciCareer.senatorship.senatorNumber | string | — | | senatorshipId | 角色: B+；锁定后仅 A+ 可改 |  |
-| jciCareer.senatorship.boardValidated | boolean | — | | senatorshipBoardValidated | 角色: B+；系统: senatorship validation |  |
+| jciCareer.senatorship.certified | boolean | ✓ | | senatorCertified | 角色: B+；系统: senatorship validation | Senator 资格展示、换届董事会验证 |
+| jciCareer.senatorship.senatorNumber | string | — | | senatorshipId | 角色: B+；锁定后仅 A+ 可改 | Senator 编号展示 |
+| jciCareer.senatorship.boardValidated | boolean | — | | senatorshipBoardValidated | 角色: B+；系统: senatorship validation | Senator 资格验证状态展示 |
 | jciCareer.currentBoardYear | number | — | | currentBoardYear | 系统: `boardMembers.term` 当前届 active 记录 | 权限判断/board 展示 |
 | jciCareer.currentBoardPosition | string | — | | currentBoardPosition | 系统: `boardMembers.position` 当前届 active 记录 | 权限判断/board 展示 |
 | jciCareer.isCurrentBoardMember | boolean | ✓ | | isCurrentBoardMember | 系统: `boardMembers.isActive + term` 同步 | Firestore rules / `usePermissions` board 权限 |
-| jciCareer.boardHistory | BoardPosition[] | ✓ | | boardHistory | 角色: B+；系统: board service/history sync |  |
+| jciCareer.boardHistory | BoardPosition[] | ✓ | | boardHistory | 角色: B+；系统: board service/history sync | 会员生涯展示、领导经历记录 |
 | jciCareer.points | number | ✓ | | points | 系统: `points` 交易汇总/积分服务；角色: B+ | 排行榜、会员统计、dashboard |
-| jciCareer.attendanceRate | number | ✓ | @deprecated 手填百分比 | attendanceRate | 角色: B+；deprecated |  |
+| jciCareer.attendanceRate | number | ✓ | @deprecated 手填百分比 | attendanceRate | 角色: B+；deprecated | @deprecated；旧版参与度展示 |
 | jciCareer.attendanceCheckins | number | — | | attendanceCheckins | 系统: attendance / points 统计 | engagement / promotion 进度 |
 | jciCareer.attendanceMonths | number | — | | attendanceMonths | 系统: attendance / points 统计 | engagement / promotion 进度 |
 | jciCareer.attendanceYear | number | — | | attendanceYear | 系统: attendance / points 统计 | engagement / promotion 进度 |
@@ -107,8 +107,8 @@
 | jciCareer.foundationPathway.eventParticipation | boolean \| number \| null | ✓ | | promotionProgress.eventParticipation | 角色: B+；系统: PromotionTracking / activity record | promotion eligibility |
 | jciCareer.foundationPathway.jciInspireCompleted | boolean \| number \| null | ✓ | | promotionProgress.jciInspireCompleted | 角色: B+；系统: PromotionTracking / activity record | promotion eligibility |
 | jciCareer.foundationPathway.completedAt | string | — | | promotionProgress.completedAt | 角色: B+；系统: PromotionTracking / promotion service | promotion audit/display |
-| jciCareer.isDuesPaidCurrentYear | boolean | — | | isDuesPaidCurrentYear | 系统: finance / membership sync；角色: B+ |  |
-| jciCareer.engagementProgress | object | — | | engagementProgress | 系统: engagement / promotion service；角色: B+ |  |
+| jciCareer.isDuesPaidCurrentYear | boolean | — | | isDuesPaidCurrentYear | 系统: finance / membership sync；角色: B+ | 会费状态判断、成员列表过滤、会费仪表盘 |
+| jciCareer.engagementProgress | object | — | | engagementProgress | 系统: engagement / promotion service；角色: B+ | 参与度仪表盘、晋升进度展示 |
 | jciCareer.engagementProgress.firstYear | map | — | Record\<string, MemberEngagementRequirementProgress\> |  | engagement / promotion service | 会员参与度与晋升进度 |
 | jciCareer.engagementProgress.secondYear | map | — | Record\<string, MemberEngagementRequirementProgress\> |  | engagement / promotion service | 会员参与度与晋升进度 |
 | jciCareer.radarStats | RadarStats | — | | radarStats | 系统: PointsService recalculation | analytics/dashboard |
@@ -129,8 +129,8 @@
 | jciCareer.membershipDuesHistory[year].toyyibPaymentUrl | string | — | |  | ToyyibPay 账单创建 | 会费支付入口 |
 | jciCareer.membershipDuesHistory[year].toyyibPaymentStatus | string | — | `"1"`=已付, `"2"`=待付, `"3"`=失败, `"4"`=结算中 |  | ToyyibPay webhook / payment sync | 会费支付状态展示 |
 | jciCareer.membershipDuesHistory[year].billExternalReferenceNo | string | — | |  | `toyyibBills.externalReferenceNo` | 账单追踪与对账 |
-| jciCareer.leaderboardVisibility | boolean \| string | — | | leaderboardVisibility | 角色: B+ 或自己设置；系统: 导入 normalize |  |
-| jciCareer.hasPaidInitiationFee | boolean | — | | hasPaidInitiationFee | 系统: finance / payment sync；角色: B+/Finance |  |
+| jciCareer.leaderboardVisibility | boolean \| string | — | | leaderboardVisibility | 角色: B+ 或自己设置；系统: 导入 normalize | 排行榜显示控制 |
+| jciCareer.hasPaidInitiationFee | boolean | — | | hasPaidInitiationFee | 系统: finance / payment sync；角色: B+/Finance | 入会费缴交状态判断、晋升条件 |
 | jciCareer.senatorshipValidatedAt | string | — | | senatorshipValidatedAt | 系统: senatorship validation | audit/display |
 | jciCareer.senatorshipValidatedBy | string | — | | senatorshipValidatedBy | 系统: senatorship validation | audit/display |
 | jciCareer.careerHistory | CareerMilestone[] | — | | careerHistory | 角色: B+；系统: 导入 normalize | member career timeline |
@@ -149,7 +149,7 @@
 | system.role | enum | — | `GUEST` \| `MEMBER` \| `BOARD` \| `ADMIN` \| `SUPER_ADMIN` \| `INACTIVE` | role | 角色: B+ / A+；系统: registration / approval / membership sync / board sync | Firestore rules / UI permissions / `boardMembers.displayRole` |
 | churnRisk | string | — | |  | 系统: AI churn prediction；角色: B+ | analytics/dashboard |
 | tier | MemberTier \| string | — | |  | 系统: tier/gamification calculation；角色: B+ | member segmentation |
-| skills | string[] | — | |  | 角色: 自己(非锁定字段) 或 B+ |  |
+| skills | string[] | — | |  | 角色: 自己(非锁定字段) 或 B+ | 会员资料展示、项目技能匹配 |
 | badges | Badge[] | — | |  | 系统: gamification service；角色: B+ | dashboard / member profile |
 
 ---
@@ -159,14 +159,14 @@
 
 | 字段路径 | 类型 | 必填 | 枚举值 / 说明 | 来 | 往 |
 |--------|------|:----:|------------|----|----|
-| id | string | ✓ | Firestore doc ID | 系统: Firestore doc id | |
+| id | string | ✓ | Firestore doc ID | 系统: Firestore doc id | 权限判断、成员名单展示 |
 | memberId | string | ✓ | 对应 members 集合 doc ID | 角色: B+；系统: board assignment 选择的 member | 关联 `members/{memberId}` |
 | position | string | ✓ | 职位名称 | 角色: B+；系统: board assignment / transition | 当前届 active 记录同步到 `members.jciCareer.currentBoardPosition` |
 | term | string | ✓ | 年份任期，如 "2025" | 角色: B+；系统: board term / transition | 当前届 active 记录同步到 `members.jciCareer.currentBoardYear` |
-| startDate | string | ✓ | | 角色: B+；系统: term 起始日或操作时间 | |
-| endDate | string | — | | 角色: B+；系统: archive / transition 写入 | |
+| startDate | string | ✓ | | 角色: B+；系统: term 起始日或操作时间 | 任期展示、换届历史排序 |
+| endDate | string | — | | 角色: B+；系统: archive / transition 写入 | 任期展示、换届状态判断 |
 | isActive | boolean | ✓ | | 角色: B+；系统: board archive/activate/transition 状态 | 当前届 active 记录用于同步 `members.jciCareer.isCurrentBoardMember` |
-| permissions | string[] | ✓ | | 系统: 由 `position` 计算生成 (`getRolePermissions(position)`) | |
+| permissions | string[] | ✓ | | 系统: 由 `position` 计算生成 (`getRolePermissions(position)`) | 权限判断、board 操作门控 |
 | commissionDirectorIds | string[] | — | | 角色: B+；系统: board assignment | 当前届同步对应 members 的 `isCurrentCommissionDirector` |
 | commissionDirectorAvatars | map | — | Record\<string, string\> | 角色: B+；系统: board assignment 上传/传入 | guest/about board 展示 |
 | commissionDirectorNames | map | — | Record\<string, string\> | 系统: 从 `members.general.name/fullName` 复制 | guest/about board 展示 |
@@ -174,8 +174,8 @@
 | avatarUrl | string | — | 冗余展示字段 | 系统: 从 `members.general.avatarUrl` 复制 | guest/about board 展示；不自动回写 member |
 | boardAvatarUrl | string | — | Board 专用头像 | 角色: B+；系统: 创建/编辑 board assignment 时传入 | guest/about board 展示，优先于 `avatarUrl` |
 | companyName | string | — | 冗余展示字段 | 系统: 从 `members.business.companyName` / legacy `members.companyName` 复制 | guest/about board 展示；不自动回写 member |
-| createdAt | string | ✓ | | 系统: 创建 `boardMembers` 记录或换届新增记录 | |
-| updatedAt | string | ✓ | | 系统: 更新/归档/换届时写入 `boardMembers.updatedAt` | |
+| createdAt | string | ✓ | | 系统: 创建 `boardMembers` 记录或换届新增记录 | 审计排序 |
+| updatedAt | string | ✓ | | 系统: 更新/归档/换届时写入 `boardMembers.updatedAt` | 审计排序 |
 
 ---
 
@@ -184,7 +184,7 @@
 
 | 字段路径 | 类型 | 必填 | 枚举值 / 说明 | 来 | 往 |
 |--------|------|:----:|------------|----|----|
-| id | string | ✓ | Firestore doc ID | 系统: Firestore doc id | |
+| id | string | ✓ | Firestore doc ID | 系统: Firestore doc id | 换届历史查询与排序 |
 | year | string | ✓ | 换届年份 | 角色: B+；系统: 换届工具选择的年份 | `boardMembers.term`、`members.jciCareer.currentBoardYear` |
 | outgoingBoard | BoardMember[] | ✓ | 卸任理事会快照 | 系统: 当前 active `boardMembers` 读取 | 当前 `boardMembers` 记录归档；对应 `members` 理事会字段清除/重置 |
 | incomingBoard | BoardMember[] | ✓ | 新任理事会快照 | 角色: B+；系统: 换届工具填写并按 position 计算 permissions | 新增 active `boardMembers`；对应 `members` 理事会字段和角色同步 |
