@@ -19,7 +19,8 @@ JCI Kuala Lumpur 分会管理系统（PWA）：会员、活动、项目、财务
 
 ```bash
 npm run dev        # Vite :3000
-npm run build      # 生产构建（含 tsc 严格检查，这就是 lint 关卡）
+npm run build      # 生产构建（Vite，不含类型检查）
+npm run typecheck  # tsc 严格检查（见 §3 ⑤ 基线）
 npm test           # Vitest
 npm run dev:a11y   # 开启 axe 无障碍扫描
 ```
@@ -77,7 +78,7 @@ npm run dev:a11y   # 开启 axe 无障碍扫描
 | ② 复用闸门 | 见第 4 节 | ✅ / 🔧 / 🆕 结论 |
 | ③ 计划 | 列出要改的文件与每步验证方式 | 中风险以上必须先给计划 |
 | ④ 修改 | 遵守 2.3 与第 5 节硬规则 | 最小 diff |
-| ⑤ 验证 | `npm run build` 通过；相关测试通过；涉及写入则补测试 | 贴出验证结果 |
+| ⑤ 验证 | `npm run build` 通过；`npm run typecheck` 错误数 ≤ 基线 **123**；相关测试通过；涉及写入则补测试。基线只降不升，降低时同步更新此数字 | 贴出验证结果 |
 | ⑥ 同步文件 | 按第 6 节「改了什么 → 更新哪里」 | 同一个 PR 内完成 |
 | ⑦ 交付说明 | 改了什么、为什么、怎么验证、**发现但没改的问题** | 简短清单 |
 

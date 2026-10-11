@@ -4,6 +4,8 @@ Generated from a read-only scan on 2026-08-24.
 
 Updated 2026-10-12: R-018 to R-024 added from the `CAPABILITIES.md` scan (commit `9f36b73`). Existing entries unchanged.
 
+Updated 2026-10-12: R-025 to R-027 added.
+
 Severity scale: P0 critical, P1 high, P2 medium, P3 low.
 
 ## P0 Risks
@@ -256,6 +258,17 @@ Recommended action:
 - No new direct imports (CLAUDE.md §5.1).
 - Migrate each file into an existing service/hook as its own task, starting with finance and member writes.
 
+### R-025 Type Checking Is Not Part Of The Build
+
+Evidence: `npm run build` runs only `vite build`; `tsc --noEmit` (`npm run typecheck`) reports existing type errors. Current count: see the baseline in CLAUDE.md §3 step ⑤.
+
+Risk: Type errors accumulate silently; earlier guidance claimed the build was the type-check gate, so agents treated a green build as type-safe.
+
+Recommended action:
+
+- Never let the error count exceed the baseline (CLAUDE.md §3 ⑤); lower the baseline as errors are fixed.
+- Once the count is 0, add `typecheck` to the build or CI.
+
 ## P3 Risks
 
 ### R-016 Existing Architecture Docs Are Valuable But Stale/Corrupted
@@ -302,3 +315,24 @@ Recommended action:
 
 - Keep facts in one source (see CLAUDE.md §6); regenerate `CAPABILITIES.md` in every PR that changes exports.
 - Add a one-line `/** responsibility */` header to the 52 files over time.
+
+### R-026 Pagination Re-Export Creates A Circular Chunk Dependency
+
+Evidence: `vite build` warns: Export "Pagination" of `components/ui/Pagination.tsx` is re-exported through `components/ui/Common.tsx` while both modules depend on each other and end up in different chunks, producing a circular dependency between chunks. The warning names `components/modules/Projects/ProjectsListShell.tsx` as the importer to change.
+
+Risk: Rollup warns this "will likely lead to broken execution order"; a load-order bug would surface only in production chunks.
+
+Recommended action:
+
+- Change `ProjectsListShell.tsx` to import `Pagination` directly from `components/ui/Pagination`.
+- Confirm the warning disappears from `vite build`.
+
+### R-027 getInitialsSvg Does Not XML-Escape Initials
+
+Evidence: every `getInitialsSvg` copy, including the standard `utils/avatarUtils.ts`, inserts the initials straight into the SVG markup.
+
+Risk: A name starting with `&` or `<` produces invalid SVG, so the fallback avatar silently fails to render (no error thrown).
+
+Recommended action:
+
+- Escape `&`, `<`, `>` in the standard `utils/avatarUtils.ts` and add a unit test; the remaining copies inherit the fix when migrated under R-020.

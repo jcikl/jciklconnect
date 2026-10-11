@@ -4,6 +4,8 @@
 
 2026-10-12 更新：根据 `CAPABILITIES.md` 扫描结果（commit `9f36b73`）新增 R-018 至 R-024，原有条目未改动。
 
+2026-10-12 更新：新增 R-025 至 R-027。
+
 严重级别：P0 严重，P1 高，P2 中，P3 低。
 
 ## P0 风险
@@ -256,6 +258,17 @@
 - 不再新增直接 import（CLAUDE.md §5.1）。
 - 每个文件单独作为一个任务迁移到现有 service / hook，从财务与会员写入开始。
 
+### R-025 类型检查不在构建流程内
+
+证据：`npm run build` 只执行 `vite build`；`tsc --noEmit`（`npm run typecheck`）报告现有类型错误。当前数量：见 CLAUDE.md §3 第 ⑤ 步的基线。
+
+风险：类型错误会悄悄累积；旧指引声称 build 就是类型检查关卡，AI 因此把 build 通过当成类型安全。
+
+建议行动：
+
+- 错误数不得高于基线（CLAUDE.md §3 ⑤）；修掉错误后同步调低基线。
+- 错误数归零后，把 `typecheck` 纳入 build 或 CI。
+
 ## P3 风险
 
 ### R-016 既有架构文档有价值但陈旧/乱码
@@ -302,3 +315,24 @@
 
 - 事实只放一处（见 CLAUDE.md §6）；每个改动 export 的 PR 都重新生成 `CAPABILITIES.md`。
 - 逐步为这 52 个文件补上一行 `/** 职责 */` 文件头。
+
+### R-026 Pagination 重新导出造成循环 chunk 依赖
+
+证据：`vite build` 警告：`components/ui/Pagination.tsx` 的 `Pagination` 经由 `components/ui/Common.tsx` 重新导出，两个模块互相依赖却被分到不同 chunk，形成 chunk 之间的循环依赖。警告指出应修改的引用方是 `components/modules/Projects/ProjectsListShell.tsx`。
+
+风险：Rollup 提示这"很可能导致执行顺序错误"；加载顺序问题只会在生产环境的 chunk 中出现。
+
+建议行动：
+
+- 把 `ProjectsListShell.tsx` 改为直接从 `components/ui/Pagination` import `Pagination`。
+- 确认 `vite build` 不再出现该警告。
+
+### R-027 getInitialsSvg 未对首字母做 XML 转义
+
+证据：所有 `getInitialsSvg` 副本（包括标准版 `utils/avatarUtils.ts`）都把首字母直接插入 SVG 标记。
+
+风险：名字以 `&` 或 `<` 开头时会生成无效 SVG，备用头像静默显示失败（不会报错）。
+
+建议行动：
+
+- 在标准版 `utils/avatarUtils.ts` 中转义 `&`、`<`、`>` 并补单元测试；其余副本按 R-020 迁移后自动获得修正。
