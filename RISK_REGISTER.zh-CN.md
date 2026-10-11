@@ -2,6 +2,8 @@
 
 生成时间：2026-08-24。来源：对当前代码库进行只读扫描。
 
+2026-10-12 更新：根据 `CAPABILITIES.md` 扫描结果（commit `9f36b73`）新增 R-018 至 R-024，原有条目未改动。
+
 严重级别：P0 严重，P1 高，P2 中，P3 低。
 
 ## P0 风险
@@ -131,6 +133,30 @@
 - 财务审批、角色变更、批量导入导出、webhook delivery、不可逆删除优先迁移到服务端 command。
 - 规则简单的读/list 可以继续客户端执行。
 
+### R-018 两套互不兼容的结构写入同一个 `pointsRules` 集合
+
+证据：`services/pointsService.ts`（`PointRule`：`category`、`basePoints`、`active`、`priority`；方法 `getPointRules` / `savePointRule`，约 L653–819）与 `services/pointsRuleService.ts`（`types/gamification.ts` 的 `PointsRule`：`trigger`、`pointValue`、`enabled`、`weight`）都读写 `COLLECTIONS.POINTS_RULES`（`pointsRules`）。`pointsRuleService` 目前没有任何地方引用。
+
+风险：同一集合可能存在两种结构的文档。如果有人（或 AI 搜索时"找到"它）重新接上 `pointsRuleService`，会读到缺字段的文档，并写入现行引擎无法评估的规则，导致积分静默算错。
+
+建议行动：
+
+- 先确认正式环境的文档是哪一种结构。
+- 指定一个标准 service 与类型；另一个在文件头标记 `@deprecated`。
+- 确认数据前不要删除；补一个用真实结构规则文档的测试。
+
+### R-019 银行对账 / 交易配对有三套重叠实现
+
+证据：`financeService.ts`（`reconcileBankAccount`、`getUnmatchedForReconciliation`、`matchTransactions`、`unmatchTransactions`，约 L3810–4222）、`eventPaymentMatchingService.ts`（`runAutoMatch`、`applyMatch`、`removeMatch`）、`reconciliationService.ts`（861 行，`executeAutoMatch`、`manualMatch`、`unlinkMatch`；无人引用）。
+
+风险：与 R-004 同一模式。配对状态会因为走不同 UI 入口而按不同规则写入；修好一条路径，其他路径照旧。新的财务需求很可能再写出第四套。
+
+建议行动：
+
+- 画出哪个 UI 入口调用哪一套实现。
+- 选定一个标准配对引擎，并把决定写进 `ARCHITECTURE.md`。
+- 将 `reconciliationService.ts` 标记为 deprecated 或 planned；决定之前不要开发新的配对功能。
+
 ## P2 风险
 
 ### R-011 测试覆盖与业务规模不匹配
@@ -193,6 +219,41 @@
 - 如果提交，则 commit 前必须 build 验证。
 - 如果不提交，则 ignore 生成产物并从构建结果部署。
 
+### R-020 工具函数在元件内被重复实现
+
+证据：`getInitialsSvg` 被定义了 10 次，默认尺寸有 5 种（36/44/48/64/200），分布在 Members、Communication、HobbyClubs、BusinessDirectory、`components/ui/AvatarUploader.tsx`、`components/layout/SearchDropdown.tsx`。`formatCurrency`、`formatDate`、`formatDateTime`、`isFuture` 已存在于 `utils/formatUtils.ts` / `utils/dateUtils.ts`，却在 6 处被重写。见 `CAPABILITIES.md` §1.1–1.2。
+
+风险：头像和日期显示不一致；每个 bug 要修 N 次；AI 会照抄它最先打开的那份本地版本。
+
+建议行动：
+
+- 在 `utils/` 建立唯一的 `getInitialsSvg(name, size)`，并附单元测试。
+- 每个文件作为一个小任务逐一替换（外科手术式），不要一次大扫除。
+- 由 CLAUDE.md 的复用闸门把关。
+
+### R-021 未被使用的模块看起来像真实功能
+
+证据：以下文件没有任何引用：`services/pointsRuleService.ts`、`services/projectAccountsService.ts`、`services/reconciliationService.ts`、`services/workflowService.ts`（见 R-004）、`hooks/useGuestAnalytics.ts`、`hooks/useMemberBenefits.ts`、`hooks/useMemberMutations.ts`、`hooks/useNotifications.ts`。注意：`hooks/useCommunication.ts:10` 有一条 `TODO (P2-DEDUP)`，说明它与 `useNotifications` 重复抓取通知。
+
+风险：开发者和 AI 不是从零再造一次，就是在不知道状态的情况下接上过时代码。
+
+建议行动：
+
+- 每个文件加状态头：`@status active | deprecated | planned | dead`（延伸 R-012 的功能清单）。
+- 处理 `useCommunication` / `useNotifications` 的 TODO：改为复用 `useNotifications`。
+- 每次状态变更后重新生成 `CAPABILITIES.md`。
+
+### R-022 元件绕过 service 层
+
+证据：10 个元件文件直接 import `firebase/firestore`，包括 `MembersView.tsx`、`Members/MemberDetail.tsx`、`Finance/TransactionSplitModal.tsx`、`ProjectManagement/ProjectFinancialAccount.tsx`、`Toyyib/ToyyibSettingsPanel.tsx`。见 `CAPABILITIES.md` §1.3。
+
+风险：这些读写绕过了 `isDevMode`、缓存、缓存清理、`writeBatch` 和错误记录规则；在 `services/` 里搜索也看不到它们。加重 R-010 的风险。
+
+建议行动：
+
+- 不再新增直接 import（CLAUDE.md §5.1）。
+- 每个文件单独作为一个任务迁移到现有 service / hook，从财务与会员写入开始。
+
 ## P3 风险
 
 ### R-016 既有架构文档有价值但陈旧/乱码
@@ -218,3 +279,24 @@
 - 准备好后运行 `codegraph init -i`。
 - 高风险重构前使用 Codegraph 做 impact analysis。
 
+### R-023 本机过程文件被提交到仓库根目录
+
+证据：根目录有一个名为 `C:UsersUser...scratchpadtsc_errors.txt` 的文件（Windows 本机暂存路径被压平成文件名）。
+
+风险：泄露本机路径、增加噪音，也说明 AI 的输出没有被约束边界。与 R-015 相关。
+
+建议行动：
+
+- 删除该文件。
+- 在 `.gitignore` 加入 `*tsc_errors*.txt` 与 scratchpad 相关规则。
+
+### R-024 AI 指引与代码脱节
+
+证据：旧版 `CLAUDE.md` 提到不存在的 `workflowExecutionService`，并把 `types.ts` 描述为约 2000 行（现在只是 `types/` 的 barrel 文件）。52 个 service / hook / util 没有文件头说明，因此 `CAPABILITIES.md` 中显示为「⚠️ 无说明」。
+
+风险：AI 会自信地照着过时指引做事。与 R-016 相关。
+
+建议行动：
+
+- 事实只放一处（见 CLAUDE.md §6）；每个改动 export 的 PR 都重新生成 `CAPABILITIES.md`。
+- 逐步为这 52 个文件补上一行 `/** 职责 */` 文件头。
