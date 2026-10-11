@@ -73,3 +73,6 @@ ios/App/App.xcworkspace/xcuserdata/
 *.ipa
 *.apk
 *.aab
+
+# Local-only env template (removed from repo 2026-10-09, kept locally)
+.env.example

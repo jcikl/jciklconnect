@@ -54,7 +54,8 @@
 
 ## 待确认
 
-<!-- 当前无待确认项 -->
+- [ ] **需核实是否已部署**：v6 P0 专项修复（commit `1c9bba2`）涉及的 `firestore.rules` 与 Cloud Functions 改动。来源：原 `CLAUDE.md` 记录"待执行 `firebase deploy --only firestore:rules && firebase deploy --only functions`"（现见 `docs/ANALYSIS-HISTORY.md`）。影响：未部署则这些 P0 修复在生产环境不生效。完成标准：用户确认已部署，或对比线上 rules 与本地 `firestore.rules` 一致。部署须用户亲自批准。
+- [ ] **另一会话产生的未提交文件，待用户决定去留**（2026-10-12 登记）：`CAPABILITIES.md`、`scripts/gen-capabilities.py`、`docs/development/{CLAUDE_MD_MIGRATION,CRUD_CHECKLIST,DECISION_PROTOCOLS,LAYER_RULES}.md`、`docs/collections/{ANALYSIS_FRAMEWORK,ANALYSIS_LOG}.md`，以及 `RISK_REGISTER(.zh-CN).md` 新增的 R-018～R-024。来源：2026-10-12 00:17 另一 AI 会话改写 CLAUDE.md 时生成。用户已决定保留 2026-10-11 版 CLAUDE.md，该会话的版本另存为 `docs/CLAUDE.md.bak-2026-10-12-other-session`（不入库）。影响：`ANALYSIS_LOG.md` 与 `docs/ANALYSIS-HISTORY.md` 内容重复；`CAPABILITIES.md` 能力地图可能有参考价值。完成标准：用户逐项决定提交、合并进现有文档或删除。
 
 ---
 
@@ -68,9 +69,13 @@
 
 <!-- 新建 Markdown 文档时记录：文档、创建原因、所属主题、入口链接 -->
 
+- `docs/ANALYSIS-HISTORY.md`（2026-10-11）：存放历次集合扫描结果与修复记录。原内容在 `CLAUDE.md` 中占约 150 行，属于历史记录而非规则；`TODO.md` 只管当前任务，`RISK_REGISTER.md` 是另一种风险格式，都不适合承载。入口：`CLAUDE.md` 第 7 节文档分工表。
+
 ---
 
 ## 已完成
+
+- [x] CLAUDE.md 重整（2026-10-11；约 680 行 → 194 行、全中文、9 章结构；历史表格迁至 `docs/ANALYSIS-HISTORY.md`；旧版六步分析模板删除，已由 `/analyze-collection` v3 取代；"来 / 往"规则补充至 `SCHEMA.md`；统一"新依赖须先问""顺手改进仅限同文件低风险"两处矛盾；`AGENT-EXECUTION.md` 补充部署须确认；旧版原文备份于 `docs/CLAUDE.md.bak-2026-10-11`，668 行，仅供对照，不作为规则读取）
 
 - [x] P0 RADAR_CONTRIBUTIONS 修复（2026-09-19；`pointsService.ts:2438` 改用 `COLLECTIONS.REGISTRATION_HISTORY`；TypeScript 编译错误和运行时崩溃均消除）
 - [x] SCHEMA.md 覆盖率验证与补全（2026-09-19；对比 constants.ts 全集合 + firestore.rules 全 match 块，发现并补写 5 个缺失集合节：finance、nonMemberLeads、userRolePermissions、membershipTypePermissions、positionPermissions）
