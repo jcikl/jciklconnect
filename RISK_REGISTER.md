@@ -2,6 +2,10 @@
 
 Generated from a read-only scan on 2026-08-24.
 
+Updated 2026-10-12: R-018 to R-024 added from the `CAPABILITIES.md` scan (commit `9f36b73`). Existing entries unchanged.
+
+Updated 2026-10-12: R-025 to R-027 added.
+
 Severity scale: P0 critical, P1 high, P2 medium, P3 low.
 
 ## P0 Risks
@@ -131,6 +135,30 @@ Recommended action:
 - Move finance approval, role changes, bulk import/export, webhook delivery, and irreversible deletes toward server-side commands.
 - Keep pure read/list operations client-side where rules are simple.
 
+### R-018 Two Incompatible Schemas Write The Same `pointsRules` Collection
+
+Evidence: `services/pointsService.ts` (`PointRule`: `category`, `basePoints`, `active`, `priority`; methods `getPointRules` / `savePointRule` around L653–819) and `services/pointsRuleService.ts` (`PointsRule` in `types/gamification.ts`: `trigger`, `pointValue`, `enabled`, `weight`) both read and write `COLLECTIONS.POINTS_RULES` (`pointsRules`). `pointsRuleService` currently has no importers.
+
+Risk: The collection can hold documents in two shapes. If anyone wires `pointsRuleService` back in (or an AI agent "finds" it via search), it will read documents with missing fields and write documents the live engine cannot evaluate, causing silent point miscalculation.
+
+Recommended action:
+
+- Confirm which shape production documents use.
+- Declare one canonical service and type; mark the other `@deprecated` in its file header.
+- Do not delete until production data is confirmed; add a test that loads a real-shaped rule document.
+
+### R-019 Three Overlapping Bank-Matching / Reconciliation Implementations
+
+Evidence: `financeService.ts` (`reconcileBankAccount`, `getUnmatchedForReconciliation`, `matchTransactions`, `unmatchTransactions`, around L3810–4222), `eventPaymentMatchingService.ts` (`runAutoMatch`, `applyMatch`, `removeMatch`), and `reconciliationService.ts` (861 lines, `executeAutoMatch`, `manualMatch`, `unlinkMatch`; no importers).
+
+Risk: Same pattern as R-004. Match status can be written by different rules depending on which UI path is used; fixes applied to one path miss the others. New finance work is likely to add a fourth version.
+
+Recommended action:
+
+- Map which UI entry calls which implementation.
+- Choose one canonical matching engine; document the decision in `ARCHITECTURE.md`.
+- Mark `reconciliationService.ts` as deprecated or planned; do not build new matching features before this decision.
+
 ## P2 Risks
 
 ### R-011 Test Coverage Is Narrow Compared With Domain Size
@@ -193,6 +221,54 @@ Recommended action:
 - If committed, require build verification before commit.
 - If not, ignore generated output and deploy from build artifacts.
 
+### R-020 Helper Functions Re-Implemented Inside Components
+
+Evidence: `getInitialsSvg` is defined 10 times with 5 different default sizes (36/44/48/64/200) across Members, Communication, HobbyClubs, BusinessDirectory, `components/ui/AvatarUploader.tsx` and `components/layout/SearchDropdown.tsx`. `formatCurrency`, `formatDate`, `formatDateTime`, and `isFuture` already exist in `utils/formatUtils.ts` / `utils/dateUtils.ts` but are redefined in 6 places. See `CAPABILITIES.md` §1.1–1.2.
+
+Risk: Avatars and dates render inconsistently; every bug fix must be repeated N times; AI agents copy whichever local version they open first.
+
+Recommended action:
+
+- Create one `getInitialsSvg(name, size)` in `utils/` with a unit test.
+- Replace copies one file per small task (surgical), not in a single sweep.
+- Enforce via the CLAUDE.md Reuse-First Gate.
+
+Progress (2026-10-12): `utils/avatarUtils.ts` `getInitialsSvg` created with tests; `components/ui/AvatarUploader.tsx` migrated. Copies using `btoa` throw `InvalidCharacterError` on non-Latin names (e.g. Chinese); the standard version uses `encodeURIComponent`. 9 copies remain.
+
+### R-021 Unused Modules Look Like Real Features
+
+Evidence: no importers for `services/pointsRuleService.ts`, `services/projectAccountsService.ts`, `services/reconciliationService.ts`, `services/workflowService.ts` (see R-004), `hooks/useGuestAnalytics.ts`, `hooks/useMemberBenefits.ts`, `hooks/useMemberMutations.ts`, `hooks/useNotifications.ts`. Note: `hooks/useCommunication.ts:10` has `TODO (P2-DEDUP)` stating it duplicates the fetch that `useNotifications` performs.
+
+Risk: Developers and AI agents either rebuild these capabilities from scratch or wire up stale code without knowing its status.
+
+Recommended action:
+
+- Give each file a status header: `@status active | deprecated | planned | dead` (extends R-012 feature inventory).
+- Resolve the `useCommunication` / `useNotifications` TODO by reusing `useNotifications`.
+- Regenerate `CAPABILITIES.md` after each status change.
+
+### R-022 Components Bypass The Service Layer
+
+Evidence: 10 component files import `firebase/firestore` directly, including `MembersView.tsx`, `Members/MemberDetail.tsx`, `Finance/TransactionSplitModal.tsx`, `ProjectManagement/ProjectFinancialAccount.tsx`, `Toyyib/ToyyibSettingsPanel.tsx`. See `CAPABILITIES.md` §1.3.
+
+Risk: These reads/writes skip `isDevMode`, caching, cache invalidation, `writeBatch`, and error logging rules; they are invisible to anyone searching `services/`. Increases exposure described in R-010.
+
+Recommended action:
+
+- No new direct imports (CLAUDE.md §5.1).
+- Migrate each file into an existing service/hook as its own task, starting with finance and member writes.
+
+### R-025 Type Checking Is Not Part Of The Build
+
+Evidence: `npm run build` runs only `vite build`; `tsc --noEmit` (`npm run typecheck`) reports existing type errors. Current count: see the baseline in CLAUDE.md §3 step ⑤.
+
+Risk: Type errors accumulate silently; earlier guidance claimed the build was the type-check gate, so agents treated a green build as type-safe.
+
+Recommended action:
+
+- Never let the error count exceed the baseline (CLAUDE.md §3 ⑤); lower the baseline as errors are fixed.
+- Once the count is 0, add `typecheck` to the build or CI.
+
 ## P3 Risks
 
 ### R-016 Existing Architecture Docs Are Valuable But Stale/Corrupted
@@ -217,3 +293,46 @@ Recommended action:
 
 - Run `codegraph init -i` when ready.
 - Use Codegraph before refactors and for impact analysis on high-risk symbols.
+
+### R-023 Local Process Artifacts Committed To Repository Root
+
+Evidence: a file named `C:UsersUser...scratchpadtsc_errors.txt` (local Windows temp path flattened into a filename) is committed at the repo root.
+
+Risk: Leaks local machine paths, adds noise, and signals that agent output is not boundary-checked. Related to R-015.
+
+Recommended action:
+
+- Delete the file.
+- Add `*tsc_errors*.txt` and scratchpad patterns to `.gitignore`.
+
+### R-024 AI Guidance Drifted From Code
+
+Evidence: the previous `CLAUDE.md` referenced a non-existent `workflowExecutionService` and described `types.ts` as ~2000 lines (it is now a barrel over `types/`). 52 services/hooks/utils have no file header, so `CAPABILITIES.md` shows "⚠️ 无说明" for them.
+
+Risk: AI agents follow stale guidance confidently. Related to R-016.
+
+Recommended action:
+
+- Keep facts in one source (see CLAUDE.md §6); regenerate `CAPABILITIES.md` in every PR that changes exports.
+- Add a one-line `/** responsibility */` header to the 52 files over time.
+
+### R-026 Pagination Re-Export Creates A Circular Chunk Dependency
+
+Evidence: `vite build` warns: Export "Pagination" of `components/ui/Pagination.tsx` is re-exported through `components/ui/Common.tsx` while both modules depend on each other and end up in different chunks, producing a circular dependency between chunks. The warning names `components/modules/Projects/ProjectsListShell.tsx` as the importer to change.
+
+Risk: Rollup warns this "will likely lead to broken execution order"; a load-order bug would surface only in production chunks.
+
+Recommended action:
+
+- Change `ProjectsListShell.tsx` to import `Pagination` directly from `components/ui/Pagination`.
+- Confirm the warning disappears from `vite build`.
+
+### R-027 getInitialsSvg Does Not XML-Escape Initials
+
+Evidence: every `getInitialsSvg` copy, including the standard `utils/avatarUtils.ts`, inserts the initials straight into the SVG markup.
+
+Risk: A name starting with `&` or `<` produces invalid SVG, so the fallback avatar silently fails to render (no error thrown).
+
+Recommended action:
+
+- Escape `&`, `<`, `>` in the standard `utils/avatarUtils.ts` and add a unit test; the remaining copies inherit the fix when migrated under R-020.
