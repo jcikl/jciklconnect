@@ -19,7 +19,7 @@
 |---|---|---|
 | Service（業務邏輯與資料存取） | 67 | `services/` |
 | Hook（React 資料綁定） | 38 | `hooks/` |
-| Util（純函數工具） | 15 | `utils/` |
+| Util（純函數工具） | 16 | `utils/` |
 | UI 元件（通用） | 33 | `components/ui/` |
 | 共用業務元件 | 9 | `components/shared/` |
 | Context | 2 | `contexts/` |
@@ -34,13 +34,14 @@
 | `formatCurrency` | `utils/formatUtils.ts` | `components/modules/SponsorshipView.tsx:10`<br>`components/modules/ProjectManagement/ProjectReportGenerator.tsx:181` |
 | `formatDate` | `utils/dateUtils.ts` | `components/modules/Finance/BankMatchingModal.tsx:27`<br>`components/modules/MemberManagement/BoardTransitionTools.tsx:161` |
 | `formatDateTime` | `utils/dateUtils.ts` | `components/modules/ZoomBookingView.tsx:59` |
+| `getInitialsSvg` | `utils/avatarUtils.ts` | `components/layout/SearchDropdown.tsx:5`<br>`components/modules/CommunicationView.tsx:16`<br>`components/modules/HobbyClubsView.tsx:4`<br>`components/modules/BusinessDirectory/businessDirectoryUtils.ts:9`<br>`components/modules/Members/MemberCreateModal.tsx:4`<br>`components/modules/Members/MemberDetail.tsx:48`<br>`components/modules/Members/MemberDetailCareerTab.tsx:8`<br>`components/modules/Members/MemberTable.tsx:10`<br>`components/modules/Members/MentorMatchingModal.tsx:9` |
 | `isFuture` | `utils/dateUtils.ts` | `components/modules/ZoomBookingView.tsx:65` |
 
 ### 1.2 同一函數在多個元件各寫一份（應抽出到 utils）
 
 | 函數 | 出現次數 | 位置 |
 |---|---|---|
-| `getInitialsSvg` | 9 | `components/layout/SearchDropdown.tsx`<br>`components/modules/CommunicationView.tsx`<br>`components/modules/HobbyClubsView.tsx`<br>`components/modules/Members/MemberCreateModal.tsx`<br>`components/modules/Members/MemberDetail.tsx`<br>`components/modules/Members/MemberDetailCareerTab.tsx`<br>`components/modules/Members/MemberTable.tsx`<br>`components/modules/Members/MentorMatchingModal.tsx`<br>`components/ui/AvatarUploader.tsx` |
+| `getInitialsSvg` | 8 | `components/layout/SearchDropdown.tsx`<br>`components/modules/CommunicationView.tsx`<br>`components/modules/HobbyClubsView.tsx`<br>`components/modules/Members/MemberCreateModal.tsx`<br>`components/modules/Members/MemberDetail.tsx`<br>`components/modules/Members/MemberDetailCareerTab.tsx`<br>`components/modules/Members/MemberTable.tsx`<br>`components/modules/Members/MentorMatchingModal.tsx` |
 
 ### 1.3 元件直接存取 Firestore（繞過 service 層）
 
@@ -1311,6 +1312,13 @@
 | `clearAuthState` | 53 | Clear authentication state from localStorage |
 | `isDevModeStored` | 65 | Check if dev mode is enabled in localStorage |
 
+### `utils/avatarUtils.ts` （8 行，2 處引用）
+> Generate an inline SVG data URI with initials so avatars do not rely on external requests. URI-encoded (not btoa) so non-Latin names such as…
+
+| 函數 | 行 | 說明 |
+|---|---|---|
+| `getInitialsSvg` | 3 | Generate an inline SVG data URI with initials so avatars do not rely on external requests. URI-encoded (not bt… |
+
 ### `utils/boardMembership.ts` （86 行，5 處引用）
 
 | 函數 | 行 | 說明 |
@@ -1443,7 +1451,7 @@
 | 元件檔 | 行數 | 引用 | Export |
 |---|---|---|---|
 | `AsyncErrorBoundary.tsx` | 4 | 9 | — |
-| `AvatarUploader.tsx` | 103 | 1 | `AvatarUploader` |
+| `AvatarUploader.tsx` | 97 | 1 | `AvatarUploader` |
 | `Badge.tsx` | 86 | 1 | `Badge`, `ProgressBar`, `AvatarGroup`, `Skeleton` |
 | `Button.tsx` | 50 | 4 | `Button` |
 | `Card.tsx` | 77 | 1 | `Card`, `StatCardsContainer` |

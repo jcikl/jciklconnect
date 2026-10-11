@@ -231,6 +231,8 @@
 - 每个文件作为一个小任务逐一替换（外科手术式），不要一次大扫除。
 - 由 CLAUDE.md 的复用闸门把关。
 
+进度（2026-10-12）：已建立 `utils/avatarUtils.ts` 的 `getInitialsSvg` 并附测试；`components/ui/AvatarUploader.tsx` 已替换。使用 `btoa` 的副本遇到非拉丁字符（例如中文名）会抛出 `InvalidCharacterError`；标准版改用 `encodeURIComponent`。剩余 9 份副本。
+
 ### R-021 未被使用的模块看起来像真实功能
 
 证据：以下文件没有任何引用：`services/pointsRuleService.ts`、`services/projectAccountsService.ts`、`services/reconciliationService.ts`、`services/workflowService.ts`（见 R-004）、`hooks/useGuestAnalytics.ts`、`hooks/useMemberBenefits.ts`、`hooks/useMemberMutations.ts`、`hooks/useNotifications.ts`。注意：`hooks/useCommunication.ts:10` 有一条 `TODO (P2-DEDUP)`，说明它与 `useNotifications` 重复抓取通知。

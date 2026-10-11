@@ -231,6 +231,8 @@ Recommended action:
 - Replace copies one file per small task (surgical), not in a single sweep.
 - Enforce via the CLAUDE.md Reuse-First Gate.
 
+Progress (2026-10-12): `utils/avatarUtils.ts` `getInitialsSvg` created with tests; `components/ui/AvatarUploader.tsx` migrated. Copies using `btoa` throw `InvalidCharacterError` on non-Latin names (e.g. Chinese); the standard version uses `encodeURIComponent`. 9 copies remain.
+
 ### R-021 Unused Modules Look Like Real Features
 
 Evidence: no importers for `services/pointsRuleService.ts`, `services/projectAccountsService.ts`, `services/reconciliationService.ts`, `services/workflowService.ts` (see R-004), `hooks/useGuestAnalytics.ts`, `hooks/useMemberBenefits.ts`, `hooks/useMemberMutations.ts`, `hooks/useNotifications.ts`. Note: `hooks/useCommunication.ts:10` has `TODO (P2-DEDUP)` stating it duplicates the fetch that `useNotifications` performs.
