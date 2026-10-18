@@ -416,6 +416,8 @@ Risk: A super admin who is not on the current board cannot add members or delete
 
 Recommended action: use `isAdmin()` everywhere and add rules tests.
 
+Progress (2026-10-18, rules changed, awaiting owner deploy): added SUPER_ADMIN to `canReadOrgMembers()` and to all 11 hard-coded `['BOARD','ADMIN']` lists (SUPER_ADMIN only, no other role widened); SUPER_ADMIN skips the LO check when deleting members; `storage.rules` `isBoard` / `isAdmin` updated to match. Emulator: 21 checks pass — SUPER_ADMIN (including one with no loId) can check in, register on behalf, cancel and delete others' registrations, read and update others' notifications, read memberEmails and delete members; MEMBER is still denied everything; an ADMIN from another LO still cannot delete members here; ADMIN and BOARD check-in unchanged. The same suite run against the old live rules denies every SUPER_ADMIN case, so the tests discriminate. Deploying also ships the owner-approved `b83d671` (submit payment requests on behalf of others; tested: BOARD allowed, MEMBER denied) and `65599ca`. Rollback: redeploy the `d8282b0` rules.
+
 ### R-035 Admin Permission Settings Have No Effect (P1)
 
 Evidence: Config → Access writes `userRolePermissions`, `positionPermissions`, `membershipTypePermissions` and `permissionCatalog`, but `hooks/usePermissions.ts`, `firestore.rules` and all functions ignore them; even the permission names differ (`members.view` vs `canViewMembers`). Introduced in commit `81a56be`. `SCHEMA.md:2342` and `SCHEMA-PERMISSIONS.md:122–124` describe it wrongly.

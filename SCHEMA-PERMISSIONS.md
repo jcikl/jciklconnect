@@ -3,6 +3,8 @@
 > 数据来源：irestore.rules（1414 行）
 > 更新时重读规则文件并重跑本文档生成。
 >
+> 2026-10-18（R-034）：此前 `canReadOrgMembers()` 和 11 处写死的 `['BOARD','ADMIN']` 漏掉了 SUPER_ADMIN，本表写作 B+ 的 eventRegistrations、notifications、inquiries、benefitUsage、webhooks、mentorMatches、mentorshipFeedback、memberEmails、nonMemberLeads 实际上不含 SUPER_ADMIN；规则已修正，现与本表一致。
+>
 > **角色缩写**
 > | 缩写 | 含义 |
 > |------|------|
@@ -26,7 +28,7 @@ esource.data 仅在 get 中可用，因此部分集合的 list 权限会比 get 
 
 | 集合 | get | list | create | update | delete | 备注 |
 |------|-----|------|--------|--------|--------|------|
-| members | M+(自己:登) | M+ | B+ 或 自注册GUEST(仅GUEST字段) | 自己(非锁定字段) 或 B+ | A+(同LO) | |
+| members | M+(自己:登) | M+ | B+ 或 自注册GUEST(仅GUEST字段) | 自己(非锁定字段) 或 B+ | A+(同LO；SA 不限 LO) | 2026-10-18 R-034：SA 删除不受 LO 限制 |
 | communication | 登 | 登 | M+(需含authorId) | 自己 或 B+ | 自己 或 B+ | |
 | events | 登 | 公 | B+ | B+ 或 M+(仅attendees字段) | B+ | list公开供宣传页使用 |
 | projects | 登(或Active状态公开) | 公 | B+ | B+ 或 M+(仅attendees字段) | B+ | |
@@ -36,7 +38,7 @@ esource.data 仅在 get 中可用，因此部分集合的 list 权限会比 get 
 | 	ransactionSplits | B+/A+ | B+/A+ | A+/Finance(父未对账) | A+/Finance(父未对账，字段白名单) | Finance(父未对账) | |
 | projectTrx | B+/A+ | B+/A+ | B+(字段白名单) | B+(非对账，字段白名单) | B+(非对账) | |
 | ankAccounts | Finance(同LO) | A+/Finance | Finance | Finance | Finance | get 限同LO |
-| paymentRequests | 登(自己/Finance/A+) | M+/Finance/A+ | 登(自己) | 自己(draft/cancel/resubmit) 或 Finance | 自己(draft) 或 A+ | |
+| paymentRequests | 登(自己/Finance/A+) | M+/Finance/A+ | 登(自己) 或 B+/A+(代他人提交) | 自己(draft/cancel/resubmit) 或 Finance | 自己(draft) 或 A+ | 代他人提交来自 commit `b83d671`，2026-10-18 随 R-034 一起部署 |
 | eventRegistrations | 登(自己/B+) | M+/B+ | 登(自己或B+) | B+(字段白名单) 或 自己(非财务字段) | B+ | |
 | points | 登 | 登 | B+ | B+/A+ | B+/A+ | |
 | 

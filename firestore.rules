@@ -91,7 +91,7 @@ service cloud.firestore {
              exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
              (
                (getUserRole() != null &&
-                getUserRole() in ['ADMIN', 'BOARD']) ||
+                getUserRole() in ['ADMIN', 'BOARD', 'SUPER_ADMIN']) ||
                isCurrentBoardMember()
              );
     }
@@ -208,7 +208,8 @@ service cloud.firestore {
       );
 
       // Only admins may delete; self-delete removed to prevent orphan data (E07)
-      allow delete: if isAdmin() && resourceInMyLo(resource.data);
+      // R-034: SUPER_ADMIN is org-wide and may have no loId, so it skips the LO check.
+      allow delete: if isAdmin() && (getUserRole() == 'SUPER_ADMIN' || resourceInMyLo(resource.data));
     }
     
     // Communication/Posts collection
@@ -557,7 +558,7 @@ service cloud.firestore {
       allow get: if isAuthenticated() &&
                     (resource.data.memberId == request.auth.uid ||
                      (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                      get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN']));
+                      get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN', 'SUPER_ADMIN']));
       // INTENTIONAL DESIGN: resource.data is unavailable in list queries, so ownership cannot be
       // enforced at the Firestore-rules layer for list. The service layer MUST always include
       // where('memberId', '==', uid) in every list query — this prevents unfiltered reads from
@@ -581,7 +582,7 @@ service cloud.firestore {
       allow update: if isAuthenticated() &&
                        (isAdmin() ||
                         (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                         get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN']) ||
+                         get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN', 'SUPER_ADMIN']) ||
                         (resource.data.memberId == request.auth.uid &&
                          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt'])));
       
@@ -589,7 +590,7 @@ service cloud.firestore {
       allow delete: if isAuthenticated() &&
                        (resource.data.memberId == request.auth.uid ||
                         (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                         get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN']));
+                         get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN', 'SUPER_ADMIN']));
     }
 
     // Documents collection
@@ -728,10 +729,10 @@ service cloud.firestore {
                        (resource.data.senderId == request.auth.uid ||
                         resource.data.recipientId == request.auth.uid ||
                         (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                         get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN']));
+                         get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN', 'SUPER_ADMIN']));
       allow delete: if isAuthenticated() &&
                        exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN', 'SUPER_ADMIN'];
     }
 
     // Badges collection
@@ -830,14 +831,14 @@ service cloud.firestore {
         request.resource.data.keys().hasOnly(['memberId', 'benefitId', 'usedAt', 'notes', 'details', 'createdAt', 'loId']);
       allow update, delete: if isAuthenticated() &&
                                exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                               get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+                               get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN', 'SUPER_ADMIN'];
     }
     
     // Webhooks collection
     match /webhooks/{webhookId} {
       allow read, create, update, delete: if isAuthenticated() && 
                                              exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                                             get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+                                             get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN', 'SUPER_ADMIN'];
     }
     
     // Webhook Logs collection
@@ -963,14 +964,14 @@ service cloud.firestore {
       allow list: if isAuthenticated();
       allow create: if isAuthenticated() &&
                      exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                     (getUserRole() in ['BOARD', 'ADMIN'] ||
+                     (getUserRole() in ['BOARD', 'ADMIN', 'SUPER_ADMIN'] ||
                       request.resource.data.mentorId == request.auth.uid ||
                       request.resource.data.menteeId == request.auth.uid);
       // FIX 22: split update/delete; add hasOnly whitelist so mentor/mentee can only change safe fields
       allow update: if isAuthenticated() &&
                      (
                        (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                        getUserRole() in ['BOARD', 'ADMIN']) ||
+                        getUserRole() in ['BOARD', 'ADMIN', 'SUPER_ADMIN']) ||
                        ((resource.data.mentorId == request.auth.uid ||
                          resource.data.menteeId == request.auth.uid) &&
                         request.resource.data.diff(resource.data).affectedKeys()
@@ -978,14 +979,14 @@ service cloud.firestore {
                      );
       allow delete: if isAuthenticated() &&
                      exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                     getUserRole() in ['BOARD', 'ADMIN'];
+                     getUserRole() in ['BOARD', 'ADMIN', 'SUPER_ADMIN'];
     }
     match /mentorshipFeedback/{docId} {
       allow read: if isAuthenticated() && 
                      exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                     getUserRole() in ['BOARD', 'ADMIN'];
+                     getUserRole() in ['BOARD', 'ADMIN', 'SUPER_ADMIN'];
       allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && getUserRole() in ['BOARD', 'ADMIN'];
+      allow update, delete: if isAuthenticated() && getUserRole() in ['BOARD', 'ADMIN', 'SUPER_ADMIN'];
     }
     
     // Knowledge / Learning: training modules, learning paths, progress, certificates

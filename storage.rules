@@ -19,13 +19,13 @@ service firebase.storage {
     function isBoard() {
       return isAuthenticated() && 
              firestore.exists(/databases/(default)/documents/members/$(request.auth.uid)) &&
-             firestore.get(/databases/(default)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN'];
+             firestore.get(/databases/(default)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN', 'SUPER_ADMIN'];
     }
     
     function isAdmin() {
       return isAuthenticated() && 
              firestore.exists(/databases/(default)/documents/members/$(request.auth.uid)) &&
-             firestore.get(/databases/(default)/documents/members/$(request.auth.uid)).data.role == 'ADMIN';
+             firestore.get(/databases/(default)/documents/members/$(request.auth.uid)).data.role in ['ADMIN', 'SUPER_ADMIN'];
     }
     
     function isValidImageFile() {

@@ -416,6 +416,8 @@
 
 建议行动：统一改用 `isAdmin()`，并补规则测试。
 
+进展（2026-10-18，规则已改，待用户部署）：`canReadOrgMembers()` 和 11 处写死的 `['BOARD','ADMIN']` 都补上 SUPER_ADMIN（只加 SUPER_ADMIN，不扩大到其他角色）；删除会员时 SUPER_ADMIN 不受分会限制；`storage.rules` 的 `isBoard` / `isAdmin` 同步补上。模拟器测试 21 项全部通过：SUPER_ADMIN（含没有分会的）可以给他人签到、代报名、取消报名、删除报名、读写他人通知、读会员邮箱占位、删除会员；MEMBER 仍全部被拒；其他分会的 ADMIN 仍不能删除本分会会员；ADMIN、BOARD 的签到不受影响。同一套测试用线上旧规则跑，SUPER_ADMIN 各项都被拒绝，证明测试有效。部署时会一并上线用户已同意的 `b83d671`（代他人提交报销，已测试：BOARD 允许、MEMBER 拒绝）和 `65599ca`。回滚：重新部署 `d8282b0` 版规则。
+
 ### R-035 后台权限配置不生效（P1）
 
 证据：Config → Access 页面写入 `userRolePermissions`、`positionPermissions`、`membershipTypePermissions`、`permissionCatalog`，但 `hooks/usePermissions.ts`、`firestore.rules` 和所有函数都不读这些表；两边连权限名称都不是同一套（`members.view` 对比 `canViewMembers`）。来源 commit `81a56be`。`SCHEMA.md:2342`、`SCHEMA-PERMISSIONS.md:122–124` 的描述与实际不符。
