@@ -5,6 +5,7 @@ import { COLLECTIONS, TOYYIB_CONFIG } from '../config/constants';
 import { errorLoggingService } from './errorLoggingService';
 import { apiCache, CACHE_TTL_5MIN } from './cacheService';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { isDevMode } from '../utils/devMode';
 
 export interface ToyyibApiCategoryRaw {
   CategoryCode: string;
@@ -157,8 +158,10 @@ export class ToyyibService {
    * codes on the member record.
    */
   static async createBill(params: CreateBillParams): Promise<ToyyibBillResponse> {
-    if (!TOYYIB_CONFIG.USER_SECRET_KEY || !TOYYIB_CONFIG.CATEGORY_CODE) {
-      console.warn('ToyyibPay: Missing API keys, simulating response');
+    // Mock only in dev mode. The secret key lives server-side (toyyibpay-api), so the old
+    // `!TOYYIB_CONFIG.USER_SECRET_KEY` check (always '' in the client) made every real bill a MOCK.
+    if (isDevMode()) {
+      console.warn('ToyyibPay: dev mode, simulating response');
       await new Promise(resolve => setTimeout(resolve, 1000));
       const mockBillCode = 'MOCK-' + Math.random().toString(36).substring(7).toUpperCase();
       return {
