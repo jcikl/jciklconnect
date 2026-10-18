@@ -762,10 +762,16 @@ export class EventsService {
             this.invalidateEventsCache();
           }
 
-          // E-3: PointsService.awardEventAttendancePoints removed — the Cloud Function
-          // onEventRegistrationUpdate (functions/gamificationLogic.ts) fires on checked_in status
-          // and writes both points and incentiveSubmissions server-side. Calling PointsService here
-          // in addition caused duplicate points records.
+          // R-039: award attendance points here. The Cloud Function this used to rely on
+          // (onEventRegistrationUpdate) was never deployed. awardEventAttendancePoints uses a
+          // deterministic points doc id, so repeated check-ins cannot double-award. Runs after the
+          // check-in commit; a failure is logged but does not undo the check-in (mirrors undoAttendance).
+          try {
+            const { PointsService } = await import('./pointsService');
+            await PointsService.awardEventAttendancePoints(memberId, eventId, event.type);
+          } catch (pointsErr) {
+            errorLoggingService.logError(pointsErr instanceof Error ? pointsErr : new Error(String(pointsErr)), { context: 'EventsService.markAttendance.points', additionalData: { memberId, eventId } });
+          }
 
           // 按当年签到记录重算出席对比（签到次数 vs 已过月份）
           const { MembersService } = await import('./membersService');

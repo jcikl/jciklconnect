@@ -461,3 +461,5 @@ Evidence: `services/eventsService.ts:765–768` removed the points call at check
 Risk: Check-ins add no personal points, so leaderboards and incentive totals run low, with no error shown.
 
 Recommended action: restore the `PointsService` call in the web check-in flow and remove the wrong comment (step P4 of the Netlify migration plan).
+
+Progress (2026-10-18, code changed, not deployed): `EventsService.markAttendance` now calls `PointsService.awardEventAttendancePoints` after the check-in batch commits (deterministic doc id, so repeated check-ins cannot double-award); a points failure is logged without undoing the check-in, mirroring `undoAttendance`. The event detail modal check-in used to change only the status (no points, no attendance list, and its `checkedInByName` field is outside the rules whitelist, so Board users were denied); it now calls `markAttendance`, symmetric with the modal undo. Added `services/eventsService.markAttendance.test.ts` (4 tests). Known edge: checking in again after an undo awards nothing, because the deterministic points doc already exists (net 0).

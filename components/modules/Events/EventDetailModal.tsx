@@ -318,11 +318,12 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   const handleMarkCheckedIn = async (reg: EventRegistration) => {
     setUpdatingRegId(reg.id);
     try {
-      const now = new Date().toISOString();
-      const actorName = member?.general?.name ?? member?.id ?? 'Admin';
-      await EventRegistrationService.updateStatus(reg.id, 'checked_in', { checkedInAt: now, checkedInByName: actorName });
+      // Same path as undo (undoAttendance): markAttendance writes status + attendanceList in one
+      // batch and awards attendance points, so check-in and undo stay symmetric (R-039).
+      const now = new Date();
+      await EventsService.markAttendance(reg.eventId, reg.memberId, now);
       EventsService.invalidateEventsCache();
-      setParticipations((prev) => prev.map((r) => (r.id === reg.id ? { ...r, status: 'checked_in' as const, checkedInAt: now, checkedInByName: actorName } : r)));
+      setParticipations((prev) => prev.map((r) => (r.id === reg.id ? { ...r, status: 'checked_in' as const, checkedInAt: now.toISOString() } : r)));
       showToast('Marked as checked in', 'success');
     } catch {
       showToast('Operation failed', 'error');

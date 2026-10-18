@@ -461,3 +461,5 @@
 风险：签到后个人积分不增加，积分排行和激励计算偏低，且没有任何报错。
 
 建议行动：在网页端签到流程恢复调用 `PointsService`，并删除那条错误注释（见 Netlify 迁移计划 P4）。
+
+进展（2026-10-18，代码已改，待部署）：`EventsService.markAttendance` 在签到批量写入成功后调用 `PointsService.awardEventAttendancePoints`（固定文档 ID，重复签到不会重复加分）；加分失败只记录错误，不撤销签到，与 `undoAttendance` 的处理方式一致。活动详情弹窗的「签到」原来只改状态（不加分、不更新出席名单，而且写入的 `checkedInByName` 不在规则白名单里，理事会被拒绝），现在改走 `markAttendance`，与弹窗的「撤销签到」对称。新增 `services/eventsService.markAttendance.test.ts`（4 个测试）。已知边界：撤销签到后再次签到不会再加分，因为固定 ID 的积分记录已存在，净积分为 0。
