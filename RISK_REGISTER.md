@@ -6,6 +6,8 @@ Updated 2026-10-12: R-018 to R-024 added from the `CAPABILITIES.md` scan (commit
 
 Updated 2026-10-12: R-025 to R-027 added.
 
+Updated 2026-10-18: R-028 to R-039 added from verification round 1 (permissions and rules); see the end of this file.
+
 Severity scale: P0 critical, P1 high, P2 medium, P3 low.
 
 ## P0 Risks
@@ -336,3 +338,124 @@ Risk: A name starting with `&` or `<` produces invalid SVG, so the fallback avat
 Recommended action:
 
 - Escape `&`, `<`, `>` in the standard `utils/avatarUtils.ts` and add a unit test; the remaining copies inherit the fix when migrated under R-020.
+
+## Added 2026-10-18: Verification Round 1 (Permissions and Rules)
+
+Source: read-only check of the repo `firestore.rules` against the code. The user supplied the live rules from the console the same day; fingerprinting matches commit `d8282b0` (2026-09-10). Later commits `b83d671` (submit payment requests on behalf of others) and `65599ca` (remove certificates / nudgeRules rules) are not deployed. The rule sections cited below are identical live and in the repo, so these issues exist in production; still reproduce "rejected" items in the emulator before fixing.
+
+### R-028 Rules Out of Step With the Data Shape; Key Writes May Be Rejected (P0)
+
+Evidence:
+
+- Reconciliation: the `transactions` update whitelist (`firestore.rules` ~L349–360) has no `reconciliation` key, but `services/financeService.ts:4198–4213` and others write `reconciliation.*`. The comment at L343 promises an admin bypass that no longer exists.
+- Self-registration: `hooks/useAuth.tsx:486–518` writes `others`, `tier`, `points`, `jciCareer`, `skills` and more, beyond the `members` create whitelist (L162–166).
+- Member self-edit: rule L178 requires top-level `name` and `email`, but profiles now keep them under `general` / `contact`.
+
+Risk: Reconciliation matching, self-registration and profile self-edits (including enabling push) are rejected.
+
+Reproduced 2026-10-18 in the Firestore emulator loaded with the live rules (`d8282b0`), using the payloads the code actually writes (script kept in the session scratch folder, not committed):
+
+- Self-registration: the real payload is denied; a whitelist-only payload passes.
+- Reconciliation match: denied for both the current Treasurer and ADMIN; the same match using the old field names passes.
+- Member phone edit: denied when the profile has only nested general / contact; allowed when it also has top-level name / email. Which shape production profiles have is not yet confirmed.
+
+Recommended action: confirm the deployed rules first, reproduce the three writes in the emulator, then fix the whitelists together.
+
+### R-029 Any Signed-In User Can Rewrite counters (P0)
+
+Evidence: `firestore.rules` L1163–1168 only requires sign-in and an int `value`; `services/paymentRequestService.ts:66` uses it for payment-request numbers.
+
+Risk: Lowering a counter gives two payment requests the same number.
+
+Recommended action: allow increment-by-one only, or generate numbers server-side.
+
+### R-030 Guests or Members Can Bulk-Read or Forge Sensitive Records (P1)
+
+Evidence:
+
+- GUEST can list all `toyyibBills` (L1237) and `paymentRequests` (L458); members can list all `eventRegistrations` (L523), `inquiries` (L726) and `surveyResponses` (L617).
+- `toyyibBills` and `eventRegistrations` creates have no field whitelist, so a record can arrive already marked paid.
+- GUEST can create a notification for any member (L569–576); members can rewrite whole attendee arrays on events/projects (L251–254, L269–272).
+- `events` / `projects` list is open to unauthenticated users, drafts included (L245, L263).
+
+Risk: Personal payment, claim and survey data leaks; payment status and notifications can be forged.
+
+Recommended action: scope lists to the caller (`resource.data.memberId == request.auth.uid`; queries that carry the same filter pass) and add create whitelists.
+
+### R-031 Any Board Member Can Approve Payment Requests, Including Their Own (P1)
+
+Evidence: `firestore.rules` L482–485.
+
+Risk: No separation of duties.
+
+Recommended action: restrict approval to finance operators and forbid `approvedBy == applicantId`.
+
+### R-032 Member Self-Payment Batch Is Rejected (P1)
+
+Evidence: `services/toyyibService.ts:215–223` writes the bill and a `toyyibCategories` update in one batch; the latter is Board-only (L1226). Callers: `hooks/useToyyibPayment.ts:70`, `:123`.
+
+Risk: The member pays in ToyyibPay but no bill record is saved.
+
+Recommended action: move the category update server-side or drop it from the member flow.
+
+### R-033 Push Notifications Are Never Delivered (P1)
+
+Evidence: tokens are saved on `members` (`services/notificationService.ts:51`) but the server reads `users/{id}` (`functions/src/notifications.ts:321`, `netlify/functions/birthday-notifications.mjs:35`).
+
+Risk: Birthday and event pushes silently fail.
+
+Recommended action: use one token location; verify together with the R-028 self-edit issue.
+
+Progress (2026-10-18, code changed, not deployed): added `netlify/lib/firebaseAdmin.mjs`; `birthday-notifications.mjs` and `send-push-test.mjs` now read the token from `members`. Also fixed birthday recipients: the query used `status == 'active'`, but current member docs have no top-level `status`, so new members never matched; it now filters by role (MEMBER / BOARD / ADMIN / SUPER_ADMIN, excluding deleted and legacy `status: inactive`) and reads the name from `general.name`. Emulator check: unauthenticated call returns 401; guests, inactive and deleted members excluded; token read from `members`; a second run the same day sends nothing new. Note: members can only save a token if the R-028 self-edit issue is fixed.
+
+### R-034 Rules Leave Out SUPER_ADMIN (P1)
+
+Evidence: `canReadOrgMembers` (L94–102) lists only ADMIN and BOARD; hard-coded `role in ['BOARD','ADMIN']` in notifications, inquiries, webhooks, benefitUsage, mentorMatches and `storage.rules` L22, L28; `resourceInMyLo` returns false when the caller has no `loId` (L115–118, L208).
+
+Risk: A super admin who is not on the current board cannot add members or delete registrations and members.
+
+Recommended action: use `isAdmin()` everywhere and add rules tests.
+
+### R-035 Admin Permission Settings Have No Effect (P1)
+
+Evidence: Config → Access writes `userRolePermissions`, `positionPermissions`, `membershipTypePermissions` and `permissionCatalog`, but `hooks/usePermissions.ts`, `firestore.rules` and all functions ignore them; even the permission names differ (`members.view` vs `canViewMembers`). Introduced in commit `81a56be`. `SCHEMA.md:2342` and `SCHEMA-PERMISSIONS.md:122–124` describe it wrongly.
+
+Risk: Admins believe they changed access when nothing changed.
+
+Recommended action: short term, label the page "not yet in effect" or hide it; decide separately whether to wire it in (critical risk).
+
+### R-036 Other Overly Broad Rules (P2)
+
+Evidence:
+
+- Readable by any signed-in user: `points` (L546), `mentorMatches` list (L963), `achievementProgress` (L1337), `benefitUsage` (L827) and others.
+- Creates with no whitelist: `errorLogs` L1191, `emailLogs` L1291, `activityPlans` L809, `mentorshipFeedback` L988, `publicBusinessListings` L1180, `contracts` L1052.
+- Counter fields settable to any value: `advertisements` L773–775; `guestPageStats` L1212 without sign-in.
+- Rules for removed features remain: `nonMemberLeads` (publicly writable) and `businessProfiles`; indexes for removed collections remain (`firestore.indexes.json` L970, L988, L1334).
+- `services/documentsService.ts:343` calls `storageRef` on Cloudinary URLs, which throws synchronously and can break document deletion.
+
+Recommended action: tighten alongside R-030; remove leftover rules and indexes.
+
+### R-037 Rules Guidance in Docs Is Wrong (P3)
+
+Evidence: `CLAUDE.md` §5.3 says `resource.data` cannot be used in list/query rules; it can when the query carries the same constraint. `docs/PERMISSION_MATRIX.zh-CN.md` L96, L130, L199 still list removed collections.
+
+Risk: AI loosens list rules because of the wrong guidance, which is one cause of R-030.
+
+Recommended action: `CLAUDE.md` changes need owner approval (CODEOWNERS); update the matrix with the R-030 fix.
+
+### R-038 No Cloud Functions Are Deployed (P1)
+
+Evidence: on 2026-10-18 `firebase functions:list` (run with an account that has access) returned "No functions found"; the Firebase environment reports billing is not enabled (the Spark plan cannot deploy Cloud Functions). None of the functions in `functions/src` run in production: automatic member promotion, dues renewal and reminders, birthday pushes, event reminders, badge / achievement / automation triggers, finance validation.
+
+Risk: Automations that depend on them fail silently, such as the October dues renewal, the January dues reminder and auto-promotion on `members` updates. Only Netlify Functions run in production; the Netlify birthday job needs an external cron, which is also unconfirmed.
+
+Recommended action: list which automations the chapter actually needs; decide between enabling billing and deploying, or moving the needed ones to Netlify (decide with R-006); mark undeployed functions clearly in the docs so they are no longer treated as live features.
+
+### R-039 Event Check-In Awards No Personal Points (P1)
+
+Evidence: `services/eventsService.ts:765–768` removed the points call at check-in, saying the Cloud Function `onEventRegistrationUpdate` handles it; that function is never imported by `functions/src/index.ts`, so it would not deploy even with billing on, and it does not write `points` anyway.
+
+Risk: Check-ins add no personal points, so leaderboards and incentive totals run low, with no error shown.
+
+Recommended action: restore the `PointsService` call in the web check-in flow and remove the wrong comment (step P4 of the Netlify migration plan).

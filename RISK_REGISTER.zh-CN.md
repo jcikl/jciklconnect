@@ -6,6 +6,8 @@
 
 2026-10-12 更新：新增 R-025 至 R-027。
 
+2026-10-18 更新：第一轮核实（权限与规则）新增 R-028 至 R-039，见文末。
+
 严重级别：P0 严重，P1 高，P2 中，P3 低。
 
 ## P0 风险
@@ -336,3 +338,124 @@
 建议行动：
 
 - 在标准版 `utils/avatarUtils.ts` 中转义 `&`、`<`、`>` 并补单元测试；其余副本按 R-020 迁移后自动获得修正。
+
+## 2026-10-18 第一轮核实新增（权限与规则）
+
+来源：对仓库内 `firestore.rules` 与代码的只读核对。线上规则已于同日由用户从控制台提供，经指纹比对确认为 commit `d8282b0`（2026-09-10）的版本：其后的 `b83d671`（允许代他人提交付款申请）和 `65599ca`（删除 certificates / nudgeRules 规则）尚未部署。以下各项涉及的规则段落线上与仓库一致，因此在线上同样存在；「被拒绝」类问题修复前仍须在模拟器里复现。
+
+### R-028 规则与代码的数据结构脱节，关键写入可能被拒（P0）
+
+证据：
+
+- 对账：`transactions` 的 update 白名单（`firestore.rules` 约 L349–360）没有 `reconciliation` 字段，而 `services/financeService.ts:4198–4213` 等处写入 `reconciliation.*`；规则注释 L343 说管理员可绕过，但代码里已没有这个绕过。
+- 新用户自助注册：`hooks/useAuth.tsx:486–518` 写入 `others`、`tier`、`points`、`jciCareer`、`skills` 等字段，超出 `members` create 白名单（L162–166）。
+- 会员自改资料：规则 L178 要求顶层有 `name`、`email`，但资料现在存在 `general` / `contact` 里。
+
+风险：对账配对、自助注册、会员改资料（含开启推送）会被拒绝。
+
+2026-10-18 模拟器复现（Firestore 模拟器加载线上同版规则 `d8282b0`，按代码实际写法写入；脚本在会话临时目录，未入库）：
+
+- 自助注册：代码实际写入的字段 → 被拒绝；只写白名单字段 → 通过。
+- 对账配对：财政（当届 Treasurer）和 ADMIN 都被拒绝；改用规则认可的旧字段名 → 通过。
+- 会员改电话：资料只有 general / contact 嵌套结构 → 被拒绝；资料另有顶层 name / email → 通过。线上会员资料是哪种结构尚未确认。
+
+建议行动：先确认线上规则版本；在模拟器里复现三条写入；再一次性修正白名单。
+
+### R-029 任何登录用户都能改写 counters（P0）
+
+证据：`firestore.rules` L1163–1168 只要求登录、字段为整数 `value`；`services/paymentRequestService.ts:66` 用它生成付款申请编号。
+
+风险：把计数器改小会让两张付款申请拿到同一编号。
+
+建议行动：限制只能递增（`request.resource.data.value == resource.data.value + 1`），或改由服务端生成编号。
+
+### R-030 访客或普通会员可整批读取、伪造敏感记录（P1）
+
+证据：
+
+- GUEST 可列出全部 `toyyibBills`（L1237）、`paymentRequests`（L458）；会员可列出全部 `eventRegistrations`（L523）、`inquiries`（L726）、`surveyResponses`（L617）。
+- `toyyibBills`、`eventRegistrations` 的 create 没有字段白名单，可自带「已付款」状态。
+- GUEST 可给任何会员创建通知（L569–576）；会员可整份改写活动 / 项目的出席名单（L251–254、L269–272）。
+- `events` / `projects` 列表对未登录者开放，包括草稿（L245、L263）。
+
+风险：缴费、报销、问卷等个人资料外泄；付款状态和通知可被伪造。
+
+建议行动：列表规则改为「只能查自己的」（`resource.data.memberId == request.auth.uid`，查询带同样条件即可通过）；create 加白名单。
+
+### R-031 任何理事都能批准付款申请，包括自己的（P1）
+
+证据：`firestore.rules` L482–485。
+
+风险：职责不分离，理事可以自己批准自己的报销。
+
+建议行动：批准限财务操作员，并禁止 `approvedBy == applicantId`。
+
+### R-032 会员自助缴费的批次写入会被拒（P1）
+
+证据：`services/toyyibService.ts:215–223` 在同一批次里写账单和更新 `toyyibCategories`，而后者只允许理事写（L1226）；调用方是 `hooks/useToyyibPayment.ts:70`、`:123`。
+
+风险：会员已在 ToyyibPay 付款成功，系统里却没有账单记录。
+
+建议行动：把类别更新移到服务端，或从会员流程中拿掉。
+
+### R-033 手机推送发不出去（P1）
+
+证据：令牌写在 `members`（`services/notificationService.ts:51`），服务端却到 `users/{id}` 找（`functions/src/notifications.ts:321`、`netlify/functions/birthday-notifications.mjs:35`）。
+
+风险：生日、活动等推送全部失效且没有报错。
+
+建议行动：统一令牌存放位置；与 R-028 的会员自改资料问题一起验证。
+
+进展（2026-10-18，代码已改，待部署）：新增 `netlify/lib/firebaseAdmin.mjs`，`birthday-notifications.mjs` 和 `send-push-test.mjs` 改为从 `members` 读令牌。同时修正生日推送的收件人条件：原查询用 `status == 'active'`，但现在的会员资料没有顶层 `status`，新会员永远查不到；改为按角色筛选（MEMBER / BOARD / ADMIN / SUPER_ADMIN，排除已删除和旧数据中 `status: inactive`），名字改读 `general.name`。模拟器验证：无密钥调用返回 401；访客、停用、已删除会员被排除；令牌取自 `members`；同一天重复运行不重复发送。注意：会员要能保存令牌，还取决于 R-028 的会员自改资料问题。
+
+### R-034 规则漏掉了 SUPER_ADMIN（P1）
+
+证据：`canReadOrgMembers`（L94–102）只列 ADMIN、BOARD；多处写死 `role in ['BOARD','ADMIN']`（notifications、inquiries、webhooks、benefitUsage、mentorMatches、`storage.rules` L22、L28）；`resourceInMyLo` 在没有 `loId` 时返回 false（L115–118、L208）。
+
+风险：最高管理员（非当届理事时）不能新增会员、删除报名或会员。
+
+建议行动：统一改用 `isAdmin()`，并补规则测试。
+
+### R-035 后台权限配置不生效（P1）
+
+证据：Config → Access 页面写入 `userRolePermissions`、`positionPermissions`、`membershipTypePermissions`、`permissionCatalog`，但 `hooks/usePermissions.ts`、`firestore.rules` 和所有函数都不读这些表；两边连权限名称都不是同一套（`members.view` 对比 `canViewMembers`）。来源 commit `81a56be`。`SCHEMA.md:2342`、`SCHEMA-PERMISSIONS.md:122–124` 的描述与实际不符。
+
+风险：管理员以为自己改了权限，实际上没有任何变化。
+
+建议行动：短期在页面标明「暂不生效」或隐藏该页；是否真正接入（极高风险）另行决定。
+
+### R-036 读取和写入范围偏宽的其他规则（P2）
+
+证据：
+
+- 任何登录用户可读：`points`（L546）、`mentorMatches` 列表（L963）、`achievementProgress`（L1337）、`benefitUsage`（L827）等。
+- 无白名单的 create：`errorLogs` L1191、`emailLogs` L1291、`activityPlans` L809、`mentorshipFeedback` L988、`publicBusinessListings` L1180、`contracts` L1052。
+- 计数字段可设任意值：`advertisements` L773–775；`guestPageStats` L1212，而且不需要登录。
+- 功能已删除但规则还在：`nonMemberLeads`（公开可写）、`businessProfiles`；已删除集合的索引还在（`firestore.indexes.json` L970、L988、L1334）。
+- `services/documentsService.ts:343` 对 Cloudinary 网址调用 `storageRef` 会同步抛错，可能导致删除文档失败。
+
+建议行动：随 R-030 一起收紧；清理残留规则和索引。
+
+### R-037 规则相关文档有误（P3）
+
+证据：`CLAUDE.md` §5.3 写「`resource.data` 不能用于 list/query 规则」，实际上只要查询自带相同条件就可以用；`docs/PERMISSION_MATRIX.zh-CN.md` L96、L130、L199 仍列出已删除的集合。
+
+风险：AI 按错误说法把列表规则放宽，正是 R-030 的成因之一。
+
+建议行动：修改 `CLAUDE.md` 须所有者批准（CODEOWNERS）；矩阵文档随 R-030 修复一起更新。
+
+### R-038 Cloud Functions 一个都没有部署（P1）
+
+证据：2026-10-18 用有权限的账号运行 `firebase functions:list`，结果为「No functions found」；Firebase 环境信息显示项目未开启计费（Spark 方案无法部署 Cloud Functions）。`functions/src` 里的所有函数（会员自动晋升、会费续费与提醒、生日推送、活动提醒、徽章 / 成就 / 自动化触发器、财务校验）在线上都没有运行。
+
+风险：依赖这些函数的自动功能静默失效，例如每年 10 月自动发起会费续费、每年 1 月会费提醒、`members` 更新后自动晋升。线上目前只有 Netlify Functions 在跑；生日推送的 Netlify 版本要靠外部定时器调用，是否配置了外部定时器也未确认。
+
+建议行动：盘点哪些自动功能是业务真正需要的；决定是开启计费并部署，还是把需要的功能迁到 Netlify（与 R-006 一起决定）；把未部署的函数从文档中标注清楚，不再当作线上能力。
+
+### R-039 会员活动签到拿不到个人积分（P1）
+
+证据：`services/eventsService.ts:765–768` 删掉了签到时发积分的调用，注释说改由 Cloud Function `onEventRegistrationUpdate` 发放；但这个函数从未被 `functions/src/index.ts` 导入，所以即使开通计费也不会部署，而且它本身也不写 `points`。
+
+风险：签到后个人积分不增加，积分排行和激励计算偏低，且没有任何报错。
+
+建议行动：在网页端签到流程恢复调用 `PointsService`，并删除那条错误注释（见 Netlify 迁移计划 P4）。

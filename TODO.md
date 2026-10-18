@@ -54,7 +54,9 @@
 
 ## 待确认
 
-- [ ] **需核实是否已部署**：v6 P0 专项修复（commit `1c9bba2`）涉及的 `firestore.rules` 与 Cloud Functions 改动。来源：原 `CLAUDE.md` 记录"待执行 `firebase deploy --only firestore:rules && firebase deploy --only functions`"（现见 `docs/ANALYSIS-HISTORY.md`）。影响：未部署则这些 P0 修复在生产环境不生效。完成标准：用户确认已部署，或对比线上 rules 与本地 `firestore.rules` 一致。部署须用户亲自批准。
+- [ ] **需核实是否已部署**（规则部分已核实，见下方 2026-10-18 结论；函数部分仍待核实）：v6 P0 专项修复（commit `1c9bba2`）涉及的 `firestore.rules` 与 Cloud Functions 改动。来源：原 `CLAUDE.md` 记录"待执行 `firebase deploy --only firestore:rules && firebase deploy --only functions`"（现见 `docs/ANALYSIS-HISTORY.md`）。影响：未部署则这些 P0 修复在生产环境不生效。完成标准：用户确认已部署，或对比线上 rules 与本地 `firestore.rules` 一致。部署须用户亲自批准。
+  - 2026-10-18 进展：本机 Firebase CLI 当前账号对 `jci-lo-management-app` 无读取权限（403），无法自动比对。需要用户在 Firebase 控制台复制当前规则，或换一个有权限的账号登录 CLI。另一个判断方法：线上对账配对、新用户自助注册如果都正常，说明线上规则和仓库版本不同（见 R-028）。
+  - 2026-10-18 结论（规则）：用户从控制台提供线上规则，比对确认是 commit `d8282b0`（2026-09-10）版，已包含 `1c9bba2` 的规则修复。未部署：`b83d671`（代他人提交付款申请，线上会被拒绝）、`65599ca`（删除已废弃集合的规则，无功能影响）。Cloud Functions：2026-10-18 用 noreply@jcikl.cc 账号查询，线上一个函数都没有部署（项目未开启计费），所以 `1c9bba2` 的函数修复也不存在于线上，见 R-038。
 - [ ] **另一会话产生的未提交文件，待用户决定去留**（2026-10-12 登记）：`CAPABILITIES.md`、`scripts/gen-capabilities.py`、`docs/development/{CLAUDE_MD_MIGRATION,CRUD_CHECKLIST,DECISION_PROTOCOLS,LAYER_RULES}.md`、`docs/collections/{ANALYSIS_FRAMEWORK,ANALYSIS_LOG}.md`，以及 `RISK_REGISTER(.zh-CN).md` 新增的 R-018～R-024。来源：2026-10-12 00:17 另一 AI 会话改写 CLAUDE.md 时生成。用户已决定保留 2026-10-11 版 CLAUDE.md，该会话的版本另存为 `docs/CLAUDE.md.bak-2026-10-12-other-session`（不入库）。影响：`ANALYSIS_LOG.md` 与 `docs/ANALYSIS-HISTORY.md` 内容重复；`CAPABILITIES.md` 能力地图可能有参考价值。完成标准：用户逐项决定提交、合并进现有文档或删除。
 
 ---
@@ -62,6 +64,12 @@
 ## 后续任务
 
 <!-- 批次分析发现的范围外问题登记于此 -->
+
+- [ ] **重建蓝图第一轮核实的修复（需要确认）**（2026-10-18 登记）。来源：第一轮核实（权限与规则），详情见 `RISK_REGISTER.md` R-028～R-037。影响：数据外泄、记录可伪造、对账 / 注册 / 推送可能失效。涉及文件：`firestore.rules`、`storage.rules`、`hooks/useAuth.tsx`、`services/{financeService,toyyibService,notificationService,paymentRequestService}.ts`、`components/modules/AccessConfigView.tsx`。完成标准：先确认线上规则版本；每项先在模拟器复现，再按极高风险流程提计划、等用户批准后修复，并补规则测试。
+- [ ] **把需要的后台任务从 Cloud Functions 搬到 Netlify（需要确认）**（2026-10-18 登记，用户已选定方向：搬到 Netlify，不开计费）。来源：R-038。盘点结论：21 个函数中只有 1 月 1 日会费提醒需要迁移，生日推送已在 Netlify，但要修令牌读取位置（R-033）；10 月自动续费、活动前一天提醒待用户决定；其余已有网页端替代或已废弃。顺带修签到积分（R-039）。步骤：P1 共享 helper（`netlify/lib/firebaseAdmin.mjs`）+ 修推送 → P2 迁移会费提醒 → P3 按用户决定 → P4 修签到积分 → P5 标记 `functions/` 停用并同步文档。完成标准：每步在 `netlify dev` + 模拟器验证，推送一律 dryRun，部署由用户执行。
+  - 2026-10-18 用户决定：10 月自动续费 → 不做，继续手动；1 月 1 日会费提醒 → 迁移；签到积分 → 在网页端恢复；活动前一天提醒 → 先不做，等推送修好后再议。`functions/` 先标记停用，保留一个月。
+- [ ] **重建蓝图第二轮核实：财务（P4）**。来源：重建蓝图 artifact 的验证顺序。完成标准：逐条核对 P4 验收标准和 2026-07-14 撤销审计的 9 个缺口，结果登记到风险清单。
+- [ ] **重建蓝图第三轮核实：其余模块（P2、P3、P5–P7）**。完成标准同上。
 
 ---
 
