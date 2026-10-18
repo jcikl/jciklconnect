@@ -6,7 +6,7 @@
 
 2026-10-12 更新：新增 R-025 至 R-027。
 
-2026-10-18 更新：第一轮核实（权限与规则）新增 R-028 至 R-044，见文末。
+2026-10-18 更新：第一轮核实（权限与规则）新增 R-028 至 R-045，见文末。
 
 严重级别：P0 严重，P1 高，P2 中，P3 低。
 
@@ -517,3 +517,11 @@
 风险：会员缴会费、活动报名费、手动建账单得到的付款链接全部无效；这是线上 `toyyibBills` 一直为空的根本原因。
 
 处理（分支 `fix/toyyib-mock-bill`，待合并）：改为仅在开发模式（`isDevMode()`）返回假账单；新增 `services/toyyibService.createBill.test.ts`（2 项，撤掉修复后对应测试失败）。
+
+### R-045 服务端过滤掉了 ToyyibPay 必需参数，真账单从未建成；付款人可改金额（P0）
+
+证据（2026-10-19，修好 R-044 后在正式站建 RM1 沙盒账单）：ToyyibPay 先回「billName exceed limit. Max 30 length」，改短名称后回「billPriceSetting parameter is empty」。`toyyibpay-api` 的转发白名单 `CREATE_BILL_ALLOWED_PARAMS` 只含名称、描述、金额、付款人、分类，把 `billPriceSetting`、`billPayorInfo`、`billPaymentChannel`、`billExternalReferenceNo` 全部丢弃；服务端名称上限检查是 255 字，而 ToyyibPay 是 30 字（描述 100 字）。另外网页端发送的 `billPriceSetting` 是 `'0'`（付款人可自行修改金额）。
+
+风险：即使没有 R-044，经系统也建不出真账单；修好后若照网页端的值转发，付款人可改金额。
+
+处理（分支 `fix/toyyib-create-bill-params`，待合并）：新增 `netlify/lib/toyyibBill.mjs` 的 `buildCreateBillParams`：价格设置固定为 `1`（固定金额）、付款人资料固定为 `1`，付款方式只接受 0/1/2，放行外部参考编号，名称 / 描述按 ToyyibPay 上限截断，回调 / 跳回网址仍只由服务端决定。单元测试 5 项通过。

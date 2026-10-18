@@ -8,6 +8,7 @@ import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { resolveReturnUrl, resolveCallbackUrl } from '../lib/siteUrl.mjs';
+import { buildCreateBillParams } from '../lib/toyyibBill.mjs';
 
 const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID;
 const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
@@ -25,12 +26,7 @@ if (!getApps().length) {
 // FIX 2: Restrict CORS to known origins only
 const ALLOWED_ORIGINS = ['https://app.jcikl.cc', 'http://localhost:3000', 'http://localhost:3001'];
 
-// FIX 3: Allowlist of safe params that may be forwarded to ToyyibPay createBill
-const CREATE_BILL_ALLOWED_PARAMS = [
-  'billName', 'billDescription', 'billAmount', 'billTo',
-  'billEmail', 'billPhone', 'billSplitPayment', 'billSplitPaymentArgs',
-  'categoryCode', // required by ToyyibPay to assign the bill to a category
-];
+// FIX 3: the createBill allowlist now lives in netlify/lib/toyyibBill.mjs (buildCreateBillParams).
 
 // Sandbox key = TOYYIBPAY_SECRET_KEY, Production key = TOYYIBPAY_SECRET_KEY_PROD.
 // Mode (sandbox vs production) is read from Firestore systemConfig/toyyibpay at request time,
@@ -182,26 +178,12 @@ export default async (req, context) => {
         result = await callToyyib('createCategory', { catname: params.catname, catdescription: params.catdescription }, isSandbox);
         break;
       case 'createBill': {
-        // NET-008: Input validation before forwarding to ToyyibPay
-        const rawAmount = Number(params.billAmount);
-        if (!params.billAmount || isNaN(rawAmount) || rawAmount <= 0) {
-          return Response.json({ error: 'Invalid input: billAmount must be a positive number' }, { status: 400, headers: cors });
-        }
-        if (!params.billName || String(params.billName).length > 255) {
-          return Response.json({ error: 'Invalid input: billName is required and must be ≤255 characters' }, { status: 400, headers: cors });
-        }
-        if (!params.billDescription || String(params.billDescription).length > 255) {
-          return Response.json({ error: 'Invalid input: billDescription is required and must be ≤255 characters' }, { status: 400, headers: cors });
-        }
-        if (params.billEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(params.billEmail)) {
-          return Response.json({ error: 'Invalid input: billEmail has an invalid format' }, { status: 400, headers: cors });
-        }
-
-        // FIX 3: Only forward explicitly allowlisted params; lock callback/return URLs
-        const sanitized = {};
-        for (const key of CREATE_BILL_ALLOWED_PARAMS) {
-          if (params[key] !== undefined) sanitized[key] = params[key];
-        }
+        // NET-008 / FIX 3: validate and allowlist in netlify/lib/toyyibBill.mjs. It also fixes the
+        // price setting (fixed amount) and payer-info flags server-side; they used to be stripped
+        // by the allowlist, so ToyyibPay rejected every bill ("billPriceSetting parameter is empty").
+        const built = buildCreateBillParams(params);
+        if (!built.ok) return Response.json({ error: built.error }, { status: 400, headers: cors });
+        const sanitized = built.params;
         // Lock callback URL to our own webhook — never accept from caller.
         // NET-005: Append ?secret=... so the callback handler can verify the request
         // originated from ToyyibPay via a shared-secret we control.

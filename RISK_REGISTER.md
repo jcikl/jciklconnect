@@ -6,7 +6,7 @@ Updated 2026-10-12: R-018 to R-024 added from the `CAPABILITIES.md` scan (commit
 
 Updated 2026-10-12: R-025 to R-027 added.
 
-Updated 2026-10-18: R-028 to R-044 added from verification round 1 (permissions and rules); see the end of this file.
+Updated 2026-10-18: R-028 to R-045 added from verification round 1 (permissions and rules); see the end of this file.
 
 Severity scale: P0 critical, P1 high, P2 medium, P3 low.
 
@@ -517,3 +517,11 @@ Evidence: `TOYYIB_CONFIG.USER_SECRET_KEY` in `config/constants.ts:142` is a fixe
 Risk: every payment link for dues, event fees and manual bills was invalid; this is why production `toyyibBills` has always been empty.
 
 Resolution (branch `fix/toyyib-mock-bill`, awaiting merge): return a mock only in dev mode (`isDevMode()`); added `services/toyyibService.createBill.test.ts` (2 tests; the proxy test fails without the fix).
+
+### R-045 The Proxy Stripped Required ToyyibPay Parameters, So No Real Bill Was Ever Created; Payers Could Change the Amount (P0)
+
+Evidence (2026-10-19, after fixing R-044, creating a RM1 sandbox bill on production): ToyyibPay first returned "billName exceed limit. Max 30 length", then, with a shorter name, "billPriceSetting parameter is empty". The `toyyibpay-api` allowlist `CREATE_BILL_ALLOWED_PARAMS` only kept name, description, amount, payer and category, dropping `billPriceSetting`, `billPayorInfo`, `billPaymentChannel` and `billExternalReferenceNo`; the server checked names against 255 characters while ToyyibPay allows 30 (description 100). The client also sent `billPriceSetting: '0'`, which lets the payer edit the amount.
+
+Risk: even without R-044 no real bill could be created; forwarding the client's value would have let payers change the amount.
+
+Resolution (branch `fix/toyyib-create-bill-params`, awaiting merge): new `buildCreateBillParams` in `netlify/lib/toyyibBill.mjs` fixes the price setting to `1` (fixed amount) and payer info to `1`, accepts payment channel 0/1/2 only, passes the external reference number, clips name / description to ToyyibPay's limits, and keeps callback / return URLs server-decided. 5 unit tests pass.
