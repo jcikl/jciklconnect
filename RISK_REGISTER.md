@@ -6,7 +6,7 @@ Updated 2026-10-12: R-018 to R-024 added from the `CAPABILITIES.md` scan (commit
 
 Updated 2026-10-12: R-025 to R-027 added.
 
-Updated 2026-10-18: R-028 to R-041 added from verification round 1 (permissions and rules); see the end of this file.
+Updated 2026-10-18: R-028 to R-042 added from verification round 1 (permissions and rules); see the end of this file.
 
 Severity scale: P0 critical, P1 high, P2 medium, P3 low.
 
@@ -489,3 +489,11 @@ Evidence: members use `https://jciklconnect.netlify.app`; `app.jcikl.cc` does no
 Risk: payers see an error page after paying and may pay twice.
 
 Recommended action / progress (2026-10-18, code changed, awaiting merge and deploy): new `netlify/lib/siteUrl.mjs` derives the site origins and production context from Netlify's own `URL` / `DEPLOY_PRIME_URL` / `CONTEXT` (no new env vars); return URLs are accepted only on our own origins (including deploy previews), otherwise `<site>/payment-return`; the callback default is our own function URL; new `/payment-return` page for guests and signed-in members shows success / pending / failed from `status_id` (informational only; the server callback still records the payment). 11 unit tests pass. The CORS allowlists of the other 10 functions also list only `app.jcikl.cc`; same-origin requests are unaffected, so that is a separate task.
+
+### R-042 Production Payment Function Could Not Start Without the ToyyibPay Key (P0, resolved)
+
+Evidence: on 2026-10-18 an unauthenticated request to production `/.netlify/functions/toyyibpay-api` returned 502 with `TOYYIBPAY_SECRET_KEY env var not set` (the function throws at start-up when the variable is missing); the PR #3 and #4 previews behaved the same. The error response also returned the server stack trace to the browser.
+
+Risk: no online payment started from the app (dues, event fees) could create a bill.
+
+Resolution: the owner set `TOYYIBPAY_SECRET_KEY` (sandbox) and `TOYYIBPAY_SECRET_KEY_PROD` (production) in Netlify the same day and redeployed; production now returns 401 (function starts and reaches the auth check). Note: without a `systemConfig/toyyibpay` setting the code defaults to sandbox mode, so confirm the mode is Production before taking real payments. Follow-up option: report a missing variable as a per-request 500 with a log entry instead of throwing at start-up, so no stack trace reaches the browser.

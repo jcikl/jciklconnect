@@ -80,6 +80,7 @@
 - [ ] **通知会员新的登录方式**（2026-10-18 登记）：Fix Auth 未发设置密码邮件，会员需用 Google 登录或「忘记密码」。完成标准：会员群发通知，或改为批量发送设置密码邮件（需用户决定）。
 - [ ] **`ConfirmDialog` 深色模式下「Cancel」按钮几乎看不见**（2026-10-18 登记）。来源：Fix Auth 执行确认窗口截图。涉及：`components/ui/ConfirmDialog.tsx`（共用组件，影响所有确认窗口）。完成标准：浅色、深色两种主题下按钮文字都清晰可读。
 - [ ] **`send-invite` / `auto-invite` 改用 uid = 会员编号**（2026-10-18 登记）。来源：R-040。这两个函数仍用随机 uid 建账号；全部会员已有账号后影响变小，但应统一用 `netlify/lib/memberAuth.mjs`。
+- [ ] **确认 ToyyibPay 模式为 Production**（2026-10-18 登记，R-042）：System Config → ToyyibPay；缺少设置时代码默认沙盒。
 - [ ] **付款跳回网址修复上线后实测**（2026-10-18 登记，R-041）：合并部署后，用最小金额实际付款一次，确认跳回 `/payment-return` 且系统记录为已付；已登录会员停留在结果页、按钮回到系统。
 - [ ] **会员自助缴费写 `membership.{年份}.toyyibBillCode` 被规则拒绝**（2026-10-18 登记）。来源：`hooks/useToyyibPayment.ts:84` 写会员资料的 `membership` 字段，而会员自改资料规则锁定 `membership`；与 R-032 同属会员自助缴费流程。完成标准：改由服务端写入或调整写入位置，并补规则测试。
 - [ ] **10 个 Netlify 函数的 CORS 白名单改用本站网址**（2026-10-18 登记，R-041）：`audit-log`、`auto-invite`、`cloudinary-delete`、`lark-sync`、`send-email`、`send-invite`、`toyyibpay-api`、`upload-to-drive`、`whapi-proxy`、`member-auth` 只列了 `app.jcikl.cc`；改用 `netlify/lib/siteUrl.mjs` 的 `siteOrigins()`。
