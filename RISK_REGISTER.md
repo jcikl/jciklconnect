@@ -6,7 +6,7 @@ Updated 2026-10-12: R-018 to R-024 added from the `CAPABILITIES.md` scan (commit
 
 Updated 2026-10-12: R-025 to R-027 added.
 
-Updated 2026-10-18: R-028 to R-043 added from verification round 1 (permissions and rules); see the end of this file.
+Updated 2026-10-18: R-028 to R-044 added from verification round 1 (permissions and rules); see the end of this file.
 
 Severity scale: P0 critical, P1 high, P2 medium, P3 low.
 
@@ -509,3 +509,11 @@ Risk: online payments are never recorded even when paid, and production collecti
 Resolution: the owner adds `TOYYIBPAY_WEBHOOK_SECRET` in Netlify (Functions scope; Production + Deploy Previews) and redeploys; GET should then return 405. Code fix (branch `fix/toyyib-mode-switch`, awaiting merge): the client sends a real boolean, the proxy accepts a boolean or "true"/"false" and refuses Production when the production key is missing, and `useToyyibMode` gains `refresh()` so the badge updates after a switch.
 
 Added the same day: `public/_redirects` held only `/* /index.html 200`, and Netlify applies that file before `netlify.toml`, so the `/api/webhooks/zoom`, `/api/webhooks/toyyibpay` and `/api/toyyibpay` rewrites in `netlify.toml` never took effect; GET `/api/webhooks/toyyibpay` returned index.html (200). ToyyibPay in production uses `TOYYIBPAY_CALLBACK_URL` (the direct function URL), so it was unaffected; if Zoom is configured with `/api/webhooks/zoom`, its notifications never arrived. Fix: list the three rewrites ahead of the catch-all in `public/_redirects` (same branch).
+
+### R-044 Every ToyyibPay Bill Created From the App Was a Mock (P0)
+
+Evidence: `TOYYIB_CONFIG.USER_SECRET_KEY` in `config/constants.ts:142` is a fixed empty string (the key now lives server-side in `toyyibpay-api`, so the client must not hold it), but `createBill` in `services/toyyibService.ts` still returned a `MOCK-xxxx` bill whenever that key was empty, without calling the proxy. On 2026-10-19 a RM1 sandbox test bill created with Manual Bill on production showed success, yet nothing appeared in ToyyibPay or `toyyibBills`.
+
+Risk: every payment link for dues, event fees and manual bills was invalid; this is why production `toyyibBills` has always been empty.
+
+Resolution (branch `fix/toyyib-mock-bill`, awaiting merge): return a mock only in dev mode (`isDevMode()`); added `services/toyyibService.createBill.test.ts` (2 tests; the proxy test fails without the fix).

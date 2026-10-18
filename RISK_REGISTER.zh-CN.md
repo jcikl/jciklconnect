@@ -6,7 +6,7 @@
 
 2026-10-12 更新：新增 R-025 至 R-027。
 
-2026-10-18 更新：第一轮核实（权限与规则）新增 R-028 至 R-043，见文末。
+2026-10-18 更新：第一轮核实（权限与规则）新增 R-028 至 R-044，见文末。
 
 严重级别：P0 严重，P1 高，P2 中，P3 低。
 
@@ -509,3 +509,11 @@
 处理：用户在 Netlify 补设 `TOYYIBPAY_WEBHOOK_SECRET`（Functions 作用域，Production + Deploy Previews）并重新部署，补好后 GET 应返回 405。代码修复（分支 `fix/toyyib-mode-switch`，待合并）：网页端发送真正的 boolean，服务端兼容 boolean 与 "true"/"false"，切到 Production 前检查正式密钥已配置；`useToyyibMode` 增加 `refresh()`，切换后重新读取模式。
 
 同日追加：`public/_redirects` 只有一条 `/* /index.html 200`，而 Netlify 先执行该文件再执行 `netlify.toml`，所以 `netlify.toml` 里的 `/api/webhooks/zoom`、`/api/webhooks/toyyibpay`、`/api/toyyibpay` 三条接口转址从未生效，GET `/api/webhooks/toyyibpay` 返回首页 HTML（200）。ToyyibPay 线上用 `TOYYIBPAY_CALLBACK_URL`（函数直连地址）不受影响；Zoom 若在 Zoom 后台填的是 `/api/webhooks/zoom`，则通知一直未送达。修复：在 `public/_redirects` 的通配规则之前加入这三条转址（同一分支）。
+
+### R-044 网页端建的 ToyyibPay 账单全部是假账单（P0）
+
+证据：`config/constants.ts:142` 的 `TOYYIB_CONFIG.USER_SECRET_KEY` 固定为空字符串（密钥已移到服务端 `toyyibpay-api`，网页端本就不应持有），但 `services/toyyibService.ts` 的 `createBill` 仍以「密钥为空」为条件直接返回 `MOCK-xxxx` 假账单，不调用付款函数。2026-10-19 在正式站用 Manual Bill 建 RM1 沙盒测试账单，界面显示成功，但 ToyyibPay 与 `toyyibBills` 都没有任何记录。
+
+风险：会员缴会费、活动报名费、手动建账单得到的付款链接全部无效；这是线上 `toyyibBills` 一直为空的根本原因。
+
+处理（分支 `fix/toyyib-mock-bill`，待合并）：改为仅在开发模式（`isDevMode()`）返回假账单；新增 `services/toyyibService.createBill.test.ts`（2 项，撤掉修复后对应测试失败）。
