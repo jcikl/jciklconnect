@@ -114,7 +114,10 @@ async function proxyCall(action: string, params: Record<string, string | boolean
   }
   if (!response.ok) {
     const err = await response.text();
-    throw new Error(`ToyyibPay proxy error (${action}): ${err}`);
+    // Surface the server's { error } message as-is (e.g. "dues payment not open yet").
+    let message = `ToyyibPay proxy error (${action}): ${err}`;
+    try { if (JSON.parse(err)?.error) message = JSON.parse(err).error; } catch { /* not JSON */ }
+    throw new Error(message);
   }
   return response.json();
 }
@@ -150,6 +153,22 @@ export class ToyyibService {
   static async buildPaymentUrl(billCode: string): Promise<string> {
     const { isSandbox } = await ToyyibService.getMode();
     return `https://${isSandbox ? 'dev.' : ''}toyyibpay.com/${billCode}`;
+  }
+
+  /**
+   * Create (or reuse) a member's membership dues bill. Everything — amount, category, bill record
+   * and the member's link to the bill — is decided and written server-side (toyyibpay-api
+   * createDuesBill), so members can pay their own dues without board-only permissions.
+   */
+  static async createDuesBill(memberId: string, year: number): Promise<ToyyibBillResponse & { isExisting: boolean }> {
+    if (isDevMode()) {
+      console.warn('ToyyibPay: dev mode, simulating dues bill');
+      const mockBillCode = 'MOCK-' + Math.random().toString(36).substring(7).toUpperCase();
+      return { billCode: mockBillCode, paymentUrl: `https://dev.toyyibpay.com/${mockBillCode}`, isExisting: false };
+    }
+    const data = await proxyCall('createDuesBill', { memberId, year: String(year) });
+    if (!data?.billCode || !data?.paymentUrl) throw new Error('Payment link generation failed');
+    return { billCode: data.billCode, paymentUrl: data.paymentUrl, isExisting: !!data.isExisting };
   }
 
   /**
@@ -563,19 +582,6 @@ export class ToyyibService {
 
   // ── Bill description formatters ───────────────────────────────────────────────
 
-  static formatMembershipBillDescription(
-    name: string,
-    nationalId: string | undefined,
-    contact: string,
-    year: number,
-    isGuest = false,
-  ): string {
-    const idSuffix = nationalId?.slice(-4);
-    const prefix = `[${year} Renewal Membership]`;
-    if (isGuest || !idSuffix) return `${prefix} ${name}, ${contact}`;
-    return `${prefix} ${name} (${idSuffix}), ${contact}`;
-  }
-
   static formatEventBillDescription(
     projectTitle: string,
     name: string,
@@ -589,97 +595,6 @@ export class ToyyibService {
   }
 
   // ── Lazy category creation ────────────────────────────────────────────────────
-
-  /**
-   * Return the categoryCode for the given membership year's ToyyibPay category,
-   * creating it on first use.
-   */
-  static async getOrCreateMembershipCategory(year: number): Promise<string> {
-    const snap = await getDocs(query(
-      collection(db, COLLECTIONS.TOYYIB_CATEGORIES),
-      where('linkedType', '==', 'membership'),
-      where('linkedYear', '==', String(year)),
-      where('isActive', '==', true),
-      limit(1),
-    ));
-    if (!snap.empty) return (snap.docs[0].data().categoryCode as string) || snap.docs[0].id;
-
-    // Fix 4 (P1): use a Firestore transaction to atomically claim the deterministic doc slot.
-    // Two concurrent callers both pass the getDocs check above; only one wins the transaction
-    // and proceeds to call the ToyyibPay API. The other finds the __pending__ placeholder and
-    // polls with backoff instead of falling through to the API, preventing duplicate categories.
-    const categoryDocRef = doc(db, COLLECTIONS.TOYYIB_CATEGORIES, `${year}_membership`);
-    let categoryCode: string | null = null;
-    let didWinRace = false;
-
-    await runTransaction(db, async (txn) => {
-      const existing = await txn.get(categoryDocRef);
-      if (existing.exists()) {
-        const data = existing.data();
-        if (data.categoryCode && data.categoryCode !== '__pending__') {
-          categoryCode = data.categoryCode as string;
-        }
-        return; // Slot already claimed — another caller is creating or already created it
-      }
-      // Reserve the slot with a placeholder to block concurrent callers
-      txn.set(categoryDocRef, { categoryCode: '__pending__', createdAt: Timestamp.now() });
-      didWinRace = true;
-    });
-
-    if (categoryCode) return categoryCode;
-
-    if (!didWinRace) {
-      // Another call is creating the category — poll with exponential backoff instead of
-      // falling through to the API (which would create a duplicate ToyyibPay category).
-      for (let i = 0; i < 5; i++) {
-        await new Promise(r => setTimeout(r, 500 * (i + 1)));
-        const pollSnap = await getDoc(categoryDocRef);
-        const code = pollSnap.data()?.categoryCode;
-        if (code && code !== '__pending__') return code as string;
-      }
-      throw new Error(`ToyyibPay category creation timed out for ${year} Membership`);
-    }
-
-    // Won the race — now call the ToyyibPay API outside the transaction
-    const catName = `${year} Membership`;
-    const result = await proxyCall('createCategory', { catname: catName, catdescription: catName });
-    if (!Array.isArray(result) || !result[0]?.CategoryCode) {
-      // Roll back the placeholder so a future attempt can try again
-      await setDoc(categoryDocRef, { categoryCode: null, isActive: false, updatedAt: serverTimestamp() }, { merge: true }).catch(() => {});
-      throw new Error(`Failed to create ToyyibPay category for ${catName}`);
-    }
-    categoryCode = result[0].CategoryCode as string;
-
-    // Replace the placeholder with the real code — retry up to 3 times so a transient
-    // network error doesn't permanently lock the slot with __pending__.
-    const membershipFinalPayload = {
-      categoryCode,
-      categoryName: catName,
-      categoryDescription: catName,
-      linkedType: 'membership',
-      linkedYear: String(year),
-      isActive: true,
-      createdAt: serverTimestamp(),
-    };
-    let membershipSetErr: unknown;
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        await setDoc(categoryDocRef, membershipFinalPayload, { merge: true });
-        return categoryCode;
-      } catch (setErr) {
-        membershipSetErr = setErr;
-        if (attempt < 2) await new Promise(r => setTimeout(r, 1000));
-      }
-    }
-    // All retries failed — clear the placeholder so a future attempt can try again,
-    // then log and rethrow so the caller knows the categoryCode was not persisted.
-    await setDoc(categoryDocRef, { categoryCode: null, isActive: false, updatedAt: serverTimestamp() }, { merge: true }).catch(() => {});
-    errorLoggingService.logError(
-      membershipSetErr instanceof Error ? membershipSetErr : new Error(`[categoryCode=${categoryCode}] ${String(membershipSetErr)}`),
-      { component: 'toyyibService', action: 'getOrCreateMembershipCategory' }
-    );
-    throw new Error(`Failed to persist ToyyibPay category ${categoryCode} for ${catName} after 3 attempts`);
-  }
 
   /**
    * Return the categoryCode for the given project's ToyyibPay category,
@@ -696,8 +611,8 @@ export class ToyyibService {
     if (!snap.empty) return (snap.docs[0].data().categoryCode as string) || snap.docs[0].id;
 
     // Fix 4 (P1): use a Firestore transaction to atomically claim the deterministic doc slot.
-    // Mirrors the same pattern used in getOrCreateMembershipCategory, including the polling
-    // fix so concurrent caller B doesn't fall through to the API and create a duplicate category.
+    // Claims a deterministic category doc slot in a transaction, with polling so
+    // concurrent caller B doesn't fall through to the API and create a duplicate category.
     const categoryDocRef = doc(db, COLLECTIONS.TOYYIB_CATEGORIES, `${projectId}_category`);
     let categoryCode: string | null = null;
     let didWinProjectRace = false;

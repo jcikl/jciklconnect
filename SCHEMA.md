@@ -122,16 +122,16 @@
 | jciCareer.membershipDuesHistory[year].dues | number \| string | — | |  | 会费配置/财务同步 | 应缴会费展示 |
 | jciCareer.membershipDuesHistory[year].type | MembershipType \| string | — | |  | 会员类型与会费配置 | 会费记录展示 |
 | jciCareer.membershipDuesHistory[year].amount | number \| string | — | |  | 支付/交易同步 | 已缴金额展示 |
-| jciCareer.membershipDuesHistory[year].status | enum | — | `paid` \| `over paid` \| `overdue` \| `partial` \| `pending` |  | finance / membership sync | dues dashboard / 会员状态 |
+| jciCareer.membershipDuesHistory[year].status | enum | — | `paid` \| `over paid` \| `overdue` \| `partial` \| `pending` |  | finance / membership sync；系统: `toyyibpay-callback` 付款成功写 `paid`、退款写 `pending`（同时写旧的 `membership[year]`） | dues dashboard / 会员状态 |
 | jciCareer.membershipDuesHistory[year].transactionId | string[] | — | |  | `transactions.id` / `paymentRequests` | 交易详情与对账 |
 | jciCareer.membershipDuesHistory[year].purpose | string | — | |  | 支付请求/交易同步 | 会费用途展示 |
 | jciCareer.membershipDuesHistory[year].paymentDate | string | — | |  | 支付成功/对账流程 | 会费历史展示 |
-| jciCareer.membershipDuesHistory[year].toyyibBillCode | string | — | |  | `toyyibBills.billCode` | ToyyibPay 账单查询 |
-| jciCareer.membershipDuesHistory[year].toyyibPaymentUrl | string | — | |  | ToyyibPay 账单创建 | 会费支付入口 |
-| jciCareer.membershipDuesHistory[year].toyyibPaymentStatus | string | — | `"1"`=已付, `"2"`=待付, `"3"`=失败, `"4"`=结算中 |  | ToyyibPay webhook / payment sync | 会费支付状态展示 |
+| jciCareer.membershipDuesHistory[year].toyyibBillCode | string | — | |  | `toyyibBills.billCode`；系统: `toyyibpay-api` createDuesBill 建账单时写入（同时写 `membership[year]`） | ToyyibPay 账单查询 |
+| jciCareer.membershipDuesHistory[year].toyyibPaymentUrl | string | — | |  | 系统: `toyyibpay-api` createDuesBill 建账单时写入 | 会费支付入口 |
+| jciCareer.membershipDuesHistory[year].toyyibPaymentStatus | string | — | `"1"`=已付, `"2"`=待付, `"3"`=失败, `"4"`=结算中 |  | 系统: createDuesBill 写 `"2"`；`toyyibpay-callback` 付款成功写 `"1"` | 会费支付状态展示 |
 | jciCareer.membershipDuesHistory[year].billExternalReferenceNo | string | — | |  | `toyyibBills.externalReferenceNo` | 账单追踪与对账 |
 | jciCareer.leaderboardVisibility | boolean \| string | — | | leaderboardVisibility | 角色: B+ 或自己设置；系统: 导入 normalize | 排行榜显示控制 |
-| jciCareer.hasPaidInitiationFee | boolean | — | | hasPaidInitiationFee | 系统: finance / payment sync；角色: B+/Finance | 入会费缴交状态判断、晋升条件 |
+| jciCareer.hasPaidInitiationFee | boolean | — | | hasPaidInitiationFee | 系统: finance / payment sync、`toyyibpay-callback`（Guest 在线付入会费成功）；角色: B+/Finance | 入会费缴交状态判断、晋升条件 |
 | jciCareer.senatorshipValidatedAt | string | — | | senatorshipValidatedAt | 系统: senatorship validation | audit/display |
 | jciCareer.senatorshipValidatedBy | string | — | | senatorshipValidatedBy | 系统: senatorship validation | audit/display |
 | jciCareer.careerHistory | CareerMilestone[] | — | | careerHistory | 角色: B+；系统: 导入 normalize | member career timeline |
@@ -869,7 +869,9 @@
 | memberId | string | — | 会员 UID，用于重复账单检测 | 系统: `members.id` | 会员账单查询与去重 |
 | projectId | string | — | 活动 ID，用于重复账单检测 | 系统: `events.id` / 项目付款流程 | 活动账单查询与去重 |
 | createdAt | any | — | Firestore Timestamp | 系统: 创建账单时生成 | 账单排序与审计 |
-| billExternalReferenceNo | string | — | webhook 回调后写入 | 系统: ToyyibPay webhook | `transactions.referenceNumber` |
+| billExternalReferenceNo | string | — | 建账单时写入，webhook 回调后回写 | 系统: 建账单（`toyyibService.createBill` / `toyyibpay-api` createDuesBill）；ToyyibPay webhook | `transactions.referenceNumber` |
+| year | number | — | 会费年度 | 系统: 建账单时写入 | `toyyibpay-callback` 取会费年度 |
+| isSandbox | boolean | — | 建账单时的 ToyyibPay 环境 | 系统: 建账单时按 `systemConfig/toyyibpay` 写入 | `toyyibpay-callback` 选择核对环境 |
 | refundTransactionId | string | — | 支付撤销时写入被冲销的交易 ID | 系统: 退款/冲销流程的 `transactions.id` | 退款交易追踪 |
 | refundedAt | any | — | Firestore Timestamp | 系统: 退款 webhook 处理时间 | 退款审计 |
 | updatedAt | any | — | Firestore Timestamp | 系统: 支付/退款/webhook 更新 | 账单更新时间 |

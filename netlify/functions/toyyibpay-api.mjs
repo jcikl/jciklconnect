@@ -10,6 +10,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { resolveReturnUrl, resolveCallbackUrl } from '../lib/siteUrl.mjs';
 import { buildCreateBillParams } from '../lib/toyyibBill.mjs';
 import { readToyyibIsSandbox, secretKeyFor, apiBaseFor } from '../lib/toyyibMode.mjs';
+import { createDuesBill, canCreateDuesBillFor } from '../lib/toyyibDues.mjs';
 
 const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID;
 const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
@@ -41,6 +42,37 @@ async function callToyyib(endpoint, extraParams = {}, isSandbox) {
   });
   if (!response.ok) throw new Error(`ToyyibPay ${endpoint} HTTP ${response.status}`);
   return response.json();
+}
+
+// NET-008 / FIX 3: `sanitized` comes from buildCreateBillParams (netlify/lib/toyyibBill.mjs), which
+// fixes the price setting (fixed amount) and payer-info flags server-side.
+async function sendCreateBill(sanitized, requestedReturnUrl, isSandbox) {
+  // Lock callback URL to our own webhook — never accept from caller.
+  // NET-005: Append ?secret=... so the callback handler can verify the request
+  // originated from ToyyibPay via a shared-secret we control.
+  // The site domain comes from Netlify's URL / DEPLOY_PRIME_URL (netlify/lib/siteUrl.mjs);
+  // it used to be hard-coded to app.jcikl.cc, a domain the site no longer serves.
+  const baseCallbackUrl = resolveCallbackUrl();
+  if (!baseCallbackUrl) throw new Error('Cannot determine ToyyibPay callback URL (TOYYIBPAY_CALLBACK_URL / URL not set)');
+  const webhookSecret = process.env.TOYYIBPAY_WEBHOOK_SECRET;
+  sanitized.billCallbackUrl = webhookSecret
+    ? `${baseCallbackUrl}?secret=${encodeURIComponent(webhookSecret)}`
+    : baseCallbackUrl;
+  // Restrict return URL to our own origins (SEC-A-010); localhost only outside production.
+  const resolvedReturnUrl = resolveReturnUrl(requestedReturnUrl);
+  if (!resolvedReturnUrl) throw new Error('Cannot determine ToyyibPay return URL (URL not set)');
+  sanitized.billReturnUrl = resolvedReturnUrl;
+  const result = await callToyyib('createBill', sanitized, isSandbox);
+  // Diagnostics for missing payment callbacks: where ToyyibPay will POST (secret never logged).
+  console.log('[toyyibpay-api] createBill', JSON.stringify({
+    mode: isSandbox ? 'sandbox' : 'production',
+    billCode: Array.isArray(result) ? result[0]?.BillCode ?? null : null,
+    callbackUrl: baseCallbackUrl,
+    callbackHasSecret: !!webhookSecret,
+    returnUrl: sanitized.billReturnUrl,
+    externalRef: sanitized.billExternalReferenceNo ?? null,
+  }));
+  return result;
 }
 
 // Try to call ToyyibPay; return fallback when endpoint is unsupported (404/405) or returns non-JSON
@@ -156,37 +188,35 @@ export default async (req, context) => {
         result = await callToyyib('createCategory', { catname: params.catname, catdescription: params.catdescription }, isSandbox);
         break;
       case 'createBill': {
-        // NET-008 / FIX 3: validate and allowlist in netlify/lib/toyyibBill.mjs. It also fixes the
-        // price setting (fixed amount) and payer-info flags server-side; they used to be stripped
-        // by the allowlist, so ToyyibPay rejected every bill ("billPriceSetting parameter is empty").
         const built = buildCreateBillParams(params);
         if (!built.ok) return Response.json({ error: built.error }, { status: 400, headers: cors });
-        const sanitized = built.params;
-        // Lock callback URL to our own webhook — never accept from caller.
-        // NET-005: Append ?secret=... so the callback handler can verify the request
-        // originated from ToyyibPay via a shared-secret we control.
-        // The site domain comes from Netlify's URL / DEPLOY_PRIME_URL (netlify/lib/siteUrl.mjs);
-        // it used to be hard-coded to app.jcikl.cc, a domain the site no longer serves.
-        const baseCallbackUrl = resolveCallbackUrl();
-        if (!baseCallbackUrl) throw new Error('Cannot determine ToyyibPay callback URL (TOYYIBPAY_CALLBACK_URL / URL not set)');
-        const webhookSecret = process.env.TOYYIBPAY_WEBHOOK_SECRET;
-        sanitized.billCallbackUrl = webhookSecret
-          ? `${baseCallbackUrl}?secret=${encodeURIComponent(webhookSecret)}`
-          : baseCallbackUrl;
-        // Restrict return URL to our own origins (SEC-A-010); localhost only outside production.
-        const resolvedReturnUrl = resolveReturnUrl(params.billReturnUrl);
-        if (!resolvedReturnUrl) throw new Error('Cannot determine ToyyibPay return URL (URL not set)');
-        sanitized.billReturnUrl = resolvedReturnUrl;
-        result = await callToyyib('createBill', sanitized, isSandbox);
-        // Diagnostics for missing payment callbacks: where ToyyibPay will POST (secret never logged).
-        console.log('[toyyibpay-api] createBill', JSON.stringify({
-          mode: isSandbox ? 'sandbox' : 'production',
-          billCode: Array.isArray(result) ? result[0]?.BillCode ?? null : null,
-          callbackUrl: baseCallbackUrl,
-          callbackHasSecret: !!webhookSecret,
-          returnUrl: sanitized.billReturnUrl,
-          externalRef: sanitized.billExternalReferenceNo ?? null,
-        }));
+        result = await sendCreateBill(built.params, params.billReturnUrl, isSandbox);
+        break;
+      }
+      case 'createDuesBill': {
+        // Membership dues for the caller (BOARD+ may pass another memberId). Amount, category and
+        // all Firestore writes are decided server-side (netlify/lib/toyyibDues.mjs).
+        const year = Number(params.year);
+        if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+          return Response.json({ error: 'year (e.g. 2026) required' }, { status: 400, headers: cors });
+        }
+        const memberId = params.memberId ? String(params.memberId) : decodedUid;
+        if (!canCreateDuesBillFor(decodedUid, callerRole, memberId)) {
+          return Response.json({ error: 'Forbidden' }, { status: 403, headers: cors });
+        }
+        const dues = await createDuesBill({
+          db: getFirestore(), memberId, year, isSandbox,
+          createBill: async (raw) => {
+            const built = buildCreateBillParams(raw);
+            if (!built.ok) throw new Error(built.error);
+            const created = await sendCreateBill(built.params, params.billReturnUrl, isSandbox);
+            const billCode = Array.isArray(created) ? created[0]?.BillCode : null;
+            if (!billCode) throw new Error(`ToyyibPay createBill returned no BillCode: ${JSON.stringify(created)}`);
+            return billCode;
+          },
+        });
+        if (dues.error) return Response.json({ error: dues.error }, { status: dues.status, headers: cors });
+        result = dues;
         break;
       }
       case 'getBills':

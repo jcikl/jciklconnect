@@ -82,12 +82,13 @@
 - [ ] **`send-invite` / `auto-invite` 改用 uid = 会员编号**（2026-10-18 登记）。来源：R-040。这两个函数仍用随机 uid 建账号；全部会员已有账号后影响变小，但应统一用 `netlify/lib/memberAuth.mjs`。
 - [ ] **确认 ToyyibPay 模式为 Production**（2026-10-18 登记，R-042）：System Config → ToyyibPay；缺少设置时代码默认沙盒。
 - [ ] **付款跳回网址修复上线后实测**（2026-10-18 登记，R-041）：合并部署后，用最小金额实际付款一次，确认跳回 `/payment-return` 且系统记录为已付；已登录会员停留在结果页、按钮回到系统。
-- [ ] **会员自助缴费写 `membership.{年份}.toyyibBillCode` 被规则拒绝**（2026-10-18 登记）。来源：`hooks/useToyyibPayment.ts:84` 写会员资料的 `membership` 字段，而会员自改资料规则锁定 `membership`；与 R-032 同属会员自助缴费流程。完成标准：改由服务端写入或调整写入位置，并补规则测试。
+- [ ] **会员自助缴会费**（2026-10-18 登记，P0，R-047）：修复在分支 `fix/toyyib-member-dues`。完成标准：合并后用测试会员在沙盒缴一次会费，账单已付、生成会费收入、会员页面显示已缴；Guest 付 RM350 后显示已付入会费。前提：理事先在 ToyyibPay 页面建好并绑定当年会费分类。
 - [ ] **10 个 Netlify 函数的 CORS 白名单改用本站网址**（2026-10-18 登记，R-041）：`audit-log`、`auto-invite`、`cloudinary-delete`、`lark-sync`、`send-email`、`send-invite`、`toyyibpay-api`、`upload-to-drive`、`whapi-proxy`、`member-auth` 只列了 `app.jcikl.cc`；改用 `netlify/lib/siteUrl.mjs` 的 `siteOrigins()`。
-- [ ] **ToyyibPay 付款通知没有入账**（2026-10-19 登记，P0，R-046）：通知其实已送达，但因读错字段（`transaction_id` 而非 `refno`）被静默拒收；核对时也固定查沙盒。修复在分支 `fix/toyyib-callback-refno`。完成标准：合并后沙盒再付一笔 RM1，日志出现 `Received billCode=…`，账单变已付、交易自动入账。
+- [x] **ToyyibPay 付款通知没有入账**（2026-10-19 登记，P0，R-046）：修复已上线（PR #9、#10）。沙盒账单 `7w11dujn` 实测：通知收下、核对通过、账单自动变已付。
 - [ ] **正式环境测试未完成：缺正式收款分类**（2026-10-19 登记）。模式开关已验证可切到 Production 并切回（`systemConfig/toyyibpay` 已写入，现为 Sandbox）。现有分类 `6x9mw99z` 仅存在于沙盒；「Create & Link」会把新分类绑定到会籍类型或项目，需用户决定绑定对象或提供在 toyyibpay.com 建好的分类编号（用 Import 导入）。
 - [ ] **ToyyibPay 页顶部模式标签切换后不更新**（2026-10-19 登记）：设置面板已显示 Production，页顶仍显示 Sandbox，疑为另一个 `useToyyibMode` 实例。
 - [x] **`toyyibBills` 未保存外部参考编号**（2026-10-19 登记）：建账单时已写入 `billExternalReferenceNo` 和 `isSandbox`（随 R-046 修复）。
+- [ ] **会员在线付活动报名费**（2026-10-19 登记，R-047）：`useToyyibPayment.payEventTicket` 同样调用只限理事以上的 `createBill`，并由网页端建分类、改报名记录，会员付不了；按 `createDuesBill` 的做法改为服务端处理。
 - [ ] **测试数据**（2026-10-19）：沙盒账单 `4e9xc8va`、`lm6obyw3`（各 RM1，测试用）留在 `toyyibBills`，待用户决定是否删除。
 - [ ] **重建蓝图第二轮核实：财务（P4）**。来源：重建蓝图 artifact 的验证顺序。完成标准：逐条核对 P4 验收标准和 2026-07-14 撤销审计的 9 个缺口，结果登记到风险清单。
 - [ ] **重建蓝图第三轮核实：其余模块（P2、P3、P5–P7）**。完成标准同上。

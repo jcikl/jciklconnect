@@ -1,14 +1,9 @@
 import { useState, useRef } from 'react';
-import { collection, doc, getDocs, limit, query, updateDoc, where } from 'firebase/firestore';
+import { collection, getDocs, limit, query, updateDoc, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import { ToyyibService } from '../services/toyyibService';
-import {
-  MembershipConfigService,
-  DEFAULT_MEMBERSHIP_RULES,
-  getTargetDuesForMembershipType,
-} from '../services/membershipConfigService';
-import type { Member, MembershipType } from '../types';
+import type { Member } from '../types';
 
 export interface ToyyibPaymentResult {
   billCode: string;
@@ -31,64 +26,9 @@ export function useToyyibPayment() {
     setIsPaying(true);
     setError(null);
     try {
-      // 1. Lazy-create category
-      const categoryCode = await ToyyibService.getOrCreateMembershipCategory(year);
-
-      // 2. Duplicate check — return existing active bill if found
-      const existing = await ToyyibService.findExistingActiveBill(member.id!, categoryCode);
-      if (existing) return { ...existing, isExisting: true };
-
-      // 3. Resolve dues amount from config
-      const isFirstYear = !member.jciCareer?.membershipDuesHistory ||
-        !Object.keys(member.jciCareer?.membershipDuesHistory).some(y =>
-          Number(y) < year &&
-          (member.jciCareer?.membershipDuesHistory![y]?.status === 'paid' || member.jciCareer?.membershipDuesHistory![y]?.status === 'over paid')
-        );
-      let amount: number;
-      try {
-        const config = await MembershipConfigService.getConfig();
-        amount = getTargetDuesForMembershipType(
-          member.jciCareer?.membershipType as MembershipType,
-          isFirstYear,
-          config.rules,
-        );
-      } catch {
-        amount = DEFAULT_MEMBERSHIP_RULES[member.jciCareer?.membershipType as MembershipType]?.duesAmount ?? 0;
-      }
-
-      // 4. Bill description
-      const isGuest = member.jciCareer?.membershipType === 'Guest';
-      const billDesc = ToyyibService.formatMembershipBillDescription(
-        member.general?.name ?? member.general?.name,
-        member.general?.idNumber ?? member.general?.idNumber ?? member.general?.idNumber,
-        (member.contact?.phone ?? member.contact?.phone) || '',
-        year,
-        isGuest,
-      );
-
-      // 5. Create bill
-      const bill = await ToyyibService.createBill({
-        billName: `${year} Renewal Membership`,
-        billDescription: billDesc,
-        billAmount: amount,
-        billTo: member.general?.name ?? member.general?.name,
-        billEmail: (member.contact?.email ?? member.contact?.email) || '',
-        billPhone: (member.contact?.phone ?? member.contact?.phone) || '',
-        categoryCode,
-        memberId: member.id,
-      });
-
-      // 6. Write toyyib fields back to member's membership record
-      if (member.id) {
-        await updateDoc(doc(db, COLLECTIONS.MEMBERS, member.id), {
-          [`membership.${year}.toyyibBillCode`]: bill.billCode,
-          [`membership.${year}.toyyibPaymentUrl`]: bill.paymentUrl,
-          [`membership.${year}.toyyibPaymentStatus`]: '2',
-          [`membership.${year}.toyyibBillName`]: `${year} Renewal Membership`,
-        });
-      }
-
-      return { ...bill, isExisting: false };
+      // Server-side: amount from membership rules, existing-bill reuse, bill record and the
+      // member's link to the bill (members cannot write those themselves under the rules).
+      return await ToyyibService.createDuesBill(member.id!, year);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Payment link generation failed';
       setError(msg);
