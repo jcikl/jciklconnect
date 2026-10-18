@@ -76,7 +76,7 @@
   - 进度：0–4 步代码完成（`b51d2d0` + 本次提交），未部署。线上只读试跑：345 人中 8 人就绪、335 人待建、2 人需人工处理（见 R-040）。待办：部署后由 SUPER_ADMIN 先试跑再执行 Fix Auth；处理 SHANE TEOH、SHIRLEY PANG；`docs/PERMISSION_MATRIX.zh-CN.md` 记录导入按钮已收紧到 ADMIN+；`send-invite` / `auto-invite` 改用 `memberAuth` 的 uid=会员编号逻辑（另开任务）。
   - 顺带发现、另行处理：`membersService.createMember` 写入的 `memberEmails` 占位记录 email 为空（L615）；`useAuth.tsx` 调用 `check-and-create-auth`（L345）和 `delete-auth-user`（L206）时没带 token，两条路一直无效。
 - [x] **部署规则（用户执行）** ✅ 2026-10-18 已部署，SUPER_ADMIN 签到线上验证通过（2026-10-18 登记）：R-034 修复 + `b83d671`（用户已同意）+ `65599ca`。命令：`firebase deploy --only firestore:rules,storage`。部署后验证：noreply@jcikl.cc（SUPER_ADMIN）能给他人签到。回滚：重新部署 `d8282b0` 的 `firestore.rules`。
-- [ ] **确认 SHANE TEOH、SHIRLEY PANG 旧登录账号由谁删除**（2026-10-18 登记）。来源：Fix Auth 试跑时两人邮箱下有登录过的账号，正式执行时已不存在。完成标准：用户确认是否在 Firebase 控制台删除；若不是，查 Firebase Auth 日志。
+- [x] **确认 SHANE TEOH、SHIRLEY PANG 旧登录账号由谁删除** ✅ 2026-10-18 用户确认是本人在 Firebase 控制台删除。（2026-10-18 登记）来源：Fix Auth 试跑时两人邮箱下有登录过的账号，正式执行时已不存在。完成标准：用户确认是否在 Firebase 控制台删除；若不是，查 Firebase Auth 日志。
 - [ ] **通知会员新的登录方式**（2026-10-18 登记）：Fix Auth 未发设置密码邮件，会员需用 Google 登录或「忘记密码」。完成标准：会员群发通知，或改为批量发送设置密码邮件（需用户决定）。
 - [ ] **`ConfirmDialog` 深色模式下「Cancel」按钮几乎看不见**（2026-10-18 登记）。来源：Fix Auth 执行确认窗口截图。涉及：`components/ui/ConfirmDialog.tsx`（共用组件，影响所有确认窗口）。完成标准：浅色、深色两种主题下按钮文字都清晰可读。
 - [ ] **`send-invite` / `auto-invite` 改用 uid = 会员编号**（2026-10-18 登记）。来源：R-040。这两个函数仍用随机 uid 建账号；全部会员已有账号后影响变小，但应统一用 `netlify/lib/memberAuth.mjs`。

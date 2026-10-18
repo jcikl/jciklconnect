@@ -480,4 +480,4 @@
 
 建议行动：已实现（待部署）`netlify/functions/member-auth.mjs`：导入时为新会员建账号（uid = 会员编号），SUPER_ADMIN 在会员导入窗口用「Fix Auth」先试跑、再执行补建；登录时不再复制资料，改为提示联系管理员。部署后由 SUPER_ADMIN 执行 Fix Auth；上述 2 位需人工处理。注意：本地 `netlify dev` 运行用到 `firebase-admin/auth` 的函数会报错（`jwks-rsa` 4.1 用 require 加载 ES 模块 `jose` 6），现有的 `send-invite` 等也一样；线上是否正常取决于 Netlify 的 Node 版本，部署后先用 Fix Auth 的试跑确认。
 
-结果（2026-10-18）：PR #3 预览版上 `member-auth` 正常加载（无令牌请求返回 401），试跑结果与本地只读脚本一致。随后 SUPER_ADMIN（noreply）在预览版执行 Fix Auth（与正式站共用同一 Firebase），未勾选替换孤儿账号、未发邮件：新建 337 个账号，8 个原已就绪，0 个错误，审计记录 4 条（`auditLog` action `member_auth_fix`）。复核：345 位会员全部有 uid = 会员编号的登录账号。SHANE TEOH、SHIRLEY PANG 原为「需人工处理」，执行时其邮箱下的旧账号已不存在（并非本功能删除：未勾选替换，且代码不删除登录过的账号），因此也被新建；旧账号由谁删除待用户确认。会员尚未设置密码：需用 Google 登录或「忘记密码」。
+结果（2026-10-18）：PR #3 预览版上 `member-auth` 正常加载（无令牌请求返回 401），试跑结果与本地只读脚本一致。随后 SUPER_ADMIN（noreply）在预览版执行 Fix Auth（与正式站共用同一 Firebase），未勾选替换孤儿账号、未发邮件：新建 337 个账号，8 个原已就绪，0 个错误，审计记录 4 条（`auditLog` action `member_auth_fix`）。复核：345 位会员全部有 uid = 会员编号的登录账号。SHANE TEOH、SHIRLEY PANG 原为「需人工处理」，执行时其邮箱下的旧账号已不存在（并非本功能删除：未勾选替换，且代码不删除登录过的账号），因此也被新建；旧账号由用户本人在 Firebase 控制台删除（2026-10-18 确认）。会员尚未设置密码：需用 Google 登录或「忘记密码」。
