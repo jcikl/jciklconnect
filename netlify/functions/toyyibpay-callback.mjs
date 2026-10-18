@@ -5,26 +5,25 @@
  * callback against ToyyibPay's own getBillTransactions API before trusting it —
  * the raw POST body is untrusted input and must never drive a "paid" write on its own.
  *
- * ToyyibPay sends: status_id, billcode, order_id, msg, transaction_id
- * status_id=1 → success, anything else → failed
+ * ToyyibPay's callback POST sends: refno, status, reason, billcode, order_id, amount
+ * (the payer's return URL uses transaction_id / status_id instead; both are accepted —
+ * see netlify/lib/toyyibCallback.mjs). The payment status always comes from
+ * getBillTransactions, never from the POST body.
  *
- * Mapped URL: /api/webhooks/toyyibpay  (via netlify.toml redirect)
+ * Mapped URL: /api/webhooks/toyyibpay  (via netlify.toml / public/_redirects)
  */
 
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
+import { parseCallbackPayload, pickTransactionRecord } from '../lib/toyyibCallback.mjs';
+import { readToyyibIsSandbox, secretKeyFor, apiBaseFor } from '../lib/toyyibMode.mjs';
 
 // Inline the collection name constant to avoid a CJS cross-import at runtime.
 // Keep in sync with config/constants.ts COLLECTIONS.TOYYIBPAY_WEBHOOKS.
 const TOYYIBPAY_WEBHOOKS_COLLECTION = 'toyyibpay_webhooks';
 
-const TOYYIB_SECRET_KEY = process.env.TOYYIBPAY_SECRET_KEY;
-if (!TOYYIB_SECRET_KEY) throw new Error('TOYYIBPAY_SECRET_KEY env var not set');
+if (!process.env.TOYYIBPAY_SECRET_KEY) throw new Error('TOYYIBPAY_SECRET_KEY env var not set');
 if (!process.env.TOYYIBPAY_WEBHOOK_SECRET) throw new Error('TOYYIBPAY_WEBHOOK_SECRET env var not set — set it in Netlify and append ?secret=<value> to the callback URL in toyyibpay-api.js createBill');
-const TOYYIB_IS_SANDBOX = process.env.TOYYIBPAY_SANDBOX !== 'false';
-const TOYYIB_BASE_URL = TOYYIB_IS_SANDBOX
-  ? 'https://dev.toyyibpay.com/index.php/api'
-  : 'https://toyyibpay.com/index.php/api';
 
 function getDb() {
   if (!getApps().length) {
@@ -46,26 +45,21 @@ function getDb() {
  * of this bill is, instead of trusting the webhook POST body. Returns the
  * verified transaction record (or null if ToyyibPay reports nothing for this bill).
  */
-async function verifyBillWithToyyib(billCode, transactionId) {
-  const params = new URLSearchParams({ userSecretKey: TOYYIB_SECRET_KEY, billCode });
-  const response = await fetch(`${TOYYIB_BASE_URL}/getBillTransactions`, {
+async function verifyBillWithToyyib(billCode, { refNo, orderId }, isSandbox) {
+  // Same environment as the bill: sandbox bills only exist on dev.toyyibpay.com and vice versa.
+  const params = new URLSearchParams({ userSecretKey: secretKeyFor(isSandbox), billCode });
+  const response = await fetch(`${apiBaseFor(isSandbox)}/getBillTransactions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: params.toString(),
   });
   if (!response.ok) throw new Error(`ToyyibPay verify HTTP ${response.status}`);
-  const records = await response.json();
-  if (!Array.isArray(records) || records.length === 0) return null;
-  // Prefer the record matching this transaction_id; otherwise fall back to the most recent.
-  const exactMatch = records.find(
-    r => r.billExternalReferenceNo === transactionId || r.id === transactionId
-  );
-  if (!exactMatch) {
-    console.warn(
-      `[toyyibpay-callback] No exact transaction_id match for ${transactionId} in ${records.length} record(s) — using first record`
-    );
+  const picked = pickTransactionRecord(await response.json(), { refNo, orderId });
+  if (!picked) return null;
+  if (!picked.exact) {
+    console.warn(`[toyyibpay-callback] billCode=${billCode}: no record matched refno/order_id — using the first record`);
   }
-  return exactMatch || records[0];
+  return picked.record;
 }
 
 export default async (req, context) => {
@@ -97,16 +91,20 @@ export default async (req, context) => {
       for (const [k, v] of params.entries()) data[k] = v;
     }
   } catch {
+    console.warn('[toyyibpay-callback] Unreadable body — rejecting callback');
     return new Response('Bad Request', { status: 400 });
   }
 
-  const transactionId = data.transaction_id;
-  const billCode = data.billcode;
-  const orderId = data.order_id;
+  // ToyyibPay's callback uses refno (the return URL uses transaction_id) — the old code read only
+  // transaction_id, so every real callback was rejected here with no log line.
+  const { refNo, billCode, orderId } = parseCallbackPayload(data);
+  const transactionId = refNo;
 
   if (!transactionId || !billCode) {
+    console.warn(`[toyyibpay-callback] Missing refno/billcode — rejecting callback (fields: ${Object.keys(data).join(',')})`);
     return new Response('Missing required fields', { status: 400 });
   }
+  console.log(`[toyyibpay-callback] Received billCode=${billCode} refno=${transactionId} order_id=${orderId ?? '-'}`);
 
   const db = getDb();
 
@@ -135,9 +133,15 @@ export default async (req, context) => {
   }
 
   // ── Verify against ToyyibPay's own record before trusting anything ──────────
+  // Environment: the mode stored on the bill at creation, else the current site-wide mode.
+  const billForModeSnap = await db.collection('toyyibBills').where('billCode', '==', billCode).limit(1).get();
+  const billIsSandbox = billForModeSnap.empty ? undefined : billForModeSnap.docs[0].data().isSandbox;
+  const isSandbox = typeof billIsSandbox === 'boolean'
+    ? billIsSandbox
+    : await readToyyibIsSandbox(db, { logPrefix: '[toyyibpay-callback]' });
   let verified;
   try {
-    verified = await verifyBillWithToyyib(billCode, transactionId);
+    verified = await verifyBillWithToyyib(billCode, { refNo: transactionId, orderId }, isSandbox);
   } catch (err) {
     console.error('[toyyibpay-callback] Verification call failed:', err);
     await idempotencyRef.set({ processed: false, error: `verify failed: ${err}`, failedAt: Timestamp.now() }, { merge: true });

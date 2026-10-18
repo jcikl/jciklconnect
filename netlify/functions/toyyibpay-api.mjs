@@ -9,6 +9,7 @@ import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { resolveReturnUrl, resolveCallbackUrl } from '../lib/siteUrl.mjs';
 import { buildCreateBillParams } from '../lib/toyyibBill.mjs';
+import { readToyyibIsSandbox, secretKeyFor, apiBaseFor } from '../lib/toyyibMode.mjs';
 
 const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID;
 const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
@@ -28,35 +29,12 @@ const ALLOWED_ORIGINS = ['https://app.jcikl.cc', 'http://localhost:3000', 'http:
 
 // FIX 3: the createBill allowlist now lives in netlify/lib/toyyibBill.mjs (buildCreateBillParams).
 
-// Sandbox key = TOYYIBPAY_SECRET_KEY, Production key = TOYYIBPAY_SECRET_KEY_PROD.
-// Mode (sandbox vs production) is read from Firestore systemConfig/toyyibpay at request time,
-// falling back to TOYYIBPAY_SANDBOX env var if Firestore is unavailable.
-const SECRET_KEY_SANDBOX = process.env.TOYYIBPAY_SECRET_KEY;
-const SECRET_KEY_PROD = process.env.TOYYIBPAY_SECRET_KEY_PROD || process.env.TOYYIBPAY_SECRET_KEY;
-if (!SECRET_KEY_SANDBOX) throw new Error('TOYYIBPAY_SECRET_KEY env var not set');
-
-const ENV_SANDBOX_DEFAULT = process.env.TOYYIBPAY_SANDBOX !== 'false'; // env fallback
-
-async function getToyyibMode() {
-  try {
-    const snap = await getFirestore().doc('systemConfig/toyyibpay').get();
-    if (snap.exists) {
-      const data = snap.data();
-      if (typeof data.isSandbox === 'boolean') return data.isSandbox;
-    }
-  } catch (err) {
-    console.warn('[toyyibpay-api] Could not read systemConfig/toyyibpay, using env fallback:', err.message);
-  }
-  return ENV_SANDBOX_DEFAULT;
-}
+// Sandbox / production mode, keys and API base: netlify/lib/toyyibMode.mjs (shared with toyyibpay-callback).
+if (!process.env.TOYYIBPAY_SECRET_KEY) throw new Error('TOYYIBPAY_SECRET_KEY env var not set');
 
 async function callToyyib(endpoint, extraParams = {}, isSandbox) {
-  const secretKey = isSandbox ? SECRET_KEY_SANDBOX : SECRET_KEY_PROD;
-  const baseUrl = isSandbox
-    ? 'https://dev.toyyibpay.com/index.php/api'
-    : 'https://toyyibpay.com/index.php/api';
-  const params = new URLSearchParams({ userSecretKey: secretKey, ...extraParams });
-  const response = await fetch(`${baseUrl}/${endpoint}`, {
+  const params = new URLSearchParams({ userSecretKey: secretKeyFor(isSandbox), ...extraParams });
+  const response = await fetch(`${apiBaseFor(isSandbox)}/${endpoint}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: params.toString(),
@@ -135,7 +113,7 @@ export default async (req, context) => {
   }
 
   // Resolve sandbox/production mode once per request from Firestore (with env fallback)
-  const isSandbox = await getToyyibMode();
+  const isSandbox = await readToyyibIsSandbox(getFirestore(), { logPrefix: '[toyyibpay-api]' });
 
   try {
     let result;
