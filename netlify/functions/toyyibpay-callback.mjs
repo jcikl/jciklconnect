@@ -15,7 +15,7 @@
 
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
-import { parseCallbackPayload, pickTransactionRecord } from '../lib/toyyibCallback.mjs';
+import { readCallbackBody, parseCallbackPayload, pickTransactionRecord } from '../lib/toyyibCallback.mjs';
 import { readToyyibIsSandbox, secretKeyFor, apiBaseFor } from '../lib/toyyibMode.mjs';
 
 // Inline the collection name constant to avoid a CJS cross-import at runtime.
@@ -80,16 +80,9 @@ export default async (req, context) => {
   }
 
   let data = {};
-  const ct = req.headers.get('content-type') || '';
   try {
-    if (ct.includes('application/json')) {
-      data = await req.json().catch(() => ({}));
-    } else {
-      // form-encoded (ToyyibPay default)
-      const bodyText = await req.text();
-      const params = new URLSearchParams(bodyText || '');
-      for (const [k, v] of params.entries()) data[k] = v;
-    }
+    // ToyyibPay posts multipart/form-data; parsing it as URL-encoded left every field empty.
+    data = await readCallbackBody(req);
   } catch {
     console.warn('[toyyibpay-callback] Unreadable body — rejecting callback');
     return new Response('Bad Request', { status: 400 });

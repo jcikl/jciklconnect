@@ -533,3 +533,5 @@
 风险：任何线上付款（会费、活动费、手动账单）都不会自动入账；切到正式模式后，核对会去查沙盒，真实付款会被拒。
 
 处理（分支 `fix/toyyib-callback-refno`，待合并）：`netlify/lib/toyyibCallback.mjs` 兼容两种字段（`refno` / `transaction_id`），按付款编号、再按 order_id 选对应记录；`netlify/lib/toyyibMode.mjs` 集中处理模式、密钥、API 地址，`toyyibpay-api` 与 `toyyibpay-callback` 共用；通知按账单建立时记下的 `isSandbox`（新字段，与 `billExternalReferenceNo` 一起在建账单时写入）选择环境，没有则用系统模式；所有拒收情况都写日志（只记账单编号和原因）。单元测试 10 项通过。
+
+后续（2026-10-19，R-046 上线后）：新加的拒收日志显示了真实的通知内容——ToyyibPay 以 `multipart/form-data`（表单上传格式）发送通知，处理程序却按普通表单解析，所有字段都读成空，沙盒账单 `g6e28dl6` 仍被拒收。分支 `fix/toyyib-callback-multipart`：`netlify/lib/toyyibCallback.mjs` 新增 `readCallbackBody`，可读取 multipart、普通表单、JSON 三种格式；新增 2 项测试（撤掉修复后失败）。

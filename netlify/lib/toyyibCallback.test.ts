@@ -1,6 +1,22 @@
 import { describe, it, expect } from 'vitest';
-import { parseCallbackPayload, pickTransactionRecord } from './toyyibCallback.mjs';
+import { readCallbackBody, parseCallbackPayload, pickTransactionRecord } from './toyyibCallback.mjs';
 import { secretKeyFor, apiBaseFor, envDefaultIsSandbox, readToyyibIsSandbox } from './toyyibMode.mjs';
+
+describe('readCallbackBody', () => {
+  const url = 'https://example.test/cb';
+  it('reads a multipart/form-data body (what ToyyibPay actually sends)', async () => {
+    const fd = new FormData();
+    fd.append('refno', 'TP1'); fd.append('status', '1'); fd.append('billcode', 'g6e28dl6'); fd.append('order_id', 'JCI-1');
+    const data = await readCallbackBody(new Request(url, { method: 'POST', body: fd }));
+    expect(parseCallbackPayload(data)).toEqual({ refNo: 'TP1', billCode: 'g6e28dl6', orderId: 'JCI-1', status: '1' });
+  });
+  it('reads URL-encoded and JSON bodies', async () => {
+    const form = new Request(url, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'refno=TP2&billcode=abc' });
+    expect(await readCallbackBody(form)).toEqual({ refno: 'TP2', billcode: 'abc' });
+    const json = new Request(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"refno":"TP3","billcode":"xyz"}' });
+    expect(await readCallbackBody(json)).toEqual({ refno: 'TP3', billcode: 'xyz' });
+  });
+});
 
 describe('parseCallbackPayload', () => {
   it('reads the ToyyibPay callback body (refno / status / billcode / order_id)', () => {
