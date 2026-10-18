@@ -359,6 +359,8 @@ Reproduced 2026-10-18 in the Firestore emulator loaded with the live rules (`d82
 - Reconciliation match: denied for both the current Treasurer and ADMIN; the same match using the old field names passes.
 - Member phone edit: denied when the profile has only nested general / contact; allowed when it also has top-level name / email. Which shape production profiles have is not yet confirmed.
 
+Progress (2026-10-18, rules changed, awaiting owner deploy): (1) `transactions` whitelist now includes `reconciliation` and the void fields (`voidedAt` / `voidedBy` / `voidReason`; voiding failed for every transaction before); a new unlock rule lets finance roles / Admin take a reconciled transaction back out of reconciliation, touching reconciliation fields only, with amount and other business fields still locked; only Admin may void a reconciled transaction. (2) Self-registration accepts the sign-up form fields, but points, tier, badges etc. must hold their defaults and `jciCareer` may only contain `joinDate`, so a guest cannot make itself a board member or treasurer. (3) Member self-edit accepts name / email either top-level or under `general` / `contact`. Emulator: 27 checks pass (12 of them security checks) and the 21 R-034 checks still pass; run against the currently deployed rules (`047b450`), all 11 checks that should pass are denied, so the tests discriminate. Not addressed: the first-login profile copy for invited imported members is still denied; it will be solved by creating Auth accounts at import time (see TODO).
+
 Recommended action: confirm the deployed rules first, reproduce the three writes in the emulator, then fix the whitelists together.
 
 ### R-029 Any Signed-In User Can Rewrite counters (P0)

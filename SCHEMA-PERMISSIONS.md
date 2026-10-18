@@ -28,13 +28,13 @@ esource.data 仅在 get 中可用，因此部分集合的 list 权限会比 get 
 
 | 集合 | get | list | create | update | delete | 备注 |
 |------|-----|------|--------|--------|--------|------|
-| members | M+(自己:登) | M+ | B+ 或 自注册GUEST(仅GUEST字段) | 自己(非锁定字段) 或 B+ | A+(同LO；SA 不限 LO) | 2026-10-18 R-034：SA 删除不受 LO 限制 |
+| members | M+(自己:登) | M+ | B+ 或 自注册GUEST(注册表单字段，积分/等级/徽章只能是默认值，jciCareer 只能有 joinDate) | 自己(非锁定字段；name/email 顶层或嵌套均可) 或 B+ | A+(同LO；SA 不限 LO) | 2026-10-18 R-034：SA 删除不受 LO 限制 |
 | communication | 登 | 登 | M+(需含authorId) | 自己 或 B+ | 自己 或 B+ | |
 | events | 登 | 公 | B+ | B+ 或 M+(仅attendees字段) | B+ | list公开供宣传页使用 |
 | projects | 登(或Active状态公开) | 公 | B+ | B+ 或 M+(仅attendees字段) | B+ | |
 | lagship_projects | 公 | 公 | B+ | B+ | B+ | 对外展示集合 |
 | 	asks | G+ | G+ | B+ | B+ 或 Assignee(自己) | B+ | |
-| 	ransactions | B+/A+ | B+/A+ | A+/Finance(必填字段，非对账状态) | A+/Finance(字段白名单，非对账) | Finance(非对账/非清算) | |
+| 	ransactions | B+/A+ | B+/A+ | A+/Finance(必填字段，非对账状态) | A+/Finance(字段白名单，非对账)；A+/Finance 可把已对账交易改回未对账(仅对账字段)；A+ 可作废已对账交易 | Finance(非对账/非清算) | 2026-10-18 R-028：白名单加入 reconciliation 与作废字段 |
 | 	ransactionSplits | B+/A+ | B+/A+ | A+/Finance(父未对账) | A+/Finance(父未对账，字段白名单) | Finance(父未对账) | |
 | projectTrx | B+/A+ | B+/A+ | B+(字段白名单) | B+(非对账，字段白名单) | B+(非对账) | |
 | ankAccounts | Finance(同LO) | A+/Finance | Finance | Finance | Finance | get 限同LO |

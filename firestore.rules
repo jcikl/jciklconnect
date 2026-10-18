@@ -163,8 +163,21 @@ service cloud.firestore {
                          request.resource.data.keys().hasOnly([
                            'email', 'name', 'displayName', 'photoURL', 'photoUrl',
                            'createdAt', 'role', 'status', 'loId',
-                           'general', 'contact', 'membership'
+                           'general', 'contact', 'membership',
+                           // R-028: fields the sign-up form writes (hooks/useAuth.tsx signUp)
+                           'others', 'skills', 'surveyAnswers', 'personaType', 'tendencyTags',
+                           'tier', 'points', 'churnRisk', 'attendanceRate', 'duesStatus', 'badges', 'jciCareer'
                          ]) &&
+                         // System-managed fields may only carry the sign-up defaults, and jciCareer may only
+                         // hold joinDate, so a self-registered GUEST cannot grant itself points, badges or a
+                         // board position (isCurrentBoardMember / currentBoardPosition drive isBoard()).
+                         request.resource.data.get('tier', 'Bronze') == 'Bronze' &&
+                         request.resource.data.get('points', 0) == 0 &&
+                         request.resource.data.get('churnRisk', 'Low') == 'Low' &&
+                         request.resource.data.get('attendanceRate', 100) == 100 &&
+                         request.resource.data.get('duesStatus', 'Pending') == 'Pending' &&
+                         request.resource.data.get('badges', []).size() == 0 &&
+                         request.resource.data.get('jciCareer', {}).keys().hasOnly(['joinDate']) &&
                          (request.resource.data.name is string ||
                           request.resource.data.get('general', {}).get('name', null) is string) &&
                          (request.resource.data.email is string ||
@@ -177,8 +190,12 @@ service cloud.firestore {
       allow update: if isAuthenticated() && (
         (request.auth.uid == memberId &&
          resource.data.get('role', 'GUEST') != 'INACTIVE' &&
-         // E8 fix: require required fields are always present so self-write cannot delete name/email
-         request.resource.data.keys().hasAll(['name', 'email']) &&
+         // E8 fix: self-write cannot delete name/email. R-028: accept either the legacy top-level fields
+         // or the current nested general.name / contact.email.
+         (request.resource.data.get('name', null) is string ||
+          request.resource.data.get('general', {}).get('name', null) is string) &&
+         (request.resource.data.get('email', null) is string ||
+          request.resource.data.get('contact', {}).get('email', null) is string) &&
          !request.resource.data.diff(resource.data).affectedKeys().hasAny([
            'role', 'loId', 'membership', 'membershipType',
            'senatorCertified', 'senatorshipBoardValidated', 'senatorshipId',
@@ -339,8 +356,8 @@ service cloud.firestore {
         (request.resource.data.get('status', '') != 'Reconciled' &&
          request.resource.data.get('status', '') != 'Partially Reconciled' &&
          request.resource.data.get('status', '') != 'Voided');
-      // TX-R2: finance staff limited to business fields; Admin unrestricted (TX-A: added missing writable fields)
-      // C1: isAdmin() bypass before Reconciled check so void/unmatch/deleteReconciliation always work
+      // TX-R2: finance staff limited to business fields on unlocked transactions.
+      // R-028: 'reconciliation' (nested match data written by matching) and the void fields added to the whitelist.
       allow update: if (isAdmin() || isFinanceOperator()) &&
         (
         (resource == null ||
@@ -356,8 +373,26 @@ service cloud.firestore {
            'description', 'amount', 'type', 'date', 'reference', 'bankAccountId', 'attachments',
            'paymentRequestId', 'inventoryLinkId', 'inventoryVariant', 'inventoryQuantity', 'tags',
            'matchStatus', 'matchedBankTxIds',
-           'memberId', 'loId', 'transactionType', 'year'
+           'memberId', 'loId', 'transactionType', 'year',
+           'reconciliation', 'voidedAt', 'voidedBy', 'voidReason'
          ]));
+      // R-028 unlock: finance roles may take a Reconciled / Partially Reconciled transaction back out of
+      // reconciliation (unmatch, delete reconciliation, compensation). Only reconciliation fields may
+      // change, and the result may not be Voided; amount, date and other business fields stay locked.
+      allow update: if (isAdmin() || isFinanceOperator()) &&
+        resource.data.get('status', '') in ['Reconciled', 'Partially Reconciled'] &&
+        request.resource.data.get('status', '') != 'Voided' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'reconciliation', 'reconciliationId', 'prevStatus', 'reconciledAt', 'reconciledBy',
+          'matchStatus', 'matchedBankTxIds', 'paymentRequestId', 'updatedAt', 'updatedBy'
+        ]);
+      // R-028 void of a reconciled transaction: Admin only (finance operators unmatch first).
+      allow update: if isAdmin() &&
+        resource.data.get('status', '') in ['Reconciled', 'Partially Reconciled'] &&
+        request.resource.data.get('status', '') == 'Voided' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'voidedAt', 'voidedBy', 'voidReason', 'reconciliation', 'updatedAt', 'updatedBy'
+        ]);
       // PT-match: board members can link/unlink project entries without full finance operator rights
       allow update: if (isBoard() || isAdmin()) &&
         resource.data.get('status', '') != 'Reconciled' &&
