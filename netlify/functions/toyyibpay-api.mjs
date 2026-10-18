@@ -200,6 +200,15 @@ export default async (req, context) => {
         if (!resolvedReturnUrl) throw new Error('Cannot determine ToyyibPay return URL (URL not set)');
         sanitized.billReturnUrl = resolvedReturnUrl;
         result = await callToyyib('createBill', sanitized, isSandbox);
+        // Diagnostics for missing payment callbacks: where ToyyibPay will POST (secret never logged).
+        console.log('[toyyibpay-api] createBill', JSON.stringify({
+          mode: isSandbox ? 'sandbox' : 'production',
+          billCode: Array.isArray(result) ? result[0]?.BillCode ?? null : null,
+          callbackUrl: baseCallbackUrl,
+          callbackHasSecret: !!webhookSecret,
+          returnUrl: sanitized.billReturnUrl,
+          externalRef: sanitized.billExternalReferenceNo ?? null,
+        }));
         break;
       }
       case 'getBills':
