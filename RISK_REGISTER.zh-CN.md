@@ -6,7 +6,7 @@
 
 2026-10-12 更新：新增 R-025 至 R-027。
 
-2026-10-18 更新：第一轮核实（权限与规则）新增 R-028 至 R-042，见文末。
+2026-10-18 更新：第一轮核实（权限与规则）新增 R-028 至 R-043，见文末。
 
 严重级别：P0 严重，P1 高，P2 中，P3 低。
 
@@ -497,3 +497,13 @@
 风险：所有经系统发起的网上缴费（会费、活动报名费）都无法建账单。
 
 处理：用户于同日在 Netlify 补设 `TOYYIBPAY_SECRET_KEY`（沙盒）与 `TOYYIBPAY_SECRET_KEY_PROD`（正式）并重新部署；复测正式站返回 401（函数正常启动，进入身份检查）。注意：缺少 `systemConfig/toyyibpay` 设置时代码默认沙盒模式，正式收款前须确认模式为 Production。后续可考虑：函数启动时缺变量改为按请求返回 500 并记录日志，避免把调用栈返回给浏览器。
+
+### R-043 付款通知函数缺少密钥无法启动；Sandbox / Production 开关从未生效（P0）
+
+证据（2026-10-19）：
+- GET 正式站 `/.netlify/functions/toyyibpay-callback` 返回 502，错误为 `TOYYIBPAY_WEBHOOK_SECRET env var not set`（函数启动时检查，缺失即抛错）。ToyyibPay 付款成功后的通知因此全部失败，账单不会被标为已付、交易不会生成；线上 `toyyibpay_webhooks`、`toyyibBills` 均为空。
+- ToyyibPay 设置页的模式开关：网页端发送 `isSandbox: String(isSandbox)`（`services/toyyibService.ts:141`），服务端只接受 boolean（`toyyibpay-api.mjs` setMode），一律返回 400；所以 `systemConfig/toyyibpay` 从未写入，系统一直按默认值使用沙盒。切换成功后页面标签也不会刷新（`useToyyibMode` 只读一次）。
+
+风险：网上缴费即使付款成功也不会入账；无法切换到正式收款。
+
+处理：用户在 Netlify 补设 `TOYYIBPAY_WEBHOOK_SECRET`（Functions 作用域，Production + Deploy Previews）并重新部署，补好后 GET 应返回 405。代码修复（分支 `fix/toyyib-mode-switch`，待合并）：网页端发送真正的 boolean，服务端兼容 boolean 与 "true"/"false"，切到 Production 前检查正式密钥已配置；`useToyyibMode` 增加 `refresh()`，切换后重新读取模式。

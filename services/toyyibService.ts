@@ -94,7 +94,7 @@ export interface ToyyibBillRecord {
 
 // All ToyyibPay API calls go through our Netlify Function proxy to avoid CORS.
 // In local Vite dev, the function isn't available (404) — callers should handle null gracefully.
-async function proxyCall(action: string, params: Record<string, string> = {}): Promise<any> {
+async function proxyCall(action: string, params: Record<string, string | boolean> = {}): Promise<any> {
   const idToken = await getAuth().currentUser?.getIdToken().catch(() => null);
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (idToken) headers['Authorization'] = `Bearer ${idToken}`;
@@ -138,7 +138,8 @@ export class ToyyibService {
 
   /** BOARD+ only. Toggle sandbox/production mode — persisted to Firestore via proxy. */
   static async setMode(isSandbox: boolean): Promise<void> {
-    await proxyCall('setMode', { isSandbox: String(isSandbox) } as any);
+    // Send a real boolean: the proxy rejected the old String(isSandbox) with 400, so the switch never worked.
+    await proxyCall('setMode', { isSandbox });
     _modeCache = null; // invalidate cache
   }
 

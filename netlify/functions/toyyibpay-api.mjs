@@ -149,15 +149,23 @@ export default async (req, context) => {
         result = { isSandbox, hasProdKey: !!process.env.TOYYIBPAY_SECRET_KEY_PROD };
         break;
       case 'setMode': {
-        // BOARD+ can toggle sandbox/production mode — persisted to Firestore
-        if (typeof params.isSandbox !== 'boolean') {
+        // BOARD+ can toggle sandbox/production mode — persisted to Firestore.
+        // Older clients sent the flag as the string "true"/"false"; accept both forms.
+        const rawMode = params.isSandbox;
+        const nextIsSandbox = rawMode === true || rawMode === 'true' ? true
+          : rawMode === false || rawMode === 'false' ? false
+          : null;
+        if (nextIsSandbox === null) {
           return Response.json({ error: 'isSandbox (boolean) required' }, { status: 400, headers: cors });
         }
+        if (!nextIsSandbox && !process.env.TOYYIBPAY_SECRET_KEY_PROD) {
+          return Response.json({ error: 'TOYYIBPAY_SECRET_KEY_PROD is not configured' }, { status: 400, headers: cors });
+        }
         await getFirestore().doc('systemConfig/toyyibpay').set(
-          { isSandbox: params.isSandbox, updatedAt: new Date().toISOString(), updatedBy: decodedUid },
+          { isSandbox: nextIsSandbox, updatedAt: new Date().toISOString(), updatedBy: decodedUid },
           { merge: true }
         );
-        result = { isSandbox: params.isSandbox };
+        result = { isSandbox: nextIsSandbox };
         break;
       }
       case 'getCategories':
