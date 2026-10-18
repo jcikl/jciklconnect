@@ -41,7 +41,7 @@ import { trimCloudinaryImage } from './services/cloudinaryService';
 import { MembersService } from './services/membersService';
 import { registerPushNotifications, unregisterPushNotifications, onForegroundMessage } from './services/notificationService';
 import { EmailService } from './services/emailService';
-import { DEFAULT_LO_ID } from './config/constants';
+import { DEFAULT_LO_ID, TOYYIB_CONFIG } from './config/constants';
 
 // Initialize email service once at app startup — provider/from config lives here,
 // API key lives server-side in RESEND_API_KEY Netlify env var (never in the browser).
@@ -90,6 +90,7 @@ const GuestAboutPage = lazy(() => import('./components/pages/guest/GuestAboutPag
 const GuestEnewslettersPage = lazy(() => import('./components/pages/guest/GuestEnewslettersPage').then(m => ({ default: m.GuestEnewslettersPage })));
 const GuestPartnershipPage = lazy(() => import('./components/pages/guest/GuestPartnershipPage').then(m => ({ default: m.GuestPartnershipPage })));
 const NotFoundPage = lazy(() => import('./components/pages/NotFoundPage').then(m => ({ default: m.NotFoundPage })));
+const PaymentReturnPage = lazy(() => import('./components/pages/PaymentReturnPage').then(m => ({ default: m.PaymentReturnPage })));
 
 // REMOVED: inline GuestLandingPage definition (moved to components/pages/guest/GuestLandingPage.tsx)
 // REMOVED: inline GuestEventsPage definition (moved to components/pages/guest/GuestEventsPage.tsx)
@@ -359,6 +360,15 @@ export const JCIKLApp: React.FC = () => {
           <p className="text-slate-600">Loading...</p>
         </div>
       </main>
+    );
+  }
+
+  // ToyyibPay sends payers back here (guests and signed-in members alike), before the guest/app split.
+  if (window.location.pathname === TOYYIB_CONFIG.RETURN_URL_SUFFIX) {
+    return (
+      <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><Spinner size="lg" /></div>}>
+        <PaymentReturnPage isAuthenticated={!!user} />
+      </Suspense>
     );
   }
 

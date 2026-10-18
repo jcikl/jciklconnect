@@ -6,7 +6,7 @@ Updated 2026-10-12: R-018 to R-024 added from the `CAPABILITIES.md` scan (commit
 
 Updated 2026-10-12: R-025 to R-027 added.
 
-Updated 2026-10-18: R-028 to R-040 added from verification round 1 (permissions and rules); see the end of this file.
+Updated 2026-10-18: R-028 to R-041 added from verification round 1 (permissions and rules); see the end of this file.
 
 Severity scale: P0 critical, P1 high, P2 medium, P3 low.
 
@@ -481,3 +481,11 @@ Risk: most members cannot sign in.
 Recommended action: implemented (not deployed) `netlify/functions/member-auth.mjs`: accounts created at import time with uid = member id, and a SUPER_ADMIN "Fix Auth" panel in the member import drawer (dry run, then run); login no longer copies profiles and asks the user to contact an admin instead. After deploy, a SUPER_ADMIN runs Fix Auth; the 2 members above need manual handling. Note: under local `netlify dev`, functions that import `firebase-admin/auth` fail (`jwks-rsa` 4.1 `require()`s the ESM-only `jose` 6), existing `send-invite` included; whether production works depends on Netlify's Node version, so confirm with a Fix Auth dry run after deploy.
 
 Result (2026-10-18): on the PR #3 deploy preview `member-auth` loaded fine (401 without a token) and the dry run matched the local read-only script. A SUPER_ADMIN (noreply) then ran Fix Auth on the preview (same Firebase as production) without replacing orphans or sending emails: 337 accounts created, 8 already ready, 0 errors, 4 audit entries (`auditLog` action `member_auth_fix`). Re-check: all 345 members now have a login account with uid = member id. SHANE TEOH and SHIRLEY PANG, flagged for review in the dry run, were also created because the used accounts under their emails no longer existed at run time (not deleted by this feature: orphan replacement was off, and the code never deletes used accounts); the owner confirmed deleting them in the Firebase console (2026-10-18). Members have no password yet: they sign in with Google or "Forgot password".
+
+### R-041 Payment Flow Hard-Codes the Retired Domain app.jcikl.cc (P1)
+
+Evidence: members use `https://jciklconnect.netlify.app`; `app.jcikl.cc` does not respond (2026-10-18). `netlify/functions/toyyibpay-api.mjs` only accepted return URLs starting with `app.jcikl.cc` and otherwise forced `https://app.jcikl.cc/payment/result`, so payers landed on a dead page; the ToyyibPay callback default was also `app.jcikl.cc` (production sets `TOYYIBPAY_CALLBACK_URL`, so it was unaffected); production was detected by "URL contains app.jcikl.cc", so the live site counted as non-production and accepted localhost return URLs. Neither the client return path `/payment-return` nor the fallback `/payment/result` had a page.
+
+Risk: payers see an error page after paying and may pay twice.
+
+Recommended action / progress (2026-10-18, code changed, awaiting merge and deploy): new `netlify/lib/siteUrl.mjs` derives the site origins and production context from Netlify's own `URL` / `DEPLOY_PRIME_URL` / `CONTEXT` (no new env vars); return URLs are accepted only on our own origins (including deploy previews), otherwise `<site>/payment-return`; the callback default is our own function URL; new `/payment-return` page for guests and signed-in members shows success / pending / failed from `status_id` (informational only; the server callback still records the payment). 11 unit tests pass. The CORS allowlists of the other 10 functions also list only `app.jcikl.cc`; same-origin requests are unaffected, so that is a separate task.

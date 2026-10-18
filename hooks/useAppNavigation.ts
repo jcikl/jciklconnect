@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ViewType } from '../types/views';
 import { getViewTitle } from '../components/app/viewTitles';
+import { TOYYIB_CONFIG } from '../config/constants';
 
 export type GuestPageKey = 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'partnerships';
 
@@ -68,7 +69,8 @@ export const useAppNavigation = ({
     if (authLoading) return;
 
     if (isAuthenticated) {
-      navigate('/roadmap');
+      // Stay on the ToyyibPay return page; its own button takes the member back into the app.
+      if (window.location.pathname !== TOYYIB_CONFIG.RETURN_URL_SUFFIX) navigate('/roadmap');
       if (viewRef.current.startsWith('GUEST')) {
         setView('DASHBOARD');
       }
