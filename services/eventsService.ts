@@ -18,7 +18,7 @@ import {
   arrayRemove,
   increment,
 } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { auth, db } from '../config/firebase';
 import { COLLECTIONS, DEFAULT_LO_ID } from '../config/constants';
 import { Event, ProjectCommitteeMember } from '../types';
 import { EventRegistrationService } from './eventRegistrationService';
@@ -856,14 +856,25 @@ export class EventsService {
             }
 
             if (shouldReverse && total > 0) {
-              await PointsService.awardPoints(
-                memberId,
-                -total,
-                'EVENT_ATTENDANCE',
-                'Reversed: attendance undone',
-                eventId,
-                'event'
-              );
+              try {
+                // awardedBy is required when the caller (board/admin) reverses another member's points;
+                // without it awardPoints rejects the cross-member write.
+                await PointsService.awardPoints(
+                  memberId,
+                  -total,
+                  'EVENT_ATTENDANCE',
+                  'Reversed: attendance undone',
+                  eventId,
+                  'event',
+                  undefined,
+                  auth.currentUser?.uid
+                );
+              } catch (reverseErr) {
+                // Release the claim so a later undo can retry instead of the flag staying true with no reversal.
+                await updateDoc(regRef2, { pointsReversed: false }).catch(releaseErr =>
+                  errorLoggingService.logError(releaseErr instanceof Error ? releaseErr : new Error(String(releaseErr)), { context: 'EventsService.undoAttendance.releaseReversalClaim', additionalData: { memberId, eventId } }));
+                throw reverseErr;
+              }
             }
           } catch (pointsErr) {
             errorLoggingService.logError(pointsErr instanceof Error ? pointsErr : new Error(String(pointsErr)), { context: 'EventsService.undoAttendance', additionalData: { memberId, eventId } });

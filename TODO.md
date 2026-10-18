@@ -70,7 +70,7 @@
   - 2026-10-18 用户决定：10 月自动续费 → 不做，继续手动；1 月 1 日会费提醒 → 迁移；签到积分 → 在网页端恢复；活动前一天提醒 → 先不做，等推送修好后再议。`functions/` 先标记停用，保留一个月。
   - 进度：P1 修推送 ✅（commit `09c3af2`）；P2 迁移 1 月会费提醒 ✅（`netlify/functions/annual-dues-reminders.mjs`，模拟器验证通过）；P4 签到积分 ✅（单元测试 4 个通过）；P5 收尾待做。均未部署。
 - [ ] **修复失败的积分规则测试**（2026-10-18 登记）。来源：`npx vitest run` 时 `tests/property/pointsRule.properties.test.ts` 报 `doc() cannot be called with an empty path`；撤掉本次改动后同样失败，属既有问题。影响：测试套件不是全绿，无法作为 CI 关卡。完成标准：查明原因并修好，全套测试通过。
-- [ ] **部署规则（用户执行）**（2026-10-18 登记）：R-034 修复 + `b83d671`（用户已同意）+ `65599ca`。命令：`firebase deploy --only firestore:rules,storage`。部署后验证：noreply@jcikl.cc（SUPER_ADMIN）能给他人签到。回滚：重新部署 `d8282b0` 的 `firestore.rules`。
+- [x] **部署规则（用户执行）** ✅ 2026-10-18 已部署，SUPER_ADMIN 签到线上验证通过（2026-10-18 登记）：R-034 修复 + `b83d671`（用户已同意）+ `65599ca`。命令：`firebase deploy --only firestore:rules,storage`。部署后验证：noreply@jcikl.cc（SUPER_ADMIN）能给他人签到。回滚：重新部署 `d8282b0` 的 `firestore.rules`。
 - [ ] **重建蓝图第二轮核实：财务（P4）**。来源：重建蓝图 artifact 的验证顺序。完成标准：逐条核对 P4 验收标准和 2026-07-14 撤销审计的 9 个缺口，结果登记到风险清单。
 - [ ] **重建蓝图第三轮核实：其余模块（P2、P3、P5–P7）**。完成标准同上。
 
