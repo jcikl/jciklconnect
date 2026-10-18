@@ -1,6 +1,7 @@
 // Shared Firebase Admin setup for Netlify Functions.
 // Lives outside netlify/functions/ so Netlify does not deploy it as a function of its own.
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 
@@ -25,6 +26,8 @@ if (!getApps().length) {
 
 export const db = hasAdminCredentials ? getFirestore() : null;
 export const messaging = hasAdminCredentials ? getMessaging() : null;
+// Talks to the Auth emulator automatically when FIREBASE_AUTH_EMULATOR_HOST is set.
+export const auth = hasAdminCredentials ? getAuth() : null;
 
 // The client saves the push token on the member document (services/notificationService.ts).
 export async function getMemberFcmToken(memberId) {

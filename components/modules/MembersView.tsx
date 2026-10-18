@@ -468,9 +468,11 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
               <Button variant="outline" size="sm" onClick={() => setIsExportModalOpen(true)}>
                 <Download size={14} className="mr-1.5" /> Export
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setIsImportModalOpen(true)}>
-                <Upload size={14} className="mr-1.5" /> Import
-              </Button>
+              {isAdmin && (
+                <Button variant="outline" size="sm" onClick={() => setIsImportModalOpen(true)}>
+                  <Upload size={14} className="mr-1.5" /> Import
+                </Button>
+              )}
             </div>
           ) : undefined}
         >
@@ -538,7 +540,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
                   membershipTypeCounts={membershipTypeCounts}
                   roleCounts={roleCounts}
                   onAddNew={canManageMembers ? () => setAddModalOpen(true) : undefined}
-                  onImport={canManageMembers ? () => setIsImportModalOpen(true) : undefined}
+                  onImport={isAdmin ? () => setIsImportModalOpen(true) : undefined /* import creates login accounts: ADMIN+ only */}
                   cardClassName="max-md:rounded-none max-md:border-0 max-md:shadow-none"
                 />
                 {sortedMembers.length === 0 && (roleFilters.length > 0 || membershipTypeFilters.length > 0 || searchQuery) && (
