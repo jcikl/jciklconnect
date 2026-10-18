@@ -221,7 +221,7 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
 
       {/* ── Weekday column headers ── */}
       {/* grid: [week-num col] [7 day cols] */}
-      <div className="grid grid-cols-[24px_repeat(7,1fr)] px-2 pb-1 border-b border-slate-100">
+      <div className="grid grid-cols-[24px_repeat(7,minmax(0,1fr))] px-2 pb-1 border-b border-slate-100">
         <div /> {/* week number placeholder */}
         {WEEK_DAY_LABELS.map((label, i) => (
           <div
@@ -236,7 +236,7 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
       {/* ── Calendar grid ── */}
       <div className="px-2 pt-1 pb-2">
         {calendarWeeks.map((week, wi) => (
-          <div key={wi} className="grid grid-cols-[24px_repeat(7,1fr)] mb-0.5">
+          <div key={wi} className="grid grid-cols-[24px_repeat(7,minmax(0,1fr))] mb-0.5">
 
             {/* ISO week number */}
             <div className="flex items-start justify-center pt-2.5">
@@ -256,7 +256,7 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
               return (
                 <div
                   key={di}
-                  className="flex flex-col items-center pt-1 pb-0.5 cursor-pointer group"
+                  className="flex flex-col items-center min-w-0 pt-1 pb-0.5 cursor-pointer group"
                   onClick={() => {
                     setSelectedDate(date);
                     onDateClick?.(date);
