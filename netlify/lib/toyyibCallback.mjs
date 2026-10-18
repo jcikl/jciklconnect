@@ -2,6 +2,23 @@
 // The callback body uses refno / status / billcode / order_id / amount; the payer's return URL
 // uses transaction_id / status_id instead. Both shapes are accepted.
 
+/**
+ * Read the callback body into a plain object. ToyyibPay posts multipart/form-data (observed
+ * 2026-10-19); URL-encoded and JSON bodies are accepted too.
+ */
+export async function readCallbackBody(req) {
+  const ct = req.headers.get('content-type') || '';
+  if (ct.includes('application/json')) return await req.json().catch(() => ({}));
+  if (ct.includes('multipart/form-data')) {
+    const data = {};
+    for (const [k, v] of (await req.formData()).entries()) if (typeof v === 'string') data[k] = v;
+    return data;
+  }
+  const data = {};
+  for (const [k, v] of new URLSearchParams((await req.text()) || '').entries()) data[k] = v;
+  return data;
+}
+
 export function parseCallbackPayload(data = {}) {
   const pick = (...keys) => {
     for (const k of keys) {
