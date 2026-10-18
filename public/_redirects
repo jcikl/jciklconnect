@@ -1,1 +1,6 @@
+# Netlify applies this file BEFORE the [[redirects]] in netlify.toml, so the API rewrites must be
+# listed here ahead of the SPA catch-all, or /api/* requests get index.html (keep in sync with netlify.toml).
+/api/webhooks/zoom       /.netlify/functions/zoom-webhook        200!
+/api/webhooks/toyyibpay  /.netlify/functions/toyyibpay-callback  200!
+/api/toyyibpay           /.netlify/functions/toyyibpay-api       200!
 /*  /index.html  200

@@ -6,7 +6,7 @@ Updated 2026-10-12: R-018 to R-024 added from the `CAPABILITIES.md` scan (commit
 
 Updated 2026-10-12: R-025 to R-027 added.
 
-Updated 2026-10-18: R-028 to R-042 added from verification round 1 (permissions and rules); see the end of this file.
+Updated 2026-10-18: R-028 to R-043 added from verification round 1 (permissions and rules); see the end of this file.
 
 Severity scale: P0 critical, P1 high, P2 medium, P3 low.
 
@@ -497,3 +497,15 @@ Evidence: on 2026-10-18 an unauthenticated request to production `/.netlify/func
 Risk: no online payment started from the app (dues, event fees) could create a bill.
 
 Resolution: the owner set `TOYYIBPAY_SECRET_KEY` (sandbox) and `TOYYIBPAY_SECRET_KEY_PROD` (production) in Netlify the same day and redeployed; production now returns 401 (function starts and reaches the auth check). Note: without a `systemConfig/toyyibpay` setting the code defaults to sandbox mode, so confirm the mode is Production before taking real payments. Follow-up option: report a missing variable as a per-request 500 with a log entry instead of throwing at start-up, so no stack trace reaches the browser.
+
+### R-043 Payment Callback Cannot Start Without Its Secret; the Sandbox / Production Switch Never Worked (P0)
+
+Evidence (2026-10-19):
+- GET on production `/.netlify/functions/toyyibpay-callback` returns 502 with `TOYYIBPAY_WEBHOOK_SECRET env var not set` (checked at start-up). Every ToyyibPay payment notification therefore fails: bills are never marked paid and no transaction is created; production `toyyibpay_webhooks` and `toyyibBills` are both empty.
+- The ToyyibPay settings mode switch sends `isSandbox: String(isSandbox)` (`services/toyyibService.ts:141`) while the proxy only accepts a boolean (`toyyibpay-api.mjs` setMode), so it always returned 400; `systemConfig/toyyibpay` was never written and the site has always run in the default sandbox mode. The badge also never refreshed after a switch (`useToyyibMode` read once).
+
+Risk: online payments are never recorded even when paid, and production collection cannot be enabled.
+
+Resolution: the owner adds `TOYYIBPAY_WEBHOOK_SECRET` in Netlify (Functions scope; Production + Deploy Previews) and redeploys; GET should then return 405. Code fix (branch `fix/toyyib-mode-switch`, awaiting merge): the client sends a real boolean, the proxy accepts a boolean or "true"/"false" and refuses Production when the production key is missing, and `useToyyibMode` gains `refresh()` so the badge updates after a switch.
+
+Added the same day: `public/_redirects` held only `/* /index.html 200`, and Netlify applies that file before `netlify.toml`, so the `/api/webhooks/zoom`, `/api/webhooks/toyyibpay` and `/api/toyyibpay` rewrites in `netlify.toml` never took effect; GET `/api/webhooks/toyyibpay` returned index.html (200). ToyyibPay in production uses `TOYYIBPAY_CALLBACK_URL` (the direct function URL), so it was unaffected; if Zoom is configured with `/api/webhooks/zoom`, its notifications never arrived. Fix: list the three rewrites ahead of the catch-all in `public/_redirects` (same branch).

@@ -54,7 +54,7 @@ export const ToyyibView: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
   const [showSettings, setShowSettings] = useState(false);
   const [connStatus, setConnStatus] = useState<'idle' | 'testing' | 'ok' | 'fail'>('idle');
   const [showSecretKey, setShowSecretKey] = useState(false);
-  const { isSandbox, hasProdKey, loading: modeLoading } = useToyyibMode();
+  const { isSandbox, hasProdKey, loading: modeLoading, refresh: refreshMode } = useToyyibMode();
   const [togglingMode, setTogglingMode] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
@@ -241,7 +241,8 @@ export const ToyyibView: React.FC<{ embedded?: boolean }> = ({ embedded }) => {
       onTestConnection={testConnection}
       onCopyField={copyField}
       showToast={showToast}
-      loadData={loadData}
+      // The settings panel calls this after switching mode: re-read the mode so the badge updates.
+      loadData={async () => { await refreshMode(); await loadData(); }}
       setShowSecretKey={setShowSecretKey}
       setTogglingMode={setTogglingMode}
       setTestMembers={setTestMembers}
