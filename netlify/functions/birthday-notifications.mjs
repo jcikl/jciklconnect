@@ -1,27 +1,5 @@
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
-import { getMessaging } from 'firebase-admin/messaging';
-
-// SEC-CF05: Use FIREBASE_ADMIN_* names (no VITE_ prefix) so Vite never injects
-// the private key into the browser bundle. Align Netlify dashboard env var names.
-const _fbProjectId = process.env.FIREBASE_ADMIN_PROJECT_ID;
-const _fbClientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
-const _fbPrivateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n');
-
-if (!_fbProjectId || !_fbClientEmail || !_fbPrivateKey) {
-  console.error('[birthday-notifications] Missing Firebase Admin credentials — function will not initialise');
-} else if (!getApps().length) {
-  initializeApp({
-    credential: cert({
-      projectId: _fbProjectId,
-      clientEmail: _fbClientEmail,
-      privateKey: _fbPrivateKey,
-    }),
-  });
-}
-
-const db = getFirestore();
-const messaging = getMessaging();
+import { db, messaging, hasAdminCredentials, getMemberFcmToken } from '../lib/firebaseAdmin.mjs';
+import { isActiveRecipient as isEligible } from '../lib/members.mjs';
 
 async function sendFcmPush(memberId, title, body, type, extraData = {}) {
   await db.collection('notifications').add({
@@ -32,8 +10,7 @@ async function sendFcmPush(memberId, title, body, type, extraData = {}) {
     createdAt: new Date().toISOString(),
   });
 
-  const userDoc = await db.collection('users').doc(memberId).get();
-  const fcmToken = userDoc.data()?.fcmToken;
+  const fcmToken = await getMemberFcmToken(memberId);
   if (!fcmToken) return;
 
   await messaging.send({
@@ -50,7 +27,7 @@ async function sendFcmPush(memberId, title, body, type, extraData = {}) {
 }
 
 export default async (req, context) => {
-  if (!_fbProjectId || !_fbClientEmail || !_fbPrivateKey) {
+  if (!hasAdminCredentials) {
     return Response.json({ error: 'Missing Firebase Admin credentials' }, { status: 500 });
   }
   const cronSecret = process.env.CRON_SECRET;
@@ -66,27 +43,30 @@ export default async (req, context) => {
     console.log(`Checking birthdays for ${todayMMDD}`);
 
     const birthdaySnap = await db.collection('members')
-      .where('status', '==', 'active')
       .where('birthdayMMDD', '==', todayMMDD)
       .get();
 
-    if (birthdaySnap.empty) {
+    const birthdayMembers = birthdaySnap.docs
+      .filter(doc => isEligible(doc.data()))
+      .map(doc => {
+        const m = doc.data();
+        const fullName = m.general?.name || m.name || '';
+        return { id: doc.id, name: fullName.split(' ')[0] || fullName };
+      });
+
+    if (birthdayMembers.length === 0) {
       console.log('No birthdays today.');
       return Response.json('No birthdays today.');
     }
 
-    const birthdayMembers = birthdaySnap.docs.map(doc => {
-      const m = doc.data();
-      return { id: doc.id, name: (m.name || '').split(' ')[0] || m.name };
-    });
-
     const allSnap = await db.collection('members')
-      .where('status', '==', 'active')
-      .select('__name__')
+      .select('role', 'deletedAt', 'status')
       .get();
 
     const birthdayIds = new Set(birthdayMembers.map(m => m.id));
-    const otherMemberIds = allSnap.docs.map(d => d.id).filter(id => !birthdayIds.has(id));
+    const otherMemberIds = allSnap.docs
+      .filter(d => isEligible(d.data()) && !birthdayIds.has(d.id))
+      .map(d => d.id);
     const birthdayNames = birthdayMembers.map(m => m.name).join(' & ');
 
     const today = now.toISOString().split('T')[0];
