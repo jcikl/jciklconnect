@@ -535,3 +535,11 @@
 处理（分支 `fix/toyyib-callback-refno`，待合并）：`netlify/lib/toyyibCallback.mjs` 兼容两种字段（`refno` / `transaction_id`），按付款编号、再按 order_id 选对应记录；`netlify/lib/toyyibMode.mjs` 集中处理模式、密钥、API 地址，`toyyibpay-api` 与 `toyyibpay-callback` 共用；通知按账单建立时记下的 `isSandbox`（新字段，与 `billExternalReferenceNo` 一起在建账单时写入）选择环境，没有则用系统模式；所有拒收情况都写日志（只记账单编号和原因）。单元测试 10 项通过。
 
 后续（2026-10-19，R-046 上线后）：新加的拒收日志显示了真实的通知内容——ToyyibPay 以 `multipart/form-data`（表单上传格式）发送通知，处理程序却按普通表单解析，所有字段都读成空，沙盒账单 `g6e28dl6` 仍被拒收。分支 `fix/toyyib-callback-multipart`：`netlify/lib/toyyibCallback.mjs` 新增 `readCallbackBody`，可读取 multipart、普通表单、JSON 三种格式；新增 2 项测试（撤掉修复后失败）。
+
+### R-047 会员无法在线缴自己的会费；金额由浏览器决定（P0）
+
+证据（2026-10-19，代码核查 `hooks/useToyyibPayment.ts` → `services/toyyibService.ts` → `toyyibpay-api` → `firestore.rules`）：会员点「Pay Dues」会在四处被挡——建当年分类（`toyyibCategories` 与付款函数的 `createCategory` 只限理事以上）、建账单（付款函数 `createBill` 只限理事以上）、记录账单并给 `toyyibCategories.billCount` 加一的批量写入（分类只限理事以上可写，可能出现 ToyyibPay 有账单、我们没记录）、在会员资料写 `membership.{年份}.toyyib*`（会员自改规则锁定）。金额在浏览器计算后以 `billAmount` 送出，付款人可改。Guest 的金额算出为 0（「Guest 无年费」），付款函数直接拒绝。付款通知只把已付写进旧的 `membership.{年份}`，会员页面读的是 `jciCareer.membershipDuesHistory.{年份}`；Guest 已付入会费标记只在两条路径中的一条设置，且读的是会员资料里不存在的顶层 `membershipType`。
+
+风险：会员完全无法在线缴会费；即使在线付了，会员页面也不会显示已缴。
+
+处理（分支 `fix/toyyib-member-dues`，待合并）：付款函数新增 `createDuesBill`（`netlify/lib/toyyibDues.mjs`）——会员只能为自己、理事以上可代任何会员；金额由服务端计算（Guest 为 RM350 入会费，其余按会籍规则，首年加注册费）；当年会费分类须由理事先建好并绑定，否则提示「尚未开放」；未付的账单直接复用；账单记录、分类计数、会员资料关联一次写入。网页端改为调用此功能，不再直接写数据库。付款通知把已付 / 退款状态同时写入 `membership.{年份}` 与 `jciCareer.membershipDuesHistory.{年份}`，两条路径都会为 Guest 标记已付入会费。规则无需改动。单元测试 11 项通过。活动报名费同样卡在只限理事以上的 `createBill`，留待处理（见 TODO）。

@@ -17,6 +17,7 @@ import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { readCallbackBody, parseCallbackPayload, pickTransactionRecord } from '../lib/toyyibCallback.mjs';
 import { readToyyibIsSandbox, secretKeyFor, apiBaseFor } from '../lib/toyyibMode.mjs';
+import { isGuestMember } from '../lib/toyyibDues.mjs';
 
 // Inline the collection name constant to avoid a CJS cross-import at runtime.
 // Keep in sync with config/constants.ts COLLECTIONS.TOYYIBPAY_WEBHOOKS.
@@ -60,6 +61,18 @@ async function verifyBillWithToyyib(billCode, { refNo, orderId }, isSandbox) {
     console.warn(`[toyyibpay-callback] billCode=${billCode}: no record matched refno/order_id — using the first record`);
   }
   return picked.record;
+}
+
+// Paid dues record, written to the legacy membership.{year} map and to
+// jciCareer.membershipDuesHistory.{year}, which the member pages read (same as financeService).
+function paidDuesFields(year, { dues, transactionId, paymentDate, purpose }) {
+  const record = { year: Number(year), status: 'paid', amount: dues, dues, transactionId: [transactionId], paymentDate, purpose, toyyibPaymentStatus: '1' };
+  const fields = {};
+  for (const [k, v] of Object.entries(record)) {
+    if (k !== 'year') fields[`membership.${year}.${k}`] = v;
+    fields[`jciCareer.membershipDuesHistory.${year}.${k}`] = v;
+  }
+  return fields;
 }
 
 export default async (req, context) => {
@@ -248,17 +261,17 @@ export default async (req, context) => {
           updatedAt: Timestamp.now(),
         };
         const memberUpdate = {
-          [`membership.${billYear}.status`]: 'paid',
-          [`membership.${billYear}.amount`]: duesAmount,
-          [`membership.${billYear}.dues`]: duesAmount,
-          [`membership.${billYear}.transactionId`]: [yearMatchTx.id],
-          [`membership.${billYear}.paymentDate`]: billPaymentDate || new Date().toISOString(),
-          [`membership.${billYear}.purpose`]: txDescription,
+          ...paidDuesFields(billYear, {
+            dues: duesAmount,
+            transactionId: yearMatchTx.id,
+            paymentDate: billPaymentDate || new Date().toISOString(),
+            purpose: txDescription,
+          }),
           updatedAt: Timestamp.now(),
         };
         // Guest entry fee: mark hasPaidInitiationFee so GuestManagementView can show "Fee Paid".
         // Promotion to Probation still requires explicit board approval via GuestManagementView.
-        if (memberData?.membershipType === 'Guest') {
+        if (isGuestMember(memberData)) {
           memberUpdate['hasPaidInitiationFee'] = true;
           memberUpdate['jciCareer.hasPaidInitiationFee'] = true;
         }
@@ -307,15 +320,22 @@ export default async (req, context) => {
           updatedAt: Timestamp.now(),
           source: 'manual',
         });
-        membershipBatch.update(memberRef, {
-          [`membership.${billYear}.status`]: 'paid',
-          [`membership.${billYear}.amount`]: duesAmount,
-          [`membership.${billYear}.dues`]: duesAmount,
-          [`membership.${billYear}.transactionId`]: [newTxRef.id],
-          [`membership.${billYear}.paymentDate`]: elsePaymentDate,
-          [`membership.${billYear}.purpose`]: txDescription,
+        const newTxMemberUpdate = {
+          ...paidDuesFields(billYear, {
+            dues: duesAmount,
+            transactionId: newTxRef.id,
+            paymentDate: elsePaymentDate,
+            purpose: txDescription,
+          }),
           updatedAt: Timestamp.now(),
-        });
+        };
+        // Guest entry fee (same as the matched-transaction path above); promotion still needs board approval.
+        const guestSnap = await memberRef.get().catch(() => null);
+        if (isGuestMember(guestSnap?.exists ? guestSnap.data() : null)) {
+          newTxMemberUpdate['hasPaidInitiationFee'] = true;
+          newTxMemberUpdate['jciCareer.hasPaidInitiationFee'] = true;
+        }
+        membershipBatch.update(memberRef, newTxMemberUpdate);
         // Sync membership status atomically with the new transaction — both succeed or both fail.
         await membershipBatch.commit();
 
@@ -490,14 +510,13 @@ export default async (req, context) => {
                 });
               }
               // Sync membership status back to pending after refund — reset all payment fields
-              refundBatch.update(db.collection('members').doc(billMemberId), {
-                [`membership.${billYear}.status`]: 'pending',
-                [`membership.${billYear}.amount`]: 0,
-                [`membership.${billYear}.transactionId`]: [],
-                [`membership.${billYear}.paymentDate`]: null,
-                [`membership.${billYear}.purpose`]: null,
-                updatedAt: Timestamp.now(),
-              });
+              const refundFields = { status: 'pending', amount: 0, transactionId: [], paymentDate: null, purpose: null };
+              const refundMemberUpdate = { updatedAt: Timestamp.now() };
+              for (const [k, v] of Object.entries(refundFields)) {
+                refundMemberUpdate[`membership.${billYear}.${k}`] = v;
+                refundMemberUpdate[`jciCareer.membershipDuesHistory.${billYear}.${k}`] = v;
+              }
+              refundBatch.update(db.collection('members').doc(billMemberId), refundMemberUpdate);
               await refundBatch.commit();
             } catch (batchErr) {
               console.error('[toyyibpay-callback] Refund batch failed — dues tx and/or member status may be inconsistent:', batchErr);
