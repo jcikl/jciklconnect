@@ -1266,7 +1266,7 @@
 |---|---|---|---|---|---|
 | `useActivityPlans.ts` | 130 | 1 | `useActivityPlans` | activityPlansService | ⚠️ 無說明 |
 | `useAdvertisements.ts` | 110 | 2 | `useAdvertisements` | advertisementService, errorLoggingService | Advertisements Data Hook |
-| `useAppNavigation.ts` | 237 | 1 | `useAppNavigation` | — | ⚠️ 無說明 |
+| `useAppNavigation.ts` | 239 | 1 | `useAppNavigation` | — | ⚠️ 無說明 |
 | `useAuth.tsx` | 774 | 54 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, membersService, mockData | Authentication Hook |
 | `useAutomation.ts` | 149 | 3 | `useAutomation` | automationService | useAutomation Hook - Manage automation workflows and rules |
 | `useBusinessDirectory.ts` | 48 | 4 | `useBusinessDirectory` | businessDirectoryService | ⚠️ 無說明 |

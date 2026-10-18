@@ -7,6 +7,7 @@
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
+import { resolveReturnUrl, resolveCallbackUrl } from '../lib/siteUrl.mjs';
 
 const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID;
 const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
@@ -196,28 +197,18 @@ export default async (req, context) => {
         // Lock callback URL to our own webhook — never accept from caller.
         // NET-005: Append ?secret=... so the callback handler can verify the request
         // originated from ToyyibPay via a shared-secret we control.
-        const baseCallbackUrl =
-          process.env.TOYYIBPAY_CALLBACK_URL ||
-          'https://app.jcikl.cc/.netlify/functions/toyyibpay-callback';
+        // The site domain comes from Netlify's URL / DEPLOY_PRIME_URL (netlify/lib/siteUrl.mjs);
+        // it used to be hard-coded to app.jcikl.cc, a domain the site no longer serves.
+        const baseCallbackUrl = resolveCallbackUrl();
+        if (!baseCallbackUrl) throw new Error('Cannot determine ToyyibPay callback URL (TOYYIBPAY_CALLBACK_URL / URL not set)');
         const webhookSecret = process.env.TOYYIBPAY_WEBHOOK_SECRET;
         sanitized.billCallbackUrl = webhookSecret
           ? `${baseCallbackUrl}?secret=${encodeURIComponent(webhookSecret)}`
           : baseCallbackUrl;
-        // Restrict return URL to our own domain (SEC-A-010).
-        // localhost is only allowed in non-production environments to prevent payment
-        // gateway callbacks from following http:// redirects in production.
-        const returnUrl = params.billReturnUrl || '';
-        const isProduction = process.env.NODE_ENV === 'production' ||
-          (process.env.URL || '').includes('app.jcikl.cc');
-        const isAllowedReturn =
-          returnUrl.startsWith('https://app.jcikl.cc') ||
-          (!isProduction && (
-            returnUrl.startsWith('http://localhost:3000') ||
-            returnUrl.startsWith('http://localhost:3001')
-          ));
-        sanitized.billReturnUrl = isAllowedReturn
-          ? returnUrl
-          : 'https://app.jcikl.cc/payment/result';
+        // Restrict return URL to our own origins (SEC-A-010); localhost only outside production.
+        const resolvedReturnUrl = resolveReturnUrl(params.billReturnUrl);
+        if (!resolvedReturnUrl) throw new Error('Cannot determine ToyyibPay return URL (URL not set)');
+        sanitized.billReturnUrl = resolvedReturnUrl;
         result = await callToyyib('createBill', sanitized, isSandbox);
         break;
       }

@@ -6,7 +6,7 @@
 
 2026-10-12 更新：新增 R-025 至 R-027。
 
-2026-10-18 更新：第一轮核实（权限与规则）新增 R-028 至 R-040，见文末。
+2026-10-18 更新：第一轮核实（权限与规则）新增 R-028 至 R-042，见文末。
 
 严重级别：P0 严重，P1 高，P2 中，P3 低。
 
@@ -481,3 +481,19 @@
 建议行动：已实现（待部署）`netlify/functions/member-auth.mjs`：导入时为新会员建账号（uid = 会员编号），SUPER_ADMIN 在会员导入窗口用「Fix Auth」先试跑、再执行补建；登录时不再复制资料，改为提示联系管理员。部署后由 SUPER_ADMIN 执行 Fix Auth；上述 2 位需人工处理。注意：本地 `netlify dev` 运行用到 `firebase-admin/auth` 的函数会报错（`jwks-rsa` 4.1 用 require 加载 ES 模块 `jose` 6），现有的 `send-invite` 等也一样；线上是否正常取决于 Netlify 的 Node 版本，部署后先用 Fix Auth 的试跑确认。
 
 结果（2026-10-18）：PR #3 预览版上 `member-auth` 正常加载（无令牌请求返回 401），试跑结果与本地只读脚本一致。随后 SUPER_ADMIN（noreply）在预览版执行 Fix Auth（与正式站共用同一 Firebase），未勾选替换孤儿账号、未发邮件：新建 337 个账号，8 个原已就绪，0 个错误，审计记录 4 条（`auditLog` action `member_auth_fix`）。复核：345 位会员全部有 uid = 会员编号的登录账号。SHANE TEOH、SHIRLEY PANG 原为「需人工处理」，执行时其邮箱下的旧账号已不存在（并非本功能删除：未勾选替换，且代码不删除登录过的账号），因此也被新建；旧账号由用户本人在 Firebase 控制台删除（2026-10-18 确认）。会员尚未设置密码：需用 Google 登录或「忘记密码」。
+
+### R-041 付款流程写死了已停用的域名 app.jcikl.cc（P1）
+
+证据：会员实际使用 `https://jciklconnect.netlify.app`，`app.jcikl.cc` 已无法连接（2026-10-18）。`netlify/functions/toyyibpay-api.mjs` 只接受 `app.jcikl.cc` 开头的付款跳回网址，否则改成 `https://app.jcikl.cc/payment/result`，所以会员付款后被带到打不开的页面；ToyyibPay 回调地址的默认值也是 `app.jcikl.cc`（线上已设 `TOYYIBPAY_CALLBACK_URL`，故未受影响）；判断正式环境用的是「URL 含 app.jcikl.cc」，导致正式站被当成非正式环境、也接受 localhost 跳回网址。另外网页端的跳回路径 `/payment-return` 和后备路径 `/payment/result` 在网站里都没有对应页面。
+
+风险：会员付完款看到错误页面，可能以为付款失败而重复付款。
+
+建议行动 / 进展（2026-10-18，代码已改，待合并部署）：新增 `netlify/lib/siteUrl.mjs`，用 Netlify 自带的 `URL` / `DEPLOY_PRIME_URL` / `CONTEXT` 判断本站网址与正式环境，不新增环境变量；跳回网址只接受本站（含预览版），否则改为「本站/payment-return」；回调默认值改为本站的函数地址；新增 `/payment-return` 页面（访客与已登录会员都能看到，按 `status_id` 显示成功 / 处理中 / 失败，只作提示，付款记录仍以服务端回调为准）。单元测试 11 项通过。其余 10 个函数的 CORS 白名单也只列了 `app.jcikl.cc`，因网页与函数同源暂不影响，另行处理。
+
+### R-042 线上付款函数因缺少 ToyyibPay 密钥无法启动（P0，已解决）
+
+证据：2026-10-18 不带令牌请求正式站 `/.netlify/functions/toyyibpay-api` 返回 502，错误为 `TOYYIBPAY_SECRET_KEY env var not set`（函数启动时检查该变量，缺失即抛错）；PR #3、#4 的预览版相同。错误响应还把服务器内部的调用栈返回给了浏览器。
+
+风险：所有经系统发起的网上缴费（会费、活动报名费）都无法建账单。
+
+处理：用户于同日在 Netlify 补设 `TOYYIBPAY_SECRET_KEY`（沙盒）与 `TOYYIBPAY_SECRET_KEY_PROD`（正式）并重新部署；复测正式站返回 401（函数正常启动，进入身份检查）。注意：缺少 `systemConfig/toyyibpay` 设置时代码默认沙盒模式，正式收款前须确认模式为 Production。后续可考虑：函数启动时缺变量改为按请求返回 500 并记录日志，避免把调用栈返回给浏览器。
