@@ -370,19 +370,6 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
               })
             )}
           </div>
-
-          {/* Add on [date] button */}
-          {!readonly && (
-            <div className="px-4 py-3">
-              <button
-                className="w-full py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-sm font-bold text-slate-600 flex items-center justify-center gap-1.5 transition-colors active:scale-[0.98]"
-                onClick={() => onDateClick?.(selectedDate)}
-              >
-                Add on {selectedDate.toLocaleDateString('en', { day: 'numeric', month: 'short' })}
-                <span className="text-base leading-none font-black ml-0.5">+</span>
-              </button>
-            </div>
-          )}
         </div>
       )}
 
