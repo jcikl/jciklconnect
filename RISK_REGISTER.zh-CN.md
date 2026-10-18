@@ -525,3 +525,11 @@
 风险：即使没有 R-044，经系统也建不出真账单；修好后若照网页端的值转发，付款人可改金额。
 
 处理（分支 `fix/toyyib-create-bill-params`，待合并）：新增 `netlify/lib/toyyibBill.mjs` 的 `buildCreateBillParams`：价格设置固定为 `1`（固定金额）、付款人资料固定为 `1`，付款方式只接受 0/1/2，放行外部参考编号，名称 / 描述按 ToyyibPay 上限截断，回调 / 跳回网址仍只由服务端决定。单元测试 5 项通过。
+
+### R-046 付款通知被静默拒收：字段名不对，核对时又固定查沙盒（P0）
+
+证据（2026-10-19，沙盒 RM1 付款 `4e9xc8va`、`lm6obyw3`、`wn0s7ywr`）：Netlify 日志在付款时段有 `toyyibpay-callback` 请求，但没有任何警告或错误，`toyyibpay_webhooks` 与交易记录始终为空。ToyyibPay 通知里付款编号的字段是 `refno`（另有 `status`、`billcode`、`order_id`、`amount`），处理程序却读 `transaction_id`（那是跳回网址才有的字段），所以每一笔真实通知都以 400「Missing required fields」结束，且不留日志。向 `getBillTransactions` 核对时也只看环境变量 `TOYYIBPAY_SANDBOX` 和沙盒密钥，不理会 `systemConfig/toyyibpay` 的系统模式；并且直接取账单的第一条记录，而不是与本次付款对应的那条。
+
+风险：任何线上付款（会费、活动费、手动账单）都不会自动入账；切到正式模式后，核对会去查沙盒，真实付款会被拒。
+
+处理（分支 `fix/toyyib-callback-refno`，待合并）：`netlify/lib/toyyibCallback.mjs` 兼容两种字段（`refno` / `transaction_id`），按付款编号、再按 order_id 选对应记录；`netlify/lib/toyyibMode.mjs` 集中处理模式、密钥、API 地址，`toyyibpay-api` 与 `toyyibpay-callback` 共用；通知按账单建立时记下的 `isSandbox`（新字段，与 `billExternalReferenceNo` 一起在建账单时写入）选择环境，没有则用系统模式；所有拒收情况都写日志（只记账单编号和原因）。单元测试 10 项通过。

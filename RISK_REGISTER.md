@@ -525,3 +525,11 @@ Evidence (2026-10-19, after fixing R-044, creating a RM1 sandbox bill on product
 Risk: even without R-044 no real bill could be created; forwarding the client's value would have let payers change the amount.
 
 Resolution (branch `fix/toyyib-create-bill-params`, awaiting merge): new `buildCreateBillParams` in `netlify/lib/toyyibBill.mjs` fixes the price setting to `1` (fixed amount) and payer info to `1`, accepts payment channel 0/1/2 only, passes the external reference number, clips name / description to ToyyibPay's limits, and keeps callback / return URLs server-decided. 5 unit tests pass.
+
+### R-046 Payment Callbacks Were Silently Rejected: Wrong Field Name, and Verification Always Used Sandbox (P0)
+
+Evidence (2026-10-19, sandbox RM1 payments `4e9xc8va`, `lm6obyw3`, `wn0s7ywr`): Netlify logs show `toyyibpay-callback` requests at the payment times with no warning or error, yet `toyyibpay_webhooks` and `transactions` stayed empty. ToyyibPay's callback body sends the payment reference as `refno` (`status`, `billcode`, `order_id`, `amount`); the handler read `transaction_id` (a return-URL field), so every real callback ended in a 400 "Missing required fields" with no log line. Verification against `getBillTransactions` also used only the `TOYYIBPAY_SANDBOX` env var and the sandbox key, ignoring the site-wide mode in `systemConfig/toyyibpay`, and took the first record of the bill instead of the one matching the payment.
+
+Risk: no online payment (dues, event fee, manual bill) is ever recorded automatically; in production mode, verification would query the sandbox and reject real payments.
+
+Resolution (branch `fix/toyyib-callback-refno`, awaiting merge): `netlify/lib/toyyibCallback.mjs` parses both shapes (`refno` / `transaction_id`) and picks the record by payment reference, then order_id; `netlify/lib/toyyibMode.mjs` holds mode / key / API-base selection shared by `toyyibpay-api` and `toyyibpay-callback`; the callback uses the bill's stored `isSandbox` (new field written at bill creation, with `billExternalReferenceNo`) or the site-wide mode; every rejection is now logged (bill code and reason only). 10 unit tests pass.

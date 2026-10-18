@@ -268,7 +268,7 @@
 | `projectFinancialService.ts` | 949 | 7 | Project Financial Service Feature: platform-enhancements Provides project-specific financial account management capabilities. Validates: Req… | PROJECTS, PROJECT_TRANSACTIONS, TRANSACTIONS, TRANSACTION_SPLITS |
 | `reconciliationService.ts` | 861 | 0 | Reconciliation Service - Auto-matching & splitting bank transactions with project transactions | TRANSACTIONS, TRANSACTION_SPLITS |
 | `sponsorshipService.ts` | 214 | 3 | ⚠️ 無說明 | SPONSORSHIPS |
-| `toyyibService.ts` | 820 | 10 | ⚠️ 無說明 | TOYYIB_BILLS, TOYYIB_CATEGORIES, TRANSACTIONS |
+| `toyyibService.ts` | 829 | 10 | ⚠️ 無說明 | TOYYIB_BILLS, TOYYIB_CATEGORIES, TRANSACTIONS |
 
 <details><summary><code>services/eventBudgetService.ts</code> — 8 個方法</summary>
 
@@ -434,27 +434,27 @@
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `getMode` | 124 | Returns the current sandbox/production mode from the server (cached 60 s). |
-| `setMode` | 140 | BOARD+ only. Toggle sandbox/production mode — persisted to Firestore via proxy. |
-| `buildPaymentUrl` | 146 | Build the ToyyibPay payment URL using the current server-side mode. |
-| `createBill` | 158 | P0-B (order guarantee): The ToyyibPay API is called FIRST via proxyCall. Only if the API call succeeds does th… |
-| `getCategories` | 261 | ToyyibPay has no "list all categories" endpoint — getCategoryDetails requires a specific code. Category codes … |
-| `createCategory` | 353 |  |
-| `updateCategory` | 388 | Update mutable metadata fields on a category (name, description, link). Note: categoryCode is assigned by Toyy… |
-| `updateCategoryLink` | 398 |  |
-| `deleteCategory` | 409 |  |
-| `importCategory` | 431 | Re-link an existing ToyyibPay category by code (fetch live details, then save to Firestore) |
-| `getCategoryDetails` | 446 |  |
-| `getBills` | 451 |  |
-| `findExistingActiveBill` | 465 | Check whether an active (non-failed) bill already exists for this member + category. Used to prevent duplicate… |
-| `syncBillStatus` | 494 | Fetch the latest payment status from ToyyibPay for a single bill and persist to Firestore. Returns the updated… |
-| `formatMembershipBillDescription` | 557 | ── Bill description formatters ─────────────────────────────────────────────── |
-| `formatEventBillDescription` | 570 |  |
-| `getOrCreateMembershipCategory` | 588 | Return the categoryCode for the given membership year's ToyyibPay category, creating it on first use. |
-| `getOrCreateProjectCategory` | 679 | Return the categoryCode for the given project's ToyyibPay category, creating it on first use. |
-| `getSettlements` | 758 |  |
-| `parseCallback` | 772 | Parse the callback data from ToyyibPay Usually parameters are sent as POST: status_id, billcode, order_id, msg… |
-| `commitWebhookRollback` | 797 | P1 FIX: Atomic rollback path for payment reversals (billpaymentStatus='3'). Previously the webhook handler wro… |
+| `getMode` | 127 | Returns the current sandbox/production mode from the server (cached 60 s). |
+| `setMode` | 143 | BOARD+ only. Toggle sandbox/production mode — persisted to Firestore via proxy. |
+| `buildPaymentUrl` | 150 | Build the ToyyibPay payment URL using the current server-side mode. |
+| `createBill` | 162 | P0-B (order guarantee): The ToyyibPay API is called FIRST via proxyCall. Only if the API call succeeds does th… |
+| `getCategories` | 270 | ToyyibPay has no "list all categories" endpoint — getCategoryDetails requires a specific code. Category codes … |
+| `createCategory` | 362 |  |
+| `updateCategory` | 397 | Update mutable metadata fields on a category (name, description, link). Note: categoryCode is assigned by Toyy… |
+| `updateCategoryLink` | 407 |  |
+| `deleteCategory` | 418 |  |
+| `importCategory` | 440 | Re-link an existing ToyyibPay category by code (fetch live details, then save to Firestore) |
+| `getCategoryDetails` | 455 |  |
+| `getBills` | 460 |  |
+| `findExistingActiveBill` | 474 | Check whether an active (non-failed) bill already exists for this member + category. Used to prevent duplicate… |
+| `syncBillStatus` | 503 | Fetch the latest payment status from ToyyibPay for a single bill and persist to Firestore. Returns the updated… |
+| `formatMembershipBillDescription` | 566 | ── Bill description formatters ─────────────────────────────────────────────── |
+| `formatEventBillDescription` | 579 |  |
+| `getOrCreateMembershipCategory` | 597 | Return the categoryCode for the given membership year's ToyyibPay category, creating it on first use. |
+| `getOrCreateProjectCategory` | 688 | Return the categoryCode for the given project's ToyyibPay category, creating it on first use. |
+| `getSettlements` | 767 |  |
+| `parseCallback` | 781 | Parse the callback data from ToyyibPay Usually parameters are sent as POST: status_id, billcode, order_id, msg… |
+| `commitWebhookRollback` | 806 | P1 FIX: Atomic rollback path for payment reversals (billpaymentStatus='3'). Previously the webhook handler wro… |
 
 </details>
 
@@ -1298,7 +1298,7 @@
 | `useSponsorships.ts` | 74 | 1 | `useSponsorships` | sponsorshipService | Sponsorships Data Hook |
 | `useSurveys.ts` | 105 | 1 | `useSurveys` | surveysService | ⚠️ 無說明 |
 | `useTemplates.ts` | 175 | 2 | `useTemplates` | templatesService | Templates Data Hook |
-| `useToyyibMode.ts` | 26 | 2 | `useToyyibMode` | toyyibService | ⚠️ 無說明 |
+| `useToyyibMode.ts` | 34 | 2 | `useToyyibMode` | toyyibService | ⚠️ 無說明 |
 | `useToyyibPay.ts` | 98 | 1 | `useToyyibCategories`, `useToyyibBills`, `useCreateBill` | toyyibService | ⚠️ 無說明 |
 | `useToyyibPayment.ts` | 166 | 1 | `useToyyibPayment` | membershipConfigService, toyyibService | ⚠️ 無說明 |
 | `useWebhooks.ts` | 113 | 1 | `useWebhooks` | webhookService | Webhook Management Hook |
@@ -1370,7 +1370,7 @@
 | `getStartOfYear` | 163 |  |
 | `getEndOfYear` | 170 |  |
 
-### `utils/devMode.ts` （36 行，68 處引用）
+### `utils/devMode.ts` （36 行，69 處引用）
 > Developer Mode Utility This utility helps services detect if the app is running in developer mode and return mock data instead of accessing …
 
 | 函數 | 行 | 說明 |

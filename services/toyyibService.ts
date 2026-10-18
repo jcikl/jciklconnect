@@ -90,6 +90,8 @@ export interface ToyyibBillRecord {
   refundTransactionId?: string;
   /** Timestamp written by the webhook when a payment reversal (status=3) is processed. */
   refundedAt?: any;
+  /** ToyyibPay environment the bill was created in (read by the payment callback). */
+  isSandbox?: boolean;
   updatedAt?: any;
 }
 
@@ -210,9 +212,12 @@ export class ToyyibService {
         // BIZ-004: dedicated year field so the webhook can extract billYear even when
         // billName doesn't start with "YYYY " (e.g. "JCI KL Membership 2026").
         year: params.membershipYear ?? new Date().getFullYear(),
+        // The payment callback verifies against the same environment the bill was created in.
+        isSandbox: (await ToyyibService.getMode()).isSandbox,
         createdAt: serverTimestamp(),
       };
       if (params.memberId) billRecord.memberId = params.memberId;
+      if (params.externalReferenceNo) billRecord.billExternalReferenceNo = params.externalReferenceNo;
       if (params.projectId) billRecord.projectId = params.projectId;
       // P1-fix: write bill record + increment category billCount atomically via writeBatch
       const usedCategoryCode = params.categoryCode || TOYYIB_CONFIG.CATEGORY_CODE;
