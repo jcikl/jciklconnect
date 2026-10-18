@@ -452,6 +452,8 @@
 
 建议行动：盘点哪些自动功能是业务真正需要的；决定是开启计费并部署，还是把需要的功能迁到 Netlify（与 R-006 一起决定）；把未部署的函数从文档中标注清楚，不再当作线上能力。
 
+进展（2026-10-18）：用户决定迁到 Netlify、不开计费。已完成（代码已改，待部署）：生日推送修复（见 R-033）；新增 `netlify/functions/annual-dues-reminders.mjs`，取代 `sendAnnualDuesReminders`，每年 1 月 1 日 10:00（马来西亚时间）运行，同一年重复运行不会重复提醒，也不会让已处理的 WhatsApp 横幅重新出现。会费记录改读 `jciCareer.membershipDuesHistory`，兼容旧的 `membership`。待做：签到积分（R-039）、标记 `functions/` 停用。
+
 ### R-039 会员活动签到拿不到个人积分（P1）
 
 证据：`services/eventsService.ts:765–768` 删掉了签到时发积分的调用，注释说改由 Cloud Function `onEventRegistrationUpdate` 发放；但这个函数从未被 `functions/src/index.ts` 导入，所以即使开通计费也不会部署，而且它本身也不写 `points`。

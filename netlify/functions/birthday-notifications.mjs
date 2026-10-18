@@ -1,10 +1,5 @@
 import { db, messaging, hasAdminCredentials, getMemberFcmToken } from '../lib/firebaseAdmin.mjs';
-
-// Current member docs have no top-level `status`; eligibility comes from role (GUEST is unvetted,
-// INACTIVE is excluded). A legacy `status: 'inactive'` on imported docs still excludes the member.
-const RECIPIENT_ROLES = ['MEMBER', 'BOARD', 'ADMIN', 'SUPER_ADMIN'];
-const isEligible = (m) =>
-  RECIPIENT_ROLES.includes(m.role) && !m.deletedAt && String(m.status ?? '').toLowerCase() !== 'inactive';
+import { isActiveRecipient as isEligible } from '../lib/members.mjs';
 
 async function sendFcmPush(memberId, title, body, type, extraData = {}) {
   await db.collection('notifications').add({

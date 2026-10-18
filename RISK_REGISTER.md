@@ -452,6 +452,8 @@ Risk: Automations that depend on them fail silently, such as the October dues re
 
 Recommended action: list which automations the chapter actually needs; decide between enabling billing and deploying, or moving the needed ones to Netlify (decide with R-006); mark undeployed functions clearly in the docs so they are no longer treated as live features.
 
+Progress (2026-10-18): the owner chose Netlify over enabling billing. Done (code changed, not deployed): birthday push fix (see R-033); new `netlify/functions/annual-dues-reminders.mjs` replaces `sendAnnualDuesReminders`, running Jan 1 at 10:00 Malaysia time; re-runs in the same year neither duplicate reminders nor re-open a WhatsApp banner the admin already dismissed. Dues records are read from `jciCareer.membershipDuesHistory`, falling back to the legacy `membership`. Remaining: check-in points (R-039) and marking `functions/` deprecated.
+
 ### R-039 Event Check-In Awards No Personal Points (P1)
 
 Evidence: `services/eventsService.ts:765–768` removed the points call at check-in, saying the Cloud Function `onEventRegistrationUpdate` handles it; that function is never imported by `functions/src/index.ts`, so it would not deploy even with billing on, and it does not write `points` anyway.

@@ -341,7 +341,7 @@ export async function getMembershipPurpose(amount: number, year: number): Promis
   return resolveMembershipPurpose(amount, year, rules);
 }
 
-// ─── WhatsApp campaign flag (written by Jan 1 Cloud Function) ─────────────────
+// ─── WhatsApp campaign flag (written by Jan 1 Netlify function annual-dues-reminders) ─
 
 const WA_CAMPAIGN_DOC = doc(db, COLLECTIONS.SYSTEM_SETTINGS, 'pendingWhatsAppCampaign');
 
