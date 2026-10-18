@@ -6,7 +6,7 @@
 
 2026-10-12 更新：新增 R-025 至 R-027。
 
-2026-10-18 更新：第一轮核实（权限与规则）新增 R-028 至 R-039，见文末。
+2026-10-18 更新：第一轮核实（权限与规则）新增 R-028 至 R-040，见文末。
 
 严重级别：P0 严重，P1 高，P2 中，P3 低。
 
@@ -471,3 +471,11 @@
 线上实测（2026-10-18，本机开发版连接正式 Firebase，经用户授权，用 PETER YU / BOARD 账号）：在活动「2026 JCI Malaysia National Convention」签到 → 报名状态变为 checked_in、进入出席名单、积分 507 → 517，生成 `points/{memberId}_{eventId}_attendance`（+10）；撤销签到 → 状态回到 registered、移出出席名单、积分回到 507、`pointsReversed: true`。同一测试中证实 SUPER_ADMIN（非当届理事）给他人签到、代报名、取消报名都被规则拒绝，即 R-034 在线上真实存在。
 
 2026-10-18 部署 R-034 规则后复测（noreply / SUPER_ADMIN）：只读探测确认新规则已生效；给 PETER YU 签到成功（507 → 517）。撤销时发现既有 bug：`undoAttendance` 调用 `awardPoints` 扣分时没有传 `awardedBy`，积分服务的跨会员防护拒绝了扣分，而 `pointsReversed` 已经先被设为 true，结果分数没扣回、以后也不会重试（此前签到不加分，所以从未暴露）。已修：传入当前用户作为 `awardedBy`；扣分失败时把 `pointsReversed` 改回 false 并记录错误。新增 2 个单元测试；修复后复测撤销成功（517 → 507，扣分记录注明授权人）。三次测试的积分、通知和标记都已清理，PETER YU 恢复 507 分。
+
+### R-040 大多数会员没有可用的登录账号（P0）
+
+证据：导入的会员资料编号是随机生成的（`services/membersService.ts:609`），邀请函数建的登录账号也是随机 uid（`netlify/functions/send-invite.mjs:89`、`auto-invite.mjs:90`），首次登录时 `hooks/useAuth.tsx` 把资料复制到新 uid，但 `firestore.rules` 只允许自建 GUEST 资料，复制被拒。2026-10-18 用管理员凭证对线上做只读试跑：345 位会员中只有 8 位的登录账号 uid 等于会员编号；335 位没有登录账号；2 位（SHANE TEOH、SHIRLEY PANG）的邮箱有登录过的账号，但没有关联到会员资料。
+
+风险：绝大多数会员无法登录使用系统。
+
+建议行动：已实现（待部署）`netlify/functions/member-auth.mjs`：导入时为新会员建账号（uid = 会员编号），SUPER_ADMIN 在会员导入窗口用「Fix Auth」先试跑、再执行补建；登录时不再复制资料，改为提示联系管理员。部署后由 SUPER_ADMIN 执行 Fix Auth；上述 2 位需人工处理。注意：本地 `netlify dev` 运行用到 `firebase-admin/auth` 的函数会报错（`jwks-rsa` 4.1 用 require 加载 ES 模块 `jose` 6），现有的 `send-invite` 等也一样；线上是否正常取决于 Netlify 的 Node 版本，部署后先用 Fix Auth 的试跑确认。

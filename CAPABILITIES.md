@@ -17,8 +17,8 @@
 
 | 層 | 檔案數 | 位置 |
 |---|---|---|
-| Service（業務邏輯與資料存取） | 67 | `services/` |
-| Hook（React 資料綁定） | 38 | `hooks/` |
+| Service（業務邏輯與資料存取） | 68 | `services/` |
+| Hook（React 資料綁定） | 39 | `hooks/` |
 | Util（純函數工具） | 16 | `utils/` |
 | UI 元件（通用） | 33 | `components/ui/` |
 | 共用業務元件 | 9 | `components/shared/` |
@@ -89,6 +89,7 @@
 |---|---|---|---|---|
 | `engagementAutoSuggestService.ts` | 380 | 1 | ⚠️ 無說明 | REGISTRATION_HISTORY |
 | `learningPathsService.ts` | 340 | 2 | Learning Paths & Learning Progress Service Fixes applied: P1 – startLearningPath uses runTransaction to prevent duplicate progress records P… | LEARNING_PATHS, LEARNING_PROGRESS |
+| `memberAuthService.ts` | 91 | 2 | 会员登录账号（Firebase Auth）的建立与补建；调用 Netlify 函数 member-auth（uid = 会员文档 ID）。 | — |
 | `memberBenefitsService.ts` | 329 | 1 | Member Benefits Service Handles the memberBenefits collection and benefitUsage write path. Read path for advertisements-as-benefits lives in… | ADVERTISEMENTS, BENEFIT_USAGE, MEMBER_BENEFITS |
 | `memberJourneyService.ts` | 170 | 2 | Leadership Journey + Trainer Pathway derivation (dashboard journey card for pre-2025 members) | — |
 | `memberStatsService.ts` | 318 | 2 | Member Statistics Service - Generates comprehensive member statistics and reports | — |
@@ -118,6 +119,15 @@
 | `deleteLearningPath` | 204 | P1 fix: cascade-delete all learningProgress records and soft-delete all certificates for this path before dele… |
 | `startLearningPath` | 237 | P1 fix: use a deterministic doc ID (memberId_pathId) so startLearningPath can use tx.get() on a single documen… |
 | `updateProgress` | 272 | P1 fix: when completion reaches 100% and a certificate is due, both the progress update and the certificate cr… |
+
+</details>
+
+<details><summary><code>services/memberAuthService.ts</code> — 2 個方法</summary>
+
+| 方法 | 行 | 說明 |
+|---|---|---|
+| `createForMembers` | 54 | After a batch import: create Auth accounts for newly created member ids (ADMIN+). |
+| `fixAll` | 70 | SUPER_ADMIN back-fill over all member profiles, page by page. |
 
 </details>
 
@@ -455,7 +465,7 @@
 | `activityPlansService.ts` | 621 | 2 | Activity Plans Service - CRUD Operations P0 fix: all methods now query COLLECTIONS.ACTIVITY_PLANS (was COLLECTIONS.PROJECTS) P1 fixes: isDev… | ACTIVITY_PLANS, PROJECTS |
 | `eventFeedbackService.ts` | 226 | 3 | Event Feedback Service - Collects and manages event feedback | EVENT_FEEDBACK |
 | `eventRegistrationService.ts` | 391 | 8 | Event Registration Service - 报名/缴费/签到统一名单（Story 8.1） | EVENT_REGISTRATIONS, PROJECTS |
-| `eventsService.ts` | 1,037 | 14 | Events Service - CRUD Operations | EVENT_BUDGETS, EVENT_FEEDBACK, EVENT_REGISTRATIONS, GUEST_REGISTRATIONS, NOTIFICATIONS, POINTS … |
+| `eventsService.ts` | 1,054 | 14 | Events Service - CRUD Operations | EVENT_BUDGETS, EVENT_FEEDBACK, EVENT_REGISTRATIONS, GUEST_REGISTRATIONS, NOTIFICATIONS, POINTS … |
 | `flagshipProjectsService.ts` | 156 | 3 | ⚠️ 無說明 | FLAGSHIP_PROJECTS |
 | `projectReportService.ts` | 775 | 3 | Project Report Service - Generates automated project reports | TEMPLATES |
 | `projectsService.ts` | 816 | 22 | Projects Service - CRUD Operations | ACTIVITY_PLANS, MEMBERS, POINTS, PROJECTS, PROJECT_REPORTS, PROJECT_TRANSACTIONS … |
@@ -512,12 +522,12 @@
 | `completeEvent` | 516 | P1-A: Mark an event as Completed (no existing method existed) |
 | `cancelEvent` | 550 | Cancel entire event — batch-cancels all active registrations and their income transactions |
 | `markAttendance` | 719 | Mark attendance (check-in) P0 guard: only BOARD+ or ADMIN callers should mark attendance; MEMBER/GUEST are blo… |
-| `undoAttendance` | 783 | Undo attendance (un-check-in) — FIX E3 P0 guard: only BOARD+ or ADMIN callers should undo attendance. |
-| `getUpcomingEvents` | 877 | Get upcoming events (approved, date >= now) |
-| `getEventsByType` | 892 | Get events by type |
-| `registerGuestForEvent` | 909 | Register a guest for an event. Uses runTransaction to atomically prevent duplicate registrations — reads first… |
-| `getGuestRegistrations` | 975 | Fetch all guest registrations for an event. Exposes a service-layer method so components don't query Firestore… |
-| `cancelGuestRegistration` | 1009 | Cancel a guest registration. P1 FIX: also updates the phone-index sentinel doc so the phone number is freed fo… |
+| `undoAttendance` | 789 | Undo attendance (un-check-in) — FIX E3 P0 guard: only BOARD+ or ADMIN callers should undo attendance. |
+| `getUpcomingEvents` | 894 | Get upcoming events (approved, date >= now) |
+| `getEventsByType` | 909 | Get events by type |
+| `registerGuestForEvent` | 926 | Register a guest for an event. Uses runTransaction to atomically prevent duplicate registrations — reads first… |
+| `getGuestRegistrations` | 992 | Fetch all guest registrations for an event. Exposes a service-layer method so components don't query Firestore… |
+| `cancelGuestRegistration` | 1026 | Cancel a guest registration. P1 FIX: also updates the phone-index sentinel doc so the phone number is freed fo… |
 
 </details>
 
@@ -1100,7 +1110,7 @@
 | `cacheService.ts` | 314 | 32 | 缓存服务 - 提供内存缓存和本地存储缓存功能 Cache Service - Provides in-memory and localStorage caching capabilities | — |
 | `cloudinaryService.ts` | 327 | 13 | Cloudinary Upload Service | — |
 | `dataImportExportService.ts` | 892 | 3 | ⚠️ 無說明 | EVENTS, MEMBERS, MEMBER_EMAILS |
-| `errorLoggingService.ts` | 354 | 65 | ⚠️ 無說明 | ERROR_LOGS |
+| `errorLoggingService.ts` | 354 | 66 | ⚠️ 無說明 | ERROR_LOGS |
 | `firestoreLogger.ts` | 197 | 3 | System Logger — Firestore ops + Performance monitoring Fire-and-forget buffered logger. Buffers events for 3 seconds then writes one batched… | SYSTEM_LOGS |
 | `inventoryService.ts` | 1,638 | 3 | Inventory Service - CRUD Operations | INVENTORY, INVENTORY_ALERTS, MAINTENANCE_SCHEDULES, STOCK_MOVEMENTS, TRANSACTIONS |
 | `mockData.ts` | 689 | 17 | ⚠️ 無說明 | — |
@@ -1257,7 +1267,7 @@
 | `useActivityPlans.ts` | 130 | 1 | `useActivityPlans` | activityPlansService | ⚠️ 無說明 |
 | `useAdvertisements.ts` | 110 | 2 | `useAdvertisements` | advertisementService, errorLoggingService | Advertisements Data Hook |
 | `useAppNavigation.ts` | 237 | 1 | `useAppNavigation` | — | ⚠️ 無說明 |
-| `useAuth.tsx` | 780 | 54 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, membersService, mockData | Authentication Hook |
+| `useAuth.tsx` | 774 | 54 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, membersService, mockData | Authentication Hook |
 | `useAutomation.ts` | 149 | 3 | `useAutomation` | automationService | useAutomation Hook - Manage automation workflows and rules |
 | `useBusinessDirectory.ts` | 48 | 4 | `useBusinessDirectory` | businessDirectoryService | ⚠️ 無說明 |
 | `useCommunication.ts` | 118 | 2 | `useCommunication` | communicationService | Communication Data Hook |
@@ -1271,12 +1281,13 @@
 | `useInventory.ts` | 232 | 2 | `useInventory` | inventoryService | Inventory Data Hook |
 | `useKnowledge.ts` | 68 | 1 | `useKnowledge` | knowledgeService | ⚠️ 無說明 |
 | `useLearningPaths.ts` | 83 | 1 | `useLearningPaths` | learningPathsService | Learning Paths Data Hook |
+| `useMemberAuth.ts` | 36 | 2 | `useMemberAuth` | memberAuthService | 会员登录账号：导入后自动建立（ADMIN+），以及 Fix Auth 试跑 / 执行补建（仅 SUPER_ADMIN）。 |
 | `useMemberBenefits.ts` | 102 | 0 | `useMemberBenefits` | memberBenefitsService | Member Benefits Data Hook Wraps MemberBenefitsService with React state (loading / error / data). |
 | `useMemberMutations.ts` | 107 | 0 | `useMemberMutations` | membersService | ⚠️ 無說明 |
 | `useMemberSearch.ts` | 53 | 1 | `useMemberSearch` | — | ⚠️ 無說明 |
 | `useMembers.ts` | 188 | 21 | `useMembers`, `usePaginatedMembers` | membersService | Members Data Hook |
 | `useNotifications.ts` | 107 | 0 | `useNotifications` | communicationService, errorLoggingService, mockData | ⚠️ 無說明 |
-| `usePermissions.ts` | 199 | 25 | `usePermissions` | — | Permission Management Hook |
+| `usePermissions.ts` | 199 | 26 | `usePermissions` | — | Permission Management Hook |
 | `usePoints.ts` | 59 | 2 | `usePoints` | pointsService | Points Data Hook |
 | `useProjects.ts` | 169 | 8 | `useProjects` | projectsService | Projects Data Hook |
 | `usePushNotifications.ts` | 63 | 1 | `usePushNotifications` | — | ⚠️ 無說明 |
@@ -1359,7 +1370,7 @@
 | `getStartOfYear` | 163 |  |
 | `getEndOfYear` | 170 |  |
 
-### `utils/devMode.ts` （36 行，67 處引用）
+### `utils/devMode.ts` （36 行，68 處引用）
 > Developer Mode Utility This utility helps services detect if the app is running in developer mode and return mock data instead of accessing …
 
 | 函數 | 行 | 說明 |
@@ -1457,15 +1468,15 @@
 | `Card.tsx` | 77 | 1 | `Card`, `StatCardsContainer` |
 | `ColumnFilterHeader.tsx` | 118 | 2 | `ColumnFilterHeader` |
 | `Combobox.tsx` | 255 | 11 | `Combobox` |
-| `Common.tsx` | 26 | 228 | — |
-| `ConfirmDialog.tsx` | 100 | 1 | `ConfirmDialog`, `CONFIRM_CLOSED` |
+| `Common.tsx` | 26 | 230 | — |
+| `ConfirmDialog.tsx` | 100 | 2 | `ConfirmDialog`, `CONFIRM_CLOSED` |
 | `DataTable.tsx` | 172 | 0 | `DataTable` |
 | `Drawer.tsx` | 139 | 2 | `Drawer` |
 | `EmptyState.tsx` | 36 | 2 | `EmptyState` |
 | `ErrorBoundary.tsx` | 261 | 3 | `ErrorFallback`, `SectionErrorFallback`, `ErrorBoundary`, `AsyncErrorBoundary`, `withErrorBoundary`, `useErrorHandler` |
 | `FilterDrawer.tsx` | 65 | 1 | `FilterDrawer` |
 | `FirstUseBanner.tsx` | 82 | 2 | `FirstUseBanner` |
-| `Form.tsx` | 502 | 95 | `Input`, `Select`, `Textarea`, `Checkbox`, `RadioGroup`, `ButtonGroup` |
+| `Form.tsx` | 502 | 96 | `Input`, `Select`, `Textarea`, `Checkbox`, `RadioGroup`, `ButtonGroup` |
 | `IntroducerSelector.tsx` | 338 | 6 | `IntroducerSelector` |
 | `LedgerTable.tsx` | 183 | 1 | `LedgerTable` |
 | `Loading.tsx` | 47 | 31 | `LoadingSpinner`, `LoadingOverlay` |

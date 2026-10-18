@@ -6,7 +6,7 @@ Updated 2026-10-12: R-018 to R-024 added from the `CAPABILITIES.md` scan (commit
 
 Updated 2026-10-12: R-025 to R-027 added.
 
-Updated 2026-10-18: R-028 to R-039 added from verification round 1 (permissions and rules); see the end of this file.
+Updated 2026-10-18: R-028 to R-040 added from verification round 1 (permissions and rules); see the end of this file.
 
 Severity scale: P0 critical, P1 high, P2 medium, P3 low.
 
@@ -471,3 +471,11 @@ Progress (2026-10-18, code changed, not deployed): `EventsService.markAttendance
 Live test (2026-10-18, local dev build against production Firebase, with the owner's permission, as PETER YU / BOARD): checking in on "2026 JCI Malaysia National Convention" set the registration to checked_in, added him to the attendance list, raised points 507 → 517 and created `points/{memberId}_{eventId}_attendance` (+10); undo restored registered status, removed him from the list, returned points to 507 and set `pointsReversed: true`. The same session confirmed that a SUPER_ADMIN who is not on the current board is denied check-in, register-on-behalf and cancel for others, i.e. R-034 is live in production.
 
 Retest after deploying the R-034 rules (noreply / SUPER_ADMIN): read-only probes confirmed the new rules are live; checking in PETER YU succeeded (507 → 517). Undo exposed an existing bug: `undoAttendance` called `awardPoints` without `awardedBy`, so the cross-member guard rejected the reversal after `pointsReversed` had already been set to true, leaving the points in place with no retry (never visible before because check-in awarded nothing). Fixed: pass the current user as `awardedBy`; on reversal failure, reset `pointsReversed` to false and log. Added 2 unit tests; retest after the fix reversed correctly (517 → 507, reversal records the authoriser). Points, notifications and flags from all three tests were cleaned up; PETER YU is back at 507.
+
+### R-040 Most Members Have No Working Login Account (P0)
+
+Evidence: imported member profiles get random doc ids (`services/membersService.ts:609`) and the invite functions create Auth users with random uids (`netlify/functions/send-invite.mjs:89`, `auto-invite.mjs:90`); on first login `hooks/useAuth.tsx` copied the profile to the new uid, which `firestore.rules` rejects (self-create must be GUEST). A read-only production dry run on 2026-10-18 found 8 of 345 members whose login uid equals their member id, 335 with no login account, and 2 (SHANE TEOH, SHIRLEY PANG) whose email has a used account that is not linked to their profile.
+
+Risk: most members cannot sign in.
+
+Recommended action: implemented (not deployed) `netlify/functions/member-auth.mjs`: accounts created at import time with uid = member id, and a SUPER_ADMIN "Fix Auth" panel in the member import drawer (dry run, then run); login no longer copies profiles and asks the user to contact an admin instead. After deploy, a SUPER_ADMIN runs Fix Auth; the 2 members above need manual handling. Note: under local `netlify dev`, functions that import `firebase-admin/auth` fail (`jwks-rsa` 4.1 `require()`s the ESM-only `jose` 6), existing `send-invite` included; whether production works depends on Netlify's Node version, so confirm with a Fix Auth dry run after deploy.

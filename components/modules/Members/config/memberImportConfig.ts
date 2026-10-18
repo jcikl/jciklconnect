@@ -443,7 +443,9 @@ export const memberImportConfig: BatchImportConfig = {
         badges: []
       } as Parameters<typeof MembersService.createMember>[0];
       
-      await MembersService.createMember(payload);
+      const newMemberId = await MembersService.createMember(payload);
+      // Collected so MemberBatchImportModal can create the login accounts (uid = member id) afterwards.
+      if (Array.isArray(context?.createdMemberIds)) context.createdMemberIds.push(newMemberId);
     }
   },
 

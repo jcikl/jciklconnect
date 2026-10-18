@@ -146,33 +146,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             // 1. Try UID lookup first
             const memberDoc = await getDoc(doc(db, COLLECTIONS.MEMBERS, firebaseUser.uid));
             let memberData: Member | null = null;
+            // Set when a profile exists for this email but under another id (an unlinked login account).
+            let unlinkedProfileId: string | null = null;
 
             if (memberDoc.exists()) {
               memberData = { id: firebaseUser.uid, ...memberDoc.data() } as Member;
             } else if (firebaseUser.email) {
-              // 2. Try Email lookup if UID failed (for newly linked accounts or imported members)
+              // 2. Login accounts are created with uid = member id (netlify/functions/member-auth).
+              // A profile found only by email means this account is not linked to it. Copying the
+              // profile here is rejected by firestore.rules and would orphan records keyed by the
+              // old id, so an admin links it instead (SUPER_ADMIN: Members → Import → Fix Auth).
               const existingProfile = await MembersService.getMemberByEmail(firebaseUser.email);
-
-              if (existingProfile) {
-                // Link the profile to the new UID
-                const { id: oldId, ...data } = existingProfile;
-                const newMemberData = { ...data, updatedAt: new Date().toISOString() };
-
-                // Copy to new ID (UID)
-                await setDoc(doc(db, COLLECTIONS.MEMBERS, firebaseUser.uid), newMemberData);
-
-                // If the old record had a different ID (imported ID), clean it up
-                if (oldId !== firebaseUser.uid) {
-                  try {
-                    const { deleteDoc } = await import('firebase/firestore');
-                    await deleteDoc(doc(db, COLLECTIONS.MEMBERS, oldId));
-                  } catch (err) {
-                    errorLoggingService.logError(err, { action: 'auth-cleanup-old-profile', oldId });
-                  }
-                }
-
-                memberData = { id: firebaseUser.uid, ...newMemberData } as Member;
-              }
+              if (existingProfile) unlinkedProfileId = existingProfile.id;
             }
 
             if (memberData && isMounted && !checkDevMode()) {
@@ -205,6 +190,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                   errorLoggingService.logError(err, { action: 'auth-member-snapshot', uid: firebaseUser.uid });
                 }
               );
+            } else if (!memberData && unlinkedProfileId && isMounted && !checkDevMode() && !isMidSignUp) {
+              // Keep the Auth account (it belongs to a real member) and ask for an admin to link it.
+              errorLoggingService.logError(new Error('Login account is not linked to its member profile'), {
+                action: 'auth-unlinked-profile', uid: firebaseUser.uid, additionalData: { profileId: unlinkedProfileId },
+              });
+              await firebaseSignOut(auth);
+              setUser(null);
+              setMember(null);
+              setAuthError('此登录账号尚未关联会员资料，请联系管理员处理（Super Admin 可在会员导入窗口用 Fix Auth 修复）。');
             } else if (!memberData && isMounted && !checkDevMode()) {
               // Still no member record — sign out, unless we're mid-signup (doc not written yet)
               if (!isMidSignUp) {
