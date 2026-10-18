@@ -507,3 +507,5 @@ Evidence (2026-10-19):
 Risk: online payments are never recorded even when paid, and production collection cannot be enabled.
 
 Resolution: the owner adds `TOYYIBPAY_WEBHOOK_SECRET` in Netlify (Functions scope; Production + Deploy Previews) and redeploys; GET should then return 405. Code fix (branch `fix/toyyib-mode-switch`, awaiting merge): the client sends a real boolean, the proxy accepts a boolean or "true"/"false" and refuses Production when the production key is missing, and `useToyyibMode` gains `refresh()` so the badge updates after a switch.
+
+Added the same day: `public/_redirects` held only `/* /index.html 200`, and Netlify applies that file before `netlify.toml`, so the `/api/webhooks/zoom`, `/api/webhooks/toyyibpay` and `/api/toyyibpay` rewrites in `netlify.toml` never took effect; GET `/api/webhooks/toyyibpay` returned index.html (200). ToyyibPay in production uses `TOYYIBPAY_CALLBACK_URL` (the direct function URL), so it was unaffected; if Zoom is configured with `/api/webhooks/zoom`, its notifications never arrived. Fix: list the three rewrites ahead of the catch-all in `public/_redirects` (same branch).

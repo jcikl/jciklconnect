@@ -507,3 +507,5 @@
 风险：网上缴费即使付款成功也不会入账；无法切换到正式收款。
 
 处理：用户在 Netlify 补设 `TOYYIBPAY_WEBHOOK_SECRET`（Functions 作用域，Production + Deploy Previews）并重新部署，补好后 GET 应返回 405。代码修复（分支 `fix/toyyib-mode-switch`，待合并）：网页端发送真正的 boolean，服务端兼容 boolean 与 "true"/"false"，切到 Production 前检查正式密钥已配置；`useToyyibMode` 增加 `refresh()`，切换后重新读取模式。
+
+同日追加：`public/_redirects` 只有一条 `/* /index.html 200`，而 Netlify 先执行该文件再执行 `netlify.toml`，所以 `netlify.toml` 里的 `/api/webhooks/zoom`、`/api/webhooks/toyyibpay`、`/api/toyyibpay` 三条接口转址从未生效，GET `/api/webhooks/toyyibpay` 返回首页 HTML（200）。ToyyibPay 线上用 `TOYYIBPAY_CALLBACK_URL`（函数直连地址）不受影响；Zoom 若在 Zoom 后台填的是 `/api/webhooks/zoom`，则通知一直未送达。修复：在 `public/_redirects` 的通配规则之前加入这三条转址（同一分支）。
