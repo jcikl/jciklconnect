@@ -902,14 +902,19 @@ service cloud.firestore {
                        (resource.data.openToExternals == true && resource.data.status == 'Active')));
       allow create, delete: if isBoard() || isAdmin();
       // Submitting a response (SurveysService.submitResponse) bumps responsesCount by exactly 1 in the same
-      // transaction: anyone who may read this survey may do that, and change nothing else but updatedAt.
+      // transaction: anyone who may read this survey may do that, and change nothing else but updatedAt —
+      // only while the survey is Active and only together with the caller's own new response
+      // (id {surveyId}_{uid}, created in this same write: absent before, present after).
       allow update: if isBoard() || isAdmin() ||
                       ((isInternalUser() ||
                         (isActiveExternal() &&
                          (request.auth.uid in resource.data.get('specificMemberIds', []) ||
                           (resource.data.get('openToExternals', false) == true && resource.data.get('status', '') == 'Active')))) &&
+                       resource.data.get('status', '') == 'Active' &&
                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['responsesCount', 'updatedAt']) &&
-                       request.resource.data.responsesCount == resource.data.get('responsesCount', 0) + 1);
+                       request.resource.data.responsesCount == resource.data.get('responsesCount', 0) + 1 &&
+                       !exists(/databases/$(database)/documents/surveyResponses/$(surveyId + '_' + request.auth.uid)) &&
+                       existsAfter(/databases/$(database)/documents/surveyResponses/$(surveyId + '_' + request.auth.uid)));
     }
     
     // Survey Responses collection
