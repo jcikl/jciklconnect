@@ -584,13 +584,15 @@ Risk: legacy or imported member docs without `loId` are invisible to non-admin K
 
 Recommended action: find members with no `loId` and set `loId = 'jcikl'` after review (data fix, not a code change); check `loId` on every import path.
 
-### R-053 BOARD Can Create a Member Doc With Any Role, Including ADMIN and SUPER_ADMIN (P1, pre-existing)
+### R-053 BOARD Can Create a Member Doc With Any Role, Including ADMIN and SUPER_ADMIN (P1, resolved)
 
 Evidence: `firestore.rules` `match /members/{memberId}` create: the branch `isBoard() || (...)` skips field checks, and the only role check on create is `(isAdmin() || role != 'CHAPTER_ADMIN')`. The update rule stops BOARD from setting ADMIN / SUPER_ADMIN / CHAPTER_ADMIN; the create rule does not.
 
 Risk: a BOARD user can create a member doc with an admin role. It is not a one-step takeover (the doc must be created under a uid that has no member doc yet), but it is a privilege gap that the update rule already closed.
 
 Recommended action: apply the same role guard on create as on update (`isAdmin()` required for ADMIN, SUPER_ADMIN and CHAPTER_ADMIN), and add a rules test.
+
+Resolution (2026-10-19): the `members` create rule now requires `isAdmin()` for ADMIN, SUPER_ADMIN, AFFILIATE and CHAPTER_ADMIN, the same guard as update. Rules tests in `tests/rules/externalMembers.rules.test.ts` ("R-053") confirm BOARD is denied ADMIN / SUPER_ADMIN creates and can still create MEMBER and BOARD docs, and ADMIN can still create ADMIN. Live once `firestore.rules` is deployed.
 
 ### R-054 Hobby Club Join Fails for Non-Lead Members (P1, resolved)
 

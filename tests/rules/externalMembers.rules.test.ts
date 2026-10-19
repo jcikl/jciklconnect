@@ -439,6 +439,20 @@ describe.skipIf(!HOST)('firestore.rules — external members (emulator)', () => 
     });
   });
 
+  describe('R-053: non-admin BOARD cannot create ADMIN / SUPER_ADMIN member docs', () => {
+    it('BOARD cannot create an ADMIN or SUPER_ADMIN', async () => {
+      expect(await set('klBoard', 'members/boardMadeAdmin', member('ADMIN', KL))).toBe(DENIED);
+      expect(await set('klBoard', 'members/boardMadeSuper', member('SUPER_ADMIN', KL))).toBe(DENIED);
+    });
+    it('BOARD still creates MEMBER and BOARD docs', async () => {
+      expect(await set('klBoard', 'members/boardMadeMember', member('MEMBER', KL))).toBe(OK);
+      expect(await set('klBoard', 'members/boardMadeBoard', member('BOARD', KL))).toBe(OK);
+    });
+    it('ADMIN can still create an ADMIN', async () => {
+      expect(await set('klAdmin', 'members/adminMadeAdmin', member('ADMIN', KL))).toBe(OK);
+    });
+  });
+
   describe('L1: pending / suspended externals get only their own docs', () => {
     it('suspended affiliate cannot read events, hobby clubs, benefits or write feedback / email logs', async () => {
       expect(await getDoc('affSuspended', 'events/e1')).toBe(DENIED);
