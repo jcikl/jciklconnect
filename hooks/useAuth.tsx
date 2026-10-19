@@ -28,6 +28,8 @@ import { BoardManagementService } from '../services/boardManagementService';
 import { errorLoggingService } from '../services/errorLoggingService';
 import { retryOnPermissionDenied } from '../utils/retryOnPermissionDenied';
 import { buildSelfSignUpMember, buildExternalSignUpMember, type ExternalSignUpInput } from '../utils/signUpPayload';
+import { MemberCardsService } from '../services/memberCardsService';
+import { applyMergeUpdates } from '../utils/memberCard.mjs';
 
 interface AuthContextType {
   user: User | null;
@@ -678,6 +680,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     if (member) {
       setMember({ ...member, ...updates });
+      // Keep memberCards in sync (card fields / privacy.shareCardInternationally), like
+      // MembersService.updateMember does. Runs after the member write; syncCards never throws
+      // (failures are logged) and does nothing when no card-relevant field changed.
+      if (member.id === user.uid) {
+        await MemberCardsService.syncCards([
+          { memberId: user.uid, before: member, after: applyMergeUpdates(member, updates) as Member },
+        ]);
+      }
     }
   }, [user, member, isDevMode]);
 

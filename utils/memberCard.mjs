@@ -97,6 +97,28 @@ function sortKeys(o) {
 }
 
 /**
+ * Applies a Firestore setDoc(..., { merge: true }) payload to a member snapshot: plain objects are merged
+ * recursively, everything else (arrays, strings, null…) replaces the value. Used for the card sync after
+ * useAuth().updateMemberProfile, which saves with merge.
+ * @param {any} member
+ * @param {Record<string, any>} updates
+ * @returns {any}
+ */
+export function applyMergeUpdates(member, updates) {
+  const isPlain = (v) => v !== null && typeof v === 'object' && !Array.isArray(v) && Object.getPrototypeOf(v) === Object.prototype;
+  /** @param {any} base @param {any} patch */
+  const merge = (base, patch) => {
+    const out = isPlain(base) ? { ...base } : {};
+    for (const [k, v] of Object.entries(patch ?? {})) {
+      if (v === undefined) continue;
+      out[k] = isPlain(v) ? merge(out[k], v) : v;
+    }
+    return out;
+  };
+  return merge(member ?? {}, updates);
+}
+
+/**
  * Applies a Firestore updateDoc-style payload to a member snapshot: top-level keys replace the whole
  * field, dot-path keys ('business.companyName') set a nested value, deleteField() removes it.
  * @param {any} member
