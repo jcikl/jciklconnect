@@ -29,7 +29,7 @@ esource.data 仅在 get 中可用，因此部分集合的 list 权限会比 get 
 | 集合 | get | list | create | update | delete | 备注 |
 |------|-----|------|--------|--------|--------|------|
 | members | 自己(登)；A+；M+/B+ 仅 KL 文档（loId 为 jcikl 或缺失，且非外部角色）；active CHAPTER_ADMIN 仅本分会文档 | A+；M+/B+ 且查询须带 `where('loId','==','jcikl')`；active CHAPTER_ADMIN 须带本分会 loId；非外部用户可按本人邮箱精确匹配 | B+ 或 自注册GUEST(注册表单字段，积分/等级/徽章只能是默认值，jciCareer 只能有 joinDate)；`role = CHAPTER_ADMIN` 仅 A+ 可写 | 自己(非锁定字段；`affiliation` 已锁定；name/email 顶层或嵌套均可) 或 B+（不能把人设为 ADMIN / SUPER_ADMIN / CHAPTER_ADMIN）；active CHAPTER_ADMIN 仅本分会 AFFILIATE 的 `affiliation` 状态字段（不能设 active） | A+(同LO；SA 不限 LO) | 2026-10-18 R-034：SA 删除不受 LO 限制；2026-10-19 Phase 0：外部用户只能读自己的完整文档（active CHAPTER_ADMIN 另可读本分会文档）；其他外部会员的完整文档仅 A+ 可读，KL 普通读者改用 `memberCards` |
-| memberCards | 自己；M+；canReadOrgMembers；active 外部用户（`international == true` 或 loId 为本分会） | 同 get（外部用户的查询须带 `where('international','==',true)` 或 `where('loId','==',本分会)`） | 自己(MEMBER+ 或 active 外部) 或 canEditMembers；字段必须与 `memberCardKeys()` 完全一致；`loId` 与 `international` 须与同批写入/已有的 members 文档一致；members 文档不存在则拒绝 | 同 create | 自己 或 canEditMembers | Phase 0 新集合，卡片由 `MemberCardsService.syncCards` 同步（见 `SCHEMA.md` `memberCards`） |
+| memberCards | 自己；isAdmin()；其余读者须本人已开放名片（`privacy.shareCardInternationally == true`，互惠规则）且为 M+ / canReadOrgMembers / active 外部用户（`international == true` 或 loId 为本分会） | 同 get，但不含「自己」（外部用户的查询须带 `where('international','==',true)` 或 `where('loId','==',本分会)`） | 自己(MEMBER+ 或 active 外部) 或 canEditMembers；字段必须与 `memberCardKeys()` 完全一致；`loId` 与 `international` 须与同批写入/已有的 members 文档一致；members 文档不存在则拒绝 | 同 create | 自己 或 canEditMembers | Phase 0 新集合，卡片由 `MemberCardsService.syncCards` 同步（见 `SCHEMA.md` `memberCards`） |
 | communication | 登 | 登 | M+(需含authorId) | 自己 或 B+ | 自己 或 B+ | |
 | events | 登 | 公 | B+ | B+ 或 M+(仅attendees字段) | B+ | list公开供宣传页使用 |
 | projects | 登(或Active状态公开) | 公 | B+ | B+ 或 M+(仅attendees字段) | B+ | |
@@ -137,7 +137,7 @@ econciliations | B+/A+ | B+/A+ | B+/A+(必填字段) | A+ 或 B+(仅notes字段)
 | 集合 | 外部用户可做的事 | 限制 |
 |------|------------------|------|
 | `members` | 读自己的完整文档；active CHAPTER_ADMIN 读本分会文档；自己改非锁定字段 | 不能读其他外部会员完整文档；`affiliation` 锁定 |
-| `memberCards` | 读 `international == true` 或本分会的卡片 | 只读；卡片写入由成员本人或 KL 编辑者完成 |
+| `memberCards` | 本人已开放名片后，读 `international == true` 或本分会的卡片（自己的卡片随时可读） | 只读；卡片写入由成员本人或 KL 编辑者完成 |
 | `events` | 读（`get` 登录即可，`list` 公开）；更新 `attendees` / `registeredMembers` / `updatedAt` | 不能创建、删除；列表未按 KL 过滤（见 `RISK_REGISTER.md` R-058） |
 | `eventRegistrations` | 只读和创建自己的报名 | 查询须带 `where('memberId','==',uid)` |
 | `surveys` | 读仅限 `specificMemberIds` 包含自己的问卷 | 不能写 |
