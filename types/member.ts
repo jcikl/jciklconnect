@@ -317,7 +317,73 @@ export interface Member {
     showPhone?: boolean;
     showAlternatePhone?: boolean;
     showSocials?: boolean;
+    /**
+     * Opt-in: show this member's public card (`memberCards`) to members of OTHER chapters.
+     * Default false (missing = false). Mirrored into `MemberCard.international`; firestore.rules
+     * rejects a card whose `international` differs from this flag. Self-editable.
+     */
+    shareCardInternationally?: boolean;
   };
+  /**
+   * Present only on external members (role AFFILIATE / CHAPTER_ADMIN). The chapter itself is the
+   * top-level `loId` (a `sisterChapters` id). Locked against self-write in firestore.rules.
+   */
+  affiliation?: MemberAffiliation;
+}
+
+/** Which JCI network an external member comes in through. */
+export type AffiliationCategory = 'sister' | 'apicc' | 'global';
+
+/**
+ * External member lifecycle:
+ * pending_chapter (waiting for own chapter admin) → pending_kl (chapter approved, waiting for KL)
+ * → active; active ↔ suspended; expired when the affiliation lapses.
+ * Only `active` external users pass isActiveExternal() in firestore.rules.
+ */
+export type AffiliationStatus = 'pending_chapter' | 'pending_kl' | 'active' | 'suspended' | 'expired';
+
+/** `members.affiliation` — affiliation data of an external member. */
+export interface MemberAffiliation {
+  category: AffiliationCategory;
+  /** Country of the member's chapter (free text / ISO name, e.g. 'Singapore'). */
+  country: string;
+  status: AffiliationStatus;
+  /** Set by the chapter admin when moving pending_chapter → pending_kl. */
+  chapterApprovedAt?: string;
+  chapterApprovedBy?: string;
+  /** Set by a KL admin when moving pending_kl → active. */
+  klApprovedAt?: string;
+  klApprovedBy?: string;
+  /** Last status change (any actor). */
+  statusUpdatedAt?: string;
+  statusUpdatedBy?: string;
+}
+
+/**
+ * `memberCards/{memberId}` — directory-safe public card (no PII). Doc id = member id.
+ * This is the ONLY member data external users may read about other people.
+ * Kept in sync from `members` by the client (Phase 0 WP2); firestore.rules accepts exactly these keys.
+ */
+export interface MemberCard {
+  displayName: string;
+  avatarUrl?: string;
+  /** Chapter id (copy of members.loId). Must equal the member doc's loId. */
+  loId: string;
+  country?: string;
+  companyName?: string;
+  position?: string;
+  department?: string;
+  industry?: string;
+  businessCategory?: string[];
+  /** Short company description / introduction. */
+  companyDescription?: string;
+  website?: string;
+  acceptInternationalBusiness?: 'Yes' | 'No' | 'Willing to Explore';
+  /** Plain-text summary (see getSpecialOfferSummary). */
+  specialOfferSummary?: string;
+  /** Visible to members of other chapters. Must equal members.privacy.shareCardInternationally (default false). */
+  international: boolean;
+  updatedAt: string;
 }
 
 /** Returns a short display string for any specialOffer value (structured or legacy string). */

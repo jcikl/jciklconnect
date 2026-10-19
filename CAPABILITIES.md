@@ -1450,12 +1450,12 @@
 |---|---|---|
 | `fetchRoadmapEventDetails` | 23 |  |
 
-### `utils/rolePermissions.ts` （113 行，1 處引用）
+### `utils/rolePermissions.ts` （140 行，1 處引用）
 
 | 函數 | 行 | 說明 |
 |---|---|---|
 | `ROLE_PERMISSIONS` | 18 | Static permission baseline per role. Dynamic board elevation is applied at runtime in usePermissions. |
-| `ALL_PERMISSIONS_GRANTED` | 100 |  |
+| `ALL_PERMISSIONS_GRANTED` | 127 |  |
 
 ### `utils/transactionCategoryUtils.ts` （277 行，4 處引用）
 > Shared category-field derivation and cleanup logic for bank transactions and splits. WHY this file exists: the same "if Membership → auto-se…
