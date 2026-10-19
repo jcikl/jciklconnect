@@ -34,8 +34,8 @@ export const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
     return events
       // Same rule as the member home / guest events page: KL host or co-host, or national / area / JCI.
       .filter(e => e.date && new Date(e.date) >= today && isKlRelevantEvent(e as any))
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-      .slice(0, 3);
+      // All upcoming KL-relevant events, same list as the guest events page (was capped at 3).
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [events]);
 
   useEffect(() => {
