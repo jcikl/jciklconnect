@@ -45,12 +45,30 @@ describe('EventPaymentService.markRegistrationPaid', () => {
   });
 
   it('USD registration: MYR amount received, original USD kept as reference', async () => {
-    await EventPaymentService.markRegistrationPaid(reg({ currency: 'USD' }), event, { paymentMethod: 'bank_transfer', actorName: 'Fin', receivedMyr: 370 });
+    await EventPaymentService.markRegistrationPaid(reg({ currency: 'USD' }), event, { paymentMethod: 'bank_transfer', actorName: 'Fin', amount: 370 });
     const tx = createTransaction.mock.calls[0][0];
     expect(tx.amount).toBe(370);
     expect(tx.originalAmount).toBe(80);
     expect(tx.originalCurrency).toBe('USD');
     expect(tx.currency).toBeUndefined();
+  });
+
+  it('price 0 but priceMin > 0 (tiered): records priceMin, not 0', async () => {
+    await EventPaymentService.markRegistrationPaid(reg(), { id: 'e1', title: 'Tiered', price: 0, priceMin: 80 }, { paymentMethod: 'cash', actorName: 'Fin' });
+    expect(createTransaction.mock.calls[0][0].amount).toBe(80);
+  });
+
+  it('records the amount finance confirmed (MYR), also for non-USD registrations', async () => {
+    await EventPaymentService.markRegistrationPaid(reg(), event, { paymentMethod: 'cash', actorName: 'Fin', amount: 120 });
+    const tx = createTransaction.mock.calls[0][0];
+    expect(tx.amount).toBe(120);
+    expect(tx.originalAmount).toBeUndefined();
+  });
+
+  it('confirmed amount 0 skips the transaction', async () => {
+    await EventPaymentService.markRegistrationPaid(reg(), event, { paymentMethod: 'cash', actorName: 'Fin', amount: 0 });
+    expect(createTransaction).not.toHaveBeenCalled();
+    expect(updateStatus).toHaveBeenCalled();
   });
 
   it('free event: no transaction, still marks paid', async () => {
