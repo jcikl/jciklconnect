@@ -135,6 +135,7 @@ const SURVEYS: Record<string, Doc> = {
   klOnly: survey('Active'),
   klOnlyFalse: survey('Active', { openToExternals: false, specificMemberIds: [] }),
   targeted: survey('Active', { targetAudience: 'Specific Group', specificMemberIds: ['aff1'] }),
+  counter: survey('Active', { openToExternals: true }),
 };
 
 const club = (name: string, extra: Doc = {}): Doc => ({ name, category: 'Social', lead: 'Lead', image: '', ...extra });
@@ -252,6 +253,52 @@ describe.skipIf(!HOST)('firestore.rules — surveys / hobby clubs open to extern
       expect(await set('klBoard', 'hobbyClubs/b1', club('B1', { openToExternals: true }))).toBe(OK);
       expect(await set('klAdmin', 'hobbyClubs/closedClub', { ...CLUBS.closedClub, openToExternals: true })).toBe(OK);
       expect(await set('owner', 'hobbyClubs/closedClub', CLUBS.closedClub)).toBe(OK); // restore
+    });
+  });
+
+  // SurveysService.submitResponse: tx.get(survey) + tx.get(response id, not yet existing)
+  // then tx.set(response) + tx.update(survey, { responsesCount: +1, updatedAt }).
+  describe('survey submit (response + responsesCount +1 in one write)', () => {
+    const submit = (uid: string, surveyId: string, count: number, surveyExtra: Doc = {}) =>
+      commit(uid, [
+        [`surveyResponses/${surveyId}_${uid}`, response(uid, surveyId)],
+        [`surveys/${surveyId}`, { ...SURVEYS[surveyId], responsesCount: count, updatedAt: '2026-10-20T00:00:00.000Z', ...surveyExtra }],
+      ]);
+    // Keep the seed in step with what the emulator holds after each successful submit.
+    const bump = (surveyId: string) => {
+      SURVEYS[surveyId] = { ...SURVEYS[surveyId], responsesCount: (SURVEYS[surveyId].responsesCount as number) + 1, updatedAt: '2026-10-20T00:00:00.000Z' };
+    };
+
+    it('the duplicate check can read a not-yet-existing response id (404, not denied)', async () => {
+      expect(await getDoc('klMember', 'surveyResponses/counter_klMember')).toBe(404);
+      expect(await getDoc('aff1', 'surveyResponses/counter_aff1')).toBe(404);
+    });
+    it('a KL MEMBER can submit', async () => {
+      expect(await submit('klMember', 'counter', 1)).toBe(OK);
+      bump('counter');
+    });
+    it('an active external can submit to an open Active survey', async () => {
+      expect(await submit('aff1', 'counter', 2)).toBe(OK);
+      bump('counter');
+    });
+    it('the duplicate check cannot read someone else\'s existing response', async () => {
+      expect(await getDoc('chAdmin', 'surveyResponses/counter_aff1')).toBe(DENIED);
+    });
+    it('+2, a decrement or any other field is denied', async () => {
+      expect(await submit('chAdmin', 'counter', 4)).toBe(DENIED);
+      expect(await submit('chAdmin', 'counter', 2)).toBe(DENIED);
+      expect(await submit('chAdmin', 'counter', 3, { title: 'Hijacked' })).toBe(DENIED);
+      expect(await submit('chAdmin', 'counter', 3, { openToExternals: false })).toBe(DENIED);
+    });
+    it('a second response is denied', async () => {
+      expect(await submit('klMember', 'counter', 3)).toBe(DENIED);
+    });
+    it('an external cannot bump a survey it cannot read', async () => {
+      expect(await submit('aff1', 'klOnly', 1)).toBe(DENIED);
+      expect(await set('aff1', 'surveys/klOnly', { ...SURVEYS.klOnly, responsesCount: 1 })).toBe(DENIED);
+    });
+    it('a non-board user still cannot edit a survey otherwise', async () => {
+      expect(await set('klMember', 'surveys/counter', { ...SURVEYS.counter, title: 'Edited' })).toBe(DENIED);
     });
   });
 

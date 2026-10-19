@@ -844,7 +844,16 @@ service cloud.firestore {
                      (isActiveExternal() &&
                       (request.auth.uid in resource.data.specificMemberIds ||
                        (resource.data.openToExternals == true && resource.data.status == 'Active')));
-      allow create, update, delete: if isBoard() || isAdmin();
+      allow create, delete: if isBoard() || isAdmin();
+      // Submitting a response (SurveysService.submitResponse) bumps responsesCount by exactly 1 in the same
+      // transaction: anyone who may read this survey may do that, and change nothing else but updatedAt.
+      allow update: if isBoard() || isAdmin() ||
+                      ((isInternalUser() ||
+                        (isActiveExternal() &&
+                         (request.auth.uid in resource.data.get('specificMemberIds', []) ||
+                          (resource.data.get('openToExternals', false) == true && resource.data.get('status', '') == 'Active')))) &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['responsesCount', 'updatedAt']) &&
+                       request.resource.data.responsesCount == resource.data.get('responsesCount', 0) + 1);
     }
     
     // Survey Responses collection
@@ -855,8 +864,9 @@ service cloud.firestore {
         return get(/databases/$(database)/documents/surveys/$(request.resource.data.surveyId)).data;
       }
       // resource.data valid for get; service-layer where(memberId == uid) handles list ownership
+      // resource == null: submitResponse's duplicate check reads its own not-yet-existing id ({surveyId}_{uid}).
       allow get: if isAuthenticated() &&
-                    (resource.data.memberId == request.auth.uid || isBoard() || isAdmin());
+                    (resource == null || resource.data.memberId == request.auth.uid || isBoard() || isAdmin());
       allow list: if isActiveMember() ||
                      (isActiveExternal() && resource.data.memberId == request.auth.uid);
       // FIX: added required field validation to prevent partial/malformed responses
