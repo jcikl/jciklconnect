@@ -19,7 +19,7 @@
 |---|---|---|
 | Service（業務邏輯與資料存取） | 68 | `services/` |
 | Hook（React 資料綁定） | 39 | `hooks/` |
-| Util（純函數工具） | 18 | `utils/` |
+| Util（純函數工具） | 19 | `utils/` |
 | UI 元件（通用） | 33 | `components/ui/` |
 | 共用業務元件 | 9 | `components/shared/` |
 | Context | 2 | `contexts/` |
@@ -1286,8 +1286,8 @@
 | `useMemberSearch.ts` | 53 | 1 | `useMemberSearch` | — | ⚠️ 無說明 |
 | `useMembers.ts` | 188 | 21 | `useMembers`, `usePaginatedMembers` | membersService | Members Data Hook |
 | `useNotifications.ts` | 107 | 0 | `useNotifications` | communicationService, errorLoggingService, mockData | ⚠️ 無說明 |
-| `usePermissions.ts` | 199 | 26 | `usePermissions` | — | Permission Management Hook |
-| `usePoints.ts` | 59 | 2 | `usePoints` | pointsService | Points Data Hook |
+| `usePermissions.ts` | 212 | 27 | `usePermissions` | — | Permission Management Hook |
+| `usePoints.ts` | 61 | 2 | `usePoints` | pointsService | Points Data Hook |
 | `useProjects.ts` | 170 | 7 | `useProjects` | projectsService | Projects Data Hook |
 | `usePushNotifications.ts` | 63 | 1 | `usePushNotifications` | — | ⚠️ 無說明 |
 | `useSisterChapterMembers.ts` | 49 | 2 | `useSisterChapterMembers` | membersService, sisterChaptersService | ⚠️ 無說明 |
@@ -1384,6 +1384,16 @@
 | `setDevMode` | 8 |  |
 | `isDevMode` | 12 |  |
 | `withDevMode` | 29 | Service helper: returns mock data in dev mode, calls the real async loader in production. Eliminates the repet… |
+
+### `utils/externalAccess.ts` （73 行，4 處引用）
+
+| 函數 | 行 | 說明 |
+|---|---|---|
+| `isExternalRole` | 13 |  |
+| `EXTERNAL_ALLOWED_VIEWS` | 28 | Active externals, per role. CHAPTER_ADMIN gets its own entry (e.g. a chapter-management view in Phase 1). |
+| `getExternalAllowedViews` | 43 | Views an external may open, or null when the role is not external (= no whitelist applies). A missing affiliat… |
+| `isViewAllowedForRole` | 52 | True when `view` may be opened. Non-external roles are unrestricted here (their own rules still apply). |
+| `getExternalStatusMessage` | 61 |  |
 
 ### `utils/fetchWithTimeout.ts` （31 行，4 處引用）
 > ERR-R-005: fetch wrapper that aborts after `ms` milliseconds. Netlify functions on the free plan time out server-side after 10 s, but the br…
@@ -1485,7 +1495,7 @@
 | `ConfirmDialog.tsx` | 100 | 2 | `ConfirmDialog`, `CONFIRM_CLOSED` |
 | `DataTable.tsx` | 172 | 0 | `DataTable` |
 | `Drawer.tsx` | 139 | 2 | `Drawer` |
-| `EmptyState.tsx` | 36 | 2 | `EmptyState` |
+| `EmptyState.tsx` | 36 | 3 | `EmptyState` |
 | `ErrorBoundary.tsx` | 261 | 3 | `ErrorFallback`, `SectionErrorFallback`, `ErrorBoundary`, `AsyncErrorBoundary`, `withErrorBoundary`, `useErrorHandler` |
 | `FilterDrawer.tsx` | 65 | 1 | `FilterDrawer` |
 | `FirstUseBanner.tsx` | 82 | 2 | `FirstUseBanner` |
@@ -1531,6 +1541,6 @@
 
 ## 8. 文件債：缺少檔頭說明的檔案
 
-共 53 個。請在檔案第一行補上 `/** 一句話說明此檔案職責 */`，下次重新生成時就會自動帶入本文件。
+共 54 個。請在檔案第一行補上 `/** 一句話說明此檔案職責 */`，下次重新生成時就會自動帶入本文件。
 
-`services/auditLogService.ts`, `services/contractService.ts`, `services/dataImportExportService.ts`, `services/engagementAutoSuggestService.ts`, `services/errorLoggingService.ts`, `services/financeService.ts`, `services/flagshipProjectsService.ts`, `services/guestAnalyticsService.ts`, `services/incentiveCalculatorService.ts`, `services/inquiryService.ts`, `services/larkSyncService.ts`, `services/membershipConfigService.ts`, `services/mockData.ts`, `services/notificationService.ts`, `services/partnershipsService.ts`, `services/permissionConfigService.ts`, `services/postcodeService.ts`, `services/promotionService.ts`, `services/reportService.ts`, `services/sisterChaptersService.ts`, `services/socialPersonaService.ts`, `services/socialPostService.ts`, `services/sponsorshipService.ts`, `services/toyyibService.ts`, `services/zoomBookingService.ts`, `hooks/useActivityPlans.ts`, `hooks/useAppNavigation.ts`, `hooks/useBusinessDirectory.ts`, `hooks/useFirestoreCollection.ts`, `hooks/useGuestAnalytics.ts`, `hooks/useHobbyClubs.ts`, `hooks/useInstallPrompt.ts`, `hooks/useKnowledge.ts`, `hooks/useMemberMutations.ts`, `hooks/useMemberSearch.ts`, `hooks/useNotifications.ts`, `hooks/usePushNotifications.ts`, `hooks/useSisterChapterMembers.ts`, `hooks/useSisterChapters.ts`, `hooks/useSocialPersonas.ts`, `hooks/useSocialPosts.ts`, `hooks/useSurveys.ts`, `hooks/useToyyibMode.ts`, `hooks/useToyyibPay.ts`, `hooks/useToyyibPayment.ts`, `hooks/useZoomBookings.ts`, `utils/activityPhase.ts`, `utils/administrativeProjectsStorage.ts`, `utils/boardMembership.ts`, `utils/financeUtils.ts`, `utils/gamificationUtils.ts`, `utils/roadmapUtils.ts`, `utils/rolePermissions.ts`
+`services/auditLogService.ts`, `services/contractService.ts`, `services/dataImportExportService.ts`, `services/engagementAutoSuggestService.ts`, `services/errorLoggingService.ts`, `services/financeService.ts`, `services/flagshipProjectsService.ts`, `services/guestAnalyticsService.ts`, `services/incentiveCalculatorService.ts`, `services/inquiryService.ts`, `services/larkSyncService.ts`, `services/membershipConfigService.ts`, `services/mockData.ts`, `services/notificationService.ts`, `services/partnershipsService.ts`, `services/permissionConfigService.ts`, `services/postcodeService.ts`, `services/promotionService.ts`, `services/reportService.ts`, `services/sisterChaptersService.ts`, `services/socialPersonaService.ts`, `services/socialPostService.ts`, `services/sponsorshipService.ts`, `services/toyyibService.ts`, `services/zoomBookingService.ts`, `hooks/useActivityPlans.ts`, `hooks/useAppNavigation.ts`, `hooks/useBusinessDirectory.ts`, `hooks/useFirestoreCollection.ts`, `hooks/useGuestAnalytics.ts`, `hooks/useHobbyClubs.ts`, `hooks/useInstallPrompt.ts`, `hooks/useKnowledge.ts`, `hooks/useMemberMutations.ts`, `hooks/useMemberSearch.ts`, `hooks/useNotifications.ts`, `hooks/usePushNotifications.ts`, `hooks/useSisterChapterMembers.ts`, `hooks/useSisterChapters.ts`, `hooks/useSocialPersonas.ts`, `hooks/useSocialPosts.ts`, `hooks/useSurveys.ts`, `hooks/useToyyibMode.ts`, `hooks/useToyyibPay.ts`, `hooks/useToyyibPayment.ts`, `hooks/useZoomBookings.ts`, `utils/activityPhase.ts`, `utils/administrativeProjectsStorage.ts`, `utils/boardMembership.ts`, `utils/externalAccess.ts`, `utils/financeUtils.ts`, `utils/gamificationUtils.ts`, `utils/roadmapUtils.ts`, `utils/rolePermissions.ts`
