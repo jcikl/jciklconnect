@@ -11,9 +11,19 @@ const KL_LO_ID = 'jcikl'; // same as DEFAULT_LO_ID (config/constants.ts)
 const avatarFor = (name: string) =>
   `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0097D7&color=fff`;
 
-/** Drop top-level undefined values (Firestore rejects them). */
-const stripUndefined = (o: Record<string, unknown>) =>
-  Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
+const isPlainObject = (v: unknown): v is Record<string, unknown> =>
+  v !== null && typeof v === 'object' && !Array.isArray(v) && Object.getPrototypeOf(v) === Object.prototype;
+
+/**
+ * Drop undefined values at every depth of plain objects (Firestore has no ignoreUndefinedProperties and
+ * rejects e.g. others.bio: undefined). Non-plain values (Timestamps, arrays) are kept as they are.
+ */
+const stripUndefined = (o: Record<string, unknown>): Record<string, unknown> =>
+  Object.fromEntries(
+    Object.entries(o)
+      .filter(([, v]) => v !== undefined)
+      .map(([k, v]) => [k, isPlainObject(v) ? stripUndefined(v) : v])
+  );
 
 /**
  * KL self sign-up (GUEST, or a matched pre-imported profile). Same fields signUp always wrote; reads
@@ -89,7 +99,7 @@ export function buildExternalSignUpMember(input: ExternalSignUpInput): Record<st
   if (input.nationality) general.nationality = input.nationality;
   const contact: Record<string, string> = { email: input.email };
   if (input.phone?.trim()) contact.phone = input.phone.trim();
-  return {
+  return stripUndefined({
     general,
     contact,
     role: UserRole.AFFILIATE,
@@ -102,5 +112,5 @@ export function buildExternalSignUpMember(input: ExternalSignUpInput): Record<st
     duesStatus: 'Pending',
     badges: [],
     jciCareer: { joinDate: new Date().toISOString().split('T')[0] },
-  };
+  });
 }

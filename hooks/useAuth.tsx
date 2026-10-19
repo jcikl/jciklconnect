@@ -494,7 +494,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const cleanMember = buildSelfSignUpMember(name, email, additionalData, existingProfile);
 
     // Save to the new UID (this links the Firebase Auth user to the profile data)
-    await setDoc(doc(db, COLLECTIONS.MEMBERS, userCredential!.user.uid), cleanMember);
+    try {
+      await setDoc(doc(db, COLLECTIONS.MEMBERS, userCredential!.user.uid), cleanMember);
+    } catch (err) {
+      // Do not leave the just-created Auth account without a profile (same as signUpExternal).
+      try { await userCredential!.user.delete(); } catch (e) {
+        errorLoggingService.logError(e, { action: 'signup-rollback-auth' });
+      }
+      isSigningUpRef.current = false;
+      throw err;
+    }
 
     // pendingRegistrations write removed — GuestManagementView queries PROBATION members directly.
 

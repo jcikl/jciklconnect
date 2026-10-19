@@ -30,6 +30,20 @@ describe('buildSelfSignUpMember (GUEST sign-up)', () => {
     expect(Object.values(doc).some(v => v === undefined)).toBe(false);
     for (const k of Object.keys(doc)) expect(SELF_SIGN_UP_KEYS).toContain(k);
   });
+
+  it('H1: never contains nested undefined (Firestore setDoc rejects it), even with no extras', () => {
+    expect(hasUndefined(buildSelfSignUpMember('Ali', 'ali@x.com'))).toBe(false);
+    expect(hasUndefined(buildSelfSignUpMember('Ali', 'ali@x.com', { general: {}, contact: {} }))).toBe(false);
+    const doc = buildSelfSignUpMember('Ali', 'ali@x.com', { others: { bio: 'Hi' } });
+    expect(doc.others).toEqual({ hobbies: [], bio: 'Hi' });
+  });
+
+  it('H1: keeps non-plain values (e.g. Timestamp-like objects) from a matched profile as they are', () => {
+    class Ts { constructor(public seconds: number) {} }
+    const ts = new Ts(5);
+    const doc = buildSelfSignUpMember('Ali', 'ali@x.com', undefined, { id: 'old', createdAt: ts, general: { name: 'Ali' } } as any);
+    expect(doc.createdAt).toBe(ts);
+  });
 });
 
 describe('buildExternalSignUpMember', () => {
@@ -56,6 +70,11 @@ describe('buildExternalSignUpMember', () => {
     expect(doc.contact).toEqual({ email: 'siti@x.sg' });
     expect(doc).not.toHaveProperty('birthdayMMDD');
     expect(doc).not.toHaveProperty('privacy');
+  });
+
+  it('H1: no nested undefined even if an optional input is explicitly undefined', () => {
+    const doc = buildExternalSignUpMember({ ...base, fullName: undefined, gender: undefined, dob: undefined, phone: undefined, nationality: undefined });
+    expect(hasUndefined(doc)).toBe(false);
   });
 
   it('category follows the chapter type', () => {
