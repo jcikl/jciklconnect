@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import type { Member } from '../../../types';
 
 interface BusinessBookmarkUser {
   id?: string;
@@ -10,7 +11,7 @@ interface BusinessBookmarkUser {
 
 interface UseBusinessBookmarksParams {
   currentUser: BusinessBookmarkUser | null | undefined;
-  updateMemberProfile: (updates: { business: { bookmarkedBusinessIds: string[] } }) => Promise<unknown>;
+  updateMemberProfile: (updates: Partial<Member>) => Promise<unknown>;
   showToast: (message: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
 }
 
@@ -37,10 +38,11 @@ export const useBusinessBookmarks = ({
     setBookmarkedIds(next);
     try {
       await updateMemberProfile({
+        // currentUser.business is the member's full business record; the write merges.
         business: {
           ...currentUser.business,
           bookmarkedBusinessIds: Array.from(next),
-        },
+        } as Member['business'],
       });
     } catch {
       setBookmarkedIds(previous);

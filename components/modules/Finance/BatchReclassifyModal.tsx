@@ -30,7 +30,7 @@ const CATEGORY_OPTIONS = [
 interface BatchReclassifyModalProps {
   isOpen: boolean;
   onClose: () => void;
-  projects: Array<{ id: string; name: string; hostingLo?: string; startDate?: string; endDate?: string; eventStartDate?: string; eventEndDate?: string; date?: string }>;
+  projects: Array<{ id: string; name?: string; hostingLo?: string; startDate?: string; endDate?: string; eventStartDate?: string; eventEndDate?: string; date?: string }>;
   loadReclassificationGroups: () => Promise<ReclassGroup[]>;
   handleBatchReclassify: (rules: {
     matchLoId: string | null;

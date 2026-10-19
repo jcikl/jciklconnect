@@ -296,7 +296,7 @@ export const EngagementAutoSuggestService = {
     jci_inspire_completion?: { course: string; date: string };
   }> {
     const [allRadar, allProjects] = await Promise.all([
-      EngagementAutoSuggestService._fetchRadarForMember(memberId),
+      EngagementAutoSuggestService._fetchRegistrationsForMember(memberId),
       ProjectsService.getAllProjects(),
     ]);
 

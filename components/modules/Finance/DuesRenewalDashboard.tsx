@@ -490,7 +490,7 @@ export const DuesRenewalDashboard: React.FC<DuesRenewalDashboardProps> = ({
       // "over paid" stored values (written when dues was incorrectly 300) don't persist.
       const computedStatus: MembershipStatus = isFirstYear
         ? (paidAmount <= 0 ? 'pending' : paidAmount >= duesVal ? (paidAmount > duesVal ? 'over paid' : 'paid') : 'pending')
-        : (membershipData?.status ?? 'pending');
+        : ((membershipData?.status as MembershipStatus | undefined) ?? 'pending'); // stored values are MembershipStatus strings
       return {
         id: `summary-${m.id}-${year}`,
         memberId: m.id,

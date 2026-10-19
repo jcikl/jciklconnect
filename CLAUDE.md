@@ -12,7 +12,7 @@ JCI Kuala Lumpur 分会管理系统（PWA）：会员、活动、项目、财务
 | 项目 | 内容 |
 |---|---|
 | 技术栈 | React 19 · TypeScript 5.8 strict · Vite 6 · Tailwind · React Router v7 · Firebase（Firestore / Auth / Storage / FCM）· Capacitor（Android） |
-| 后端 | Netlify Functions（`netlify/functions/*.mjs`）；Firebase 为 Spark 方案，无 Cloud Functions |
+| 后端 | Firebase Cloud Functions（`functions/src/`）+ Netlify Functions（`netlify/functions/*.mjs`） |
 | 第三方 | Cloudinary · ToyyibPay · Zoom · Lark |
 | 部署 | Netlify（主）· Firebase Hosting（副）· PWA via `vite-plugin-pwa` |
 | 路径别名 | `@/*` → 项目根目录 |

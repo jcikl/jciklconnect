@@ -12,7 +12,7 @@ const createInitialRegistrationForm = (member: Member | null): RegistrationFormD
   dietary: (member?.general?.dietaryPreference as 'normal' | 'vegetarian' | 'halal') ?? 'normal',
   emergencyContactName: member?.contact?.emergency?.name ?? '',
   emergencyContactPhone: member?.contact?.emergency?.phone ?? '',
-  tshirtSize: member?.tshirtSize ?? '',
+  tshirtSize: member?.others?.tshirtSize ?? '',
 });
 
 export const useEventRegistrationForm = ({

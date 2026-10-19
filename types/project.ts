@@ -82,7 +82,6 @@ export interface Project {
   committee?: ProjectCommitteeMember[];
   trainers?: ProjectTrainer[];
   roadmapId?: string;
-  roadmapUrl?: string;
   hostingLo?: string;
   /** Co-hosting LO names. Legacy docs / old clients may hold one comma-separated string — read via utils/loHosting.mjs parseCoHosting. */
   coHosting?: string[];

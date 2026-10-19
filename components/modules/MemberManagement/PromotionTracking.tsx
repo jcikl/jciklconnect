@@ -1146,7 +1146,9 @@ export const PromotionTracking: React.FC<{ searchQuery?: string }> = ({ searchQu
         </Card>
       )}
 
-      {activeView !== 'promotion' && activeView !== 'requests' && (
+      {/* Engagement list — 1st / 2nd year views only (Official has its own section below; it used
+          to render an empty header and Auto-Suggest button here too). */}
+      {activeView !== 'promotion' && activeView !== 'requests' && activeView !== 'official' && (
         <Card>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
             <span className="font-bold text-slate-900">

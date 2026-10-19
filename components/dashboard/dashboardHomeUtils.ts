@@ -21,7 +21,7 @@ interface DashboardMemberLike {
     businessCategory?: unknown[];
     companyDescription?: string;
     idealReferrals?: string | unknown[];
-    acceptInternationalBusiness?: boolean;
+    acceptInternationalBusiness?: string; // 'Yes' | 'No' | 'Willing to Explore' (types/member.ts)
     levelOfManagement?: string;
   };
   others?: {
