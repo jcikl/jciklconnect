@@ -11,9 +11,10 @@ import { useFirestoreCollection } from './useFirestoreCollection';
 
 /**
  * @param options.scope 'upcoming' loads only events starting today or later (dashboard);
+ *   'kl' loads every event JCI KL hosts or co-hosts (board dashboard stats);
  *   default 'all' loads every listed event (event list, reports, search).
  */
-export const useEvents = (options?: { publicMode?: boolean; scope?: 'all' | 'upcoming' }) => {
+export const useEvents = (options?: { publicMode?: boolean; scope?: 'all' | 'upcoming' | 'kl' }) => {
   const publicMode = options?.publicMode ?? false;
   const scope = options?.scope ?? 'all';
   const { showToast } = useToast();
@@ -27,7 +28,9 @@ export const useEvents = (options?: { publicMode?: boolean; scope?: 'all' | 'upc
 
   const { data: events, loading: loading1, error, reload: loadEvents } = useFirestoreCollection<Event>({
     loader: () =>
-      (scope === 'upcoming' ? EventsService.getUpcomingEvents() : EventsService.getAllEvents()).catch(err => {
+      (scope === 'upcoming' ? EventsService.getUpcomingEvents()
+        : scope === 'kl' ? EventsService.getKlEvents()
+        : EventsService.getAllEvents()).catch(err => {
         if (publicMode) {
           // In public mode, silently fail — Firestore rules may block unauthenticated reads
           errorLoggingService.logError(err, { action: 'useEvents-public-fetch' });

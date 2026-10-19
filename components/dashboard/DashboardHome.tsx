@@ -25,6 +25,7 @@ import { DashboardProfileCompletionSheet } from './DashboardProfileCompletionShe
 import { DashboardProfileCompletionWidget } from './DashboardProfileCompletionWidget';
 import { DashboardUpgradeModal } from './DashboardUpgradeModal';
 import { getMemberDob, getProfileCompleteness, normalizeMembership } from './dashboardHomeUtils';
+import { isKlRelevantEvent } from '../../utils/loHosting.mjs';
 
 interface DashboardHomeProps {
   userRole: UserRole;
@@ -180,22 +181,10 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   };
 
   // Calculate stats from real data
-  const upcomingEvents = React.useMemo(() => {
-    const KL = 'jci kuala lumpur';
-    return events.filter(e => {
-      if (e.status === 'Cancelled') return false;
-      const lo = ((e as any).hostingLo ?? '').trim().toLowerCase();
-      const coRaw = (e as any).coHosting;
-      const level = ((e as any).level ?? '').trim().toLowerCase();
-      const isKL = lo === KL || (
-        Array.isArray(coRaw)
-          ? coRaw.some((c: string) => typeof c === 'string' && c.trim().toLowerCase() === KL)
-          : typeof coRaw === 'string' && coRaw.trim().toLowerCase() === KL
-      );
-      const isNationalOrAbove = level === 'national' || level === 'jci' || level === 'area' || level.startsWith('area');
-      return isKL || isNationalOrAbove;
-    });
-  }, [events]);
+  const upcomingEvents = React.useMemo(
+    () => events.filter(e => e.status !== 'Cancelled' && isKlRelevantEvent(e as any)),
+    [events]
+  );
 
 
 

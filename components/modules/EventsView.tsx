@@ -9,6 +9,7 @@ import { EventsListPanel } from './Events/EventsListPanel';
 import { EventsHeader, type EventsViewMode } from './Events/EventsHeader';
 import { EventDetailModal } from './Events/EventDetailModal';
 import { useEventsListState } from './Events/useEventsListState';
+import { isKlRelevantEvent } from '../../utils/loHosting.mjs';
 
 export type { RegistrationFormData } from './Events/EventRegistrationFormModal';
 
@@ -45,18 +46,7 @@ export const EventsView: React.FC<{ searchQuery?: string; initialSelectedEventId
 
       {viewMode === 'calendar' ? (
         <EventCalendarView
-          events={events.filter(e => {
-            const KL = 'jci kuala lumpur';
-            const lo = ((e as any).hostingLo ?? '').trim().toLowerCase();
-            const coRaw = (e as any).coHosting;
-            const level = ((e as any).level ?? '').trim().toLowerCase();
-            const isKL = lo === KL || (
-              Array.isArray(coRaw)
-                ? coRaw.some((c: string) => typeof c === 'string' && c.trim().toLowerCase() === KL)
-                : typeof coRaw === 'string' && coRaw.trim().toLowerCase() === KL
-            );
-            return isKL || level === 'national' || level === 'jci' || level === 'area' || level.startsWith('area');
-          })}
+          events={events.filter(e => isKlRelevantEvent(e as any))}
           onEventClick={setSelectedEvent}
           onEventUpdate={updateEvent}
         />

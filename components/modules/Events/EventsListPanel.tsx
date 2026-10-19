@@ -4,6 +4,7 @@ import { LoadingState } from '../../ui/Loading';
 import type { Event, Member } from '../../../types';
 import { EventRow } from './EventRow';
 import type { EventsListTab } from './useEventsListState';
+import { isKlRelevantEvent } from '../../../utils/loHosting.mjs';
 
 interface EventsListPanelProps {
   activeTab: EventsListTab;
@@ -22,18 +23,8 @@ interface EventsListPanelProps {
   markAttendance: (eventId: string, memberId: string) => void;
 }
 
-const KL = 'jci kuala lumpur';
-
 function isJCIKLRelevant(e: Event): boolean {
-  const lo    = ((e as any).hostingLo ?? '').trim().toLowerCase();
-  const coRaw = (e as any).coHosting;
-  const level = ((e as any).level ?? '').trim().toLowerCase();
-  const isKL = lo === KL || (
-    Array.isArray(coRaw)
-      ? coRaw.some((c: string) => typeof c === 'string' && c.trim().toLowerCase() === KL)
-      : typeof coRaw === 'string' && coRaw.trim().toLowerCase() === KL
-  );
-  return isKL || level === 'national' || level === 'jci' || level === 'area' || level.startsWith('area');
+  return isKlRelevantEvent(e as any);
 }
 
 const EMPTY_MESSAGE = 'No events found.';

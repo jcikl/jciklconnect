@@ -5,7 +5,8 @@ import { Card, StatCard, Badge, Button, Tabs, Modal, useToast } from '../ui/Comm
 import { Select, Input } from '../ui/Form';
 import { useMembers } from '../../hooks/useMembers';
 import { useEvents } from '../../hooks/useEvents';
-import { useProjects } from '../../hooks/useProjects';
+import { activityPhase } from '../../utils/activityPhase';
+import { formatDate, getMYTTodayStr } from '../../utils/dateUtils';
 import { usePoints } from '../../hooks/usePoints';
 import { useInventory } from '../../hooks/useInventory';
 import { useHobbyClubs } from '../../hooks/useHobbyClubs';
@@ -116,8 +117,9 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
       } as MemberWithDues;
     });
   }, [rawMembers]);
-  const { events, loading: eventsLoading } = useEvents();
-  const { projects, loading: projectsLoading } = useProjects();
+  // Board stats cover JCI KL's own activities (hosted or co-hosted) — projects and events are the
+  // same records. Loading every event / project downloaded ~13 MB, mostly other LOs' Roadmap events.
+  const { events, loading: eventsLoading } = useEvents({ scope: 'kl' });
   const { leaderboard, pointHistory } = usePoints();
   const { items: inventoryItems, loading: inventoryLoading } = useInventory();
   const { businesses, loading: businessesLoading } = useBusinessDirectory();
@@ -282,7 +284,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
         Promise.all(members.slice(0, 10).map(m => AIPredictionService.predictMemberChurn(m.id))).catch(() => []),
         AIPredictionService.getPersonalizedRecommendations(members[0]?.id || '', 5).catch(() => []),
         Promise.all(events.slice(0, 5).map(e => AIPredictionService.predictEventDemand(e.id))).catch(() => []),
-        Promise.all(projects.slice(0, 5).map(p => AIPredictionService.predictProjectSuccess(p.id))).catch(() => []),
+        Promise.all(events.slice(0, 5).map(p => AIPredictionService.predictProjectSuccess(p.id))).catch(() => []),
       ]);
 
       setAiInsights({
@@ -296,7 +298,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
     } finally {
       setLoadingAI(false);
     }
-  }, [members, events, projects]);
+  }, [members, events]);
 
   useEffect(() => {
     loadFinancialData();
@@ -312,7 +314,7 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
   }, [autoRefreshEnabled, loadFinancialData]);
 
   useEffect(() => {
-    if (members.length > 0 && events.length > 0 && projects.length > 0) {
+    if (members.length > 0 && events.length > 0) {
       loadAIInsights();
     }
   }, [loadAIInsights]);
@@ -327,9 +329,12 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
       return joinDate.getMonth() === now.getMonth() && joinDate.getFullYear() === now.getFullYear();
     }).length;
 
-    const upcomingEvents = events.filter(e => new Date(e.date) >= new Date() && e.status === 'Upcoming');
-    const activeProjects = projects.filter(p => p.status === 'Active');
-    const completedProjects = projects.filter(p => p.status === 'Completed');
+    // By dates, not status: imported events stay "Active" after they end (utils/activityPhase.ts).
+    const today = getMYTTodayStr();
+    const phases = events.map(e => activityPhase(e, today));
+    const upcomingActivities = phases.filter(p => p === 'upcoming').length;
+    const ongoingActivities = phases.filter(p => p === 'ongoing').length;
+    const completedActivities = phases.filter(p => p === 'completed').length;
 
     const highRiskMembers = members.filter(m => m.churnRisk === 'High').length;
     const averagePoints = leaderboard.length > 0
@@ -358,9 +363,9 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
       totalMembers,
       activeMembers,
       newMembersThisMonth,
-      upcomingEvents: upcomingEvents.length,
-      activeProjects: activeProjects.length,
-      completedProjects: completedProjects.length,
+      upcomingActivities,
+      ongoingActivities,
+      completedActivities,
       highRiskMembers,
       averagePoints,
       totalInventoryItems,
@@ -372,12 +377,12 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
       totalBankBalance,
       lowBalanceAccounts,
     };
-  }, [members, events, projects, leaderboard, inventoryItems, businesses, bankAccounts]);
+  }, [members, events, leaderboard, inventoryItems, businesses, bankAccounts]);
 
   // Calculate analytics data for charts
   const engagementTrendData = useMemo(() => {
     const now = new Date();
-    const months: { month: string; events: number; projects: number; members: number }[] = [];
+    const months: { month: string; events: number; members: number }[] = [];
 
     // Generate last 6 months
     for (let i = 5; i >= 0; i--) {
@@ -391,11 +396,6 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
           eventDate.getFullYear() === date.getFullYear();
       }).length;
 
-      // Count projects - Project type doesn't have createdAt/startDate
-      // So we can't accurately track project creation by month
-      // Set to 0 for now, or could track by status changes if that data existed
-      const projectsInMonth = 0;
-
       // Count members joined in this month
       const membersInMonth = members.filter(m => {
         const joinDate = new Date(m.jciCareer?.joinDate);
@@ -406,25 +406,19 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
       months.push({
         month: monthName,
         events: eventsInMonth,
-        projects: projectsInMonth,
         members: membersInMonth,
       });
     }
 
     return months;
-  }, [events, projects, members]);
+  }, [events, members]);
 
-  const projectStatusData = useMemo(() => {
-    const statusCounts: Record<string, number> = {};
-    projects.forEach(project => {
-      statusCounts[project.status] = (statusCounts[project.status] || 0) + 1;
-    });
-
-    return Object.entries(statusCounts).map(([status, count]) => ({
-      status,
-      count,
-    }));
-  }, [projects]);
+  // Activity status by dates (same phases as the key metrics).
+  const projectStatusData = useMemo(() => [
+    { status: 'Upcoming', count: metrics.upcomingActivities },
+    { status: 'Ongoing', count: metrics.ongoingActivities },
+    { status: 'Completed', count: metrics.completedActivities },
+  ].filter(d => d.count > 0), [metrics]);
 
   const eventTypeData = useMemo(() => {
     const typeCounts: Record<string, number> = {};
@@ -534,8 +528,8 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
                     <Calendar size={16} />
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Upcoming Events</span>
-                    <span className="text-2xl font-black text-slate-900 leading-tight">{metrics.upcomingEvents}</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Upcoming Activities</span>
+                    <span className="text-2xl font-black text-slate-900 leading-tight">{metrics.upcomingActivities}</span>
                     <span className="text-[10px] text-slate-400 font-medium mt-1">Scheduled activities</span>
                   </div>
                 </div>
@@ -544,9 +538,9 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
                     <Briefcase size={16} />
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Active Projects</span>
-                    <span className="text-2xl font-black text-slate-900 leading-tight">{metrics.activeProjects}</span>
-                    <span className="text-[10px] text-slate-400 font-medium mt-1">{metrics.completedProjects} completed</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Ongoing Activities</span>
+                    <span className="text-2xl font-black text-slate-900 leading-tight">{metrics.ongoingActivities}</span>
+                    <span className="text-[10px] text-slate-400 font-medium mt-1">{metrics.completedActivities} completed</span>
                   </div>
                 </div>
               </div>
@@ -735,22 +729,26 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
                 </Card>
 
                 {/* Project Status */}
-                <Card noPadding noHeaderPadding className="mb-6" title={<div className="px-4 py-3 font-semibold text-slate-800 text-base">Project Status Overview</div>}>
+                <Card noPadding noHeaderPadding className="mb-6" title={<div className="px-4 py-3 font-semibold text-slate-800 text-base">Latest Activities</div>}>
                   <div className="p-4">
                     <div className="space-y-4">
-                      {projects.slice(0, 5).map(project => (
-                        <div key={project.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-slate-900">{project.name ?? 'Project'}</h4>
-                            <p className="text-sm text-slate-500">{project.status} • {project.completion ?? 0}% Complete</p>
+                      {/* events are newest first (getKlEvents) */}
+                      {events.slice(0, 5).map(activity => {
+                        const phase = activityPhase(activity);
+                        return (
+                          <div key={activity.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-semibold text-slate-900 truncate">{activity.title || 'Activity'}</h4>
+                              <p className="text-sm text-slate-500">{formatDate(activity.date)}</p>
+                            </div>
+                            <Badge variant={phase === 'ongoing' ? 'success' : 'neutral'}>
+                              {phase === 'upcoming' ? 'Upcoming' : phase === 'ongoing' ? 'Ongoing' : 'Completed'}
+                            </Badge>
                           </div>
-                          <Badge variant={project.status === 'Active' ? 'success' : 'neutral'}>
-                            {project.status}
-                          </Badge>
-                        </div>
-                      ))}
-                      {projects.length === 0 && (
-                        <div className="text-center py-8 text-slate-400 text-sm">No projects found</div>
+                        );
+                      })}
+                      {events.length === 0 && (
+                        <div className="text-center py-8 text-slate-400 text-sm">No activities found</div>
                       )}
                     </div>
                   </div>
@@ -1037,13 +1035,12 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
                     <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
                     <Legend />
                     <Line type="monotone" dataKey="events" stroke="#0097D7" strokeWidth={2} name="Events" />
-                    <Line type="monotone" dataKey="projects" stroke="#6EC4E8" strokeWidth={2} name="Projects" />
                     <Line type="monotone" dataKey="members" stroke="#1C3F94" strokeWidth={2} name="Members" />
                   </LineChart>
                 </ResponsiveContainer>
               </Card>
 
-              <Card title="Project Status Distribution">
+              <Card title="Activity Status Distribution">
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie

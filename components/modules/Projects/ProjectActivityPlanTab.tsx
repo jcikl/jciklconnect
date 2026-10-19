@@ -5,6 +5,7 @@ import { Project } from '../../../types';
 import { PROJECT_TYPE_LABELS } from '../../../config/constants';
 import { formatDate, toDate } from '../../../utils/dateUtils';
 import { ProjectActivityDrawer } from './ProjectActivityDrawer';
+import { formatCoHosting } from '../../../utils/loHosting.mjs';
 
 interface ProjectActivityPlanTabProps {
   project: Project;
@@ -154,7 +155,7 @@ export const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
           )}
 
           {/* JCI Malaysia */}
-          {(project.location || project.hostingLo || project.area || project.coHosting || project.roadmapId) && (
+          {(project.location || project.hostingLo || project.area || formatCoHosting(project.coHosting) || project.roadmapId) && (
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">JCI Malaysia</p>
               <div className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2.5 space-y-1.5">
@@ -170,10 +171,10 @@ export const ProjectActivityPlanTab: React.FC<ProjectActivityPlanTabProps> = ({
                     <span className="text-sm text-slate-700">{project.area}</span>
                   </div>
                 )}
-                {project.coHosting && (
+                {formatCoHosting(project.coHosting) && (
                   <div className="flex items-start gap-2">
                     <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-20 shrink-0 mt-0.5">Co-Hosting</span>
-                    <span className="text-sm text-slate-700">{project.coHosting}</span>
+                    <span className="text-sm text-slate-700">{formatCoHosting(project.coHosting)}</span>
                   </div>
                 )}
                 {project.location && (

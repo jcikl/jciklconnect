@@ -7,6 +7,7 @@ import { useEvents } from '@/hooks/useEvents';
 import { GuestHeader } from '@/components/layout/GuestHeader';
 import { GuestFooter } from '@/components/layout/GuestFooter';
 import { Event } from '@/types';
+import { isKlRelevantEvent } from '../../../utils/loHosting.mjs';
 
 const EventCalendarView = lazy(() =>
   import('@/components/modules/EventCalendarView').then(m => ({ default: m.EventCalendarView }))
@@ -41,19 +42,7 @@ export const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
     });
   }, [events]);
 
-  const KL = 'jci kuala lumpur';
-  const isKLRelevant = (e: Event) => {
-    const lo = ((e as any).hostingLo ?? '').trim().toLowerCase();
-    const coRaw = (e as any).coHosting;
-    const level = ((e as any).level ?? '').trim().toLowerCase();
-    const isKL = lo === KL || (
-      Array.isArray(coRaw)
-        ? coRaw.some((c: string) => typeof c === 'string' && c.trim().toLowerCase() === KL)
-        : typeof coRaw === 'string' && coRaw.trim().toLowerCase() === KL
-    );
-    const isNationalOrAbove = level === 'national' || level === 'jci' || level === 'area' || level.startsWith('area');
-    return isKL || isNationalOrAbove;
-  };
+  const isKLRelevant = (e: Event) => isKlRelevantEvent(e as any);
   const publicEvents = upcomingEvents.filter(isKLRelevant);
   const allPublishedEvents = events.filter(isKLRelevant);
 

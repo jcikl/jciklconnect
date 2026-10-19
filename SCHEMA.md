@@ -1052,6 +1052,8 @@
 | lead | string | — | | 角色: B+ / Board；系统: 项目表单 | 项目负责人展示 |
 | organizerId | string \| null | — | | 系统: `createProject(currentUserId)` / 当前 `auth.uid` | 项目负责人识别与权限 |
 | level | enum | — | `JCI` \| `National` \| `Area` \| `Local` | 角色: B+；系统: 项目表单 | 项目分类展示与筛选 |
+| hostingLo | string | — | 主办分会名称，如 `JCI Kuala Lumpur`（`JCI Kuala Lumpur West` / `Mandarin` 是其他分会） | 系统: Roadmap 导入；角色: B+ 项目表单 | 分会筛选（`utils/loHosting.mjs`）、理事版首页 `getKlEvents` 查询 |
+| coHosting | string[] | — | 协办分会名称列表。2026-10 前为一串逗号分隔文字，由 `scripts/migrateCoHostingToArray.mjs` 转换；读取一律经 `parseCoHosting` 兼容两种格式 | 系统: Roadmap 导入（拆分文字）；角色: B+ 项目表单（逗号分隔输入）；`ProjectsService.createProject/updateProject` 统一存为列表 | 分会筛选、`getKlEvents` 的 `array-contains` 查询 |
 | pillar | enum | — | `Individual` \| `Community` \| `Business` \| `International` \| `LOM` \| `Chapter` | 角色: B+；系统: 项目表单 | 项目分类展示与筛选 |
 | category | string | — | | 角色: B+；系统: 项目表单 | 项目分类展示 |
 | type | enum | — | `program` \| `skill_development` \| `event` \| `project` | 角色: B+；系统: 项目表单 | 项目类型展示与分支逻辑 |

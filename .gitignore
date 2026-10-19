@@ -38,6 +38,7 @@ yarn-error.log*
 # Local migration/audit reports and script backups
 *.bak-*
 *-report.json
+coHosting-backup-*.json
 lark-migration-inventory.json
 .lark-jcikl-state.json
 

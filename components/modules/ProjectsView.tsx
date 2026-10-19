@@ -22,6 +22,7 @@ import { ProjectActivityDrawer } from './Projects/ProjectActivityDrawer';
 import { ProjectsTemplateModal } from './Projects/ProjectsTemplateModal';
 import { ProjectsDetailHeader } from './Projects/ProjectsDetailHeader';
 import { ProjectsListShell } from './Projects/ProjectsListShell';
+import { involvesLo } from '../../utils/loHosting.mjs';
 
 // Roadmap template bridge extracted to utils/roadmapUtils.ts
 // All sub-components extracted to Projects/ subdirectory
@@ -112,16 +113,7 @@ export const ProjectsView: React.FC<{ onNavigate?: (view: string) => void; searc
 
     if (!isAdmin && member) {
       const loName = (LO_ID_TO_NAME[(member as any).loId ?? ''] ?? '').trim().toLowerCase();
-      filtered = filtered.filter(p => {
-        if (!loName) return true;
-        const hosting = ((p as any).hostingLo ?? '').trim().toLowerCase();
-        const coRaw = (p as any).coHosting;
-        const isHosting = hosting === loName;
-        const isCo = Array.isArray(coRaw)
-          ? coRaw.some((c: string) => typeof c === 'string' && c.trim().toLowerCase() === loName)
-          : typeof coRaw === 'string' && coRaw.trim().toLowerCase() === loName;
-        return isHosting || isCo;
-      });
+      filtered = filtered.filter(p => !loName || involvesLo(p as any, loName));
     }
 
     if (activeTab === 'past-projects') {
