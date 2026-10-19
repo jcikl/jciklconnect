@@ -80,3 +80,29 @@ describe('EventsService.getKlEvents', () => {
     expect((await EventsService.getKlEvents()).map(e => e.id)).toEqual(['new', 'old']);
   });
 });
+
+describe('EventsService.getKlRelevantEvents', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    EventsService.invalidateEventsCache();
+    getDocsMock.mockResolvedValue({
+      docs: [
+        doc('national', { eventStartDate: '2026-11-11', status: 'Active', level: 'National' }),
+        doc('kl-done', { eventStartDate: '2025-05-01', status: 'Completed', hostingLo: 'JCI Kuala Lumpur' }),
+        doc('no-date', { status: 'Active', hostingLo: 'JCI Kuala Lumpur' }),
+        doc('kl', { eventStartDate: '2026-10-21', status: 'Active', coHosting: ['JCI Kuala Lumpur'] }),
+      ],
+    });
+  });
+
+  it('asks only for KL host / co-host or national / area / JCI level events', async () => {
+    await EventsService.getKlRelevantEvents();
+    expect(whereMock).toHaveBeenCalledWith('hostingLo', '==', 'JCI Kuala Lumpur');
+    expect(whereMock).toHaveBeenCalledWith('coHosting', 'array-contains', 'JCI Kuala Lumpur');
+    expect(whereMock).toHaveBeenCalledWith('level', 'in', ['National', 'Area', 'JCI']);
+  });
+
+  it('keeps listed statuses with a date, newest first (same as getAllEvents)', async () => {
+    expect((await EventsService.getKlRelevantEvents()).map(e => e.id)).toEqual(['national', 'kl']);
+  });
+});
