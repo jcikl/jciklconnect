@@ -91,7 +91,7 @@
 | `learningPathsService.ts` | 340 | 2 | Learning Paths & Learning Progress Service Fixes applied: P1 – startLearningPath uses runTransaction to prevent duplicate progress records P… | LEARNING_PATHS, LEARNING_PROGRESS |
 | `memberAuthService.ts` | 91 | 2 | 会员登录账号（Firebase Auth）的建立与补建；调用 Netlify 函数 member-auth（uid = 会员文档 ID）。 | — |
 | `memberBenefitsService.ts` | 329 | 1 | Member Benefits Service Handles the memberBenefits collection and benefitUsage write path. Read path for advertisements-as-benefits lives in… | ADVERTISEMENTS, BENEFIT_USAGE, MEMBER_BENEFITS |
-| `memberJourneyService.ts` | 170 | 2 | Leadership Journey + Trainer Pathway derivation (dashboard journey card for pre-2025 members) | — |
+| `memberJourneyService.ts` | 155 | 2 | Leadership Journey + Trainer Pathway derivation (dashboard journey card for pre-2025 members) | — |
 | `memberStatsService.ts` | 318 | 2 | Member Statistics Service - Generates comprehensive member statistics and reports | — |
 | `membersService.ts` | 2,284 | 41 | Members Service - CRUD Operations | BOARD_MEMBERS, EVENT_REGISTRATIONS, MEMBERS, MEMBER_EMAILS, NOTIFICATIONS, PAYMENT_REQUESTS … |
 | `membershipConfigService.ts` | 373 | 17 | ⚠️ 無說明 | SYSTEM_SETTINGS |
@@ -149,9 +149,9 @@
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `getLeadershipJourney` | 46 | Leadership Journey — derived from project committee assignments + Board of Directors records |
-| `getTrainerJourney` | 149 | Trainer Pathway — derived from member skills + points (same criteria as the profile card) |
-| `getJourney` | 164 |  |
+| `getLeadershipJourney` | 45 | Leadership Journey — derived from project committee assignments + Board of Directors records |
+| `getTrainerJourney` | 134 | Trainer Pathway — derived from member skills + points (same criteria as the profile card) |
+| `getJourney` | 149 |  |
 
 </details>
 
@@ -468,7 +468,7 @@
 | `eventsService.ts` | 1,071 | 14 | Events Service - CRUD Operations | EVENT_BUDGETS, EVENT_FEEDBACK, EVENT_REGISTRATIONS, GUEST_REGISTRATIONS, NOTIFICATIONS, POINTS … |
 | `flagshipProjectsService.ts` | 156 | 3 | ⚠️ 無說明 | FLAGSHIP_PROJECTS |
 | `projectReportService.ts` | 775 | 3 | Project Report Service - Generates automated project reports | TEMPLATES |
-| `projectsService.ts` | 816 | 22 | Projects Service - CRUD Operations | ACTIVITY_PLANS, MEMBERS, POINTS, PROJECTS, PROJECT_REPORTS, PROJECT_TRANSACTIONS … |
+| `projectsService.ts` | 816 | 21 | Projects Service - CRUD Operations | ACTIVITY_PLANS, MEMBERS, POINTS, PROJECTS, PROJECT_REPORTS, PROJECT_TRANSACTIONS … |
 | `zoomBookingService.ts` | 168 | 1 | ⚠️ 無說明 | ZOOM_BOOKINGS |
 
 <details><summary><code>services/activityPlansService.ts</code> — 11 個方法</summary>
@@ -1106,9 +1106,9 @@
 
 | Service | 行數 | 引用 | 用途 | 集合 |
 |---|---|---|---|---|
-| `aiPredictionService.ts` | 949 | 5 | AI Prediction Service - Advanced AI predictions for events, projects, and sponsors | — |
+| `aiPredictionService.ts` | 949 | 4 | AI Prediction Service - Advanced AI predictions for events, projects, and sponsors | — |
 | `cacheService.ts` | 314 | 32 | 缓存服务 - 提供内存缓存和本地存储缓存功能 Cache Service - Provides in-memory and localStorage caching capabilities | — |
-| `cloudinaryService.ts` | 327 | 13 | Cloudinary Upload Service | — |
+| `cloudinaryService.ts` | 337 | 14 | Cloudinary Upload Service | — |
 | `dataImportExportService.ts` | 892 | 3 | ⚠️ 無說明 | EVENTS, MEMBERS, MEMBER_EMAILS |
 | `errorLoggingService.ts` | 354 | 66 | ⚠️ 無說明 | ERROR_LOGS |
 | `firestoreLogger.ts` | 197 | 3 | System Logger — Firestore ops + Performance monitoring Fire-and-forget buffered logger. Buffers events for 3 seconds then writes one batched… | SYSTEM_LOGS |
@@ -1136,10 +1136,10 @@
 
 </details>
 
-<details><summary><code>services/cloudinaryService.ts</code> — 0 個方法、13 個函數/常數</summary>
+<details><summary><code>services/cloudinaryService.ts</code> — 0 個方法、14 個函數/常數</summary>
 
 
-**其他 export：** `trimCloudinaryImage` (L9), `getMemberAvatarKey` (L48), `getMemberAvatarFolder` (L55), `uploadMemberAvatarToCloudinary` (L59), `uploadBoardAvatarToCloudinary` (L79), `uploadPresidentialLogoToCloudinary` (L98), `uploadMemberGroupPhotoToCloudinary` (L114), `uploadMemberOfferLogoToCloudinary` (L131), `uploadMemberOfferBannerToCloudinary` (L146), `uploadBodGroupPhotoToCloudinary` (L161), `uploadToCloudinary` (L186), `getPublicIdFromUrl` (L269), `deleteFromCloudinary` (L290)
+**其他 export：** `trimCloudinaryImage` (L9), `resizeCloudinaryImage` (L19), `getMemberAvatarKey` (L58), `getMemberAvatarFolder` (L65), `uploadMemberAvatarToCloudinary` (L69), `uploadBoardAvatarToCloudinary` (L89), `uploadPresidentialLogoToCloudinary` (L108), `uploadMemberGroupPhotoToCloudinary` (L124), `uploadMemberOfferLogoToCloudinary` (L141), `uploadMemberOfferBannerToCloudinary` (L156), `uploadBodGroupPhotoToCloudinary` (L171), `uploadToCloudinary` (L196), `getPublicIdFromUrl` (L279), `deleteFromCloudinary` (L300)
 
 </details>
 

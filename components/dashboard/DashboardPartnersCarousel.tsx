@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Autoplay, Pagination } from 'swiper/modules';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Advertisement, AdvertisementService } from '../../services/advertisementService';
+import { resizeCloudinaryImage } from '../../services/cloudinaryService';
 import { UserRole } from '../../types';
 import { MembersOnlyOverlay } from '../ui/MembersOnlyOverlay';
 import { Skeleton } from '../ui/Common';
@@ -75,7 +76,8 @@ export const DashboardPartnersCarousel: React.FC<DashboardPartnersCarouselProps>
                     onSelectAd(ad);
                   }}
                 >
-                  <img src={ad.imageUrl} alt={ad.title} className="w-full h-full object-cover" />
+                  {/* Cards are ~350px wide; 720px covers 2x screens (originals were up to ~1 MB each). */}
+                  <img src={resizeCloudinaryImage(ad.imageUrl, 720)} alt={ad.title} className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
                   <div className="absolute bottom-0 left-0 right-0 p-4 z-10">
                     <h3 className="text-white font-bold text-sm sm:text-base line-clamp-1">{ad.title}</h3>

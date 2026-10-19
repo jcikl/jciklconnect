@@ -4,7 +4,6 @@ import { Skeleton } from '../ui/Common';
 import { useAuth } from '../../hooks/useAuth';
 import { useEvents } from '../../hooks/useEvents';
 
-import { AIPredictionService, PersonalizedRecommendation } from '../../services/aiPredictionService';
 import { ContractService, CommitmentContract } from '../../services/contractService';
 import { PromotionService, type MemberEngagementProgressSummary } from '../../services/promotionService';
 import { MembersService } from '../../services/membersService';
@@ -50,8 +49,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   // (3,000+ docs) made the home page take several seconds.
   const { events, loading: eventsLoading, registerForEvent, markAttendance, cancelRegistration } = useEvents({ scope: 'upcoming' });
 
-  const [recommendations, setRecommendations] = useState<PersonalizedRecommendation[]>([]);
-  const [topRecommendation, setTopRecommendation] = useState<PersonalizedRecommendation | null>(null);
   const [contracts, setContracts] = useState<CommitmentContract[]>([]);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [homepageAds, setHomepageAds] = useState<Advertisement[]>([]);
@@ -181,23 +178,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     }
     setShowJourneyModal(true);
   };
-
-  // Load personalized recommendations — deferred so the dashboard renders first
-  useEffect(() => {
-    if (!member) return;
-    const timer = setTimeout(async () => {
-      try {
-        const recs = await AIPredictionService.getPersonalizedRecommendations(member.id, 5);
-        setRecommendations(recs);
-        if (recs.length > 0) {
-          setTopRecommendation(recs[0]);
-        }
-      } catch (err) {
-        console.error('Failed to load recommendations:', err);
-      }
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [member]);
 
   // Calculate stats from real data
   const upcomingEvents = React.useMemo(() => {
