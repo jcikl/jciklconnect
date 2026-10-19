@@ -380,22 +380,29 @@ service cloud.firestore {
              card.international == owner.get('privacy', {}).get('shareCardInternationally', false);
     }
 
+    // Reciprocity (owner rule): a non-admin may view other people's cards only after opting in
+    // their OWN card (members.privacy.shareCardInternationally == true). Reuses memberData(), the
+    // caller's member doc that getUserRole() etc. already read (one billed get per request).
+    function hasOptedInCard() {
+      return memberData().get('privacy', {}).get('shareCardInternationally', false) == true;
+    }
+
     function externalCanReadCard() {
       return isActiveExternal() &&
              (resource.data.international == true || resource.data.loId == getMyLoId());
     }
 
     match /memberCards/{memberId} {
+      // Owner may always get their own card; KL admins read everything; everyone else (KL members,
+      // BOARD, active externals — even for their own chapter) must have opted in first.
       allow get: if isAuthenticated() && (
         request.auth.uid == memberId ||
-        isActiveMember() ||
-        canReadOrgMembers() ||
-        externalCanReadCard()
+        isAdmin() ||
+        (hasOptedInCard() && (isActiveMember() || canReadOrgMembers() || externalCanReadCard()))
       );
       allow list: if isAuthenticated() && (
-        isActiveMember() ||
-        canReadOrgMembers() ||
-        externalCanReadCard()
+        isAdmin() ||
+        (hasOptedInCard() && (isActiveMember() || canReadOrgMembers() || externalCanReadCard()))
       );
       allow create, update: if isAuthenticated() &&
         ((request.auth.uid == memberId && (isActiveMember() || isActiveExternal())) ||
