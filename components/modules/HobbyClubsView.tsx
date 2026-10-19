@@ -9,10 +9,11 @@ const getInitialsSvg = (name: string, size = 200): string => {
 import { Calendar, Plus, Heart, Edit, Trash2 } from 'lucide-react';
 import { Card, Button, Badge, Modal, PageHeader, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
 import type { ConfirmState } from '../ui/Common';
-import { Input, Select, Textarea } from '../ui/Form';
+import { Input, Select, Textarea, Checkbox } from '../ui/Form';
 import { LoadingState } from '../ui/Loading';
 import { useHobbyClubs } from '../../hooks/useHobbyClubs';
 import { useAuth } from '../../hooks/useAuth';
+import { usePermissions } from '../../hooks/usePermissions';
 import { getClubGroupLink } from '../../utils/clubLink';
 import { HobbyClub, ClubActivity } from '../../types';
 import { Tabs } from '../ui/Common';
@@ -27,6 +28,9 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
     const [activeTab, setActiveTab] = useState<'clubs' | 'activities'>('clubs');
     const { clubs, loading, error, createClub, updateClub, deleteClub, scheduleActivity, updateActivity, deleteActivity } = useHobbyClubs();
     const { member } = useAuth();
+    const { isAdmin, isBoard, isExternal } = usePermissions();
+    // Only board / admin decide whether other JCI chapters can see a club (also enforced in firestore.rules).
+    const canSetAudience = (isAdmin || isBoard) && !isExternal;
 
     const filteredClubs = React.useMemo(() => {
         const term = (searchQuery || '').toLowerCase();
@@ -50,6 +54,7 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
                 lead: member?.general?.name || '',
                 image: formData.get('image') as string || getInitialsSvg(formData.get('name') as string, 200),
                 whatsappUrl: ((formData.get('whatsappUrl') as string) || '').trim(),
+                ...(canSetAudience ? { openToExternals: formData.get('openToExternals') === 'on' } : {}),
             };
 
             await createClub(newClub);
@@ -73,6 +78,7 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
                 category: (formData.get('category') as HobbyClub['category']) || 'Social',
                 image: formData.get('image') as string || selectedClub.image,
                 whatsappUrl: ((formData.get('whatsappUrl') as string) || '').trim(),
+                ...(canSetAudience ? { openToExternals: formData.get('openToExternals') === 'on' } : {}),
             });
             setEditModalOpen(false);
             setSelectedClub(null);
@@ -128,7 +134,7 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
                         <LoadingState loading={loading} error={error} empty={filteredClubs.length === 0} emptyMessage="No hobby clubs found">
                             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
                                 {/* Start new club card */}
-                                <button
+                                {!isExternal && <button
                                     className="group flex flex-col items-center justify-center gap-3 min-h-[220px] rounded-2xl border-2 border-dashed border-slate-200 text-slate-400 hover:border-jci-blue/40 hover:text-jci-blue hover:bg-blue-50/30 transition-all"
                                     onClick={() => setCreateModalOpen(true)}
                                 >
@@ -136,7 +142,7 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
                                         <Plus size={20} />
                                     </div>
                                     <span className="font-bold text-sm">Start New Club</span>
-                                </button>
+                                </button>}
                                 {filteredClubs.map(club => (
                                     <div key={club.id} className="group flex flex-col bg-white rounded-2xl border border-slate-100/80 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 overflow-hidden">
                                         {/* Cover */}
@@ -150,7 +156,7 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
                                                 {club.category}
                                             </span>
                                             {/* Owner actions */}
-                                            {isOwner(club) && (
+                                            {(isOwner(club) || canSetAudience) && (
                                                 <div className="absolute top-2.5 left-2.5 flex gap-1">
                                                     <button
                                                         className="p-1.5 rounded-lg bg-black/30 backdrop-blur-md text-white/90 hover:bg-black/50 transition-colors"
@@ -158,12 +164,14 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
                                                     >
                                                         <Edit size={13} />
                                                     </button>
+                                                    {isOwner(club) && (
                                                     <button
                                                         className="p-1.5 rounded-lg bg-black/30 backdrop-blur-md text-white/90 hover:bg-red-500/80 transition-colors"
                                                         onClick={() => handleDeleteClub(club.id)}
                                                     >
                                                         <Trash2 size={13} />
                                                     </button>
+                                                    )}
                                                 </div>
                                             )}
                                             {/* Name on cover */}
@@ -251,6 +259,7 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
                     ]} required />
                     <Input name="image" label="Image URL" type="url" placeholder="https://..." />
                     <Input name="whatsappUrl" label="Group Chat Link" type="url" placeholder="WhatsApp / LINE / Discord invite link" />
+                    {canSetAudience && <Checkbox name="openToExternals" label="Open to other JCI chapters" />}
                     <div className="pt-4">
                         <Button className="w-full" type="submit" disabled={!member}>Create Club</Button>
                     </div>
@@ -278,6 +287,7 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
                         ]} defaultValue={selectedClub.category} required />
                         <Input name="image" label="Image URL" type="url" defaultValue={selectedClub.image} />
                         <Input name="whatsappUrl" label="Group Chat Link" type="url" placeholder="WhatsApp / LINE / Discord invite link" defaultValue={selectedClub.whatsappUrl} />
+                        {canSetAudience && <Checkbox name="openToExternals" label="Open to other JCI chapters" defaultChecked={!!selectedClub.openToExternals} />}
                         <div className="pt-4">
                             <Button className="w-full" type="submit" disabled={isSaving} isLoading={isSaving}>Update Club</Button>
                         </div>

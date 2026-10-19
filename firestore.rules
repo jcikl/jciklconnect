@@ -838,19 +838,36 @@ service cloud.firestore {
     
     // Surveys collection — SUPER_ADMIN included via isAdmin()
     match /surveys/{surveyId} {
-      // External users: only surveys targeted to them via the existing 'Specific Group' list
-      // (list query must carry where('specificMemberIds','array-contains',uid)).
+      // External users: surveys targeted to them via the 'Specific Group' list, or Active surveys that
+      // board/admin opened to other chapters (openToExternals; missing = false). List queries must carry
+      // where('specificMemberIds','array-contains',uid) OR where('openToExternals','==',true) + where('status','==','Active').
       allow read: if isInternalUser() ||
-                     (isActiveExternal() && request.auth.uid in resource.data.specificMemberIds);
-      allow create, update, delete: if isBoard() || isAdmin();
+                     (isActiveExternal() &&
+                      (request.auth.uid in resource.data.specificMemberIds ||
+                       (resource.data.openToExternals == true && resource.data.status == 'Active')));
+      allow create, delete: if isBoard() || isAdmin();
+      // Submitting a response (SurveysService.submitResponse) bumps responsesCount by exactly 1 in the same
+      // transaction: anyone who may read this survey may do that, and change nothing else but updatedAt.
+      allow update: if isBoard() || isAdmin() ||
+                      ((isInternalUser() ||
+                        (isActiveExternal() &&
+                         (request.auth.uid in resource.data.get('specificMemberIds', []) ||
+                          (resource.data.get('openToExternals', false) == true && resource.data.get('status', '') == 'Active')))) &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['responsesCount', 'updatedAt']) &&
+                       request.resource.data.responsesCount == resource.data.get('responsesCount', 0) + 1);
     }
     
     // Survey Responses collection
     // FIX 5: allow read used resource.data.memberId which is null in list queries — members could never list their own responses
     match /surveyResponses/{responseId} {
+      // Survey being answered (get() results are cached per request, so repeated calls cost one read).
+      function surveyOfResponse() {
+        return get(/databases/$(database)/documents/surveys/$(request.resource.data.surveyId)).data;
+      }
       // resource.data valid for get; service-layer where(memberId == uid) handles list ownership
+      // resource == null: submitResponse's duplicate check reads its own not-yet-existing id ({surveyId}_{uid}).
       allow get: if isAuthenticated() &&
-                    (resource.data.memberId == request.auth.uid || isBoard() || isAdmin());
+                    (resource == null || resource.data.memberId == request.auth.uid || isBoard() || isAdmin());
       allow list: if isActiveMember() ||
                      (isActiveExternal() && resource.data.memberId == request.auth.uid);
       // FIX: added required field validation to prevent partial/malformed responses
@@ -860,10 +877,12 @@ service cloud.firestore {
                       request.resource.data.memberId == request.auth.uid &&
                       request.resource.data.keys().hasAll(['surveyId', 'memberId', 'responses', 'submittedAt']) &&
                       !exists(/databases/$(database)/documents/surveyResponses/$(responseId)) &&
-                      // External users may only answer surveys targeted to them.
+                      // External users may only answer surveys targeted to them, or Active surveys open to externals.
                       (!isExternal() ||
                        (isActiveExternal() &&
-                        request.auth.uid in get(/databases/$(database)/documents/surveys/$(request.resource.data.surveyId)).data.get('specificMemberIds', [])));
+                        (request.auth.uid in surveyOfResponse().get('specificMemberIds', []) ||
+                         (surveyOfResponse().get('openToExternals', false) == true &&
+                          surveyOfResponse().get('status', '') == 'Active'))));
       allow update, delete: if isBoard() || isAdmin();
     }
 
@@ -928,13 +947,17 @@ service cloud.firestore {
     // Hobby Clubs collection
     // FIX 12: any authenticated user (including GUEST) could create/update/delete any club
     match /hobbyClubs/{clubId} {
-      allow read: if isInternalUser() || isActiveExternal();  // whitelisted module: hobby clubs
+      // Externals (other chapters) see only clubs board/admin opened to them (list query: where('openToExternals','==',true)).
+      allow read: if isInternalUser() || (isActiveExternal() && resource.data.openToExternals == true);
       // P2 Fix: exclude GUEST role from creating clubs — only MEMBER and above.
-      allow create: if (isMember() && getUserRole() != 'GUEST') || isBoard() || isAdmin();
-      // Club lead can update descriptive fields only — leadId and memberIds are admin-managed
+      // Only board/admin may open a club to other chapters.
+      allow create: if (isBoard() || isAdmin()) ||
+                      (isMember() && getUserRole() != 'GUEST' &&
+                       request.resource.data.get('openToExternals', false) != true);
+      // Club lead can update descriptive fields only — leadId, memberIds and openToExternals are admin-managed
       allow update: if isBoard() || isAdmin() ||
                       (isMember() && resource.data.leadId == request.auth.uid
-                        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['leadId', 'memberIds']));
+                        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['leadId', 'memberIds', 'openToExternals']));
       allow delete: if isAdmin();
     }
     

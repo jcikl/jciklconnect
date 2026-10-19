@@ -23,6 +23,7 @@ import { MOCK_CLUBS } from './mockData';
 // --- Cache key prefixes ---
 const CACHE_PREFIX_CLUBS = 'hobbyClubs:';
 const CACHE_ALL_CLUBS = 'hobbyClubs:all';
+const CACHE_EXTERNAL_CLUBS = 'hobbyClubs:external';
 const CACHE_TTL = CACHE_TTL_3MIN;
 
 function clubKey(clubId: string) {
@@ -45,19 +46,44 @@ export class HobbyClubsService {
       async () => {
         try {
           // P1 fix: filter out soft-deleted clubs so they never appear in the UI.
-          const snapshot = await getDocs(
-            query(
-              collection(db, COLLECTIONS.HOBBY_CLUBS),
-              where('isDeleted', '!=', true),
-              orderBy('isDeleted'),
-              orderBy('name', 'asc')
-            )
-          );
-          return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as HobbyClub));
+          // Filtered in code: where('isDeleted','!=',true) would also drop clubs with no isDeleted field,
+          // which is every club createClub writes.
+          const snapshot = await getDocs(collection(db, COLLECTIONS.HOBBY_CLUBS));
+          return snapshot.docs
+            .map(d => ({ id: d.id, ...d.data() } as HobbyClub))
+            .filter(c => c.isDeleted !== true)
+            .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
         } catch (error) {
           errorLoggingService.logError(error as Error, {
             component: 'HobbyClubsService',
             action: 'getAllClubs',
+          });
+          throw error;
+        }
+      },
+      CACHE_TTL
+    );
+  }
+
+  // Clubs visible to externals (other chapters): openToExternals == true only (firestore.rules hobbyClubs read).
+  // Single equality filter → no composite index; soft-deleted clubs and sorting handled in code.
+  static async getClubsForExternal(): Promise<HobbyClub[]> {
+    if (isDevMode()) return MOCK_CLUBS.filter(c => c.openToExternals === true && c.isDeleted !== true);
+    return apiCache.getOrSet(
+      CACHE_EXTERNAL_CLUBS,
+      async () => {
+        try {
+          const snapshot = await getDocs(
+            query(collection(db, COLLECTIONS.HOBBY_CLUBS), where('openToExternals', '==', true))
+          );
+          return snapshot.docs
+            .map(d => ({ id: d.id, ...d.data() } as HobbyClub))
+            .filter(c => c.isDeleted !== true)
+            .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+        } catch (error) {
+          errorLoggingService.logError(error as Error, {
+            component: 'HobbyClubsService',
+            action: 'getClubsForExternal',
           });
           throw error;
         }

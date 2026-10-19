@@ -113,6 +113,7 @@ export interface HobbyClub {
   whatsappUrl?: string; // Group chat invite link (WhatsApp / LINE / Discord ...) that "Join" opens
   capacity?: number;   // Legacy: was enforced by the removed in-app join
   isDeleted?: boolean; // Soft-delete flag; getAllClubs filters these out
+  openToExternals?: boolean; // Members of other JCI chapters may see it. Missing = false. Board/admin only.
 }
 
 export interface TrainingModule {

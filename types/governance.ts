@@ -27,6 +27,8 @@ export interface Survey {
     required: boolean;
   }>;
   targetAudience: 'All Members' | 'Board' | 'Project Leads' | 'Specific Group';
+  /** Other JCI chapters may see/answer it while Active. Missing = false. */
+  openToExternals?: boolean;
   status: 'Draft' | 'Active' | 'Closed';
   startDate: string;
   endDate: string;
