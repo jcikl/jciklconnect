@@ -347,6 +347,22 @@ describe.skipIf(!HOST)('firestore.rules — surveys / hobby clubs open to extern
     });
   });
 
+  describe('surveyResponses: id must be {surveyId}_{uid}', () => {
+    it('a response under a foreign id is denied (member and external)', async () => {
+      expect(await set('klMember', 'surveyResponses/klOnly_someoneElse', response('klMember', 'klOnly'))).toBe(DENIED);
+      expect(await set('klMember', 'surveyResponses/randomId123', response('klMember', 'klOnly'))).toBe(DENIED);
+      expect(await set('klMember', 'surveyResponses/openActive_klMember', response('klMember', 'klOnly'))).toBe(DENIED); // other survey's id
+      expect(await set('aff1', 'surveyResponses/openActive_x', response('aff1', 'openActive'))).toBe(DENIED);
+    });
+    it('the canonical id still works', async () => {
+      expect(await set('klBoard', 'surveyResponses/klOnly_klBoard', response('klBoard', 'klOnly'))).toBe(OK);
+    });
+    it('board/admin keep what they had: any id with their own memberId', async () => {
+      expect(await set('klAdmin', 'surveyResponses/adminFreeId', response('klAdmin', 'klOnly'))).toBe(OK);
+      expect(await set('klBoard', 'surveyResponses/boardFreeId', response('klBoard', 'klOnly'))).toBe(OK);
+    });
+  });
+
   describe('KL behaviour unchanged', () => {
     it('KL MEMBER reads every survey and lists unfiltered', async () => {
       expect(await getDoc('klMember', 'surveys/openDraft')).toBe(OK);

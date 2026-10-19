@@ -935,10 +935,13 @@ service cloud.firestore {
       allow list: if isActiveMember() ||
                      (isActiveExternal() && resource.data.memberId == request.auth.uid);
       // FIX: added required field validation to prevent partial/malformed responses
-      // DEDUP: !exists() check prevents duplicate submissions when service uses memberId_surveyId as doc ID.
-      // Service MUST use a deterministic responseId = memberId + '_' + surveyId when calling setDoc.
+      // DEDUP: the id is deterministic, {surveyId}_{memberId} (SurveysService.submitResponse), and
+      // !exists() rejects a second submission. Non-board/admin users must use exactly that id, so they
+      // cannot add extra responses under other ids; board/admin keep their previous freedom.
       allow create: if isAuthenticated() &&
                       request.resource.data.memberId == request.auth.uid &&
+                      (isBoard() || isAdmin() ||
+                       responseId == request.resource.data.surveyId + '_' + request.auth.uid) &&
                       request.resource.data.keys().hasAll(['surveyId', 'memberId', 'responses', 'submittedAt']) &&
                       !exists(/databases/$(database)/documents/surveyResponses/$(responseId)) &&
                       // External users may only answer surveys targeted to them, or Active surveys open to externals.
