@@ -4,7 +4,19 @@ export enum UserRole {
   BOARD = 'BOARD',
   ADMIN = 'ADMIN',
   SUPER_ADMIN = 'SUPER_ADMIN',
-  INACTIVE = 'INACTIVE'
+  INACTIVE = 'INACTIVE',
+  /**
+   * External member: a JCI member of ANOTHER chapter (members.loId = a `sisterChapters` id, never 'jcikl').
+   * Limited to a whitelist of modules; may only read their OWN full member doc (directory data comes
+   * from `memberCards`). Lifecycle lives in `Member.affiliation`. Not part of isMember()/isActiveMember().
+   */
+  AFFILIATE = 'AFFILIATE',
+  /**
+   * Chapter administrator (分会管理人) of one external chapter, created by KL admins.
+   * Everything an AFFILIATE can do, plus (rules only, Phase 0): read the full member docs of their OWN
+   * chapter and update a limited set of `affiliation` fields of their chapter's AFFILIATE members.
+   */
+  CHAPTER_ADMIN = 'CHAPTER_ADMIN'
 }
 
 export enum MemberTier {

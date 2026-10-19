@@ -7,6 +7,8 @@ import { useToast } from '../components/ui/Common';
 import { useAuth } from './useAuth';
 import { isDevMode } from '../utils/devMode';
 import { useFirestoreCollection } from './useFirestoreCollection';
+import { DEFAULT_LO_ID } from '../config/constants';
+import { filterKlMembers } from '../utils/memberScope';
 
 export interface UseMembersResult {
   members: Member[];
@@ -34,7 +36,12 @@ export const useMembers = (loIdFilter?: string | null): UseMembersResult => {
   const enabled = !authLoading && (inDevMode || isFullMember);
 
   const { data: members, loading, error, reload: loadMembers } = useFirestoreCollection<Member>({
-    loader: () => MembersService.getAllMembers(loIdFilter ?? currentMember?.loId ?? undefined),
+    loader: async () => {
+      const lo = loIdFilter ?? currentMember?.loId ?? undefined;
+      const list = await MembersService.getAllMembers(lo);
+      // Safety net: KL scope must never surface external-chapter members.
+      return !lo || lo === DEFAULT_LO_ID ? filterKlMembers(list) : list;
+    },
     enabled,
     deps: [loIdFilter, currentMember?.loId, currentMember?.role, isDevModeFromAuth, authLoading],
   });

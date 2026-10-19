@@ -17,9 +17,9 @@
 
 | 層 | 檔案數 | 位置 |
 |---|---|---|
-| Service（業務邏輯與資料存取） | 68 | `services/` |
+| Service（業務邏輯與資料存取） | 69 | `services/` |
 | Hook（React 資料綁定） | 39 | `hooks/` |
-| Util（純函數工具） | 18 | `utils/` |
+| Util（純函數工具） | 22 | `utils/` |
 | UI 元件（通用） | 33 | `components/ui/` |
 | 共用業務元件 | 9 | `components/shared/` |
 | Context | 2 | `contexts/` |
@@ -73,10 +73,10 @@
 
 | 檔案 | 行數 |
 |---|---|
-| `services/financeService.ts` | 5,320 |
+| `services/financeService.ts` | 5,325 |
 | `services/pointsService.ts` | 2,492 |
-| `services/membersService.ts` | 2,284 |
-| `hooks/useFinanceData.ts` | 2,033 |
+| `services/membersService.ts` | 2,326 |
+| `hooks/useFinanceData.ts` | 2,034 |
 | `services/inventoryService.ts` | 1,638 |
 
 ## 2. Service 層（按業務領域）
@@ -91,12 +91,13 @@
 | `learningPathsService.ts` | 340 | 2 | Learning Paths & Learning Progress Service Fixes applied: P1 – startLearningPath uses runTransaction to prevent duplicate progress records P… | LEARNING_PATHS, LEARNING_PROGRESS |
 | `memberAuthService.ts` | 91 | 2 | 会员登录账号（Firebase Auth）的建立与补建；调用 Netlify 函数 member-auth（uid = 会员文档 ID）。 | — |
 | `memberBenefitsService.ts` | 329 | 1 | Member Benefits Service Handles the memberBenefits collection and benefitUsage write path. Read path for advertisements-as-benefits lives in… | ADVERTISEMENTS, BENEFIT_USAGE, MEMBER_BENEFITS |
+| `memberCardsService.ts` | 138 | 7 | Member Cards Service — keeps `memberCards/{memberId}` (the public directory card, Phase 0 WP2) in sync with `members`. The card is written A… | MEMBER_CARDS |
 | `memberJourneyService.ts` | 155 | 2 | Leadership Journey + Trainer Pathway derivation (dashboard journey card for pre-2025 members) | — |
-| `memberStatsService.ts` | 318 | 2 | Member Statistics Service - Generates comprehensive member statistics and reports | — |
-| `membersService.ts` | 2,284 | 41 | Members Service - CRUD Operations | BOARD_MEMBERS, EVENT_REGISTRATIONS, MEMBERS, MEMBER_EMAILS, NOTIFICATIONS, PAYMENT_REQUESTS … |
+| `memberStatsService.ts` | 319 | 2 | Member Statistics Service - Generates comprehensive member statistics and reports | — |
+| `membersService.ts` | 2,326 | 41 | Members Service - CRUD Operations | BOARD_MEMBERS, EVENT_REGISTRATIONS, MEMBERS, MEMBER_EMAILS, NOTIFICATIONS, PAYMENT_REQUESTS … |
 | `membershipConfigService.ts` | 373 | 17 | ⚠️ 無說明 | SYSTEM_SETTINGS |
 | `mentorshipService.ts` | 638 | 4 | Mentorship Matching Service | MEMBERS, MENTORSHIP_FEEDBACK, MENTOR_MATCHES |
-| `promotionService.ts` | 1,187 | 4 | ⚠️ 無說明 | MANUAL_PROMOTION_REQUESTS, MEMBERS, PROMOTION_HISTORY, SYSTEM |
+| `promotionService.ts` | 1,191 | 4 | ⚠️ 無說明 | MANUAL_PROMOTION_REQUESTS, MEMBERS, PROMOTION_HISTORY, SYSTEM |
 
 <details><summary><code>services/engagementAutoSuggestService.ts</code> — 0 個方法、1 個函數/常數</summary>
 
@@ -145,6 +146,21 @@
 
 </details>
 
+<details><summary><code>services/memberCardsService.ts</code> — 8 個方法</summary>
+
+| 方法 | 行 | 說明 |
+|---|---|---|
+| `getInternationalCards` | 41 | Cards shared with other chapters (`international == true`), all chapters, KL's own excluded. Query shape: ONE … |
+| `getCardsByChapters` | 61 | Cards of the given chapters (KL users only: rules let active KL members list any card, by `loId ==` or `in`; e… |
+| `invalidateCardsCache` | 80 | Drop cached card lists (call after the viewer opts in, so a stale result is not served). |
+| `buildCard` | 85 |  |
+| `shouldHaveCard` | 89 |  |
+| `applyUpdates` | 94 | Member snapshot after an updateDoc-style payload (dot-paths supported). |
+| `plan` | 99 | Decide the card action for a before -> after member change (see planCardSync). |
+| `syncCards` | 108 | Applies the planned card upserts/deletes for already-committed member writes, chunked (<= 400 per batch). Neve… |
+
+</details>
+
 <details><summary><code>services/memberJourneyService.ts</code> — 3 個方法</summary>
 
 | 方法 | 行 | 說明 |
@@ -159,8 +175,8 @@
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `generateStatistics` | 51 | Generate comprehensive member statistics |
-| `generateReport` | 192 | Generate comprehensive member report with insights |
+| `generateStatistics` | 52 | Generate comprehensive member statistics |
+| `generateReport` | 193 | Generate comprehensive member report with insights |
 
 </details>
 
@@ -168,38 +184,38 @@
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `syncComputedMembershipType` | 97 | Recompute membershipType from profile + promotion (Full); always persisted on save. |
-| `invalidateMembersCache` | 124 | Invalidate all members cache (call after any write to members collection). |
-| `getAllMembers` | 132 | Get all members, optionally filtered by loId (for multi-LO). |
-| `getMemberById` | 176 | Get member by ID |
-| `recalculateIntroducerStats` | 198 | Helper to recalculate radar stats for an introducer (dynamic import to avoid circular dependency) |
-| `normalizeMemberData` | 245 | Helper to map flat properties to standard nested sub-objects (general, contact, etc.) for database consistency… |
-| `createMember` | 566 | Create new member. Caller should pass loId (or use DEFAULT_LO_ID for single-LO). |
-| `updateMember` | 645 | Update member. Sets updatedAt and optionally updatedBy (audit). |
-| `validateSenatorshipByBoard` | 863 | Board of Directors validates a member's senatorship number (locks future edits). |
-| `revokeSenatorshipValidation` | 889 | Revoke board validation (admin / board only). Clears certification. |
-| `deleteMember` | 983 | Delete member |
-| `searchMembers` | 1092 | Search members |
-| `getMembersByRole` | 1111 | Get members by role |
-| `getMemberByEmail` | 1141 | Get member by email (for account linking) |
-| `getMembersAtRisk` | 1180 | Get members at risk (churn prediction) |
-| `computeAttendanceMonths` | 1200 | 当年应计月份数：入会年份从入会月起算，否则从 1 月起算 |
-| `recalculateAttendance` | 1214 | 按当年 checked_in 记录重算出席对比（签到次数 vs 已过月份），写回会员档案 |
-| `updateMemberRole` | 1246 |  |
-| `assignMentor` | 1295 | Assign mentor |
-| `batchUpdateMembers` | 1318 | Batch update members — uses writeBatch for atomicity (E01) |
-| `batchDeleteMembers` | 1484 | Batch delete members — uses writeBatch for atomicity (E02) |
-| `getFirstMembershipYearKey` | 1649 | Earliest year key on member.jciCareer?.membershipDuesHistory (e.g. "2024"). |
-| `statusFromMembershipAmount` | 1662 |  |
-| `fixFirstMembershipDuesTo350` | 1680 | Set dues on each member's first membership year to RM350 and recalculate status from paid amount. SYNC-004 NOT… |
-| `getEffectiveJoinYear` | 1787 | Effective membership start year (calendar Oct rollover or first payment year). |
-| `inferMembershipType` | 1818 | Infer membershipType from role, senatorship, and membership[year].dues (Config rules). |
-| `batchSyncMembershipTypes` | 1841 | Batch-sync members.jciCareer?.membershipType from membership dues + role + Config. Does not modify members.jci… |
-| `batchSyncMembershipRecords` | 1953 | Batch-sync members.jciCareer?.membershipDuesHistory[year] from each member's membershipType + Membership Confi… |
-| `syncMembershipFromMembershipType` | 2169 |  |
-| `migrateMembershipTypeFullToOfficial` | 2176 | TEMP MIGRATION: membershipType 'Full' → 'Official' |
-| `migrateDobToGeneralDob` | 2211 | TEMP MIGRATION: copy root-level dateOfBirth/dob into general.dob for members missing it |
-| `getMembersPaginated` | 2253 | Cursor-based paginated member fetch (ordered by name). Pass `lastDoc` from the previous page's result to advan… |
+| `syncComputedMembershipType` | 98 | Recompute membershipType from profile + promotion (Full); always persisted on save. |
+| `invalidateMembersCache` | 125 | Invalidate all members cache (call after any write to members collection). |
+| `getAllMembers` | 133 | Get all members, optionally filtered by loId (for multi-LO). |
+| `getMemberById` | 178 | Get member by ID |
+| `recalculateIntroducerStats` | 200 | Helper to recalculate radar stats for an introducer (dynamic import to avoid circular dependency) |
+| `normalizeMemberData` | 247 | Helper to map flat properties to standard nested sub-objects (general, contact, etc.) for database consistency… |
+| `createMember` | 568 | Create new member. Caller should pass loId (or use DEFAULT_LO_ID for single-LO). |
+| `updateMember` | 649 | Update member. Sets updatedAt and optionally updatedBy (audit). |
+| `validateSenatorshipByBoard` | 869 | Board of Directors validates a member's senatorship number (locks future edits). |
+| `revokeSenatorshipValidation` | 895 | Revoke board validation (admin / board only). Clears certification. |
+| `deleteMember` | 989 | Delete member |
+| `searchMembers` | 1100 | Search members |
+| `getMembersByRole` | 1119 | Get members by role |
+| `getMemberByEmail` | 1150 | Get member by email (for account linking) |
+| `getMembersAtRisk` | 1191 | Get members at risk (churn prediction) |
+| `computeAttendanceMonths` | 1212 | 当年应计月份数：入会年份从入会月起算，否则从 1 月起算 |
+| `recalculateAttendance` | 1226 | 按当年 checked_in 记录重算出席对比（签到次数 vs 已过月份），写回会员档案 |
+| `updateMemberRole` | 1258 |  |
+| `assignMentor` | 1327 | Assign mentor |
+| `batchUpdateMembers` | 1350 | Batch update members — uses writeBatch for atomicity (E01) |
+| `batchDeleteMembers` | 1521 | Batch delete members — uses writeBatch for atomicity (E02) |
+| `getFirstMembershipYearKey` | 1689 | Earliest year key on member.jciCareer?.membershipDuesHistory (e.g. "2024"). |
+| `statusFromMembershipAmount` | 1702 |  |
+| `fixFirstMembershipDuesTo350` | 1720 | Set dues on each member's first membership year to RM350 and recalculate status from paid amount. SYNC-004 NOT… |
+| `getEffectiveJoinYear` | 1827 | Effective membership start year (calendar Oct rollover or first payment year). |
+| `inferMembershipType` | 1858 | Infer membershipType from role, senatorship, and membership[year].dues (Config rules). |
+| `batchSyncMembershipTypes` | 1881 | Batch-sync members.jciCareer?.membershipType from membership dues + role + Config. Does not modify members.jci… |
+| `batchSyncMembershipRecords` | 1993 | Batch-sync members.jciCareer?.membershipDuesHistory[year] from each member's membershipType + Membership Confi… |
+| `syncMembershipFromMembershipType` | 2209 |  |
+| `migrateMembershipTypeFullToOfficial` | 2216 | TEMP MIGRATION: membershipType 'Full' → 'Official' |
+| `migrateDobToGeneralDob` | 2251 | TEMP MIGRATION: copy root-level dateOfBirth/dob into general.dob for members missing it |
+| `getMembersPaginated` | 2293 | Cursor-based paginated member fetch (ordered by name). Pass `lastDoc` from the previous page's result to advan… |
 
 </details>
 
@@ -234,24 +250,24 @@
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `getPromotionProgress` | 339 | Get promotion progress for a Probation Member |
-| `getPromotionProgressForMember` | 345 |  |
-| `buildEngagementProgress` | 354 |  |
-| `saveEngagementRequirement` | 386 |  |
-| `checkAllRequirements` | 426 | Check all four promotion requirements for a member |
-| `checkRequirement` | 434 | Check a specific requirement for a member |
-| `processAutomaticPromotions` | 449 | Process automatic promotion for eligible members |
-| `promoteToOfficialMember` | 480 | Promote a Probation Member to Full Member |
-| `createManualPromotionRequest` | 607 | Create manual promotion request |
-| `updateMemberActivity` | 697 | Update member activity that might affect promotion requirements |
-| `getPromotionStatistics` | 724 | Get promotion statistics |
-| `getPromotionTrackingOverview` | 735 |  |
-| `getProbationMembersForDisplay` | 835 | Public API for UI: probation members with computed membership type |
-| `savePromotionProgressField` | 893 | Save a single promotion progress field for a member |
-| `getManualPromotionRequests` | 963 | List manual promotion requests, optionally filtered by status. |
-| `backfillOfficialMembershipType` | 982 | Backfill: sync jciCareer.membershipType for all members where root membershipType === 'Official' but jciCareer… |
-| `approveManualPromotionRequest` | 1011 | Approve a manual promotion request and trigger the actual promotion. |
-| `rejectManualPromotionRequest` | 1041 | Reject a manual promotion request with a reason. |
+| `getPromotionProgress` | 340 | Get promotion progress for a Probation Member |
+| `getPromotionProgressForMember` | 346 |  |
+| `buildEngagementProgress` | 355 |  |
+| `saveEngagementRequirement` | 387 |  |
+| `checkAllRequirements` | 427 | Check all four promotion requirements for a member |
+| `checkRequirement` | 435 | Check a specific requirement for a member |
+| `processAutomaticPromotions` | 450 | Process automatic promotion for eligible members |
+| `promoteToOfficialMember` | 481 | Promote a Probation Member to Full Member |
+| `createManualPromotionRequest` | 611 | Create manual promotion request |
+| `updateMemberActivity` | 701 | Update member activity that might affect promotion requirements |
+| `getPromotionStatistics` | 728 | Get promotion statistics |
+| `getPromotionTrackingOverview` | 739 |  |
+| `getProbationMembersForDisplay` | 839 | Public API for UI: probation members with computed membership type |
+| `savePromotionProgressField` | 897 | Save a single promotion progress field for a member |
+| `getManualPromotionRequests` | 967 | List manual promotion requests, optionally filtered by status. |
+| `backfillOfficialMembershipType` | 986 | Backfill: sync jciCareer.membershipType for all members where root membershipType === 'Official' but jciCareer… |
+| `approveManualPromotionRequest` | 1015 | Approve a manual promotion request and trigger the actual promotion. |
+| `rejectManualPromotionRequest` | 1045 | Reject a manual promotion request with a reason. |
 
 </details>
 
@@ -261,7 +277,7 @@
 |---|---|---|---|---|
 | `eventBudgetService.ts` | 306 | 3 | Event Budget Management Service | EVENT_BUDGETS |
 | `eventPaymentMatchingService.ts` | 310 | 1 | EventPaymentMatchingService Matches event registration income transactions (Pending) to imported bank transactions. Three matching paths: A … | TRANSACTIONS |
-| `financeService.ts` | 5,320 | 32 | ⚠️ 無說明 | BANK_ACCOUNTS, FINANCE_ALERTS, FINANCE_META, MEMBERS, PAYMENT_REQUESTS, PROJECT_TRANSACTIONS … |
+| `financeService.ts` | 5,325 | 32 | ⚠️ 無說明 | BANK_ACCOUNTS, FINANCE_ALERTS, FINANCE_META, MEMBERS, PAYMENT_REQUESTS, PROJECT_TRANSACTIONS … |
 | `incentiveCalculatorService.ts` | 385 | 1 | ⚠️ 無說明 | BANK_ACCOUNTS, EVENTS, EVENT_REGISTRATIONS, INCENTIVE_SUBMISSIONS, MEMBERS, PROJECTS … |
 | `paymentRequestService.ts` | 999 | 4 | Payment Request Service (Story 2.1) | BANK_ACCOUNTS, COUNTERS, NOTIFICATIONS, PAYMENT_REQUESTS, TRANSACTIONS |
 | `projectAccountsService.ts` | 236 | 0 | Project Financial Accounts Service | PROJECTS |
@@ -300,68 +316,68 @@
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `getAllTransactions` | 169 | Get all transactions |
-| `getHistoricalNetFlowBeforeYear` | 230 | Get cumulative net flow of bank accounts before a specific year |
-| `getTransactionYearsForAccount` | 299 | Get all transaction years for a specific bank account |
-| `getAllTransactionYears` | 342 | Get all unique transaction years across all accounts |
-| `getProjectTransactions` | 389 | Get project transactions |
-| `getBankTransactionsByProject` | 435 | Get bank transactions associated with a project (from transactions collection) |
-| `createTransaction` | 552 | Create transaction |
-| `batchCreateBankTransactions` | 662 | Batch-optimised path for bank statement imports. Replaces N individual createTransaction calls (N reads + N co… |
-| `createProjectTransaction` | 760 | Create project transaction ATOMIC-001: accepts an optional externalBatch so callers can keep multi-document op… |
-| `updateProjectTransaction` | 823 | Update project transaction |
-| `createTransactionSplit` | 861 | Create transaction split (upsert: update existing or create new) |
-| `getTransactionSplits` | 1168 | Get transaction splits |
-| `getAllTransactionSplits` | 1192 | Get ALL transaction splits in bulk |
-| `updateTransactionSplit` | 1234 | Update transaction split |
-| `deleteTransactionSplit` | 1354 | Delete transaction split |
-| `getTransactionsByType` | 1470 | Get transactions by type (including splits) Uses cached getAllTransactions + getAllTransactionSplits to avoid … |
-| `updateTransaction` | 1501 | Update transaction Accepts Partial<Transaction> for typed fields, or a string-keyed map for Firestore dot-nota… |
-| `batchUpdateTransactionCategory` | 1697 | Batch update Transaction Category fields for multiple transactions |
-| `batchUpdateSplitCategory` | 1868 | Batch update Transaction Category fields for multiple split records |
-| `getTransactionById` | 2039 | Get transaction by ID from either TRANSACTIONS or PROJECT_TRANSACTIONS |
-| `deleteTransaction` | 2074 | Delete transaction |
-| `reverseTransaction` | 2204 | Reverse a transaction by creating a counter-entry and voiding the original |
-| `deleteProjectTransaction` | 2276 | Delete project transaction |
-| `syncTransactionWithInventory` | 2441 | Synchronize transaction with inventory |
-| `syncMemberMembership` | 2486 | Synchronize member membership summary based on transactions |
-| `getAllBankAccounts` | 2775 | P0-fix: added `loId` parameter. When provided (non-admin callers) the query is scoped to that LO's accounts. W… |
-| `recalculateAllBankAccountBalances` | 2841 | Recalculate currentBalance for all bank accounts from transaction history |
-| `createBankAccount` | 2869 | Create bank account |
-| `updateBankAccount` | 2912 | Update bank account |
-| `deleteBankAccount` | 2941 | Delete bank account — guarded: refuses if linked transactions, reconciliation records, or payment requests exi… |
-| `getTransactionsByCategory` | 2979 | Get transactions by category |
-| `getFinancialSummary` | 3005 | Get financial summary |
-| `initiateDuesRenewal` | 3101 | Automated dues renewal with membership type support Handles membership types: Probation (RM300), Official (RM3… |
-| `sendDuesReminders` | 3300 | Send reminder notifications for overdue dues (excludes senators) |
-| `getDuesRenewalStatus` | 3368 | Get dues renewal status for a specific year |
-| `getMembersDuesList` | 3462 | Get members sorted by dues year and membership type |
-| `processDuesPayment` | 3579 | Process dues payment and update member status |
-| `calculateSystemBalance` | 3651 | Calculate system balance for reconciliation (includes all transaction types) |
-| `detectDiscrepancies` | 3740 | Detect reconciliation discrepancies |
-| `reconcileBankAccount` | 3810 | Reconcile bank account with enhanced transaction type support |
-| `getReconciliationHistory` | 4000 | Get reconciliation history |
-| `deleteReconciliation` | 4026 |  |
-| `getUnmatchedForReconciliation` | 4143 | Get unmatched transactions for reconciliation matching UI Returns bank_import and manual transactions separate… |
-| `matchTransactions` | 4171 | Link a bank import transaction to a manually-entered transaction Sets matchStatus:'full' on the bank import an… |
-| `unmatchTransactions` | 4222 | Unmatch a previously matched pair — restores each side to the status it had before matching (tracked via prevS… |
-| `getBankAccountById` | 4265 | Get bank account by ID with dynamic balance |
-| `generateFinancialReport` | 4307 | Generate financial reports |
-| `exportFinancialReportAsCSV` | 4426 | Export financial report as CSV |
-| `exportTransactionsAsCSV` | 4490 | Export detailed transaction list as CSV |
-| `generateIncomeStatement` | 4532 | Generate comprehensive Income Statement (P&L Statement) |
-| `generateBalanceSheet` | 4634 | Generate comprehensive Balance Sheet |
-| `generateCashFlowStatement` | 4802 | Generate comprehensive Cash Flow Statement |
-| `generateIncomeDetailsStatement` | 4955 | Generate Income Details Statement (detailed breakdown of income sources) |
-| `getTransactionsPaginated` | 5035 | Cursor-based paginated transaction fetch (ordered by date desc). Pass `lastDoc` from the previous page's resul… |
-| `getFinanceAlerts` | 5078 | ── Finance Alerts ──────────────────────────────────────────────────────── |
-| `resolveFinanceAlert` | 5115 |  |
-| `voidTransaction` | 5138 | ── Void Transaction ────────────────────────────────────────────────────── |
-| `getReclassificationGroups` | 5206 | Returns distinct (loId, category, projectId, unmatchedProjectTitle) combos across all transactions, ordered by… |
-| `batchReclassifyTransactions` | 5241 | Batch-updates all transactions matching each rule's (loId, category, projectId, unmatchedProjectTitle) with th… |
-| `backfillMissingLoId` | 5293 | Backfills loId = DEFAULT_LO_ID on all transactions where loId is missing or null. |
+| `getAllTransactions` | 170 | Get all transactions |
+| `getHistoricalNetFlowBeforeYear` | 231 | Get cumulative net flow of bank accounts before a specific year |
+| `getTransactionYearsForAccount` | 300 | Get all transaction years for a specific bank account |
+| `getAllTransactionYears` | 343 | Get all unique transaction years across all accounts |
+| `getProjectTransactions` | 390 | Get project transactions |
+| `getBankTransactionsByProject` | 436 | Get bank transactions associated with a project (from transactions collection) |
+| `createTransaction` | 553 | Create transaction |
+| `batchCreateBankTransactions` | 663 | Batch-optimised path for bank statement imports. Replaces N individual createTransaction calls (N reads + N co… |
+| `createProjectTransaction` | 761 | Create project transaction ATOMIC-001: accepts an optional externalBatch so callers can keep multi-document op… |
+| `updateProjectTransaction` | 824 | Update project transaction |
+| `createTransactionSplit` | 862 | Create transaction split (upsert: update existing or create new) |
+| `getTransactionSplits` | 1169 | Get transaction splits |
+| `getAllTransactionSplits` | 1193 | Get ALL transaction splits in bulk |
+| `updateTransactionSplit` | 1235 | Update transaction split |
+| `deleteTransactionSplit` | 1355 | Delete transaction split |
+| `getTransactionsByType` | 1471 | Get transactions by type (including splits) Uses cached getAllTransactions + getAllTransactionSplits to avoid … |
+| `updateTransaction` | 1502 | Update transaction Accepts Partial<Transaction> for typed fields, or a string-keyed map for Firestore dot-nota… |
+| `batchUpdateTransactionCategory` | 1698 | Batch update Transaction Category fields for multiple transactions |
+| `batchUpdateSplitCategory` | 1869 | Batch update Transaction Category fields for multiple split records |
+| `getTransactionById` | 2040 | Get transaction by ID from either TRANSACTIONS or PROJECT_TRANSACTIONS |
+| `deleteTransaction` | 2075 | Delete transaction |
+| `reverseTransaction` | 2205 | Reverse a transaction by creating a counter-entry and voiding the original |
+| `deleteProjectTransaction` | 2277 | Delete project transaction |
+| `syncTransactionWithInventory` | 2442 | Synchronize transaction with inventory |
+| `syncMemberMembership` | 2487 | Synchronize member membership summary based on transactions |
+| `getAllBankAccounts` | 2780 | P0-fix: added `loId` parameter. When provided (non-admin callers) the query is scoped to that LO's accounts. W… |
+| `recalculateAllBankAccountBalances` | 2846 | Recalculate currentBalance for all bank accounts from transaction history |
+| `createBankAccount` | 2874 | Create bank account |
+| `updateBankAccount` | 2917 | Update bank account |
+| `deleteBankAccount` | 2946 | Delete bank account — guarded: refuses if linked transactions, reconciliation records, or payment requests exi… |
+| `getTransactionsByCategory` | 2984 | Get transactions by category |
+| `getFinancialSummary` | 3010 | Get financial summary |
+| `initiateDuesRenewal` | 3106 | Automated dues renewal with membership type support Handles membership types: Probation (RM300), Official (RM3… |
+| `sendDuesReminders` | 3305 | Send reminder notifications for overdue dues (excludes senators) |
+| `getDuesRenewalStatus` | 3373 | Get dues renewal status for a specific year |
+| `getMembersDuesList` | 3467 | Get members sorted by dues year and membership type |
+| `processDuesPayment` | 3584 | Process dues payment and update member status |
+| `calculateSystemBalance` | 3656 | Calculate system balance for reconciliation (includes all transaction types) |
+| `detectDiscrepancies` | 3745 | Detect reconciliation discrepancies |
+| `reconcileBankAccount` | 3815 | Reconcile bank account with enhanced transaction type support |
+| `getReconciliationHistory` | 4005 | Get reconciliation history |
+| `deleteReconciliation` | 4031 |  |
+| `getUnmatchedForReconciliation` | 4148 | Get unmatched transactions for reconciliation matching UI Returns bank_import and manual transactions separate… |
+| `matchTransactions` | 4176 | Link a bank import transaction to a manually-entered transaction Sets matchStatus:'full' on the bank import an… |
+| `unmatchTransactions` | 4227 | Unmatch a previously matched pair — restores each side to the status it had before matching (tracked via prevS… |
+| `getBankAccountById` | 4270 | Get bank account by ID with dynamic balance |
+| `generateFinancialReport` | 4312 | Generate financial reports |
+| `exportFinancialReportAsCSV` | 4431 | Export financial report as CSV |
+| `exportTransactionsAsCSV` | 4495 | Export detailed transaction list as CSV |
+| `generateIncomeStatement` | 4537 | Generate comprehensive Income Statement (P&L Statement) |
+| `generateBalanceSheet` | 4639 | Generate comprehensive Balance Sheet |
+| `generateCashFlowStatement` | 4807 | Generate comprehensive Cash Flow Statement |
+| `generateIncomeDetailsStatement` | 4960 | Generate Income Details Statement (detailed breakdown of income sources) |
+| `getTransactionsPaginated` | 5040 | Cursor-based paginated transaction fetch (ordered by date desc). Pass `lastDoc` from the previous page's resul… |
+| `getFinanceAlerts` | 5083 | ── Finance Alerts ──────────────────────────────────────────────────────── |
+| `resolveFinanceAlert` | 5120 |  |
+| `voidTransaction` | 5143 | ── Void Transaction ────────────────────────────────────────────────────── |
+| `getReclassificationGroups` | 5211 | Returns distinct (loId, category, projectId, unmatchedProjectTitle) combos across all transactions, ordered by… |
+| `batchReclassifyTransactions` | 5246 | Batch-updates all transactions matching each rule's (loId, category, projectId, unmatchedProjectTitle) with th… |
+| `backfillMissingLoId` | 5298 | Backfills loId = DEFAULT_LO_ID on all transactions where loId is missing or null. |
 
-**其他 export：** `invalidateFinanceCache` (L114)
+**其他 export：** `invalidateFinanceCache` (L115)
 
 </details>
 
@@ -604,7 +620,7 @@
 
 | Service | 行數 | 引用 | 用途 | 集合 |
 |---|---|---|---|---|
-| `gamificationService.ts` | 549 | 1 | gamificationService.ts - Unified Service for Awards (Achievements + Badges) | BADGES, BADGE_AWARDS, EVENT_REGISTRATIONS, LEARNING_PROGRESS, MEMBERS, POINTS |
+| `gamificationService.ts` | 550 | 1 | gamificationService.ts - Unified Service for Awards (Achievements + Badges) | BADGES, BADGE_AWARDS, EVENT_REGISTRATIONS, LEARNING_PROGRESS, MEMBERS, POINTS |
 | `pointsRuleService.ts` | 690 | 0 | Points Rule Service - Points Rule Configuration Management | POINTS_RULES, POINTS_RULE_EXECUTIONS |
 | `pointsService.ts` | 2,492 | 17 | Points Service - Point management and gamification engine | INCENTIVE_PROGRAMS, INCENTIVE_STANDARDS, INCENTIVE_SUBMISSIONS, LO_STAR_PROGRESS, MEMBERS, POINTS … |
 | `ruleExecutionService.ts` | 580 | 1 | Rule Execution Service Feature: platform-enhancements Provides rule execution engine and comprehensive logging capabilities. Validates: Requ… | WORKFLOW_EXECUTIONS |
@@ -1106,10 +1122,10 @@
 | Service | 行數 | 引用 | 用途 | 集合 |
 |---|---|---|---|---|
 | `aiPredictionService.ts` | 949 | 3 | AI Prediction Service - Advanced AI predictions for events, projects, and sponsors | — |
-| `cacheService.ts` | 314 | 32 | 缓存服务 - 提供内存缓存和本地存储缓存功能 Cache Service - Provides in-memory and localStorage caching capabilities | — |
+| `cacheService.ts` | 314 | 33 | 缓存服务 - 提供内存缓存和本地存储缓存功能 Cache Service - Provides in-memory and localStorage caching capabilities | — |
 | `cloudinaryService.ts` | 337 | 14 | Cloudinary Upload Service | — |
-| `dataImportExportService.ts` | 892 | 3 | ⚠️ 無說明 | EVENTS, MEMBERS, MEMBER_EMAILS |
-| `errorLoggingService.ts` | 354 | 66 | ⚠️ 無說明 | ERROR_LOGS |
+| `dataImportExportService.ts` | 913 | 3 | ⚠️ 無說明 | EVENTS, MEMBERS, MEMBER_EMAILS |
+| `errorLoggingService.ts` | 354 | 67 | ⚠️ 無說明 | ERROR_LOGS |
 | `firestoreLogger.ts` | 197 | 3 | System Logger — Firestore ops + Performance monitoring Fire-and-forget buffered logger. Buffers events for 3 seconds then writes one batched… | SYSTEM_LOGS |
 | `inventoryService.ts` | 1,638 | 3 | Inventory Service - CRUD Operations | INVENTORY, INVENTORY_ALERTS, MAINTENANCE_SCHEDULES, STOCK_MOVEMENTS, TRANSACTIONS |
 | `mockData.ts` | 689 | 17 | ⚠️ 無說明 | — |
@@ -1146,14 +1162,14 @@
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `parseFile` | 66 | Parse uploaded file and extract data |
-| `parseCSVContent` | 133 | Parse CSV content string |
-| `validateData` | 155 | Validate imported data |
-| `importData` | 329 | Import data after validation |
-| `exportToCSV` | 586 | Export data to CSV format |
-| `exportToJSON` | 619 | Export data to JSON (Story 6.1 â€“ ä¸»æ¡£å¯¼å‡ºçº¦å®šæ ¼å¼) |
-| `exportToExcel` | 640 | Export data to Excel format |
-| `generateImportTemplate` | 682 | Generate import template |
+| `parseFile` | 67 | Parse uploaded file and extract data |
+| `parseCSVContent` | 134 | Parse CSV content string |
+| `validateData` | 156 | Validate imported data |
+| `importData` | 330 | Import data after validation |
+| `exportToCSV` | 607 | Export data to CSV format |
+| `exportToJSON` | 640 | Export data to JSON (Story 6.1 â€“ ä¸»æ¡£å¯¼å‡ºçº¦å®šæ ¼å¼) |
+| `exportToExcel` | 661 | Export data to Excel format |
+| `generateImportTemplate` | 703 | Generate import template |
 
 </details>
 
@@ -1266,12 +1282,12 @@
 | `useActivityPlans.ts` | 130 | 1 | `useActivityPlans` | activityPlansService | ⚠️ 無說明 |
 | `useAdvertisements.ts` | 110 | 2 | `useAdvertisements` | advertisementService, errorLoggingService | Advertisements Data Hook |
 | `useAppNavigation.ts` | 239 | 1 | `useAppNavigation` | — | ⚠️ 無說明 |
-| `useAuth.tsx` | 782 | 54 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, membersService, mockData | Authentication Hook |
+| `useAuth.tsx` | 782 | 56 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, membersService, mockData | Authentication Hook |
 | `useAutomation.ts` | 149 | 3 | `useAutomation` | automationService | useAutomation Hook - Manage automation workflows and rules |
 | `useBusinessDirectory.ts` | 48 | 4 | `useBusinessDirectory` | businessDirectoryService | ⚠️ 無說明 |
 | `useCommunication.ts` | 118 | 2 | `useCommunication` | communicationService | Communication Data Hook |
 | `useEvents.ts` | 191 | 8 | `useEvents` | errorLoggingService, eventsService, membersService | Events Data Hook |
-| `useFinanceData.ts` | 2,033 | 4 | `useFinanceData` | errorLoggingService, financeService, inventoryService, membersService, membershipConfigService, paymentRequestService, projectFinancialService, projectsService | TODO (PERF-A-004): This hook has ~90 useState declarations, causing full FinanceView re-renders on any state update. Planned refactor: split… |
+| `useFinanceData.ts` | 2,034 | 4 | `useFinanceData` | errorLoggingService, financeService, inventoryService, membersService, membershipConfigService, paymentRequestService, projectFinancialService, projectsService | TODO (PERF-A-004): This hook has ~90 useState declarations, causing full FinanceView re-renders on any state update. Planned refactor: split… |
 | `useFirestoreCollection.ts` | 171 | 18 | `useFirestoreCollection` | — | ⚠️ 無說明 |
 | `useGamification.ts` | 148 | 1 | `useGamification` | gamificationService | useGamification.ts - Unified Hook for Awards (Achievements + Badges) |
 | `useGuestAnalytics.ts` | 21 | 0 | `useGuestAnalytics` | guestAnalyticsService | ⚠️ 無說明 |
@@ -1284,13 +1300,13 @@
 | `useMemberBenefits.ts` | 102 | 0 | `useMemberBenefits` | memberBenefitsService | Member Benefits Data Hook Wraps MemberBenefitsService with React state (loading / error / data). |
 | `useMemberMutations.ts` | 107 | 0 | `useMemberMutations` | membersService | ⚠️ 無說明 |
 | `useMemberSearch.ts` | 53 | 1 | `useMemberSearch` | — | ⚠️ 無說明 |
-| `useMembers.ts` | 188 | 21 | `useMembers`, `usePaginatedMembers` | membersService | Members Data Hook |
+| `useMembers.ts` | 195 | 21 | `useMembers`, `usePaginatedMembers` | membersService | Members Data Hook |
 | `useNotifications.ts` | 107 | 0 | `useNotifications` | communicationService, errorLoggingService, mockData | ⚠️ 無說明 |
-| `usePermissions.ts` | 199 | 26 | `usePermissions` | — | Permission Management Hook |
-| `usePoints.ts` | 59 | 2 | `usePoints` | pointsService | Points Data Hook |
+| `usePermissions.ts` | 212 | 28 | `usePermissions` | — | Permission Management Hook |
+| `usePoints.ts` | 61 | 2 | `usePoints` | pointsService | Points Data Hook |
 | `useProjects.ts` | 170 | 7 | `useProjects` | projectsService | Projects Data Hook |
 | `usePushNotifications.ts` | 63 | 1 | `usePushNotifications` | — | ⚠️ 無說明 |
-| `useSisterChapterMembers.ts` | 49 | 2 | `useSisterChapterMembers` | membersService, sisterChaptersService | ⚠️ 無說明 |
+| `useSisterChapterMembers.ts` | 84 | 2 | `useSisterChapterMembers` | memberCardsService, membersService, sisterChaptersService | ⚠️ 無說明 |
 | `useSisterChapters.ts` | 26 | 3 | `useSisterChapters` | sisterChaptersService | ⚠️ 無說明 |
 | `useSocialPersonas.ts` | 46 | 2 | `useSocialPersonas` | socialPersonaService | ⚠️ 無說明 |
 | `useSocialPosts.ts` | 74 | 1 | `useSocialPosts` | socialPostService | ⚠️ 無說明 |
@@ -1347,6 +1363,12 @@
 | `isMemberCurrentBoard` | 69 | Whether the member is an active board member this calendar year. Source of truth: `member.jciCareer?.isCurrent… |
 | `hasActiveBoardRecordForCurrentYear` | 82 | Whether any boardMembers record is active for the current calendar year. |
 
+### `utils/cardAccess.ts` （16 行，1 處引用）
+
+| 函數 | 行 | 說明 |
+|---|---|---|
+| `canViewCards` | 9 | Reciprocity rule: a user may view other members' cards only if they share their own card (`privacy.shareCardIn… |
+
 ### `utils/dataUtils.ts` （33 行，4 處引用）
 > recursivley removes undefined values from an object. Firestore does not support 'undefined' values, so this helper is essential before savin…
 
@@ -1376,7 +1398,7 @@
 | `getStartOfYear` | 163 |  |
 | `getEndOfYear` | 170 |  |
 
-### `utils/devMode.ts` （36 行，69 處引用）
+### `utils/devMode.ts` （36 行，70 處引用）
 > Developer Mode Utility This utility helps services detect if the app is running in developer mode and return mock data instead of accessing …
 
 | 函數 | 行 | 說明 |
@@ -1384,6 +1406,16 @@
 | `setDevMode` | 8 |  |
 | `isDevMode` | 12 |  |
 | `withDevMode` | 29 | Service helper: returns mock data in dev mode, calls the real async loader in production. Eliminates the repet… |
+
+### `utils/externalAccess.ts` （73 行，4 處引用）
+
+| 函數 | 行 | 說明 |
+|---|---|---|
+| `isExternalRole` | 13 |  |
+| `EXTERNAL_ALLOWED_VIEWS` | 28 | Active externals, per role. CHAPTER_ADMIN gets its own entry (e.g. a chapter-management view in Phase 1). |
+| `getExternalAllowedViews` | 43 | Views an external may open, or null when the role is not external (= no whitelist applies). A missing affiliat… |
+| `isViewAllowedForRole` | 52 | True when `view` may be opened. Non-external roles are unrestricted here (their own rules still apply). |
+| `getExternalStatusMessage` | 61 |  |
 
 ### `utils/fetchWithTimeout.ts` （31 行，4 處引用）
 > ERR-R-005: fetch wrapper that aborts after `ms` milliseconds. Netlify functions on the free plan time out server-side after 10 s, but the br…
@@ -1419,6 +1451,13 @@
 |---|---|---|
 | `calculateAwardProgress` | 8 | Pure function: calculates progress percentage (0–100) toward an award. Milestone-based awards use segment logi… |
 
+### `utils/internationalCards.ts` （27 行，1 處引用）
+
+| 函數 | 行 | 說明 |
+|---|---|---|
+| `planCardQuery` | 15 | Which memberCards query the signed-in user may run. KL users list the active sister chapters' cards (every sis… |
+| `attachSisterChapters` | 20 | Attach each card's active sister chapter; cards of unknown/inactive chapters are dropped. |
+
 ### `utils/malaysianIdUtils.ts` （110 行，6 處引用）
 > Malaysian IC (MyKad) utilities
 
@@ -1428,6 +1467,12 @@
 | `isMalaysianIC` | 78 | Returns true if the IC looks like a Malaysian MyKad (12 digits). |
 | `getGenderFromIC` | 86 | Derives gender from last digit of IC: odd = Male, even = Female. |
 | `getDateOfBirthFromIC` | 97 | Derives date of birth (YYYY-MM-DD) from first 6 digits of IC. Uses sliding-window century: YY <= current year'… |
+
+### `utils/memberScope.ts` （10 行，5 處引用）
+
+| 函數 | 行 | 說明 |
+|---|---|---|
+| `isKlMember` | 4 | True for KL-chapter members. Legacy docs without a loId count as KL. |
 
 ### `utils/myPostcodes.ts` （870 行，3 處引用）
 > Malaysia postcode → area/state lookup. Lookup order: exact postcode match → prefix range → keyword scan → null.
@@ -1450,12 +1495,12 @@
 |---|---|---|
 | `fetchRoadmapEventDetails` | 23 |  |
 
-### `utils/rolePermissions.ts` （113 行，1 處引用）
+### `utils/rolePermissions.ts` （140 行，1 處引用）
 
 | 函數 | 行 | 說明 |
 |---|---|---|
 | `ROLE_PERMISSIONS` | 18 | Static permission baseline per role. Dynamic board elevation is applied at runtime in usePermissions. |
-| `ALL_PERMISSIONS_GRANTED` | 100 |  |
+| `ALL_PERMISSIONS_GRANTED` | 127 |  |
 
 ### `utils/transactionCategoryUtils.ts` （277 行，4 處引用）
 > Shared category-field derivation and cleanup logic for bank transactions and splits. WHY this file exists: the same "if Membership → auto-se…
@@ -1477,15 +1522,15 @@
 | `AsyncErrorBoundary.tsx` | 4 | 9 | — |
 | `AvatarUploader.tsx` | 97 | 1 | `AvatarUploader` |
 | `Badge.tsx` | 86 | 1 | `Badge`, `ProgressBar`, `AvatarGroup`, `Skeleton` |
-| `Button.tsx` | 50 | 4 | `Button` |
+| `Button.tsx` | 50 | 5 | `Button` |
 | `Card.tsx` | 77 | 1 | `Card`, `StatCardsContainer` |
 | `ColumnFilterHeader.tsx` | 118 | 2 | `ColumnFilterHeader` |
 | `Combobox.tsx` | 255 | 11 | `Combobox` |
-| `Common.tsx` | 26 | 230 | — |
+| `Common.tsx` | 26 | 231 | — |
 | `ConfirmDialog.tsx` | 100 | 2 | `ConfirmDialog`, `CONFIRM_CLOSED` |
 | `DataTable.tsx` | 172 | 0 | `DataTable` |
 | `Drawer.tsx` | 139 | 2 | `Drawer` |
-| `EmptyState.tsx` | 36 | 2 | `EmptyState` |
+| `EmptyState.tsx` | 36 | 4 | `EmptyState` |
 | `ErrorBoundary.tsx` | 261 | 3 | `ErrorFallback`, `SectionErrorFallback`, `ErrorBoundary`, `AsyncErrorBoundary`, `withErrorBoundary`, `useErrorHandler` |
 | `FilterDrawer.tsx` | 65 | 1 | `FilterDrawer` |
 | `FirstUseBanner.tsx` | 82 | 2 | `FirstUseBanner` |
@@ -1531,6 +1576,6 @@
 
 ## 8. 文件債：缺少檔頭說明的檔案
 
-共 53 個。請在檔案第一行補上 `/** 一句話說明此檔案職責 */`，下次重新生成時就會自動帶入本文件。
+共 57 個。請在檔案第一行補上 `/** 一句話說明此檔案職責 */`，下次重新生成時就會自動帶入本文件。
 
-`services/auditLogService.ts`, `services/contractService.ts`, `services/dataImportExportService.ts`, `services/engagementAutoSuggestService.ts`, `services/errorLoggingService.ts`, `services/financeService.ts`, `services/flagshipProjectsService.ts`, `services/guestAnalyticsService.ts`, `services/incentiveCalculatorService.ts`, `services/inquiryService.ts`, `services/larkSyncService.ts`, `services/membershipConfigService.ts`, `services/mockData.ts`, `services/notificationService.ts`, `services/partnershipsService.ts`, `services/permissionConfigService.ts`, `services/postcodeService.ts`, `services/promotionService.ts`, `services/reportService.ts`, `services/sisterChaptersService.ts`, `services/socialPersonaService.ts`, `services/socialPostService.ts`, `services/sponsorshipService.ts`, `services/toyyibService.ts`, `services/zoomBookingService.ts`, `hooks/useActivityPlans.ts`, `hooks/useAppNavigation.ts`, `hooks/useBusinessDirectory.ts`, `hooks/useFirestoreCollection.ts`, `hooks/useGuestAnalytics.ts`, `hooks/useHobbyClubs.ts`, `hooks/useInstallPrompt.ts`, `hooks/useKnowledge.ts`, `hooks/useMemberMutations.ts`, `hooks/useMemberSearch.ts`, `hooks/useNotifications.ts`, `hooks/usePushNotifications.ts`, `hooks/useSisterChapterMembers.ts`, `hooks/useSisterChapters.ts`, `hooks/useSocialPersonas.ts`, `hooks/useSocialPosts.ts`, `hooks/useSurveys.ts`, `hooks/useToyyibMode.ts`, `hooks/useToyyibPay.ts`, `hooks/useToyyibPayment.ts`, `hooks/useZoomBookings.ts`, `utils/activityPhase.ts`, `utils/administrativeProjectsStorage.ts`, `utils/boardMembership.ts`, `utils/financeUtils.ts`, `utils/gamificationUtils.ts`, `utils/roadmapUtils.ts`, `utils/rolePermissions.ts`
+`services/auditLogService.ts`, `services/contractService.ts`, `services/dataImportExportService.ts`, `services/engagementAutoSuggestService.ts`, `services/errorLoggingService.ts`, `services/financeService.ts`, `services/flagshipProjectsService.ts`, `services/guestAnalyticsService.ts`, `services/incentiveCalculatorService.ts`, `services/inquiryService.ts`, `services/larkSyncService.ts`, `services/membershipConfigService.ts`, `services/mockData.ts`, `services/notificationService.ts`, `services/partnershipsService.ts`, `services/permissionConfigService.ts`, `services/postcodeService.ts`, `services/promotionService.ts`, `services/reportService.ts`, `services/sisterChaptersService.ts`, `services/socialPersonaService.ts`, `services/socialPostService.ts`, `services/sponsorshipService.ts`, `services/toyyibService.ts`, `services/zoomBookingService.ts`, `hooks/useActivityPlans.ts`, `hooks/useAppNavigation.ts`, `hooks/useBusinessDirectory.ts`, `hooks/useFirestoreCollection.ts`, `hooks/useGuestAnalytics.ts`, `hooks/useHobbyClubs.ts`, `hooks/useInstallPrompt.ts`, `hooks/useKnowledge.ts`, `hooks/useMemberMutations.ts`, `hooks/useMemberSearch.ts`, `hooks/useNotifications.ts`, `hooks/usePushNotifications.ts`, `hooks/useSisterChapterMembers.ts`, `hooks/useSisterChapters.ts`, `hooks/useSocialPersonas.ts`, `hooks/useSocialPosts.ts`, `hooks/useSurveys.ts`, `hooks/useToyyibMode.ts`, `hooks/useToyyibPay.ts`, `hooks/useToyyibPayment.ts`, `hooks/useZoomBookings.ts`, `utils/activityPhase.ts`, `utils/administrativeProjectsStorage.ts`, `utils/boardMembership.ts`, `utils/cardAccess.ts`, `utils/externalAccess.ts`, `utils/financeUtils.ts`, `utils/gamificationUtils.ts`, `utils/internationalCards.ts`, `utils/memberScope.ts`, `utils/roadmapUtils.ts`, `utils/rolePermissions.ts`

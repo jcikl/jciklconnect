@@ -93,6 +93,14 @@ Roles include `GUEST`, `MEMBER`, `BOARD`, `ADMIN`, `SUPER_ADMIN`, and `INACTIVE`
 
 Important distinction: UI permission logic and Firestore rules intentionally differ in some places. Firestore `isBoard()` includes admin roles as a superset for collection access, while UI board-elevation excludes admin because admin already receives explicit permissions.
 
+### External Members (Phase 0)
+
+External users (`AFFILIATE`, `CHAPTER_ADMIN`: members of other chapters) are outside `isMember()` / `isActiveMember()` / `isBoard()` / `isAdmin()`.
+
+- `utils/externalAccess.ts` is the single source of which views external users may open. Navigation and view rendering both read it; KL roles are not restricted by it. Access is client-side; `firestore.rules` (`isExternal()`, `isActiveExternal()`) is the real boundary.
+- Public member cards live in `memberCards/{memberId}`. `services/memberCardsService.ts` (`MemberCardsService.syncCards`) writes them from `members` after each member write, using `utils/memberCard.mjs`. Cards are the only member data external users may read about other people.
+- Scope and rule details: `SCHEMA.md` (`members.affiliation`, `memberCards`), `SCHEMA-PERMISSIONS.md`, `docs/PERMISSION_MATRIX.zh-CN.md`.
+
 ## Major Operation Flows
 
 ### Authentication

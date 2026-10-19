@@ -5,6 +5,7 @@ import { Button, Modal } from '../../ui/Common';
 import { LoadingState } from '../../ui/Loading';
 import { getInitialsSvg } from './businessDirectoryUtils';
 import { useSisterChapterMembers } from '../../../hooks/useSisterChapterMembers';
+import { ShareCardNotice } from './ShareCardNotice';
 import { hasSpecialOffer, getSpecialOfferSummary } from '../../../types/member';
 
 interface LocalBusinessTabProps {
@@ -63,23 +64,24 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
   getBizScore,
 }) => {
   const [quickFilter, setQuickFilter] = useState<'all' | 'bookmarked' | 'ideal' | 'international'>('all');
-  const [intlDetail, setIntlDetail] = useState<{ name: string; chineseName?: string; avatarUrl: string; position: string; companyName: string; jciChapter: string; country: string; industry: string; businessCategory: string; email: string; description: string; specialOffer: string | undefined } | null>(null);
+  const [intlDetail, setIntlDetail] = useState<{ name: string; chineseName?: string; avatarUrl: string; position: string; companyName: string; jciChapter: string; country: string; industry: string; businessCategory: string; email: string; website: string; description: string; specialOffer: string | undefined } | null>(null);
 
-  const { members: rawIntlMembers, loading: intlLoading } = useSisterChapterMembers();
+  const { members: rawIntlMembers, loading: intlLoading, canView: canViewIntl, optIn, optingIn } = useSisterChapterMembers();
   const intlViews = rawIntlMembers.map(m => ({
     id: m.id,
-    name: m.general?.name ?? '',
-    chineseName: m.general?.chineseName,
-    avatarUrl: m.general?.avatarUrl ?? getInitialsSvg(m.general?.name ?? ''),
-    position: m.business?.position ?? '',
-    companyName: m.business?.companyName ?? '',
+    name: m.displayName ?? '',
+    chineseName: undefined as string | undefined,
+    avatarUrl: m.avatarUrl ?? getInitialsSvg(m.displayName ?? ''),
+    position: m.position ?? '',
+    companyName: m.companyName ?? '',
     jciChapter: m.sisterChapter?.name ?? '',
     country: m.sisterChapter?.country ?? '',
-    industry: m.business?.industry ?? '',
-    businessCategory: (m.business?.businessCategory ?? []).join(', '),
-    email: m.contact?.email ?? '',
-    description: m.business?.companyDescription ?? '',
-    specialOffer: getSpecialOfferSummary(m.business?.specialOffer),
+    industry: m.industry ?? '',
+    businessCategory: (m.businessCategory ?? []).join(', '),
+    email: '',
+    website: m.website ?? '',
+    description: m.companyDescription ?? '',
+    specialOffer: m.specialOfferSummary,
   }));
 
   const mobileDisplayBusinesses = isGuest ? filteredBusinesses : quickFilter === 'bookmarked'
@@ -194,7 +196,9 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
                     <span className="text-xs font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{counts[quickFilter]}</span>
                   </div>
                 )}
-                {quickFilter === 'international' ? (
+                {quickFilter === 'international' && !canViewIntl ? (
+                  <ShareCardNotice onShare={optIn} sharing={optingIn} />
+                ) : quickFilter === 'international' ? (
                   <LoadingState loading={intlLoading} error={null} empty={intlViews.length === 0} emptyMessage="No international members found">
                     <div className="divide-y divide-slate-100 bg-white">
                       {intlViews.map(member => (
@@ -481,9 +485,9 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
             )}
           </div>
           <div className="flex gap-2 pt-4 border-t border-slate-100 mt-4">
-            <Button variant="outline" size="sm" className="flex-1"
-              onClick={() => window.open(`mailto:${intlDetail.email}?subject=JCI KL Collaboration Inquiry`, '_blank')}>
-              <Globe size={14} className="mr-2" /> Email
+            <Button variant="outline" size="sm" className="flex-1" disabled={!intlDetail.website}
+              onClick={() => window.open(intlDetail.website, '_blank', 'noopener')}>
+              <Globe size={14} className="mr-2" /> Website
             </Button>
           </div>
         </Modal>

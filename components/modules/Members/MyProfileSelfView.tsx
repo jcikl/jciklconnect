@@ -28,6 +28,8 @@ export const MyProfileSelfView: React.FC<{ member: Member; onSave: (updates: Par
     showPhone: member.privacy?.showPhone ?? true,
     showAlternatePhone: member.privacy?.showAlternatePhone ?? true,
     showSocials: member.privacy?.showSocials ?? true,
+    // Opt-in (default off): mirrored into memberCards.international by MembersService.updateMember
+    shareCardInternationally: member.privacy?.shareCardInternationally ?? false,
   });
 
   const [form, setForm] = useState<Record<string, string>>(() => {
@@ -124,6 +126,7 @@ export const MyProfileSelfView: React.FC<{ member: Member; onSave: (updates: Par
             { key: 'showPhone', label: 'Primary Phone', desc: 'Show your primary phone number to other members' },
             { key: 'showAlternatePhone', label: 'Alternative Phone', desc: 'Show your alternative phone number to other members' },
             { key: 'showSocials', label: 'Social Media', desc: 'Show your LinkedIn, Facebook, Instagram and WeChat to other members' },
+            { key: 'shareCardInternationally', label: 'Show my card to international JCI members', desc: 'Let JCI members of other chapters see your name, company and business card. Off by default.' },
           ] as { key: keyof typeof privacy; label: string; desc: string }[]).map(({ key, label, desc }) => (
             <div key={key} className="flex items-center justify-between gap-3">
               <div className="flex-1">

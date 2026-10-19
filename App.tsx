@@ -243,24 +243,29 @@ export const JCIKLApp: React.FC = () => {
     isMember,
     isPlainMember,
     isGuest,
+    isExternal,
+    externalAllowedViews,
+    externalStatus,
     canAccessWorkspaceModules,
     canAccessEventsAndPayments,
     effectiveRole,
     hasPermission,
   } = usePermissions();
+  // Mobile nav: external users only see whitelisted entries (utils/externalAccess.ts); KL roles see everything as before.
+  const canSeeView = (v: ViewType) => !externalAllowedViews || externalAllowedViews.includes(v);
   // Roles below member only get events management as a project creator / committee member;
   // only they need the (large) projects list, so other roles skip loading it.
   const hasRoleEventsAccess = isAdmin || isBoard || isDeveloper || isMember;
-  const { projects } = useProjects({ enabled: !!member && !hasRoleEventsAccess });
+  const { projects } = useProjects({ enabled: !!member && !hasRoleEventsAccess && !isExternal });
   const canViewEventsManagement = React.useMemo(() => {
-    if (!member) return false;
+    if (!member || isExternal) return false;
     if (hasRoleEventsAccess) return true;
     return projects.some(p => {
       const isCreator = p.organizerId === member.id || p.submittedBy === member.id;
       const isCommittee = p.committee?.some(c => c.memberId === member.id) ?? false;
       return isCreator || isCommittee;
     });
-  }, [member, hasRoleEventsAccess, projects]);
+  }, [member, isExternal, hasRoleEventsAccess, projects]);
 
 
   // useCommunication hook is safe to call even without authentication
@@ -455,6 +460,8 @@ export const JCIKLApp: React.FC = () => {
       canAccessEventsAndPayments,
       canViewEventsManagement,
       hasPermission,
+      externalAllowedViews,
+      externalStatus,
       showBoardDashboard,
       searchQuery,
       onSearchChange: setSearchQuery,
@@ -483,6 +490,7 @@ export const JCIKLApp: React.FC = () => {
     canAccessWorkspaceModules,
     canViewEventsManagement,
     hasPermission,
+    externalAllowedViews,
   };
 
   return (
@@ -758,6 +766,7 @@ export const JCIKLApp: React.FC = () => {
           <>
             <div className={`mobile-bottom-nav md:hidden fixed bottom-5 left-4 right-4 ${'bg-slate-900/95 border-slate-700/50'} backdrop-blur-xl rounded-3xl shadow-xl border flex items-center h-[66px] px-1 z-50`}>
               {/* Dashboard */}
+              {canSeeView('DASHBOARD') && (
               <button
                 onClick={() => handleViewChange('DASHBOARD')}
                 className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 h-full"
@@ -767,8 +776,10 @@ export const JCIKLApp: React.FC = () => {
                 </div>
                 <span className={`text-[10px] font-semibold transition-colors duration-200 ${view === 'DASHBOARD' ? 'text-jci-blue' : ('text-slate-500')}`}>Dashboard</span>
               </button>
+              )}
 
               {/* Directory */}
+              {canSeeView('DIRECTORY') && (
               <button
                 onClick={() => handleViewChange('DIRECTORY')}
                 className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 h-full"
@@ -778,8 +789,10 @@ export const JCIKLApp: React.FC = () => {
                 </div>
                 <span className={`text-[10px] font-semibold transition-colors duration-200 ${view === 'DIRECTORY' ? 'text-jci-blue' : ('text-slate-500')}`}>Directory</span>
               </button>
+              )}
 
               {/* Benefits */}
+              {canSeeView('BENEFITS') && (
               <button
                 onClick={() => handleViewChange('BENEFITS')}
                 className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 h-full"
@@ -789,6 +802,7 @@ export const JCIKLApp: React.FC = () => {
                 </div>
                 <span className={`text-[10px] font-semibold transition-colors duration-200 ${view === 'BENEFITS' ? 'text-jci-blue' : ('text-slate-500')}`}>Benefits</span>
               </button>
+              )}
 
               {/* Menu / Avatar */}
               <button
@@ -856,30 +870,45 @@ export const JCIKLApp: React.FC = () => {
                       </div>
                     )}
                     {/* Event List — visible to all roles including GUEST */}
+                    {canSeeView('EVENTS') && (
                     <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('EVENTS'); setShowMobileMenu(false); }}>
                       <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-green-950/30 text-green-400 border-green-900/50'}`}><Calendar size={22} /></div>
                       <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Event List</span>
                     </div>
+                    )}
                     {canAccessWorkspaceModules && (
                       <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('COMMUNICATION'); setShowMobileMenu(false); }}>
                         <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-sky-950/30 text-sky-400 border-sky-900/50'}`}><MessageSquare size={22} /></div>
                         <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Comm</span>
                       </div>
                     )}
-                    {!isGuest && (
+                    {!isGuest && !isExternal && (
                       <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('KNOWLEDGE'); setShowMobileMenu(false); }}>
                         <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-indigo-950/30 text-indigo-400 border-indigo-900/50'}`}><BookOpen size={22} /></div>
                         <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Knowledge</span>
                       </div>
                     )}
+                    {canSeeView('CLUBS') && (
                     <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('CLUBS'); setShowMobileMenu(false); }}>
                       <div className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-sm ${'bg-pink-950/30 text-pink-400 border-pink-900/50'}`}><Heart size={22} /></div>
                       <span className={`text-[10px] sm:text-xs font-bold text-center mt-1 ${'text-slate-300'}`}>Hobbies</span>
                     </div>
+                    )}
                   </div>
 
                   {/* Workspace section */}
-                  {member?.role !== UserRole.GUEST && (
+                  {/* External users: whitelisted workspace entries only (Surveys) */}
+                  {isExternal && canSeeView('SURVEYS') && (
+                    <div className="pt-4">
+                      <div className="grid grid-cols-5 gap-y-4 gap-x-1">
+                        <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('SURVEYS'); setShowMobileMenu(false); }}>
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><CheckSquare size={22} /></div>
+                          <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Surveys</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {member?.role !== UserRole.GUEST && !isExternal && (
                     <div className="pt-4">
                       <div className="flex items-center gap-2 mb-3 w-[90%]">
                         <span className={`text-[10px] font-bold uppercase tracking-widest shrink-0 ${'text-slate-500'}`}>Workspace</span>

@@ -45,6 +45,7 @@ import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 import { MOCK_MEMBERS } from './mockData';
 import { AuditLogService } from './auditLogService';
 import { LarkSyncService } from './larkSyncService';
+import { MemberCardsService } from './memberCardsService';
 
 const CACHE_KEY_ALL_MEMBERS = 'members:all';
 const CACHE_KEY_LO = (loId: string) => `members:lo:${loId}`;
@@ -144,7 +145,8 @@ export class MembersService {
             orderBy('updatedAt', 'desc')
           );
         } else {
-          q = query(collection(db, COLLECTIONS.MEMBERS), limit(500));
+          // Rules require every non-admin members list query to be constrained to the KL chapter.
+          q = query(collection(db, COLLECTIONS.MEMBERS), where('loId', '==', DEFAULT_LO_ID), limit(500));
         }
         const snapshot = await getDocs(q);
         const docs = snapshot.docs.map(d => ({ ...(d.data() as Omit<Member, 'id'>), id: d.id } as Member));
@@ -210,28 +212,28 @@ export class MembersService {
       }
 
       // 2. Otherwise, check if it matches a member name
-      const q = query(collection(db, COLLECTIONS.MEMBERS), where('name', '==', trimmed));
+      const q = query(collection(db, COLLECTIONS.MEMBERS), where('loId', '==', DEFAULT_LO_ID), where('name', '==', trimmed));
       const snap = await getDocs(q);
       for (const d of snap.docs) {
         await PointsService.recalculateMemberRadarStats(d.id);
       }
 
       // 3. Also check general.name
-      const q2 = query(collection(db, COLLECTIONS.MEMBERS), where('general.name', '==', trimmed));
+      const q2 = query(collection(db, COLLECTIONS.MEMBERS), where('loId', '==', DEFAULT_LO_ID), where('general.name', '==', trimmed));
       const snap2 = await getDocs(q2);
       for (const d of snap2.docs) {
         await PointsService.recalculateMemberRadarStats(d.id);
       }
 
       // 4. Also check top-level fullName
-      const q3 = query(collection(db, COLLECTIONS.MEMBERS), where('fullName', '==', trimmed));
+      const q3 = query(collection(db, COLLECTIONS.MEMBERS), where('loId', '==', DEFAULT_LO_ID), where('fullName', '==', trimmed));
       const snap3 = await getDocs(q3);
       for (const d of snap3.docs) {
         await PointsService.recalculateMemberRadarStats(d.id);
       }
 
       // 5. Also check general.fullName (nested path)
-      const q4 = query(collection(db, COLLECTIONS.MEMBERS), where('general.fullName', '==', trimmed));
+      const q4 = query(collection(db, COLLECTIONS.MEMBERS), where('loId', '==', DEFAULT_LO_ID), where('general.fullName', '==', trimmed));
       const snap4 = await getDocs(q4);
       for (const d of snap4.docs) {
         await PointsService.recalculateMemberRadarStats(d.id);
@@ -619,6 +621,8 @@ export class MembersService {
       const docRef = memberRef;
       logWrite(CACHE_KEY_ALL_MEMBERS, 'membersService.createMember');
       this.invalidateMembersCache();
+      // memberCards: written after the member doc; a card failure never fails the create
+      await MemberCardsService.syncCards([{ memberId: memberRef.id, before: null, after: { ...normalizedData, id: memberRef.id } as Member }]);
 
       // Isolate syncPublicListing so a failure here does not roll back the member creation (E-02)
       try {
@@ -775,6 +779,8 @@ export class MembersService {
       } else {
         await updateDoc(memberRef, normalizedUpdates);
       }
+      // memberCards: member doc is committed; now rebuild/delete the card (failure is logged, not thrown)
+      await MemberCardsService.syncCards([{ memberId, before: currentData, after: MemberCardsService.applyUpdates(currentData, normalizedUpdates) as Member }]);
       const _frames = (new Error().stack ?? '').split('\n').slice(2);
       const _named = _frames
         .map(l => l.trim().replace(/^at /, '').replace(/ \(.*\)/, '').trim())
@@ -1060,6 +1066,8 @@ export class MembersService {
       boardSnap.docs.forEach(d => primaryBatch.delete(d.ref));
       bizSnap.docs.forEach(d => primaryBatch.delete(d.ref));
       await this.commitWithRetry(primaryBatch);
+      // memberCards: soft-deleted -> INACTIVE, so no public card (failure is logged, not thrown)
+      await MemberCardsService.syncCards([{ memberId, before: null, after: { role: 'INACTIVE' } as Member, forceDelete: true }]);
 
       // Cascade batch: soft-cancel eventRegistrations + paymentRequests, delete notifications (P1 fix).
       // Points, transactions, achievements, badgeAwards, loStarProgress are kept as historical
@@ -1116,6 +1124,7 @@ export class MembersService {
     try {
       const q = query(
         collection(db, COLLECTIONS.MEMBERS),
+        where('loId', '==', DEFAULT_LO_ID),
         where('role', '==', role),
         // PERF11: Increased from 200 to 500 to match getAllMembers cap. TODO: implement pagination for very large chapters.
         limit(500)
@@ -1146,6 +1155,7 @@ export class MembersService {
     try {
       const q = query(
         collection(db, COLLECTIONS.MEMBERS),
+        where('loId', '==', DEFAULT_LO_ID),
         where('email', '==', email),
         limit(1)
       );
@@ -1160,6 +1170,7 @@ export class MembersService {
       // only under contact.email and the flat field may not be populated.
       const q2 = query(
         collection(db, COLLECTIONS.MEMBERS),
+        where('loId', '==', DEFAULT_LO_ID),
         where('contact.email', '==', email),
         limit(1)
       );
@@ -1181,6 +1192,7 @@ export class MembersService {
     try {
       const q = query(
         collection(db, COLLECTIONS.MEMBERS),
+        where('loId', '==', DEFAULT_LO_ID),
         where('churnRisk', 'in', ['High', 'Medium'])
       );
 
@@ -1264,8 +1276,23 @@ export class MembersService {
       const boardSnap = await getDocs(
         query(collection(db, COLLECTIONS.BOARD_MEMBERS), where('memberId', '==', memberId))
       );
+      const roleMemberSnap = await getDoc(doc(db, COLLECTIONS.MEMBERS, memberId));
       const roleBatch = writeBatch(db);
+      // External roles are never board members: clear the board flags in the same write (they would
+      // otherwise keep isBoard()-style access flags from a previous KL board term).
+      const clearBoardFlags: Record<string, unknown> = (newRole === UserRole.AFFILIATE || newRole === UserRole.CHAPTER_ADMIN)
+        ? {
+            isCurrentBoardMember: false,
+            isCurrentCommissionDirector: false,
+            currentBoardYear: deleteField(),
+            currentBoardPosition: deleteField(),
+            'jciCareer.isCurrentBoardMember': false,
+            'jciCareer.currentBoardYear': deleteField(),
+            'jciCareer.currentBoardPosition': deleteField(),
+          }
+        : {};
       roleBatch.update(doc(db, COLLECTIONS.MEMBERS, memberId), {
+        ...clearBoardFlags,
         role: newRole,
         updatedAt: Timestamp.now(),
         roleChangedBy: auth?.currentUser?.uid ?? null,
@@ -1276,6 +1303,11 @@ export class MembersService {
       );
       await this.commitWithRetry(roleBatch);
       this.invalidateMembersCache();
+      // memberCards: role decides whether the card exists (MEMBER+ yes; GUEST/INACTIVE no)
+      if (roleMemberSnap.exists()) {
+        const beforeRole = { ...roleMemberSnap.data(), id: memberId } as Member;
+        await MemberCardsService.syncCards([{ memberId, before: beforeRole, after: { ...beforeRole, role: newRole } }]);
+      }
       void LarkSyncService.syncRecord({ collection: 'members', id: memberId, action: 'upsert' });
       // P1-fix: audit role changes — these are high-sensitivity operations.
       AuditLogService.writeAuditEntry({
@@ -1415,6 +1447,7 @@ export class MembersService {
       }
 
       // Firestore writeBatch limit is 500; flush every 400 to stay safe
+      const cardOps: Array<{ memberId: string; before: Member; after: Member }> = [];
       for (let i = 0; i < memberIds.length; i += 400) {
         const batch = writeBatch(db);
         memberIds.slice(i, i + 400).forEach(id => {
@@ -1439,11 +1472,15 @@ export class MembersService {
           const typePatch = membershipTypePatchMap.get(id) ?? {};
           // Merge GUEST→MEMBER membership initialization patch (variant symmetry fix)
           const membershipInitPatch = membershipInitPatchMap.get(id) ?? {};
-          batch.update(doc(db, COLLECTIONS.MEMBERS, id), { ...perMemberNormalized, ...typePatch, ...membershipInitPatch, updatedAt: now });
+          const memberPatch = { ...perMemberNormalized, ...typePatch, ...membershipInitPatch, updatedAt: now };
+          batch.update(doc(db, COLLECTIONS.MEMBERS, id), memberPatch);
+          if (existing) cardOps.push({ memberId: id, before: existing, after: MemberCardsService.applyUpdates(existing, memberPatch) as Member });
         });
         await this.commitWithRetry(batch);
       }
       this.invalidateMembersCache();
+      // memberCards: after all member chunks are committed (same rules as updateMember; failure is logged, not thrown)
+      await MemberCardsService.syncCards(cardOps);
 
       // Sync display side effects when any display-affecting field is updated (N1 fix).
       // Mirrors updateMember behaviour. Fires concurrently; failures are silent.
@@ -1546,6 +1583,9 @@ export class MembersService {
         });
         await this.commitWithRetry(batch);
       }
+
+      // memberCards: soft-deleted -> INACTIVE, so no public cards (failure is logged, not thrown)
+      await MemberCardsService.syncCards(memberIds.map(id => ({ memberId: id, before: null, after: { role: 'INACTIVE' } as Member, forceDelete: true })));
 
       // FIX: Release memberEmails uniqueness slots so emails can be re-registered.
       // Mirror the logic in single deleteMember: contact.email → email → sanitize → batch.delete.
@@ -2261,12 +2301,14 @@ export class MembersService {
 
     let q = query(
       collection(db, COLLECTIONS.MEMBERS),
+      where('loId', '==', DEFAULT_LO_ID),
       orderBy('name'),
       limit(pageSize)
     );
     if (lastDoc) {
       q = query(
         collection(db, COLLECTIONS.MEMBERS),
+        where('loId', '==', DEFAULT_LO_ID),
         orderBy('name'),
         startAfter(lastDoc),
         limit(pageSize)

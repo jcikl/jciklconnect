@@ -1,6 +1,9 @@
 import React, { lazy } from 'react';
 import { UserRole, Member } from '../../types';
 import { ViewType } from '../../types/views';
+import type { AffiliationStatus } from '../../types/member';
+import { ExternalAccessNotice } from './ExternalAccessNotice';
+import { ExternalSelfProfile } from './ExternalSelfProfile';
 
 const FinanceView = lazy(() => import('../modules/FinanceView').then(m => ({ default: m.FinanceView })));
 const PaymentRequestsView = lazy(() => import('../modules/PaymentRequestsView').then(m => ({ default: m.PaymentRequestsView })));
@@ -45,6 +48,9 @@ export interface AppViewRenderContext {
   canAccessEventsAndPayments: boolean;
   canViewEventsManagement: boolean;
   hasPermission: (permission: string) => boolean;
+  /** External users only (utils/externalAccess.ts): views they may open. null/undefined for KL roles. */
+  externalAllowedViews?: readonly ViewType[] | null;
+  externalStatus?: AffiliationStatus | null;
   showBoardDashboard: boolean;
   searchQuery: string;
   onSearchChange: React.Dispatch<React.SetStateAction<string>>;
@@ -74,6 +80,8 @@ export const renderAppView = (view: ViewType, context: AppViewRenderContext): Re
     canAccessEventsAndPayments,
     canViewEventsManagement,
     hasPermission,
+    externalAllowedViews,
+    externalStatus,
     showBoardDashboard,
     searchQuery,
     onSearchChange,
@@ -102,6 +110,22 @@ export const renderAppView = (view: ViewType, context: AppViewRenderContext): Re
     />
   );
 
+  // External users (AFFILIATE / CHAPTER_ADMIN): hard whitelist, applied before any per-view rule so that
+  // URL / localStorage / programmatic view switches cannot reach a KL-only module.
+  if (externalAllowedViews) {
+    if (externalAllowedViews.includes(view)) {
+      // The only whitelisted view that is a KL module is MEMBERS: externals get their OWN profile only,
+      // rendered from the signed-in member (no members list query, no KL tabs).
+      if (view === 'MEMBERS') {
+        return wrapErrorBoundary(<ExternalSelfProfile />, '个人资料');
+      }
+    } else if (externalStatus !== 'active') {
+      return <ExternalAccessNotice status={externalStatus} />;
+    } else {
+      return wrapErrorBoundary(dashboardFallback, '仪表板');
+    }
+  }
+
   switch (view) {
     case 'MEMBERS':
       if (!canAccessWorkspaceModules && !hasMember) return dashboardFallback;
@@ -113,7 +137,7 @@ export const renderAppView = (view: ViewType, context: AppViewRenderContext): Re
       if (!canViewEventsManagement || isPlainMember) return dashboardFallback;
       return wrapErrorBoundary(<FlagshipProjectsManagementView searchQuery={searchQuery} />, '旗舰项目');
     case 'EVENTS':
-      if (!canViewEventsManagement) return dashboardFallback;
+      if (!canViewEventsManagement && !externalAllowedViews) return dashboardFallback;
       return wrapErrorBoundary(<EventsView searchQuery={searchQuery} initialSelectedEventId={initialSelectedEventId} onClearSelection={clearSelectedEvent} />, '活动列表');
     case 'FINANCE':
       if (memberRole === UserRole.GUEST) return dashboardFallback;

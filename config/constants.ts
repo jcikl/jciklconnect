@@ -108,6 +108,7 @@ export const COLLECTIONS = {
   AUDIT_LOG: 'auditLog',
   /** Member email dedup slots — one doc per sanitised email, enforces uniqueness across import paths */
   MEMBER_EMAILS: 'memberEmails',
+  MEMBER_CARDS: 'memberCards',
   /** ToyyibPay outbound webhook records */
   TOYYIBPAY_WEBHOOKS: 'toyyibpay_webhooks',
   /** Tracks which members have already received birthday notification emails on a given date */

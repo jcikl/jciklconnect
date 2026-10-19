@@ -4,6 +4,7 @@ import { MembersService } from './membersService';
 import { EventsService } from './eventsService';
 import { ProjectsService } from './projectsService';
 import { withDevMode } from '../utils/devMode';
+import { filterKlMembers } from '../utils/memberScope';
 import { errorLoggingService } from './errorLoggingService';
 
 export interface MemberStatistics {
@@ -53,7 +54,7 @@ export class MemberStatsService {
       () => this.getMockStatistics(),
       async () => {
     try {
-      const allMembers = await MembersService.getAllMembers();
+      const allMembers = filterKlMembers(await MembersService.getAllMembers());
       const now = new Date();
       const currentYear = year || now.getFullYear();
       const currentMonth = now.getMonth();

@@ -38,6 +38,7 @@ import {
   roleForMembershipType,
 } from './membershipConfigService';
 import { MembersService } from './membersService';
+import { MemberCardsService } from './memberCardsService';
 import { errorLoggingService } from './errorLoggingService';
 
 function chunkArray<T>(arr: T[], size: number): T[][] {
@@ -2651,6 +2652,10 @@ export class FinanceService {
 
           await updateDoc(memberRef, zeroTxUpdates);
           memberUpdated = true;
+          // memberCards: a demoted MEMBER -> GUEST must lose its public card (non-fatal, after the member write)
+          if (zeroTxUpdates.role === 'GUEST') {
+            await MemberCardsService.syncCards([{ memberId, before: { ...member, id: memberId }, after: { ...member, id: memberId, role: 'GUEST' } }]);
+          }
         } else if (allMembershipTransactions.length > 0) {
           // 5. Determine status based on amount - dues
           const balance = totalAmount - duesAmount;

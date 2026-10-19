@@ -20,6 +20,8 @@
 - `ADMIN`：管理员。
 - `SUPER_ADMIN`：超级管理员。
 - `INACTIVE`：停用用户，应被硬性限制。
+- `AFFILIATE`（外部会员）：其他 JCI 分会的会员，`members.loId` 为 `sisterChapters` 中的分会。不属于 `isMember()` / `isActiveMember()`；只能打开白名单视图（见下表），且 `affiliation.status` 为 `active` 时才能使用，其他状态只能看自己的资料与提示。
+- `CHAPTER_ADMIN`（分会管理人）：某个外部分会的管理人，由 KL 管理员创建。前端视图与 `AFFILIATE` 相同；规则层另允许读取本分会的完整会员文档，并修改本分会 AFFILIATE 的 `affiliation` 状态字段（不能设为 `active`）。
 - `isBoard()`：Firestore Rules 中包含 `BOARD`、`ADMIN`、`SUPER_ADMIN`，也包含 current board member。
 - `isAdmin()`：Firestore Rules 中包含 `ADMIN`、`SUPER_ADMIN`。
 - `canOperateFinance`：前端 `usePermissions.ts` 中的财务操作权限，主要给当前年度 treasurer/secretary/president。
@@ -40,6 +42,26 @@
 | System/Access Config | 多数为 `isAdmin || isBoard`，`AccessConfigView` 内部要求 `isAdmin` | UI 与页面内部有二次限制。 |
 | Developer Interface | `isDeveloper || isAdmin` | Dev mode 对本地调试放大权限。 |
 | Social Media | `hasPermission('canManageEvents')` 作为 BOD 判断，`isAdmin` 控制删除等高权限操作 | 与 Firestore `socialPosts` rules 需重点对齐。 |
+
+## 外部用户角色矩阵（Phase 0）
+
+来源：`utils/externalAccess.ts`（唯一白名单，导航与视图渲染都读取它）、`hooks/usePermissions.ts`（`externalAllowedViews`）。`AFFILIATE` 与 `CHAPTER_ADMIN` 的前端视图相同；差异只在 Firestore 规则层（见下方说明）。
+
+| 视图（ViewType） | 说明 | AFFILIATE（active） | CHAPTER_ADMIN（active） | 非 active（pending / suspended / expired） |
+|---|---|:---:|:---:|:---:|
+| `DASHBOARD` | 仪表盘（仅挂载 `birthdays` / `partners` / `events` / `profile` 小部件） | 是 | 是 | 否 |
+| `DIRECTORY` | 会员目录 | 是 | 是 | 否 |
+| `BENEFITS` | 会员福利 | 是 | 是 | 否 |
+| `EVENTS` | 活动 | 是 | 是 | 否 |
+| `SURVEYS` | 问卷 | 是 | 是 | 否 |
+| `CLUBS` | 兴趣社群 | 是 | 是 | 否 |
+| `MEMBERS` | 仅本人资料（`MyProfileSelfView`） | 是 | 是 | 是 |
+
+- 非 active 外部用户只能打开 `MEMBERS`，并看到 `ExternalAccessNotice` 状态提示（`getExternalStatusMessage`）。
+- 白名单之外的所有视图（财务、成员管理、项目、自动化、系统配置等）对两种外部角色都不可见，`isViewAllowedForRole` 返回 false。
+- `CHAPTER_ADMIN` 在规则层的额外权限：读取本分会完整会员文档（`members`）、修改本分会 AFFILIATE 的 `affiliation` 状态字段。前端目前没有对应的管理视图（Phase 1 规划）。
+- `DIRECTORY` 与生日列表的数据来源应为 `memberCards`，目前尚未接入（见 `RISK_REGISTER.md` R-058）。
+- 前端白名单只是 UI 层限制；真正的数据边界是 `firestore.rules`，逐集合范围见 `SCHEMA-PERMISSIONS.md`「外部用户（AFFILIATE / CHAPTER_ADMIN）的规则范围」。
 
 ## Firestore 集合权限矩阵
 

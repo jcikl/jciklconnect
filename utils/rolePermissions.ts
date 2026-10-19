@@ -95,6 +95,33 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission> = {
     canManageSettings: false,
     canApproveClaims: false,
   },
+  // External roles: most restrictive baseline. Module access is a separate whitelist (Phase 0 WP3).
+  [UserRole.AFFILIATE]: {
+    canViewMembers: false,
+    canEditMembers: false,
+    canViewFinance: false,
+    canEditFinance: false,
+    canManageProjects: false,
+    canManageEvents: false,
+    canManageInventory: false,
+    canManageAutomation: false,
+    canViewReports: false,
+    canManageSettings: false,
+    canApproveClaims: false,
+  },
+  [UserRole.CHAPTER_ADMIN]: {
+    canViewMembers: false,
+    canEditMembers: false,
+    canViewFinance: false,
+    canEditFinance: false,
+    canManageProjects: false,
+    canManageEvents: false,
+    canManageInventory: false,
+    canManageAutomation: false,
+    canViewReports: false,
+    canManageSettings: false,
+    canApproveClaims: false,
+  },
 };
 
 export const ALL_PERMISSIONS_GRANTED: Permission = {

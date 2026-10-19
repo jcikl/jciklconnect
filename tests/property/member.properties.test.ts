@@ -372,7 +372,9 @@ describe('Member Management Properties', () => {
             ],
             [UserRole.INACTIVE]: [
               'id', 'name', 'membershipType'
-            ]
+            ],
+            [UserRole.AFFILIATE]: ['id', 'name'],
+            [UserRole.CHAPTER_ADMIN]: ['id', 'name']
           };
 
           const allowedFields = fieldPermissions[userRole];

@@ -18,7 +18,7 @@ import {
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { db } from '../config/firebase';
-import { COLLECTIONS, POINT_CATEGORIES, MEMBER_TIERS } from '../config/constants';
+import { COLLECTIONS, DEFAULT_LO_ID, POINT_CATEGORIES, MEMBER_TIERS } from '../config/constants';
 import { Member, MemberTier, IncentiveProgram, IncentiveStandard, IncentiveSubmission, LOStarProgress, RadarPointsConfig } from '../types';
 import { isDevMode, withDevMode } from '../utils/devMode';
 import { MembersService } from './membersService';
@@ -2403,7 +2403,7 @@ export class PointsService {
       // 2. Calculate Recruitment Points
       // TODO: Store introducerId (memberId) instead of introducer name string, then use where() query
       let recruitment = 0;
-      const membersSnap = await getDocs(query(collection(db, COLLECTIONS.MEMBERS), limit(500)));
+      const membersSnap = await getDocs(query(collection(db, COLLECTIONS.MEMBERS), where('loId', '==', DEFAULT_LO_ID), limit(500)));
       if (membersSnap.size >= 500) console.warn('calculateRadarStats: hit 500-member cap, results may be incomplete');
       let referCount = 0;
       membersSnap.forEach(mDoc => {

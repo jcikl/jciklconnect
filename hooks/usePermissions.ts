@@ -5,6 +5,7 @@ import { UserRole } from '../types';
 import { isDevMode } from '../utils/devMode';
 import { isMemberCurrentBoard, isExternalOfficerPosition } from '../utils/boardMembership';
 import { Permission, ROLE_PERMISSIONS, ALL_PERMISSIONS_GRANTED } from '../utils/rolePermissions';
+import { isExternalRole, getExternalAllowedViews } from '../utils/externalAccess';
 
 export type { Permission };
 
@@ -58,7 +59,7 @@ export const usePermissions = () => {
 
     // ADMIN and SUPER_ADMIN are excluded here because they receive permissions from ROLE_PERMISSIONS[ADMIN/SUPER_ADMIN].
     // Firestore rules (isBoard()) does include ADMIN for collection access — the two systems have different semantics by design.
-    if ((isCurrentBoardMember || isLegacyBoardRoleInner) && !isExternalOfficerInner && member.role !== UserRole.ADMIN && member.role !== UserRole.SUPER_ADMIN && member.role !== UserRole.INACTIVE) {
+    if ((isCurrentBoardMember || isLegacyBoardRoleInner) && !isExternalOfficerInner && !isExternalRole(member.role) && member.role !== UserRole.ADMIN && member.role !== UserRole.SUPER_ADMIN && member.role !== UserRole.INACTIVE) {
       basePermissions = {
         ...basePermissions,
         canViewMembers: true,
@@ -126,7 +127,12 @@ export const usePermissions = () => {
     member?.jciCareer?.currentBoardPosition ?? memberWithLegacyBoardFields?.currentBoardPosition;
   const isExternalOfficer = isExternalOfficerPosition(currentBoardPosition);
   // T-1: INACTIVE is a hard block — never grant board status regardless of flags
-  const isBoardUser = (isCurrentBoardMember || isLegacyBoardRole) && !isExternalOfficer && effectiveRole !== UserRole.INACTIVE;
+  // External-chapter users (AFFILIATE / CHAPTER_ADMIN) never get board status, whatever their member doc says.
+  const isExternal = isExternalRole(effectiveRole);
+  // Role-only simulation of an external role previews an active affiliation.
+  const externalStatus = simulatedRole ? 'active' : member?.affiliation?.status;
+  const externalAllowedViews = getExternalAllowedViews(effectiveRole, externalStatus);
+  const isBoardUser = (isCurrentBoardMember || isLegacyBoardRole) && !isExternalOfficer && !isExternal && effectiveRole !== UserRole.INACTIVE;
   const isPlainMember =
     effectiveRole === UserRole.MEMBER && !isBoardUser;
 
@@ -137,6 +143,7 @@ export const usePermissions = () => {
   // canAccessWorkspaceModules is set here for UI-layer consistency.
   const isHonoraryOrSenator =
     !simulatedRole &&
+    !isExternal &&
     (member?.jciCareer?.membershipType === 'Honorary' || member?.jciCareer?.membershipType === 'Senator');
   const canAccessWorkspaceModules =
     effectiveRole !== UserRole.GUEST &&
@@ -149,7 +156,8 @@ export const usePermissions = () => {
   /** Events management + Payment Requests — open to all active members */
   const canAccessEventsAndPayments =
     effectiveRole !== UserRole.GUEST &&
-    effectiveRole !== UserRole.INACTIVE;
+    effectiveRole !== UserRole.INACTIVE &&
+    !isExternal;
 
   // B-3: Derive board-position flags from currentBoardPosition field
   const boardPosition = (currentBoardPosition ?? '').toLowerCase();
@@ -177,6 +185,11 @@ export const usePermissions = () => {
     hasAnyPermission,
     hasAllPermissions,
     isGuest: effectiveRole === UserRole.GUEST,
+    /** AFFILIATE / CHAPTER_ADMIN: external-chapter user, restricted to the whitelist in utils/externalAccess.ts */
+    isExternal,
+    /** Views this user may open when external (whitelist); null for KL roles (no whitelist applies). */
+    externalAllowedViews,
+    externalStatus,
     // B-2: Derive from actual membershipType field instead of hardcoded false
     isProbationMember: member?.jciCareer?.membershipType === 'Probation' && effectiveRole !== UserRole.INACTIVE,
     isMember: effectiveRole === UserRole.MEMBER,

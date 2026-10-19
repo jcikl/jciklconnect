@@ -24,7 +24,7 @@ import {
   isExternalOfficerPosition,
 } from '../utils/boardMembership';
 import { db } from '../config/firebase';
-import { COLLECTIONS } from '../config/constants';
+import { COLLECTIONS, DEFAULT_LO_ID } from '../config/constants';
 import { Member, UserRole, BoardPosition, BoardMember, BoardTransition, BoardTermSettings } from '../types';
 import { isDevMode, withDevMode } from '../utils/devMode';
 import { MembersService } from './membersService';
@@ -852,7 +852,7 @@ export class BoardManagementService {
         // Build previousBoardRecords from ALL members currently flagged as board,
         // so the clear path fires for ghost records with no active boardMembers doc.
         const ghostSnap = await getDocs(
-          query(collection(db, COLLECTIONS.MEMBERS), where('isCurrentBoardMember', '==', true))
+          query(collection(db, COLLECTIONS.MEMBERS), where('loId', '==', DEFAULT_LO_ID), where('isCurrentBoardMember', '==', true))
         );
         const ghostRecords: BoardMember[] = ghostSnap.docs
           .filter((d) => !activeMemberIds.has(d.id))
@@ -870,7 +870,7 @@ export class BoardManagementService {
 
         // Also clear ghost commission directors
         const commDirGhostSnap = await getDocs(
-          query(collection(db, COLLECTIONS.MEMBERS), where('isCurrentCommissionDirector', '==', true))
+          query(collection(db, COLLECTIONS.MEMBERS), where('loId', '==', DEFAULT_LO_ID), where('isCurrentCommissionDirector', '==', true))
         );
         const activeCommDirIds = new Set(
           active.flatMap((b) => b.commissionDirectorIds ?? [])
