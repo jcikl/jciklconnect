@@ -88,6 +88,10 @@ describe.skipIf(!HOST)('firestore.rules — WP-3 external self-registration (emu
     expect(await commit('owner', [
       ['sisterChapters/jcicitysg', { name: 'JCI City Singapore', country: 'Singapore', type: ['sister_lo'], isActive: true }],
       ['sisterChapters/jcioff', { name: 'JCI Off', country: 'Japan', type: ['global'], isActive: false }],
+      ['sisterChapters/jcimixed', { name: 'JCI Mixed', country: 'Thailand', type: ['sister_lo', 'apicc'], isActive: true }],
+      ['sisterChapters/jciapicc', { name: 'JCI APICC', country: 'Japan', type: ['apicc'], isActive: true }],
+      ['sisterChapters/jciglobal', { name: 'JCI Global', country: 'France', type: ['global'], isActive: true }],
+      ['sisterChapters/jcinotype', { name: 'JCI No Type', country: 'Korea', isActive: true }],
       ['members/already', external()],
       ['members/klAdmin', { role: 'ADMIN', loId: 'jcikl', general: { name: 'Admin' } }],
     ])).toBe(OK);
@@ -113,8 +117,34 @@ describe.skipIf(!HOST)('firestore.rules — WP-3 external self-registration (emu
     it('minimal shape (no optional defaults) is allowed too', async () => {
       expect(await set('ok2', 'members/ok2', {
         general: { name: 'Min' }, contact: { email: 'min@example.test' }, role: 'AFFILIATE', loId: SG,
-        affiliation: { category: 'apicc', country: 'Singapore', status: 'pending_chapter' },
+        affiliation: { category: 'sister', country: 'Singapore', status: 'pending_chapter' },
       })).toBe(OK);
+    });
+  });
+
+  // Review M4: affiliation.category must be what utils/affiliation.mjs categoryForChapter gives for the
+  // chapter's type: sister_lo → sister, else apicc → apicc, else global → global, none → sister.
+  describe('M4: category is tied to the chapter type', () => {
+    const at = (loId: string, country: string, category: string) =>
+      external({ loId }, { country, category });
+    it.each([
+      ['sister_lo chapter → sister', 'm4a', SG, 'Singapore', 'sister'],
+      ['sister_lo + apicc chapter → sister', 'm4b', 'jcimixed', 'Thailand', 'sister'],
+      ['apicc chapter → apicc', 'm4c', 'jciapicc', 'Japan', 'apicc'],
+      ['global chapter → global', 'm4d', 'jciglobal', 'France', 'global'],
+      ['chapter without type → sister', 'm4e', 'jcinotype', 'Korea', 'sister'],
+    ])('allowed: %s', async (_l, uid, loId, country, category) => {
+      expect(await set(uid, `members/${uid}`, at(loId, country, category))).toBe(OK);
+    });
+    it.each([
+      ['sister_lo chapter with apicc', 'm4f', SG, 'Singapore', 'apicc'],
+      ['sister_lo chapter with global', 'm4g', SG, 'Singapore', 'global'],
+      ['sister_lo + apicc chapter with apicc', 'm4h', 'jcimixed', 'Thailand', 'apicc'],
+      ['apicc chapter with sister', 'm4i', 'jciapicc', 'Japan', 'sister'],
+      ['global chapter with sister', 'm4j', 'jciglobal', 'France', 'sister'],
+      ['chapter without type with global', 'm4k', 'jcinotype', 'Korea', 'global'],
+    ])('denied: %s', async (_l, uid, loId, country, category) => {
+      expect(await set(uid, `members/${uid}`, at(loId, country, category))).toBe(DENIED);
     });
     it('GUEST self sign-up still works (regression)', async () => {
       expect(await set('guest1', 'members/guest1', {

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   MAX_PER_CALL, CHAPTER_MEMBER_CAP, isKlAdmin, isActiveChapterAdmin, emailSlotId, mmddFromDob, categoryForChapter,
   validateInvitees, resolveCreateScope, checkChapter, checkCap, buildExternalMemberDoc, cardFor,
-  checkStatusTransition, statusUpdates, withStatus, canManageMember,
+  checkStatusTransition, statusUpdates, withStatus, canManageMember, CAP_COUNTED_STATUSES, countsTowardCap,
 } from './externalAccounts.mjs';
 
 const SG = 'jcicitysg';
@@ -88,6 +88,13 @@ describe('chapter and cap checks', () => {
     expect(checkChapter({ isActive: false })).toMatchObject({ ok: false, status: 409 });
     expect(checkChapter({ isActive: true })).toEqual({ ok: true });
   });
+  it('M2: only active / suspended members count toward the cap (pending / rejected self-registrations do not)', () => {
+    expect([...CAP_COUNTED_STATUSES].sort()).toEqual(['active', 'suspended']);
+    expect(countsTowardCap(aff('active'))).toBe(true);
+    expect(countsTowardCap(aff('suspended'))).toBe(true);
+    for (const s of ['pending_chapter', 'pending_kl', 'rejected', 'expired']) expect(countsTowardCap(aff(s))).toBe(false);
+    expect(countsTowardCap({ role: 'MEMBER', loId: SG })).toBe(false);
+  });
   it('cap of 100 per chapter', () => {
     expect(checkCap(CHAPTER_MEMBER_CAP - 2, 2).ok).toBe(true);
     expect(checkCap(CHAPTER_MEMBER_CAP - 1, 2).ok).toBe(false);
@@ -126,8 +133,20 @@ describe('checkStatusTransition', () => {
     expect(ok(chAdmin, aff('pending_chapter'), 'rejected')).toBe(true);
     expect(ok(chAdmin, aff('pending_kl'), 'rejected')).toBe(true);
     expect(ok(chAdmin, aff('active'), 'suspended')).toBe(true);
-    expect(ok(chAdmin, aff('suspended', { activatedAt: '2026-01-01' }), 'active')).toBe(true);
+    expect(ok(chAdmin, aff('suspended', { activatedAt: '2026-01-01', suspendedByRole: 'CHAPTER_ADMIN' }), 'active')).toBe(true);
     expect(ok(chAdmin, aff('suspended'), 'active')).toBe(false);
+  });
+
+  it('M1: a chapter admin cannot undo a KL suspension (or one with no recorded suspender)', () => {
+    expect(ok(chAdmin, aff('suspended', { activatedAt: '2026-01-01', suspendedByRole: 'KL' }), 'active')).toBe(false);
+    expect(ok(chAdmin, aff('suspended', { activatedAt: '2026-01-01' }), 'active')).toBe(false);
+    expect(ok(klAdmin, aff('suspended', { activatedAt: '2026-01-01', suspendedByRole: 'CHAPTER_ADMIN' }), 'active')).toBe(true);
+  });
+
+  it('M1: every → suspended records who suspended', () => {
+    expect(statusUpdates(chAdmin, 'c', aff('active'), 'suspended', 'T')).toMatchObject({ 'affiliation.suspendedByRole': 'CHAPTER_ADMIN' });
+    expect(statusUpdates(klAdmin, 'k', aff('active'), 'suspended', 'T')).toMatchObject({ 'affiliation.suspendedByRole': 'KL' });
+    expect(statusUpdates(klAdmin, 'k', aff('pending_kl'), 'active', 'T')).not.toHaveProperty(['affiliation.suspendedByRole']);
   });
   it('chapter admin may never set pending_kl → active or touch other chapters / roles / self', () => {
     expect(ok(chAdmin, aff('pending_kl'), 'active')).toBe(false);

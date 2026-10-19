@@ -178,7 +178,7 @@ export const ChapterAdminView: React.FC = () => {
                     </Button>
                   </>
                 )}
-                {actionable(m) && m.affiliation?.status === 'suspended' && m.affiliation?.activatedAt && (
+                {actionable(m) && m.affiliation?.status === 'suspended' && m.affiliation?.suspendedByRole === 'CHAPTER_ADMIN' && (
                   <Button size="sm" variant="success" disabled={busyId === m.id} onClick={() => change(m, 'active', 'Member reactivated')}>
                     <PlayCircle size={14} className="mr-1" />Reactivate
                   </Button>

@@ -247,6 +247,16 @@ service cloud.firestore {
              (d.get('email', null) is string || d.get('contact', {}).get('email', null) is string);
     }
 
+    // Same mapping as utils/affiliation.mjs categoryForChapter (review M4): sisterChapters.type (list) →
+    // members.affiliation.category. sister_lo → 'sister', else apicc → 'apicc', else global → 'global',
+    // no type → 'sister'. Keep the two in sync.
+    function categoryForChapterType(types) {
+      return types.hasAny(['sister_lo']) ? 'sister'
+           : types.hasAny(['apicc']) ? 'apicc'
+           : types.hasAny(['global']) ? 'global'
+           : 'sister';
+    }
+
     // Phase 1 WP-3: an external person registers themself for an ACTIVE sister chapter as an AFFILIATE
     // waiting for their chapter admin (pending_chapter). Never CHAPTER_ADMIN, never KL, never active.
     // affiliation holds exactly category / country / status; country must equal the chapter's country.
@@ -263,7 +273,8 @@ service cloud.firestore {
              d.affiliation.keys().hasOnly(['category', 'country', 'status']) &&
              d.affiliation.keys().hasAll(['category', 'country', 'status']) &&
              d.affiliation.status == 'pending_chapter' &&
-             d.affiliation.category in ['sister', 'apicc', 'global'] &&
+             d.affiliation.category == categoryForChapterType(
+               get(/databases/$(database)/documents/sisterChapters/$(d.loId)).data.get('type', [])) &&
              d.affiliation.country == get(/databases/$(database)/documents/sisterChapters/$(d.loId)).data.get('country', null) &&
              d.keys().hasOnly(selfSignUpKeys().concat(['affiliation'])) &&
              selfSignUpDefaultsOk();
@@ -383,25 +394,10 @@ service cloud.firestore {
           !resource.data.get('senatorshipBoardValidated', false) ||
           request.resource.data.get('senatorshipId', resource.data.get('senatorshipId', null))
             == resource.data.get('senatorshipId', null))
-        ) ||
-        // Active CHAPTER_ADMIN → AFFILIATE docs of their own chapter: only affiliation.status and its
-        // audit fields. role / loId / everything else unchanged; may never set status 'active'
-        // (KL admins activate). Never touches KL members (own loId is never 'jcikl').
-        (isActiveChapterAdmin() &&
-         resource.data.loId == getMyLoId() &&
-         resource.data.get('role', '') == 'AFFILIATE' &&
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['affiliation', 'updatedAt', 'updatedBy']) &&
-         request.resource.data.get('affiliation', {}).diff(resource.data.get('affiliation', {})).affectedKeys()
-           .hasOnly(['status', 'chapterApprovedAt', 'chapterApprovedBy', 'statusUpdatedAt', 'statusUpdatedBy']) &&
-         (request.resource.data.get('affiliation', {}).get('status', '') == resource.data.get('affiliation', {}).get('status', '') ||
-          request.resource.data.get('affiliation', {}).get('status', '') in ['pending_chapter', 'pending_kl', 'suspended', 'expired']) &&
-         // L6: audit fields, when written, must name the caller.
-         (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['updatedBy']) ||
-          request.resource.data.updatedBy == request.auth.uid) &&
-         (!request.resource.data.get('affiliation', {}).diff(resource.data.get('affiliation', {})).affectedKeys().hasAny(['chapterApprovedBy']) ||
-          request.resource.data.affiliation.chapterApprovedBy == request.auth.uid) &&
-         (!request.resource.data.get('affiliation', {}).diff(resource.data.get('affiliation', {})).affectedKeys().hasAny(['statusUpdatedBy']) ||
-          request.resource.data.affiliation.statusUpdatedBy == request.auth.uid))
+        )
+        // Review M1: no client branch for CHAPTER_ADMIN status changes. Approve / reject / suspend /
+        // reactivate go through netlify/functions/external-accounts (Admin SDK: transition table,
+        // memberCards sync, suspendedByRole), so chapter admins write no member docs from the client.
       );
 
       // Only admins may delete; self-delete removed to prevent orphan data (E07)

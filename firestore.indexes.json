@@ -93,6 +93,20 @@
           "order": "ASCENDING"
         },
         {
+          "fieldPath": "affiliation.status",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "members",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "loId",
+          "order": "ASCENDING"
+        },
+        {
           "fieldPath": "updatedAt",
           "order": "DESCENDING"
         }

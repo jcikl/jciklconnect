@@ -27,6 +27,7 @@ import { logWrite, logDelete } from './firestoreLogger';
 import { logError as logServiceError, errorLoggingService } from './errorLoggingService';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { COLLECTIONS, DEFAULT_LO_ID } from '../config/constants';
+import { isCrossLoDeleteBlocked } from '../utils/memberScope';
 import {
   Member,
   MemberCreateInput,
@@ -1021,10 +1022,9 @@ export class MembersService {
 
       // Firestore rule requires (resource == null || resourceInMyLo(resource.data)).
       // If target has an loId and current admin has a different loId, deny client-side to avoid permission error.
-      // Exception: a KL admin soft-deleting a legacy sister-chapter doc (old "Add Member", role MEMBER with
-      // loId != jcikl). The rules' update branch lets isAdmin() edit any LO, so this would not be denied.
-      const klAdminOnSisterDoc = myLoId === DEFAULT_LO_ID && targetLoId != null && targetLoId !== DEFAULT_LO_ID;
-      if (targetLoId != null && myLoId != null && targetLoId !== myLoId && !klAdminOnSisterDoc) {
+      // Exception (admin role only): a KL ADMIN / SUPER_ADMIN soft-deleting a legacy sister-chapter doc
+      // (old "Add Member", role MEMBER with loId != jcikl) — utils/memberScope.ts isCrossLoDeleteBlocked.
+      if (isCrossLoDeleteBlocked(currentRole, myLoId, targetLoId)) {
         const e: any = new Error('Cannot delete member from a different LO');
         e.code = 'permission-denied';
         console.warn(`Delete blocked by LO mismatch: user ${currentUid} lo=${myLoId} target ${memberId} lo=${targetLoId}`);
