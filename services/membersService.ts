@@ -45,6 +45,7 @@ import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 import { MOCK_MEMBERS } from './mockData';
 import { AuditLogService } from './auditLogService';
 import { LarkSyncService } from './larkSyncService';
+import { MemberCardsService } from './memberCardsService';
 
 const CACHE_KEY_ALL_MEMBERS = 'members:all';
 const CACHE_KEY_LO = (loId: string) => `members:lo:${loId}`;
@@ -620,6 +621,8 @@ export class MembersService {
       const docRef = memberRef;
       logWrite(CACHE_KEY_ALL_MEMBERS, 'membersService.createMember');
       this.invalidateMembersCache();
+      // memberCards: written after the member doc; a card failure never fails the create
+      await MemberCardsService.syncCards([{ memberId: memberRef.id, before: null, after: { ...normalizedData, id: memberRef.id } as Member }]);
 
       // Isolate syncPublicListing so a failure here does not roll back the member creation (E-02)
       try {
@@ -776,6 +779,8 @@ export class MembersService {
       } else {
         await updateDoc(memberRef, normalizedUpdates);
       }
+      // memberCards: member doc is committed; now rebuild/delete the card (failure is logged, not thrown)
+      await MemberCardsService.syncCards([{ memberId, before: currentData, after: MemberCardsService.applyUpdates(currentData, normalizedUpdates) as Member }]);
       const _frames = (new Error().stack ?? '').split('\n').slice(2);
       const _named = _frames
         .map(l => l.trim().replace(/^at /, '').replace(/ \(.*\)/, '').trim())
@@ -1061,6 +1066,8 @@ export class MembersService {
       boardSnap.docs.forEach(d => primaryBatch.delete(d.ref));
       bizSnap.docs.forEach(d => primaryBatch.delete(d.ref));
       await this.commitWithRetry(primaryBatch);
+      // memberCards: soft-deleted -> INACTIVE, so no public card (failure is logged, not thrown)
+      await MemberCardsService.syncCards([{ memberId, before: null, after: { role: 'INACTIVE' } as Member, forceDelete: true }]);
 
       // Cascade batch: soft-cancel eventRegistrations + paymentRequests, delete notifications (P1 fix).
       // Points, transactions, achievements, badgeAwards, loStarProgress are kept as historical
@@ -1269,6 +1276,7 @@ export class MembersService {
       const boardSnap = await getDocs(
         query(collection(db, COLLECTIONS.BOARD_MEMBERS), where('memberId', '==', memberId))
       );
+      const roleMemberSnap = await getDoc(doc(db, COLLECTIONS.MEMBERS, memberId));
       const roleBatch = writeBatch(db);
       roleBatch.update(doc(db, COLLECTIONS.MEMBERS, memberId), {
         role: newRole,
@@ -1281,6 +1289,11 @@ export class MembersService {
       );
       await this.commitWithRetry(roleBatch);
       this.invalidateMembersCache();
+      // memberCards: role decides whether the card exists (MEMBER+ yes; GUEST/INACTIVE no)
+      if (roleMemberSnap.exists()) {
+        const beforeRole = { ...roleMemberSnap.data(), id: memberId } as Member;
+        await MemberCardsService.syncCards([{ memberId, before: beforeRole, after: { ...beforeRole, role: newRole } }]);
+      }
       void LarkSyncService.syncRecord({ collection: 'members', id: memberId, action: 'upsert' });
       // P1-fix: audit role changes — these are high-sensitivity operations.
       AuditLogService.writeAuditEntry({
@@ -1420,6 +1433,7 @@ export class MembersService {
       }
 
       // Firestore writeBatch limit is 500; flush every 400 to stay safe
+      const cardOps: Array<{ memberId: string; before: Member; after: Member }> = [];
       for (let i = 0; i < memberIds.length; i += 400) {
         const batch = writeBatch(db);
         memberIds.slice(i, i + 400).forEach(id => {
@@ -1444,11 +1458,15 @@ export class MembersService {
           const typePatch = membershipTypePatchMap.get(id) ?? {};
           // Merge GUEST→MEMBER membership initialization patch (variant symmetry fix)
           const membershipInitPatch = membershipInitPatchMap.get(id) ?? {};
-          batch.update(doc(db, COLLECTIONS.MEMBERS, id), { ...perMemberNormalized, ...typePatch, ...membershipInitPatch, updatedAt: now });
+          const memberPatch = { ...perMemberNormalized, ...typePatch, ...membershipInitPatch, updatedAt: now };
+          batch.update(doc(db, COLLECTIONS.MEMBERS, id), memberPatch);
+          if (existing) cardOps.push({ memberId: id, before: existing, after: MemberCardsService.applyUpdates(existing, memberPatch) as Member });
         });
         await this.commitWithRetry(batch);
       }
       this.invalidateMembersCache();
+      // memberCards: after all member chunks are committed (same rules as updateMember; failure is logged, not thrown)
+      await MemberCardsService.syncCards(cardOps);
 
       // Sync display side effects when any display-affecting field is updated (N1 fix).
       // Mirrors updateMember behaviour. Fires concurrently; failures are silent.
@@ -1551,6 +1569,9 @@ export class MembersService {
         });
         await this.commitWithRetry(batch);
       }
+
+      // memberCards: soft-deleted -> INACTIVE, so no public cards (failure is logged, not thrown)
+      await MemberCardsService.syncCards(memberIds.map(id => ({ memberId: id, before: null, after: { role: 'INACTIVE' } as Member, forceDelete: true })));
 
       // FIX: Release memberEmails uniqueness slots so emails can be re-registered.
       // Mirror the logic in single deleteMember: contact.email → email → sanitize → batch.delete.
