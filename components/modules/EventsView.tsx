@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useToast } from '../ui/Common';
 import { useEvents } from '../../hooks/useEvents';
 import { useAuth } from '../../hooks/useAuth';
@@ -9,7 +9,11 @@ import { EventsListPanel } from './Events/EventsListPanel';
 import { EventsHeader, type EventsViewMode } from './Events/EventsHeader';
 import { EventDetailModal } from './Events/EventDetailModal';
 import { useEventsListState } from './Events/useEventsListState';
-import { isKlRelevantEvent } from '../../utils/loHosting.mjs';
+import { isEventVisibleToExternal, isKlRelevantEvent } from '../../utils/loHosting.mjs';
+import { usePermissions } from '../../hooks/usePermissions';
+
+// Same listed statuses as EventsService.getAllEvents (the 'kl' scope returns every non-cancelled status).
+const LISTED_EVENT_STATUSES = ['Active', 'Upcoming', 'Approved'];
 
 export type { RegistrationFormData } from './Events/EventRegistrationFormModal';
 
@@ -17,10 +21,19 @@ export const EventsView: React.FC<{ searchQuery?: string; initialSelectedEventId
   const [viewMode, setViewMode] = useState<EventsViewMode>('list');
   // Only the events this page can show (KL host / co-host, national / area / JCI) — loading every
   // event (~3,200, 5 MB) took several seconds.
-  const { events, loading, error, loadEvents, registerForEvent, markAttendance, updateEvent, cancelRegistration } = useEvents({ scope: 'klRelevant' });
+  // External-chapter members only see events KL hosts or co-hosts ('kl' scope + listed-status filter).
+  const { isExternal } = usePermissions();
+  const { events: loadedEvents, loading, error, loadEvents, registerForEvent, markAttendance, updateEvent, cancelRegistration } = useEvents({ scope: isExternal ? 'kl' : 'klRelevant' });
+  const events = useMemo(
+    () => (isExternal
+      ? loadedEvents.filter(e => isEventVisibleToExternal(e as any) && LISTED_EVENT_STATUSES.includes(String(e.status)))
+      : loadedEvents),
+    [isExternal, loadedEvents]
+  );
   const { member } = useAuth();
   const { showToast } = useToast();
   const loId = (member as { loId?: string })?.loId ?? DEFAULT_LO_ID;
+  // useMembers only loads for KL roles (its own `enabled` gate), so externals never trigger the denied read.
   const { members: memberOptions } = useMembers(loId);
 
   const {

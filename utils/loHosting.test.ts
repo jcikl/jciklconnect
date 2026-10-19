@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseCoHosting, formatCoHosting, loRoleIn, involvesLo, isKlRelevantEvent, KL_LO_NAME } from './loHosting.mjs';
+import { parseCoHosting, formatCoHosting, loRoleIn, involvesLo, isKlRelevantEvent, isEventVisibleToExternal, KL_LO_NAME } from './loHosting.mjs';
 
 const roadmapText = 'JCI Bandar Klang, JCI Kuala Lumpur, JCI Lead Tropicana';
 
@@ -36,5 +36,19 @@ describe('LO matching', () => {
     expect(isKlRelevantEvent({ hostingLo: 'JCI Mines', level: 'National' })).toBe(true);
     expect(isKlRelevantEvent({ hostingLo: 'JCI Mines', level: 'Area Central' })).toBe(true);
     expect(isKlRelevantEvent({ hostingLo: 'JCI Mines', level: 'Local' })).toBe(false);
+  });
+});
+
+describe('isEventVisibleToExternal', () => {
+  it('shows events KL hosts or co-hosts', () => {
+    expect(isEventVisibleToExternal({ hostingLo: KL_LO_NAME })).toBe(true);
+    expect(isEventVisibleToExternal({ hostingLo: 'JCI Mines', coHosting: ['JCI Kuala Lumpur'] })).toBe(true);
+    expect(isEventVisibleToExternal({ hostingLo: 'JCI Mines', coHosting: roadmapText })).toBe(true);
+  });
+  it('hides other LOs events even at national / area / JCI level, and look-alike names', () => {
+    expect(isEventVisibleToExternal({ hostingLo: 'JCI Mines', level: 'National' } as Record<string, unknown>)).toBe(false);
+    expect(isEventVisibleToExternal({ hostingLo: 'JCI Kuala Lumpur West' })).toBe(false);
+    expect(isEventVisibleToExternal({})).toBe(false);
+    expect(isEventVisibleToExternal(null)).toBe(false);
   });
 });

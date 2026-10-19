@@ -25,7 +25,7 @@ import { DashboardProfileCompletionSheet } from './DashboardProfileCompletionShe
 import { DashboardProfileCompletionWidget } from './DashboardProfileCompletionWidget';
 import { DashboardUpgradeModal } from './DashboardUpgradeModal';
 import { getMemberDob, getProfileCompleteness, normalizeMembership } from './dashboardHomeUtils';
-import { isKlRelevantEvent } from '../../utils/loHosting.mjs';
+import { isEventVisibleToExternal, isKlRelevantEvent } from '../../utils/loHosting.mjs';
 import { filterKlMembers } from '../../utils/memberScope';
 import { isExternalRole } from '../../utils/externalAccess';
 
@@ -187,8 +187,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
   // Calculate stats from real data
   const upcomingEvents = React.useMemo(
-    () => events.filter(e => e.status !== 'Cancelled' && isKlRelevantEvent(e as any)),
-    [events]
+    () => events.filter(e => e.status !== 'Cancelled' && (isExternal ? isEventVisibleToExternal(e as any) : isKlRelevantEvent(e as any))),
+    [events, isExternal]
   );
 
 
