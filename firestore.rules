@@ -1163,9 +1163,13 @@ service cloud.firestore {
                         && request.resource.data.keys().hasAll(['eventId', 'email', 'phone', 'status', '_indexFor'])
                         && request.resource.data.keys().hasOnly(['eventId', 'email', 'phone', 'status', '_indexFor'])
                         && request.resource.data.status == 'Pending');
+      // Main doc: check-in / notes / cancel (cancelGuestRegistration writes status + cancelledAt).
+      // Phone index doc: status only (cancelGuestRegistration marks it Cancelled).
       allow update: if (isBoard() || isAdmin()) &&
-                      request.resource.data.diff(resource.data).affectedKeys()
-                        .hasOnly(['status', 'checkedIn', 'checkedInAt', 'notes', 'updatedAt']);
+                      (resource.data.get('_indexFor', null) == 'phone'
+                        ? request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+                        : request.resource.data.diff(resource.data).affectedKeys()
+                            .hasOnly(['status', 'checkedIn', 'checkedInAt', 'notes', 'updatedAt', 'cancelledAt']));
       allow delete: if isBoard();
     }
     

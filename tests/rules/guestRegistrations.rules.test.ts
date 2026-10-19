@@ -188,6 +188,36 @@ describe.skipIf(!HOST)('firestore.rules — guestRegistrations (emulator)', () =
     });
   });
 
+  // EventsService.cancelGuestRegistration: one batch, main doc { status: 'Cancelled', cancelledAt } and
+  // phone index doc { status: 'Cancelled' } (update = full doc here, so the diff is exactly those keys).
+  describe('cancel (board/admin)', () => {
+    const email = 'd@example.test';
+    const phone = '+60 12-444 4444';
+    const cancelBatch = (mainExtra: Doc = {}, indexExtra: Doc = {}): Array<[string, Doc]> => [
+      [mainPath(email), mainDoc(email, phone, { status: 'Cancelled', cancelledAt: '2026-10-20T00:00:00.000Z', ...mainExtra })],
+      [indexPath(phone), indexDoc(email, phone, { status: 'Cancelled', ...indexExtra })],
+    ];
+    beforeAll(async () => {
+      expect(await commit(null, registration(email, phone))).toBe(OK);
+    });
+    it('MEMBER and signed-out users cannot cancel', async () => {
+      expect(await commit('klMember', cancelBatch())).toBe(DENIED);
+      expect(await commit(null, cancelBatch())).toBe(DENIED);
+    });
+    it('other fields are denied on either doc', async () => {
+      expect(await commit('klAdmin', cancelBatch({ name: 'Renamed' }))).toBe(DENIED);
+      expect(await commit('klAdmin', cancelBatch({}, { email: 'x@example.test' }))).toBe(DENIED);
+      expect(await commit('klAdmin', cancelBatch({}, { cancelledAt: '2026-10-20T00:00:00.000Z' }))).toBe(DENIED);
+    });
+    it('BOARD can cancel (main doc status + cancelledAt, index doc status)', async () => {
+      expect(await commit('klBoard', cancelBatch())).toBe(OK);
+    });
+    it('check-in fields on the main doc still work for ADMIN', async () => {
+      const r = mainDoc('a@example.test', '+60 12-111 1111', { checkedIn: true, checkedInAt: 'now', updatedAt: 'now' });
+      expect(await commit('klAdmin', [[mainPath('a@example.test'), r]])).toBe(OK);
+    });
+  });
+
   describe('reads stay board/admin only', () => {
     it('ADMIN and BOARD can get and list', async () => {
       expect(await getDoc('klAdmin', mainPath('a@example.test'))).toBe(OK);
