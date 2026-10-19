@@ -462,7 +462,6 @@ export const JCIKLApp: React.FC = () => {
       hasPermission,
       externalAllowedViews,
       externalStatus,
-      memberId: member?.id,
       showBoardDashboard,
       searchQuery,
       onSearchChange: setSearchQuery,

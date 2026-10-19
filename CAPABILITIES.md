@@ -19,7 +19,7 @@
 |---|---|---|
 | Service（業務邏輯與資料存取） | 69 | `services/` |
 | Hook（React 資料綁定） | 39 | `hooks/` |
-| Util（純函數工具） | 20 | `utils/` |
+| Util（純函數工具） | 21 | `utils/` |
 | UI 元件（通用） | 33 | `components/ui/` |
 | 共用業務元件 | 9 | `components/shared/` |
 | Context | 2 | `contexts/` |
@@ -91,10 +91,10 @@
 | `learningPathsService.ts` | 340 | 2 | Learning Paths & Learning Progress Service Fixes applied: P1 – startLearningPath uses runTransaction to prevent duplicate progress records P… | LEARNING_PATHS, LEARNING_PROGRESS |
 | `memberAuthService.ts` | 91 | 2 | 会员登录账号（Firebase Auth）的建立与补建；调用 Netlify 函数 member-auth（uid = 会员文档 ID）。 | — |
 | `memberBenefitsService.ts` | 329 | 1 | Member Benefits Service Handles the memberBenefits collection and benefitUsage write path. Read path for advertisements-as-benefits lives in… | ADVERTISEMENTS, BENEFIT_USAGE, MEMBER_BENEFITS |
-| `memberCardsService.ts` | 83 | 2 | Member Cards Service — keeps `memberCards/{memberId}` (the public directory card, Phase 0 WP2) in sync with `members`. The card is written A… | MEMBER_CARDS |
+| `memberCardsService.ts` | 109 | 4 | Member Cards Service — keeps `memberCards/{memberId}` (the public directory card, Phase 0 WP2) in sync with `members`. The card is written A… | MEMBER_CARDS |
 | `memberJourneyService.ts` | 155 | 2 | Leadership Journey + Trainer Pathway derivation (dashboard journey card for pre-2025 members) | — |
 | `memberStatsService.ts` | 319 | 2 | Member Statistics Service - Generates comprehensive member statistics and reports | — |
-| `membersService.ts` | 2,312 | 41 | Members Service - CRUD Operations | BOARD_MEMBERS, EVENT_REGISTRATIONS, MEMBERS, MEMBER_EMAILS, NOTIFICATIONS, PAYMENT_REQUESTS … |
+| `membersService.ts` | 2,312 | 40 | Members Service - CRUD Operations | BOARD_MEMBERS, EVENT_REGISTRATIONS, MEMBERS, MEMBER_EMAILS, NOTIFICATIONS, PAYMENT_REQUESTS … |
 | `membershipConfigService.ts` | 373 | 17 | ⚠️ 無說明 | SYSTEM_SETTINGS |
 | `mentorshipService.ts` | 638 | 4 | Mentorship Matching Service | MEMBERS, MENTORSHIP_FEEDBACK, MENTOR_MATCHES |
 | `promotionService.ts` | 1,187 | 4 | ⚠️ 無說明 | MANUAL_PROMOTION_REQUESTS, MEMBERS, PROMOTION_HISTORY, SYSTEM |
@@ -146,15 +146,16 @@
 
 </details>
 
-<details><summary><code>services/memberCardsService.ts</code> — 5 個方法</summary>
+<details><summary><code>services/memberCardsService.ts</code> — 6 個方法</summary>
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `buildCard` | 30 |  |
-| `shouldHaveCard` | 34 |  |
-| `applyUpdates` | 39 | Member snapshot after an updateDoc-style payload (dot-paths supported). |
-| `plan` | 44 | Decide the card action for a before -> after member change (see planCardSync). |
-| `syncCards` | 53 | Applies the planned card upserts/deletes for already-committed member writes, chunked (<= 400 per batch). Neve… |
+| `getInternationalCards` | 41 | Cards shared with other chapters (`international == true`), all chapters, KL's own excluded. Query shape: ONE … |
+| `buildCard` | 56 |  |
+| `shouldHaveCard` | 60 |  |
+| `applyUpdates` | 65 | Member snapshot after an updateDoc-style payload (dot-paths supported). |
+| `plan` | 70 | Decide the card action for a before -> after member change (see planCardSync). |
+| `syncCards` | 79 | Applies the planned card upserts/deletes for already-committed member writes, chunked (<= 400 per batch). Neve… |
 
 </details>
 
@@ -1119,7 +1120,7 @@
 | Service | 行數 | 引用 | 用途 | 集合 |
 |---|---|---|---|---|
 | `aiPredictionService.ts` | 949 | 3 | AI Prediction Service - Advanced AI predictions for events, projects, and sponsors | — |
-| `cacheService.ts` | 314 | 32 | 缓存服务 - 提供内存缓存和本地存储缓存功能 Cache Service - Provides in-memory and localStorage caching capabilities | — |
+| `cacheService.ts` | 314 | 33 | 缓存服务 - 提供内存缓存和本地存储缓存功能 Cache Service - Provides in-memory and localStorage caching capabilities | — |
 | `cloudinaryService.ts` | 337 | 14 | Cloudinary Upload Service | — |
 | `dataImportExportService.ts` | 892 | 3 | ⚠️ 無說明 | EVENTS, MEMBERS, MEMBER_EMAILS |
 | `errorLoggingService.ts` | 354 | 67 | ⚠️ 無說明 | ERROR_LOGS |
@@ -1279,7 +1280,7 @@
 | `useActivityPlans.ts` | 130 | 1 | `useActivityPlans` | activityPlansService | ⚠️ 無說明 |
 | `useAdvertisements.ts` | 110 | 2 | `useAdvertisements` | advertisementService, errorLoggingService | Advertisements Data Hook |
 | `useAppNavigation.ts` | 239 | 1 | `useAppNavigation` | — | ⚠️ 無說明 |
-| `useAuth.tsx` | 782 | 54 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, membersService, mockData | Authentication Hook |
+| `useAuth.tsx` | 782 | 55 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, membersService, mockData | Authentication Hook |
 | `useAutomation.ts` | 149 | 3 | `useAutomation` | automationService | useAutomation Hook - Manage automation workflows and rules |
 | `useBusinessDirectory.ts` | 48 | 4 | `useBusinessDirectory` | businessDirectoryService | ⚠️ 無說明 |
 | `useCommunication.ts` | 118 | 2 | `useCommunication` | communicationService | Communication Data Hook |
@@ -1303,7 +1304,7 @@
 | `usePoints.ts` | 61 | 2 | `usePoints` | pointsService | Points Data Hook |
 | `useProjects.ts` | 170 | 7 | `useProjects` | projectsService | Projects Data Hook |
 | `usePushNotifications.ts` | 63 | 1 | `usePushNotifications` | — | ⚠️ 無說明 |
-| `useSisterChapterMembers.ts` | 49 | 2 | `useSisterChapterMembers` | membersService, sisterChaptersService | ⚠️ 無說明 |
+| `useSisterChapterMembers.ts` | 42 | 2 | `useSisterChapterMembers` | memberCardsService, sisterChaptersService | ⚠️ 無說明 |
 | `useSisterChapters.ts` | 26 | 3 | `useSisterChapters` | sisterChaptersService | ⚠️ 無說明 |
 | `useSocialPersonas.ts` | 46 | 2 | `useSocialPersonas` | socialPersonaService | ⚠️ 無說明 |
 | `useSocialPosts.ts` | 74 | 1 | `useSocialPosts` | socialPostService | ⚠️ 無說明 |
@@ -1442,6 +1443,12 @@
 |---|---|---|
 | `calculateAwardProgress` | 8 | Pure function: calculates progress percentage (0–100) toward an award. Milestone-based awards use segment logi… |
 
+### `utils/internationalCards.ts` （16 行，1 處引用）
+
+| 函數 | 行 | 說明 |
+|---|---|---|
+| `attachSisterChapters` | 9 | Attach each card's active sister chapter; cards of unknown/inactive chapters are dropped. |
+
 ### `utils/malaysianIdUtils.ts` （110 行，6 處引用）
 > Malaysian IC (MyKad) utilities
 
@@ -1560,6 +1567,6 @@
 
 ## 8. 文件債：缺少檔頭說明的檔案
 
-共 55 個。請在檔案第一行補上 `/** 一句話說明此檔案職責 */`，下次重新生成時就會自動帶入本文件。
+共 56 個。請在檔案第一行補上 `/** 一句話說明此檔案職責 */`，下次重新生成時就會自動帶入本文件。
 
-`services/auditLogService.ts`, `services/contractService.ts`, `services/dataImportExportService.ts`, `services/engagementAutoSuggestService.ts`, `services/errorLoggingService.ts`, `services/financeService.ts`, `services/flagshipProjectsService.ts`, `services/guestAnalyticsService.ts`, `services/incentiveCalculatorService.ts`, `services/inquiryService.ts`, `services/larkSyncService.ts`, `services/membershipConfigService.ts`, `services/mockData.ts`, `services/notificationService.ts`, `services/partnershipsService.ts`, `services/permissionConfigService.ts`, `services/postcodeService.ts`, `services/promotionService.ts`, `services/reportService.ts`, `services/sisterChaptersService.ts`, `services/socialPersonaService.ts`, `services/socialPostService.ts`, `services/sponsorshipService.ts`, `services/toyyibService.ts`, `services/zoomBookingService.ts`, `hooks/useActivityPlans.ts`, `hooks/useAppNavigation.ts`, `hooks/useBusinessDirectory.ts`, `hooks/useFirestoreCollection.ts`, `hooks/useGuestAnalytics.ts`, `hooks/useHobbyClubs.ts`, `hooks/useInstallPrompt.ts`, `hooks/useKnowledge.ts`, `hooks/useMemberMutations.ts`, `hooks/useMemberSearch.ts`, `hooks/useNotifications.ts`, `hooks/usePushNotifications.ts`, `hooks/useSisterChapterMembers.ts`, `hooks/useSisterChapters.ts`, `hooks/useSocialPersonas.ts`, `hooks/useSocialPosts.ts`, `hooks/useSurveys.ts`, `hooks/useToyyibMode.ts`, `hooks/useToyyibPay.ts`, `hooks/useToyyibPayment.ts`, `hooks/useZoomBookings.ts`, `utils/activityPhase.ts`, `utils/administrativeProjectsStorage.ts`, `utils/boardMembership.ts`, `utils/externalAccess.ts`, `utils/financeUtils.ts`, `utils/gamificationUtils.ts`, `utils/memberScope.ts`, `utils/roadmapUtils.ts`, `utils/rolePermissions.ts`
+`services/auditLogService.ts`, `services/contractService.ts`, `services/dataImportExportService.ts`, `services/engagementAutoSuggestService.ts`, `services/errorLoggingService.ts`, `services/financeService.ts`, `services/flagshipProjectsService.ts`, `services/guestAnalyticsService.ts`, `services/incentiveCalculatorService.ts`, `services/inquiryService.ts`, `services/larkSyncService.ts`, `services/membershipConfigService.ts`, `services/mockData.ts`, `services/notificationService.ts`, `services/partnershipsService.ts`, `services/permissionConfigService.ts`, `services/postcodeService.ts`, `services/promotionService.ts`, `services/reportService.ts`, `services/sisterChaptersService.ts`, `services/socialPersonaService.ts`, `services/socialPostService.ts`, `services/sponsorshipService.ts`, `services/toyyibService.ts`, `services/zoomBookingService.ts`, `hooks/useActivityPlans.ts`, `hooks/useAppNavigation.ts`, `hooks/useBusinessDirectory.ts`, `hooks/useFirestoreCollection.ts`, `hooks/useGuestAnalytics.ts`, `hooks/useHobbyClubs.ts`, `hooks/useInstallPrompt.ts`, `hooks/useKnowledge.ts`, `hooks/useMemberMutations.ts`, `hooks/useMemberSearch.ts`, `hooks/useNotifications.ts`, `hooks/usePushNotifications.ts`, `hooks/useSisterChapterMembers.ts`, `hooks/useSisterChapters.ts`, `hooks/useSocialPersonas.ts`, `hooks/useSocialPosts.ts`, `hooks/useSurveys.ts`, `hooks/useToyyibMode.ts`, `hooks/useToyyibPay.ts`, `hooks/useToyyibPayment.ts`, `hooks/useZoomBookings.ts`, `utils/activityPhase.ts`, `utils/administrativeProjectsStorage.ts`, `utils/boardMembership.ts`, `utils/externalAccess.ts`, `utils/financeUtils.ts`, `utils/gamificationUtils.ts`, `utils/internationalCards.ts`, `utils/memberScope.ts`, `utils/roadmapUtils.ts`, `utils/rolePermissions.ts`

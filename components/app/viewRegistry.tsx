@@ -3,6 +3,7 @@ import { UserRole, Member } from '../../types';
 import { ViewType } from '../../types/views';
 import type { AffiliationStatus } from '../../types/member';
 import { ExternalAccessNotice } from './ExternalAccessNotice';
+import { ExternalSelfProfile } from './ExternalSelfProfile';
 
 const FinanceView = lazy(() => import('../modules/FinanceView').then(m => ({ default: m.FinanceView })));
 const PaymentRequestsView = lazy(() => import('../modules/PaymentRequestsView').then(m => ({ default: m.PaymentRequestsView })));
@@ -50,8 +51,6 @@ export interface AppViewRenderContext {
   /** External users only (utils/externalAccess.ts): views they may open. null/undefined for KL roles. */
   externalAllowedViews?: readonly ViewType[] | null;
   externalStatus?: AffiliationStatus | null;
-  /** Current user's member id (external users only ever see their own profile). */
-  memberId?: string;
   showBoardDashboard: boolean;
   searchQuery: string;
   onSearchChange: React.Dispatch<React.SetStateAction<string>>;
@@ -83,7 +82,6 @@ export const renderAppView = (view: ViewType, context: AppViewRenderContext): Re
     hasPermission,
     externalAllowedViews,
     externalStatus,
-    memberId,
     showBoardDashboard,
     searchQuery,
     onSearchChange,
@@ -116,9 +114,10 @@ export const renderAppView = (view: ViewType, context: AppViewRenderContext): Re
   // URL / localStorage / programmatic view switches cannot reach a KL-only module.
   if (externalAllowedViews) {
     if (externalAllowedViews.includes(view)) {
-      // The only whitelisted view that is a KL module is MEMBERS: externals get their OWN profile only.
+      // The only whitelisted view that is a KL module is MEMBERS: externals get their OWN profile only,
+      // rendered from the signed-in member (no members list query, no KL tabs).
       if (view === 'MEMBERS') {
-        return wrapErrorBoundary(<MembersView searchQuery="" initialSelectedMemberId={memberId ?? null} onClearSelection={clearSelectedMember} onNavigate={onNavigate} />, '会员');
+        return wrapErrorBoundary(<ExternalSelfProfile />, '个人资料');
       }
     } else if (externalStatus !== 'active') {
       return <ExternalAccessNotice status={externalStatus} />;

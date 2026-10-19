@@ -1,13 +1,17 @@
 import { useState, useEffect } from 'react';
-import { MembersService } from '../services/membersService';
+import { MemberCardsService } from '../services/memberCardsService';
 import { SisterChaptersService } from '../services/sisterChaptersService';
-import type { Member } from '../types';
 import type { SisterChapter } from '../types/sisterChapter';
+import { attachSisterChapters, type SisterChapterCard } from '../utils/internationalCards';
 
-export interface SisterChapterMember extends Member {
-  sisterChapter: SisterChapter;
-}
+/** International directory entry: a public member card (`memberCards`) plus its sister chapter. */
+export type SisterChapterMember = SisterChapterCard;
 
+/**
+ * Sister-chapter people for the international directory, read from `memberCards` (never from `members`,
+ * whose list rule only allows KL docs). One query, `international == true`, allowed for KL members and
+ * active externals alike. Chapters and cards load independently so one failure does not blank the other.
+ */
 export function useSisterChapterMembers() {
   const [members, setMembers] = useState<SisterChapterMember[]>([]);
   const [chapters, setChapters] = useState<SisterChapter[]>([]);
@@ -18,27 +22,16 @@ export function useSisterChapterMembers() {
     let cancelled = false;
     const load = async () => {
       setLoading(true);
-      try {
-        const allChapters = await SisterChaptersService.getAll();
-        const activeChapters = allChapters.filter(c => c.isActive);
-        if (cancelled) return;
-        setChapters(activeChapters);
-
-        const perChapter = await Promise.all(
-          activeChapters.map(ch => MembersService.getAllMembers(ch.id))
-        );
-        if (cancelled) return;
-
-        const flat: SisterChapterMember[] = perChapter.flatMap((mems, i) =>
-          mems.map(m => ({ ...m, sisterChapter: activeChapters[i] }))
-        );
-        setMembers(flat);
-        setError(null);
-      } catch {
-        if (!cancelled) setError('Failed to load international members');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+      const [chaptersRes, cardsRes] = await Promise.allSettled([
+        SisterChaptersService.getAll(),
+        MemberCardsService.getInternationalCards(),
+      ]);
+      if (cancelled) return;
+      const activeChapters = chaptersRes.status === 'fulfilled' ? chaptersRes.value.filter(c => c.isActive) : [];
+      setChapters(activeChapters);
+      setMembers(cardsRes.status === 'fulfilled' ? attachSisterChapters(cardsRes.value, activeChapters) : []);
+      setError(chaptersRes.status === 'rejected' || cardsRes.status === 'rejected' ? 'Failed to load international members' : null);
+      setLoading(false);
     };
     load();
     return () => { cancelled = true; };

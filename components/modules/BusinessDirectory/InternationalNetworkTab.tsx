@@ -20,26 +20,29 @@ type IntlMemberView = {
   businessCategory: string;
   position: string;
   email: string;
+  website: string;
   description: string;
   specialOffer: SpecialOffer | string | undefined;
 };
 
 function toIntlView(m: SisterChapterMember): IntlMemberView {
   return {
+    // Built from the public member card: no chineseName / email / structured offer.
     id: m.id,
-    name: m.general?.name ?? '',
-    chineseName: m.general?.chineseName,
-    avatarUrl: m.general?.avatarUrl ?? '',
+    name: m.displayName ?? '',
+    chineseName: undefined,
+    avatarUrl: m.avatarUrl ?? '',
     jciChapter: m.sisterChapter.name,
     flagEmoji: m.sisterChapter.flagEmoji,
     country: m.sisterChapter.country,
-    companyName: m.business?.companyName ?? (m as any).companyName ?? '',
-    industry: m.business?.industry ?? (m as any).industry ?? '',
-    businessCategory: (m.business?.businessCategory ?? []).join(', '),
-    position: m.business?.position ?? '',
-    email: m.contact?.email ?? '',
-    description: m.business?.companyDescription ?? (m.business as any)?.introduction ?? '',
-    specialOffer: m.business?.specialOffer,
+    companyName: m.companyName ?? '',
+    industry: m.industry ?? '',
+    businessCategory: (m.businessCategory ?? []).join(', '),
+    position: m.position ?? '',
+    email: '',
+    website: m.website ?? '',
+    description: m.companyDescription ?? '',
+    specialOffer: m.specialOfferSummary,
   };
 }
 
@@ -98,7 +101,7 @@ export const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = (
     ownerName: member.chineseName ? `${member.name} (${member.chineseName})` : member.name,
     companyName: member.companyName,
     industry: `${member.jciChapter} (${member.country})`,
-    description: member.description, website: member.email,
+    description: member.description, website: member.website,
     offer: getSpecialOfferSummary(member.specialOffer), logo: member.avatarUrl,
     idealReferralTypes: [],
     businessCategory: member.businessCategory, acceptsInternationalBusiness: 'Yes'
@@ -267,9 +270,9 @@ export const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = (
                   </div>
                   {/* Footer */}
                   <div className="px-4 pb-4 flex gap-2">
-                    <button onClick={(e) => { e.stopPropagation(); window.open(`mailto:${member.email}?subject=JCI KL Collaboration Inquiry`, '_blank'); }}
-                      className="flex-1 border border-slate-200 text-slate-600 text-xs font-bold py-2 rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-1.5">
-                      <Globe size={11} /> Email
+                    <button disabled={!member.website} onClick={(e) => { e.stopPropagation(); window.open(member.website, '_blank', 'noopener'); }}
+                      className="disabled:opacity-40 flex-1 border border-slate-200 text-slate-600 text-xs font-bold py-2 rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-1.5">
+                      <Globe size={11} /> Website
                     </button>
                     <button onClick={(e) => { e.stopPropagation(); onContact(getMappedBiz(member)); }}
                       className="flex-1 bg-jci-blue text-white text-xs font-bold py-2 rounded-lg hover:bg-jci-blue/90 transition-colors flex items-center justify-center gap-1.5">
@@ -426,9 +429,9 @@ export const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = (
             )}
           </div>
           <div className="flex gap-2 pt-4 border-t border-slate-100 mt-4">
-            <Button variant="outline" size="sm" className="flex-1"
-              onClick={() => window.open(`mailto:${detailMember.email}?subject=JCI KL Collaboration Inquiry`, '_blank')}>
-              <Globe size={14} className="mr-2" /> Email
+            <Button variant="outline" size="sm" className="flex-1" disabled={!detailMember.website}
+              onClick={() => window.open(detailMember.website, '_blank', 'noopener')}>
+              <Globe size={14} className="mr-2" /> Website
             </Button>
             <Button variant="primary" size="sm" className="flex-1 bg-jci-blue text-white"
               onClick={() => {
@@ -438,7 +441,7 @@ export const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = (
                   ownerName: detailMember.chineseName ? `${detailMember.name} (${detailMember.chineseName})` : detailMember.name,
                   companyName: detailMember.companyName,
                   industry: `${detailMember.jciChapter} (${detailMember.country})`,
-                  description: detailMember.description, website: detailMember.email,
+                  description: detailMember.description, website: detailMember.website,
                   offer: getSpecialOfferSummary(detailMember.specialOffer), logo: detailMember.avatarUrl,
                   idealReferralTypes: [],
                   businessCategory: detailMember.businessCategory, acceptsInternationalBusiness: 'Yes'
