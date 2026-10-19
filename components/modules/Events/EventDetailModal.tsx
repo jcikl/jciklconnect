@@ -231,7 +231,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     setMarkPaidReg(reg);
   };
 
-  const handleConfirmMarkPaid = async (paymentMethod: 'bank_transfer' | 'cash', receivedMyr?: number) => {
+  const handleConfirmMarkPaid = async (paymentMethod: 'bank_transfer' | 'cash', amount: number) => {
     const reg = markPaidReg;
     if (!reg) return;
     setMarkPaidReg(null);
@@ -240,7 +240,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
       const actorName = member?.general?.name ?? member?.id ?? 'Admin';
       // Creates the income transaction (bank account resolved by the service) and then flips the registration;
       // a failure aborts the whole operation so a registration is never 'paid' without its finance record.
-      const { paidAt: now } = await EventPaymentService.markRegistrationPaid(reg, event, { paymentMethod, actorName, receivedMyr });
+      const { paidAt: now } = await EventPaymentService.markRegistrationPaid(reg, event, { paymentMethod, actorName, amount });
       setParticipations((prev) => prev.map((r) => (r.id === reg.id ? { ...r, status: 'paid' as const, paidAt: now, paidByName: actorName, paymentMethod } : r)));
       showToast('Marked as paid', 'success');
     } catch (err) {
@@ -515,6 +515,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
       <EventMarkPaidModal
         key={markPaidReg?.id}
         registration={markPaidReg}
+        defaultAmount={event.price || event.priceMin || 0}
         onClose={() => setMarkPaidReg(null)}
         onConfirm={handleConfirmMarkPaid}
       />

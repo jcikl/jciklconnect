@@ -30,24 +30,24 @@ export class EventPaymentService {
 
   /**
    * Mark a registration paid. The transaction records MYR; for a USD (external) registration the price the
-   * payer saw is kept as originalAmount / originalCurrency, and `receivedMyr` (MYR actually received) may
-   * override the amount. Free events skip the transaction. If the registration update fails, the
+   * payer saw is kept as originalAmount / originalCurrency. `options.amount` is the MYR finance confirmed
+   * (defaults to the listed price, `price || priceMin`); an amount of 0 skips the transaction. If the registration update fails, the
    * transaction is removed again so no orphan income record is left.
    */
   static async markRegistrationPaid(
     reg: EventRegistration,
     event: Pick<Event, 'id' | 'title' | 'price' | 'priceMin'>,
-    options: { paymentMethod: 'bank_transfer' | 'cash'; actorName: string; receivedMyr?: number }
+    options: { paymentMethod: 'bank_transfer' | 'cash'; actorName: string; amount?: number }
   ): Promise<{ paidAt: string; financeTransactionId?: string }> {
     const now = new Date().toISOString();
     const today = now.split('T')[0];
-    const price = event.price ?? event.priceMin ?? 0;
+    const price = event.price || event.priceMin || 0;
     const isUsd = reg.currency === 'USD';
-    const amount = isUsd && options.receivedMyr != null ? options.receivedMyr : price;
+    const amount = options.amount ?? price;
 
     let financeTransactionId: string | undefined;
     try {
-      if (price > 0) {
+      if (amount > 0) {
         const bankAccountId = await this.resolveBankAccountId(event.id);
         financeTransactionId = await FinanceService.createTransaction({
           loId: DEFAULT_LO_ID,
@@ -60,7 +60,7 @@ export class EventPaymentService {
           memberId: reg.memberId,
           eventRegistrationId: reg.id,
           amount,
-          ...(isUsd ? { originalAmount: price, originalCurrency: 'USD' as const } : {}),
+          ...(isUsd ? { originalAmount: price || amount, originalCurrency: 'USD' as const } : {}),
           description: `Event ticket — ${event.title ?? reg.eventId}`,
           date: today,
           source: 'manual',

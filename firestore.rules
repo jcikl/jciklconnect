@@ -796,8 +796,12 @@ service cloud.firestore {
     match /eventRegistrations/{regId} {
       // ER-R1: split get/list — resource.data is null in list queries; members can only self-read via get
       // resource == null: registerForEvent's transaction reads the (not yet existing) {eventId}_{uid} doc first.
+      // Only for the caller's OWN id (exact "_" + uid suffix) so 404 vs 403 cannot be used to probe others.
       allow get: if isAuthenticated() &&
-        (isAdmin() || resource == null || resource.data.get('memberId', null) == request.auth.uid || canReadOrgMembers());
+        (isAdmin() ||
+         (resource == null && regId.size() > request.auth.uid.size() &&
+          regId[regId.size() - request.auth.uid.size() - 1:] == '_' + request.auth.uid) ||
+         resource.data.get('memberId', null) == request.auth.uid || canReadOrgMembers());
       // Members may list their own registrations (service adds where('memberId','==',uid)); Board+ lists all.
       // Active external users: own registrations only — the query must carry where('memberId','==',uid).
       allow list: if isAuthenticated() && (isAdmin() || canReadOrgMembers() || isMember() ||

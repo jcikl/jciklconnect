@@ -92,6 +92,15 @@ describe.skipIf(!HOST)('firestore.rules — external event registration (emulato
     expect(await commit('aff1', [setW('eventRegistrations/p1_aff1', reg, false), counter])).toBe(OK);
   });
 
+  it('cannot probe another user\'s registration id (404 vs 403 would leak who registered)', async () => {
+    expect(await getDoc('aff1', 'eventRegistrations/p1_klMember')).toBe(DENIED);
+    expect(await getDoc('aff1', 'eventRegistrations/p1_nobody')).toBe(DENIED);
+  });
+
+  it('a uid that is only a suffix-lookalike of another id cannot probe it', async () => {
+    expect(await getDoc('aff1', 'eventRegistrations/p1_xaff1')).toBe(DENIED);
+  });
+
   it('the external can read the registration back', async () => {
     expect(await getDoc('aff1', 'eventRegistrations/p1_aff1')).toBe(OK);
   });
