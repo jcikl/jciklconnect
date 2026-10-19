@@ -20,6 +20,7 @@ import {
   MessageSquare,
   Package,
   Share2,
+  User,
   SlidersHorizontal,
   Sparkles,
   Users,
@@ -40,6 +41,8 @@ export interface SidebarNavigationContext {
   canAccessWorkspaceModules: boolean;
   canViewEventsManagement: boolean;
   hasPermission: (permission: string) => boolean;
+  /** External users (AFFILIATE / CHAPTER_ADMIN): the only views they may open (utils/externalAccess.ts). Omitted/null for KL roles. */
+  externalAllowedViews?: readonly ViewType[] | null;
 }
 
 export interface SidebarNavigationItem {
@@ -80,13 +83,19 @@ export const sidebarNavigationSections: SidebarNavigationSection[] = [
         icon: <Calendar size={18} />,
         label: 'Event List',
         view: 'EVENTS',
-        visible: ({ canAccessWorkspaceModules }) => canAccessWorkspaceModules,
+        visible: ({ canAccessWorkspaceModules, externalAllowedViews }) => canAccessWorkspaceModules || !!externalAllowedViews,
       },
       {
         icon: <MessageSquare size={18} />,
         label: 'Communication',
         view: 'COMMUNICATION',
         visible: ({ canAccessWorkspaceModules }) => canAccessWorkspaceModules,
+      },
+      {
+        icon: <User size={18} />,
+        label: 'My Profile',
+        view: 'MEMBERS',
+        visible: ({ externalAllowedViews }) => !!externalAllowedViews,
       },
       {
         icon: <Building2 size={18} />,
@@ -249,3 +258,17 @@ export const sidebarNavigationSections: SidebarNavigationSection[] = [
     ],
   },
 ];
+
+/**
+ * Single visibility rule for a sidebar item: the item's own rule AND, for external users, the whitelist.
+ * KL roles (externalAllowedViews null/undefined) are decided by the item's own rule only.
+ */
+export const isSidebarItemVisible = (
+  section: SidebarNavigationSection,
+  item: SidebarNavigationItem,
+  context: SidebarNavigationContext,
+): boolean => {
+  if (section.visible && !section.visible(context)) return false;
+  if (context.externalAllowedViews && !context.externalAllowedViews.includes(item.view)) return false;
+  return !item.visible || item.visible(context);
+};

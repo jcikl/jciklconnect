@@ -27,6 +27,7 @@ import { DashboardUpgradeModal } from './DashboardUpgradeModal';
 import { getMemberDob, getProfileCompleteness, normalizeMembership } from './dashboardHomeUtils';
 import { isKlRelevantEvent } from '../../utils/loHosting.mjs';
 import { filterKlMembers } from '../../utils/memberScope';
+import { isExternalRole } from '../../utils/externalAccess';
 
 interface DashboardHomeProps {
   userRole: UserRole;
@@ -47,6 +48,9 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 }) => {
 
   const { member } = useAuth();
+  // External-chapter users only get birthdays / partners / events / profile widgets. KL-only widgets
+  // (journey, commitments, promotion, engagement) must not mount or load anything for them.
+  const isExternal = isExternalRole(userRole);
   // Only today-and-later events: the dashboard shows upcoming events, and loading every event
   // (3,000+ docs) made the home page take several seconds.
   const { events, loading: eventsLoading, registerForEvent, markAttendance, cancelRegistration } = useEvents({ scope: 'upcoming' });
@@ -105,7 +109,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
   // Load active commitments (Phase 3)
   useEffect(() => {
-    if (!member) return;
+    if (!member || isExternal) return;
     const fetchContracts = async () => {
       try {
         const data = await ContractService.getMemberContracts(member.id);
@@ -119,7 +123,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
   // Load Leadership/Trainer journey (shown to all members in the journey modal)
   useEffect(() => {
-    if (!member || normalizeMembership(member) === 'guest') return;
+    if (!member || isExternal || normalizeMembership(member) === 'guest') return;
     let cancelled = false;
     MemberJourneyService.getJourney(member)
       .then(j => { if (!cancelled) setPathwayJourney(j); })
@@ -129,7 +133,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
   // Load Promotion Progress for Probation and Full members (Journey modal shows it for both)
   useEffect(() => {
-    if (!member || normalizeMembership(member) === 'guest') return;
+    if (!member || isExternal || normalizeMembership(member) === 'guest') return;
     const loadPromotion = async () => {
       setPromoLoading(true);
       try {
@@ -146,7 +150,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
   // Load Engagement Progress for all members (Probation included)
   useEffect(() => {
-    if (!member || normalizeMembership(member) === 'guest') return;
+    if (!member || isExternal || normalizeMembership(member) === 'guest') return;
     const loadEngagement = async () => {
       setEngagementLoading(true);
       try {
@@ -324,7 +328,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       />
 
       <DashboardMembershipJourneyCard
-        show={showJourneyCard}
+        show={showJourneyCard && !isExternal}
         isProbationMember={isProbationMember}
         isFullMember={isFullMember}
         isVeteranMember={isVeteranMember}
@@ -354,7 +358,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
           onSelectEvent={setSelectedEventForDetail}
         />
 
-        {member.role !== UserRole.GUEST && (
+        {member.role !== UserRole.GUEST && !isExternal && (
           <>
             <DashboardActiveCommitments contracts={contracts} />
           </>
@@ -366,7 +370,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         onClose={() => setShowUpgradeModal(false)}
       />
 
-      <DashboardMembershipJourneyModal
+      {!isExternal && <DashboardMembershipJourneyModal
         isOpen={showJourneyModal}
         onClose={() => setShowJourneyModal(false)}
         journeyActiveTab={journeyActiveTab}
@@ -384,7 +388,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         setExpandedJourneySteps={setExpandedJourneySteps}
         journeyGroupTab={journeyGroupTab}
         setJourneyGroupTab={setJourneyGroupTab}
-      />
+      />}
       {/* Event Detail Modal */}
       {selectedEventForDetail && (
         <EventDetailModal

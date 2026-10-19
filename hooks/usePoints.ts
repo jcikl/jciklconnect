@@ -4,12 +4,14 @@ import { Member } from '../types';
 import { useToast } from '../components/ui/Common';
 import { useAuth } from './useAuth';
 import { useFirestoreCollection } from './useFirestoreCollection';
+import { isExternalRole } from '../utils/externalAccess';
 
 export const usePoints = () => {
   const { member } = useAuth();
   const { showToast } = useToast();
 
-  const isEligible = !!member && member.role !== 'GUEST' && member.role !== 'INACTIVE';
+  // External-chapter users (AFFILIATE / CHAPTER_ADMIN) do not take part in KL points.
+  const isEligible = !!member && member.role !== 'GUEST' && member.role !== 'INACTIVE' && !isExternalRole(member.role);
 
   const { data: pointHistory, loading: loading1, error: error1, reload: reloadHistory } = useFirestoreCollection<PointTransaction>({
     loader: () => PointsService.getMemberPointHistory(member?.id ?? ''),

@@ -5,6 +5,7 @@ import {
   SidebarNavigationContext,
   SidebarNavigationSection,
   sidebarNavigationSections,
+  isSidebarItemVisible,
 } from './navigationConfig';
 import { ViewType } from '../../types/views';
 
@@ -34,7 +35,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   const renderSidebarSection = (section: SidebarNavigationSection) => {
     if (section.visible && !section.visible(navigationContext)) return null;
 
-    const visibleItems = section.items.filter(item => !item.visible || item.visible(navigationContext));
+    const visibleItems = section.items.filter(item => isSidebarItemVisible(section, item, navigationContext));
     if (visibleItems.length === 0) return null;
 
     const content = (
