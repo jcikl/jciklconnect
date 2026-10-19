@@ -19,7 +19,7 @@
 |---|---|---|
 | Service（業務邏輯與資料存取） | 69 | `services/` |
 | Hook（React 資料綁定） | 39 | `hooks/` |
-| Util（純函數工具） | 22 | `utils/` |
+| Util（純函數工具） | 23 | `utils/` |
 | UI 元件（通用） | 33 | `components/ui/` |
 | 共用業務元件 | 9 | `components/shared/` |
 | Context | 2 | `contexts/` |
@@ -712,7 +712,7 @@
 | `boardManagementService.ts` | 1,264 | 11 | Board Management Service - Handles "One Year to Lead" principle | BOARD_MEMBERS, BOARD_TERM_SETTINGS, BOARD_TRANSITIONS, MEMBERS |
 | `contractService.ts` | 344 | 2 | ⚠️ 無說明 | CONTRACTS, FINANCE_ALERTS, POINT_ESCROW |
 | `documentsService.ts` | 431 | 1 | Documents Service with Version Control | DOCUMENTS, DOCUMENT_VERSIONS |
-| `hobbyClubsService.ts` | 407 | 3 | Hobby Clubs Service - CRUD Operations | HOBBY_CLUBS |
+| `hobbyClubsService.ts` | 317 | 3 | Hobby Clubs Service - CRUD Operations | HOBBY_CLUBS |
 | `permissionConfigService.ts` | 151 | 1 | ⚠️ 無說明 | PERMISSION_CATALOG |
 | `sisterChaptersService.ts` | 62 | 3 | ⚠️ 無說明 | SISTER_CHAPTERS |
 | `templatesService.ts` | 433 | 7 | Templates Service - Event Templates Management | TEMPLATES |
@@ -801,7 +801,7 @@
 
 </details>
 
-<details><summary><code>services/hobbyClubsService.ts</code> — 15 個方法</summary>
+<details><summary><code>services/hobbyClubsService.ts</code> — 12 個方法</summary>
 
 | 方法 | 行 | 說明 |
 |---|---|---|
@@ -811,15 +811,12 @@
 | `createClub` | 96 | Create club |
 | `updateClub` | 125 | Update club |
 | `deleteClub` | 148 | Soft-delete a club by setting isDeleted: true. Hard deletion is avoided to prevent stale memberIds references … |
-| `joinClub` | 172 | Join a club. Uses runTransaction to atomically: read current doc → check capacity → add member + increment cou… |
-| `leaveClub` | 210 | Leave a club. Guard: the club lead cannot leave without reassigning first. |
-| `getClubsByCategory` | 242 | Get clubs by category |
-| `getActivities` | 280 | Read a club's activities (non-transactional convenience helper) |
-| `addActivity` | 290 | P1 fix: Add a club activity. Uses runTransaction so the read → modify → write is atomic; concurrent modificati… |
-| `updateActivity` | 327 | P1 fix: Update a club activity. Uses runTransaction to prevent read/write races. |
-| `deleteActivity` | 360 | P1 fix: Delete a club activity. Uses runTransaction to prevent read/write races. |
-| `scheduleActivity` | 387 |  |
-| `getClubMembers` | 392 | Get club members |
+| `getClubsByCategory` | 168 | Get clubs by category |
+| `getActivities` | 206 | Read a club's activities (non-transactional convenience helper) |
+| `addActivity` | 216 | P1 fix: Add a club activity. Uses runTransaction so the read → modify → write is atomic; concurrent modificati… |
+| `updateActivity` | 253 | P1 fix: Update a club activity. Uses runTransaction to prevent read/write races. |
+| `deleteActivity` | 286 | P1 fix: Delete a club activity. Uses runTransaction to prevent read/write races. |
+| `scheduleActivity` | 313 |  |
 
 </details>
 
@@ -1291,7 +1288,7 @@
 | `useFirestoreCollection.ts` | 171 | 18 | `useFirestoreCollection` | — | ⚠️ 無說明 |
 | `useGamification.ts` | 148 | 1 | `useGamification` | gamificationService | useGamification.ts - Unified Hook for Awards (Achievements + Badges) |
 | `useGuestAnalytics.ts` | 21 | 0 | `useGuestAnalytics` | guestAnalyticsService | ⚠️ 無說明 |
-| `useHobbyClubs.ts` | 175 | 2 | `useHobbyClubs` | hobbyClubsService | ⚠️ 無說明 |
+| `useHobbyClubs.ts` | 128 | 2 | `useHobbyClubs` | hobbyClubsService | ⚠️ 無說明 |
 | `useInstallPrompt.ts` | 47 | 1 | `useInstallPrompt` | — | ⚠️ 無說明 |
 | `useInventory.ts` | 232 | 2 | `useInventory` | inventoryService | Inventory Data Hook |
 | `useKnowledge.ts` | 68 | 1 | `useKnowledge` | knowledgeService | ⚠️ 無說明 |
@@ -1300,7 +1297,7 @@
 | `useMemberBenefits.ts` | 102 | 0 | `useMemberBenefits` | memberBenefitsService | Member Benefits Data Hook Wraps MemberBenefitsService with React state (loading / error / data). |
 | `useMemberMutations.ts` | 107 | 0 | `useMemberMutations` | membersService | ⚠️ 無說明 |
 | `useMemberSearch.ts` | 53 | 1 | `useMemberSearch` | — | ⚠️ 無說明 |
-| `useMembers.ts` | 195 | 21 | `useMembers`, `usePaginatedMembers` | membersService | Members Data Hook |
+| `useMembers.ts` | 195 | 20 | `useMembers`, `usePaginatedMembers` | membersService | Members Data Hook |
 | `useNotifications.ts` | 107 | 0 | `useNotifications` | communicationService, errorLoggingService, mockData | ⚠️ 無說明 |
 | `usePermissions.ts` | 212 | 28 | `usePermissions` | — | Permission Management Hook |
 | `usePoints.ts` | 61 | 2 | `usePoints` | pointsService | Points Data Hook |
@@ -1368,6 +1365,12 @@
 | 函數 | 行 | 說明 |
 |---|---|---|
 | `canViewCards` | 9 | Reciprocity rule: a user may view other members' cards only if they share their own card (`privacy.shareCardIn… |
+
+### `utils/clubLink.ts` （17 行，2 處引用）
+
+| 函數 | 行 | 說明 |
+|---|---|---|
+| `getClubGroupLink` | 7 | The club's group chat link (WhatsApp / LINE / Discord / Telegram …) that "Join" opens, or null when none is se… |
 
 ### `utils/dataUtils.ts` （33 行，4 處引用）
 > recursivley removes undefined values from an object. Firestore does not support 'undefined' values, so this helper is essential before savin…
@@ -1576,6 +1579,6 @@
 
 ## 8. 文件債：缺少檔頭說明的檔案
 
-共 57 個。請在檔案第一行補上 `/** 一句話說明此檔案職責 */`，下次重新生成時就會自動帶入本文件。
+共 58 個。請在檔案第一行補上 `/** 一句話說明此檔案職責 */`，下次重新生成時就會自動帶入本文件。
 
-`services/auditLogService.ts`, `services/contractService.ts`, `services/dataImportExportService.ts`, `services/engagementAutoSuggestService.ts`, `services/errorLoggingService.ts`, `services/financeService.ts`, `services/flagshipProjectsService.ts`, `services/guestAnalyticsService.ts`, `services/incentiveCalculatorService.ts`, `services/inquiryService.ts`, `services/larkSyncService.ts`, `services/membershipConfigService.ts`, `services/mockData.ts`, `services/notificationService.ts`, `services/partnershipsService.ts`, `services/permissionConfigService.ts`, `services/postcodeService.ts`, `services/promotionService.ts`, `services/reportService.ts`, `services/sisterChaptersService.ts`, `services/socialPersonaService.ts`, `services/socialPostService.ts`, `services/sponsorshipService.ts`, `services/toyyibService.ts`, `services/zoomBookingService.ts`, `hooks/useActivityPlans.ts`, `hooks/useAppNavigation.ts`, `hooks/useBusinessDirectory.ts`, `hooks/useFirestoreCollection.ts`, `hooks/useGuestAnalytics.ts`, `hooks/useHobbyClubs.ts`, `hooks/useInstallPrompt.ts`, `hooks/useKnowledge.ts`, `hooks/useMemberMutations.ts`, `hooks/useMemberSearch.ts`, `hooks/useNotifications.ts`, `hooks/usePushNotifications.ts`, `hooks/useSisterChapterMembers.ts`, `hooks/useSisterChapters.ts`, `hooks/useSocialPersonas.ts`, `hooks/useSocialPosts.ts`, `hooks/useSurveys.ts`, `hooks/useToyyibMode.ts`, `hooks/useToyyibPay.ts`, `hooks/useToyyibPayment.ts`, `hooks/useZoomBookings.ts`, `utils/activityPhase.ts`, `utils/administrativeProjectsStorage.ts`, `utils/boardMembership.ts`, `utils/cardAccess.ts`, `utils/externalAccess.ts`, `utils/financeUtils.ts`, `utils/gamificationUtils.ts`, `utils/internationalCards.ts`, `utils/memberScope.ts`, `utils/roadmapUtils.ts`, `utils/rolePermissions.ts`
+`services/auditLogService.ts`, `services/contractService.ts`, `services/dataImportExportService.ts`, `services/engagementAutoSuggestService.ts`, `services/errorLoggingService.ts`, `services/financeService.ts`, `services/flagshipProjectsService.ts`, `services/guestAnalyticsService.ts`, `services/incentiveCalculatorService.ts`, `services/inquiryService.ts`, `services/larkSyncService.ts`, `services/membershipConfigService.ts`, `services/mockData.ts`, `services/notificationService.ts`, `services/partnershipsService.ts`, `services/permissionConfigService.ts`, `services/postcodeService.ts`, `services/promotionService.ts`, `services/reportService.ts`, `services/sisterChaptersService.ts`, `services/socialPersonaService.ts`, `services/socialPostService.ts`, `services/sponsorshipService.ts`, `services/toyyibService.ts`, `services/zoomBookingService.ts`, `hooks/useActivityPlans.ts`, `hooks/useAppNavigation.ts`, `hooks/useBusinessDirectory.ts`, `hooks/useFirestoreCollection.ts`, `hooks/useGuestAnalytics.ts`, `hooks/useHobbyClubs.ts`, `hooks/useInstallPrompt.ts`, `hooks/useKnowledge.ts`, `hooks/useMemberMutations.ts`, `hooks/useMemberSearch.ts`, `hooks/useNotifications.ts`, `hooks/usePushNotifications.ts`, `hooks/useSisterChapterMembers.ts`, `hooks/useSisterChapters.ts`, `hooks/useSocialPersonas.ts`, `hooks/useSocialPosts.ts`, `hooks/useSurveys.ts`, `hooks/useToyyibMode.ts`, `hooks/useToyyibPay.ts`, `hooks/useToyyibPayment.ts`, `hooks/useZoomBookings.ts`, `utils/activityPhase.ts`, `utils/administrativeProjectsStorage.ts`, `utils/boardMembership.ts`, `utils/cardAccess.ts`, `utils/clubLink.ts`, `utils/externalAccess.ts`, `utils/financeUtils.ts`, `utils/gamificationUtils.ts`, `utils/internationalCards.ts`, `utils/memberScope.ts`, `utils/roadmapUtils.ts`, `utils/rolePermissions.ts`

@@ -64,40 +64,6 @@ export const useHobbyClubs = () => {
     }
   };
 
-  const joinClub = async (clubId: string) => {
-    if (!member) { showToast('Please login to join clubs', 'error'); return; }
-    if (isSubmittingRef.current) return;
-    isSubmittingRef.current = true;
-    try {
-      await HobbyClubsService.joinClub(clubId, member.id);
-      await loadClubs();
-      showToast('Joined club successfully', 'success');
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to join club';
-      showToast(errorMessage, 'error');
-      throw err;
-    } finally {
-      isSubmittingRef.current = false;
-    }
-  };
-
-  const leaveClub = async (clubId: string) => {
-    if (!member) { showToast('Please login to leave clubs', 'error'); return; }
-    if (isSubmittingRef.current) return;
-    isSubmittingRef.current = true;
-    try {
-      await HobbyClubsService.leaveClub(clubId, member.id);
-      await loadClubs();
-      showToast('Left club successfully', 'success');
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to leave club';
-      showToast(errorMessage, 'error');
-      throw err;
-    } finally {
-      isSubmittingRef.current = false;
-    }
-  };
-
   const scheduleActivity = async (clubId: string, activityDate: string, description: string) => {
     if (isSubmittingRef.current) return;
     isSubmittingRef.current = true;
@@ -146,16 +112,6 @@ export const useHobbyClubs = () => {
     }
   };
 
-  const getClubMembers = async (clubId: string): Promise<string[]> => {
-    try {
-      return await HobbyClubsService.getClubMembers(clubId);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load club members';
-      showToast(errorMessage, 'error');
-      throw err;
-    }
-  };
-
   return {
     clubs,
     loading,
@@ -164,11 +120,8 @@ export const useHobbyClubs = () => {
     createClub,
     updateClub,
     deleteClub,
-    joinClub,
-    leaveClub,
     scheduleActivity,
     updateActivity,
     deleteActivity,
-    getClubMembers,
   };
 };
