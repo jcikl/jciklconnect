@@ -113,20 +113,26 @@ describe.skipIf(!HOST)('firestore.rules — buildMemberCard output (emulator)', 
     expect(await commit('klAdmin', [{ path: 'memberCards/klMember', data: card }])).toBe(OK);
   });
 
-  it('opt-in toggle: member doc and card in ONE commit is accepted', async () => {
+  it('opt-in toggle: member doc first, then the card in a separate commit is accepted', async () => {
     const after = { ...klMember, privacy: { shareCardInternationally: true } };
     const card = buildMemberCard(after) as unknown as Doc;
     expect(card.international).toBe(true);
     expect(await commit('klMember', [
       { path: 'members/klMember', data: { ...klMemberDoc, privacy: { shareCardInternationally: true } } as Doc },
-      { path: 'memberCards/klMember', data: card },
     ])).toBe(OK);
+    expect(await commit('klMember', [{ path: 'memberCards/klMember', data: card }])).toBe(OK);
   });
 
-  it('card whose international differs from the member doc is rejected', async () => {
-    // member doc now has shareCardInternationally true (previous test); a card saying false must fail
+  it('card still saying false is rejected once the member doc says true (stale card never passes)', async () => {
     const card = buildMemberCard({ ...klMember, privacy: { shareCardInternationally: false } }) as unknown as Doc;
     expect(await commit('klMember', [{ path: 'memberCards/klMember', data: card }])).toBe(DENIED);
+  });
+
+  it('turning the opt-in off: member doc first, then card international=false', async () => {
+    expect(await commit('klMember', [
+      { path: 'members/klMember', data: { ...klMemberDoc, privacy: { shareCardInternationally: false } } as Doc },
+    ])).toBe(OK);
+    expect(await commit('klMember', [{ path: 'memberCards/klMember', data: buildMemberCard(klMember) as unknown as Doc }])).toBe(OK);
   });
 
   it('card with an extra key is rejected', async () => {

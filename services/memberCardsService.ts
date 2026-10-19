@@ -1,18 +1,31 @@
 // Member Cards Service — keeps `memberCards/{memberId}` (the public directory card, Phase 0 WP2)
-// in sync with `members`. The card is written in the SAME writeBatch / transaction as the member
-// write wherever the path allows, because firestore.rules validates it with getAfter(member doc)
-// (loId and international must match the member doc after the write).
-import { doc, writeBatch, type WriteBatch, type Transaction as FirestoreTransaction } from 'firebase/firestore';
+// in sync with `members`. The card is written AFTER the member doc has committed (CLAUDE.md §5.2:
+// main doc first, side effects after), in its own writeBatch, and a card failure is logged but never
+// fails the member save (e.g. while an older firestore.rules still denies memberCards writes).
+// firestore.rules validates the card against the member doc (get/getAfter), so it works either way.
+import { doc, writeBatch } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import type { Member, MemberCard } from '../types';
 import { buildMemberCard, shouldHaveCard, planCardSync, applyMemberUpdates } from '../utils/memberCard.mjs';
 import { errorLoggingService } from './errorLoggingService';
+import { isDevMode } from '../utils/devMode';
 
 export type CardSyncAction = 'upsert' | 'delete' | 'none';
 
+/** One member's before -> after change (before null = new member / unknown). */
+export interface CardSyncInput {
+  memberId: string;
+  before: Partial<Member> | null;
+  after: Partial<Member>;
+  /** Delete the card even if `before` did not qualify (member deleted). */
+  forceDelete?: boolean;
+}
+
+const BATCH_SIZE = 400;
+
 // No cache: this service only writes. If reads are added, add an invalidateCardsCache() and call it
-// from every method below.
+// from every write method below.
 export class MemberCardsService {
   static buildCard(member: Partial<Member>, nowIso?: string): MemberCard {
     return buildMemberCard(member, nowIso) as MemberCard;
@@ -33,44 +46,37 @@ export class MemberCardsService {
   }
 
   /**
-   * Adds the card write for before -> after to an existing batch (same commit as the member write).
-   * Returns the action taken; 'none' means no op was added to the batch.
+   * Applies the planned card upserts/deletes for already-committed member writes, chunked (<= 400 per
+   * batch). Never throws: failures are logged through errorLoggingService so the member save stands.
+   * Returns the number of card ops that were committed.
    */
-  static addToBatch(
-    batch: WriteBatch,
-    memberId: string,
-    before: Partial<Member> | null,
-    after: Partial<Member>,
-    opts?: { forceDelete?: boolean },
-  ): CardSyncAction {
-    const action = this.plan(before, after, opts);
-    const ref = doc(db, COLLECTIONS.MEMBER_CARDS, memberId);
-    if (action === 'upsert') batch.set(ref, this.buildCard(after));
-    else if (action === 'delete') batch.delete(ref);
-    return action;
-  }
-
-  /** Same as addToBatch, for a runTransaction (member create). */
-  static addToTransaction(txn: FirestoreTransaction, memberId: string, after: Partial<Member>): CardSyncAction {
-    const action = this.plan(null, after);
-    if (action === 'upsert') txn.set(doc(db, COLLECTIONS.MEMBER_CARDS, memberId), this.buildCard(after));
-    return action;
-  }
-
-  /** Unconditional delete op for a batch (member deleted / made INACTIVE). Deleting a missing doc is a no-op. */
-  static deleteInBatch(batch: WriteBatch, memberId: string): void {
-    batch.delete(doc(db, COLLECTIONS.MEMBER_CARDS, memberId));
-  }
-
-  /** Standalone delete (no member write in the same batch). Errors are logged and rethrown. */
-  static async deleteCard(memberId: string): Promise<void> {
-    try {
-      const batch = writeBatch(db);
-      this.deleteInBatch(batch, memberId);
-      await batch.commit();
-    } catch (error) {
-      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MemberCardsService.deleteCard', additionalInfo: `memberId=${memberId}` });
-      throw error;
+  static async syncCards(inputs: CardSyncInput[]): Promise<number> {
+    if (isDevMode()) return 0;
+    const ops: Array<{ memberId: string; action: 'upsert' | 'delete'; after: Partial<Member> }> = [];
+    for (const { memberId, before, after, forceDelete } of inputs) {
+      const action = this.plan(before, after, { forceDelete });
+      if (action !== 'none') ops.push({ memberId, action, after });
     }
+    let committed = 0;
+    for (let i = 0; i < ops.length; i += BATCH_SIZE) {
+      const chunk = ops.slice(i, i + BATCH_SIZE);
+      try {
+        const batch = writeBatch(db);
+        const nowIso = new Date().toISOString();
+        for (const { memberId, action, after } of chunk) {
+          const ref = doc(db, COLLECTIONS.MEMBER_CARDS, memberId);
+          if (action === 'upsert') batch.set(ref, this.buildCard(after, nowIso));
+          else batch.delete(ref);
+        }
+        await batch.commit();
+        committed += chunk.length;
+      } catch (error) {
+        errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), {
+          context: 'MemberCardsService.syncCards',
+          additionalInfo: `member write succeeded; card sync failed for ${chunk.length} card(s), e.g. ${chunk[0]?.memberId}`,
+        });
+      }
+    }
+    return committed;
   }
 }

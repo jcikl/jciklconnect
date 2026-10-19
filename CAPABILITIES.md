@@ -75,7 +75,7 @@
 |---|---|
 | `services/financeService.ts` | 5,320 |
 | `services/pointsService.ts` | 2,492 |
-| `services/membersService.ts` | 2,308 |
+| `services/membersService.ts` | 2,305 |
 | `hooks/useFinanceData.ts` | 2,033 |
 | `services/inventoryService.ts` | 1,638 |
 
@@ -91,10 +91,10 @@
 | `learningPathsService.ts` | 340 | 2 | Learning Paths & Learning Progress Service Fixes applied: P1 – startLearningPath uses runTransaction to prevent duplicate progress records P… | LEARNING_PATHS, LEARNING_PROGRESS |
 | `memberAuthService.ts` | 91 | 2 | 会员登录账号（Firebase Auth）的建立与补建；调用 Netlify 函数 member-auth（uid = 会员文档 ID）。 | — |
 | `memberBenefitsService.ts` | 329 | 1 | Member Benefits Service Handles the memberBenefits collection and benefitUsage write path. Read path for advertisements-as-benefits lives in… | ADVERTISEMENTS, BENEFIT_USAGE, MEMBER_BENEFITS |
-| `memberCardsService.ts` | 77 | 1 | Member Cards Service — keeps `memberCards/{memberId}` (the public directory card, Phase 0 WP2) in sync with `members`. The card is written i… | MEMBER_CARDS |
+| `memberCardsService.ts` | 83 | 2 | Member Cards Service — keeps `memberCards/{memberId}` (the public directory card, Phase 0 WP2) in sync with `members`. The card is written A… | MEMBER_CARDS |
 | `memberJourneyService.ts` | 155 | 2 | Leadership Journey + Trainer Pathway derivation (dashboard journey card for pre-2025 members) | — |
 | `memberStatsService.ts` | 318 | 2 | Member Statistics Service - Generates comprehensive member statistics and reports | — |
-| `membersService.ts` | 2,308 | 41 | Members Service - CRUD Operations | BOARD_MEMBERS, EVENT_REGISTRATIONS, MEMBERS, MEMBER_EMAILS, NOTIFICATIONS, PAYMENT_REQUESTS … |
+| `membersService.ts` | 2,305 | 41 | Members Service - CRUD Operations | BOARD_MEMBERS, EVENT_REGISTRATIONS, MEMBERS, MEMBER_EMAILS, NOTIFICATIONS, PAYMENT_REQUESTS … |
 | `membershipConfigService.ts` | 373 | 17 | ⚠️ 無說明 | SYSTEM_SETTINGS |
 | `mentorshipService.ts` | 638 | 4 | Mentorship Matching Service | MEMBERS, MENTORSHIP_FEEDBACK, MENTOR_MATCHES |
 | `promotionService.ts` | 1,187 | 4 | ⚠️ 無說明 | MANUAL_PROMOTION_REQUESTS, MEMBERS, PROMOTION_HISTORY, SYSTEM |
@@ -146,18 +146,15 @@
 
 </details>
 
-<details><summary><code>services/memberCardsService.ts</code> — 8 個方法</summary>
+<details><summary><code>services/memberCardsService.ts</code> — 5 個方法</summary>
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `buildCard` | 17 |  |
-| `shouldHaveCard` | 21 |  |
-| `applyUpdates` | 26 | Member snapshot after an updateDoc-style payload (dot-paths supported). |
-| `plan` | 31 | Decide the card action for a before -> after member change (see planCardSync). |
-| `addToBatch` | 39 | Adds the card write for before -> after to an existing batch (same commit as the member write). Returns the ac… |
-| `addToTransaction` | 54 | Same as addToBatch, for a runTransaction (member create). |
-| `deleteInBatch` | 61 | Unconditional delete op for a batch (member deleted / made INACTIVE). Deleting a missing doc is a no-op. |
-| `deleteCard` | 66 | Standalone delete (no member write in the same batch). Errors are logged and rethrown. |
+| `buildCard` | 30 |  |
+| `shouldHaveCard` | 34 |  |
+| `applyUpdates` | 39 | Member snapshot after an updateDoc-style payload (dot-paths supported). |
+| `plan` | 44 | Decide the card action for a before -> after member change (see planCardSync). |
+| `syncCards` | 53 | Applies the planned card upserts/deletes for already-committed member writes, chunked (<= 400 per batch). Neve… |
 
 </details>
 
@@ -192,30 +189,30 @@
 | `normalizeMemberData` | 246 | Helper to map flat properties to standard nested sub-objects (general, contact, etc.) for database consistency… |
 | `createMember` | 567 | Create new member. Caller should pass loId (or use DEFAULT_LO_ID for single-LO). |
 | `updateMember` | 648 | Update member. Sets updatedAt and optionally updatedBy (audit). |
-| `validateSenatorshipByBoard` | 873 | Board of Directors validates a member's senatorship number (locks future edits). |
-| `revokeSenatorshipValidation` | 899 | Revoke board validation (admin / board only). Clears certification. |
-| `deleteMember` | 993 | Delete member |
-| `searchMembers` | 1103 | Search members |
-| `getMembersByRole` | 1122 | Get members by role |
-| `getMemberByEmail` | 1152 | Get member by email (for account linking) |
-| `getMembersAtRisk` | 1191 | Get members at risk (churn prediction) |
-| `computeAttendanceMonths` | 1211 | 当年应计月份数：入会年份从入会月起算，否则从 1 月起算 |
-| `recalculateAttendance` | 1225 | 按当年 checked_in 记录重算出席对比（签到次数 vs 已过月份），写回会员档案 |
-| `updateMemberRole` | 1257 |  |
-| `assignMentor` | 1313 | Assign mentor |
-| `batchUpdateMembers` | 1336 | Batch update members — uses writeBatch for atomicity (E01) |
-| `batchDeleteMembers` | 1505 | Batch delete members — uses writeBatch for atomicity (E02) |
-| `getFirstMembershipYearKey` | 1673 | Earliest year key on member.jciCareer?.membershipDuesHistory (e.g. "2024"). |
-| `statusFromMembershipAmount` | 1686 |  |
-| `fixFirstMembershipDuesTo350` | 1704 | Set dues on each member's first membership year to RM350 and recalculate status from paid amount. SYNC-004 NOT… |
-| `getEffectiveJoinYear` | 1811 | Effective membership start year (calendar Oct rollover or first payment year). |
-| `inferMembershipType` | 1842 | Infer membershipType from role, senatorship, and membership[year].dues (Config rules). |
-| `batchSyncMembershipTypes` | 1865 | Batch-sync members.jciCareer?.membershipType from membership dues + role + Config. Does not modify members.jci… |
-| `batchSyncMembershipRecords` | 1977 | Batch-sync members.jciCareer?.membershipDuesHistory[year] from each member's membershipType + Membership Confi… |
-| `syncMembershipFromMembershipType` | 2193 |  |
-| `migrateMembershipTypeFullToOfficial` | 2200 | TEMP MIGRATION: membershipType 'Full' → 'Official' |
-| `migrateDobToGeneralDob` | 2235 | TEMP MIGRATION: copy root-level dateOfBirth/dob into general.dob for members missing it |
-| `getMembersPaginated` | 2277 | Cursor-based paginated member fetch (ordered by name). Pass `lastDoc` from the previous page's result to advan… |
+| `validateSenatorshipByBoard` | 868 | Board of Directors validates a member's senatorship number (locks future edits). |
+| `revokeSenatorshipValidation` | 894 | Revoke board validation (admin / board only). Clears certification. |
+| `deleteMember` | 988 | Delete member |
+| `searchMembers` | 1099 | Search members |
+| `getMembersByRole` | 1118 | Get members by role |
+| `getMemberByEmail` | 1148 | Get member by email (for account linking) |
+| `getMembersAtRisk` | 1187 | Get members at risk (churn prediction) |
+| `computeAttendanceMonths` | 1207 | 当年应计月份数：入会年份从入会月起算，否则从 1 月起算 |
+| `recalculateAttendance` | 1221 | 按当年 checked_in 记录重算出席对比（签到次数 vs 已过月份），写回会员档案 |
+| `updateMemberRole` | 1253 |  |
+| `assignMentor` | 1308 | Assign mentor |
+| `batchUpdateMembers` | 1331 | Batch update members — uses writeBatch for atomicity (E01) |
+| `batchDeleteMembers` | 1502 | Batch delete members — uses writeBatch for atomicity (E02) |
+| `getFirstMembershipYearKey` | 1670 | Earliest year key on member.jciCareer?.membershipDuesHistory (e.g. "2024"). |
+| `statusFromMembershipAmount` | 1683 |  |
+| `fixFirstMembershipDuesTo350` | 1701 | Set dues on each member's first membership year to RM350 and recalculate status from paid amount. SYNC-004 NOT… |
+| `getEffectiveJoinYear` | 1808 | Effective membership start year (calendar Oct rollover or first payment year). |
+| `inferMembershipType` | 1839 | Infer membershipType from role, senatorship, and membership[year].dues (Config rules). |
+| `batchSyncMembershipTypes` | 1862 | Batch-sync members.jciCareer?.membershipType from membership dues + role + Config. Does not modify members.jci… |
+| `batchSyncMembershipRecords` | 1974 | Batch-sync members.jciCareer?.membershipDuesHistory[year] from each member's membershipType + Membership Confi… |
+| `syncMembershipFromMembershipType` | 2190 |  |
+| `migrateMembershipTypeFullToOfficial` | 2197 | TEMP MIGRATION: membershipType 'Full' → 'Official' |
+| `migrateDobToGeneralDob` | 2232 | TEMP MIGRATION: copy root-level dateOfBirth/dob into general.dob for members missing it |
+| `getMembersPaginated` | 2274 | Cursor-based paginated member fetch (ordered by name). Pass `lastDoc` from the previous page's result to advan… |
 
 </details>
 
@@ -1392,7 +1389,7 @@
 | `getStartOfYear` | 163 |  |
 | `getEndOfYear` | 170 |  |
 
-### `utils/devMode.ts` （36 行，69 處引用）
+### `utils/devMode.ts` （36 行，70 處引用）
 > Developer Mode Utility This utility helps services detect if the app is running in developer mode and return mock data instead of accessing …
 
 | 函數 | 行 | 說明 |
