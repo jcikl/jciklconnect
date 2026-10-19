@@ -28,6 +28,7 @@ import { getMemberDob, getProfileCompleteness, normalizeMembership } from './das
 import { isKlRelevantEvent } from '../../utils/loHosting.mjs';
 import { filterKlMembers } from '../../utils/memberScope';
 import { isExternalRole } from '../../utils/externalAccess';
+import { useChapterBirthdays } from '../../hooks/useChapterBirthdays';
 
 interface DashboardHomeProps {
   userRole: UserRole;
@@ -203,8 +204,21 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const currentMonth = parseInt(mytTodayStr.slice(0, 2), 10) - 1; // 0-indexed for compat
   const currentDay = parseInt(mytTodayStr.slice(3), 10);
   const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }));
+  // Externals cannot read member docs: their own chapter's birthdays come from the chapter-birthdays
+  // function (day + month only). Shaped like members for the banner / drawer; the year 2000 is a
+  // placeholder (leap year, so 29 Feb parses) and is never displayed.
+  const { birthdays: chapterBirthdays } = useChapterBirthdays(isExternal ? currentMonth + 1 : null);
+  const chapterBirthdayMembers = React.useMemo(
+    () => chapterBirthdays.map(b => ({
+      id: b.id,
+      general: { name: b.displayName, avatarUrl: b.avatarUrl ?? undefined, dob: `2000-${b.mmdd.slice(0, 2)}-${b.mmdd.slice(2)}` },
+    }) as unknown as Member),
+    [chapterBirthdays]
+  );
   const birthdayMembers = React.useMemo(() => {
-    return filterKlMembers(members)
+    return (isExternal ? chapterBirthdayMembers : filterKlMembers(members))
+      // privacy.hideBirthday: the member chose not to appear in birthday lists.
+      .filter(m => m.privacy?.hideBirthday !== true)
       .filter(m => {
         const dob = getMemberDob(m);
         if (!dob) return false;
@@ -221,7 +235,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         if (passedA !== passedB) return passedA - passedB;
         return dayA - dayB;
       });
-  }, [members, currentMonth, currentDay]);
+  }, [members, isExternal, chapterBirthdayMembers, currentMonth, currentDay]);
 
   const todayBirthdays = React.useMemo(() => {
     return birthdayMembers.filter(m => {

@@ -201,6 +201,20 @@ service cloud.firestore {
       return isActiveChapterAdmin() && resource.data.loId == getMyLoId();
     }
 
+    // WP-8 (decision 8): an external member (AFFILIATE / CHAPTER_ADMIN) may set their own general.dob once,
+    // while it is still empty; birthdayMMDD, if written, must match it (or stay unset).
+    function externalSetsDobOnce() {
+      let before = resource.data;
+      let after = request.resource.data;
+      let dob = after.get('general', {}).get('dob', null);
+      return before.get('role', '') in ['AFFILIATE', 'CHAPTER_ADMIN'] &&
+             before.get('general', {}).get('dob', null) in [null, ''] &&
+             dob is string &&
+             dob.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+             (after.get('birthdayMMDD', null) == before.get('birthdayMMDD', null) ||
+              after.get('birthdayMMDD', null) == dob.split('-')[1] + dob.split('-')[2]);
+    }
+
     // ── Self sign-up (members create) ─────────────────────────────────────────────────────────
     // A brand-new user writing their own doc (uid == doc id, doc does not exist yet).
     function isNewSelfSignUp(memberId) {
@@ -343,14 +357,18 @@ service cloud.firestore {
            'deletedAt', 'deletedBy', 'createdAt', 'createdBy',
            'attendanceCheckins', 'attendanceMonths', 'attendanceYear',
            'leaderboardScore', 'points',
-           'churnRisk', 'tier', 'birthdayMMDD', 'isDeveloper',
+           'churnRisk', 'tier', 'isDeveloper',
            'isCurrentBoardMember', 'currentBoardPosition',
            // External members cannot self-activate or change their category/country.
            'affiliation'
          ]) &&
+         // birthdayMMDD is locked, except when an external sets their dob once (WP-8).
+         (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['birthdayMMDD']) ||
+          externalSetsDobOnce()) &&
          (resource.data.get('role', 'GUEST') == 'GUEST' ||
           (request.resource.data.get('general', {}).get('nationality', null) == resource.data.get('general', {}).get('nationality', null) &&
-           request.resource.data.get('general', {}).get('dob', null)         == resource.data.get('general', {}).get('dob', null) &&
+           (request.resource.data.get('general', {}).get('dob', null)        == resource.data.get('general', {}).get('dob', null) ||
+            externalSetsDobOnce()) &&
            request.resource.data.get('general', {}).get('idNumber', null)    == resource.data.get('general', {}).get('idNumber', null) &&
            request.resource.data.get('general', {}).get('idType', null)      == resource.data.get('general', {}).get('idType', null)))
         ) ||

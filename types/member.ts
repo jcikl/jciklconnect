@@ -323,6 +323,8 @@ export interface Member {
      * rejects a card whose `international` differs from this flag. Self-editable.
      */
     shareCardInternationally?: boolean;
+    /** Hide my birthday (day / month) from birthday lists. Default false (missing = shown). Self-editable. */
+    hideBirthday?: boolean;
   };
   /**
    * Present only on external members (role AFFILIATE / CHAPTER_ADMIN). The chapter itself is the
