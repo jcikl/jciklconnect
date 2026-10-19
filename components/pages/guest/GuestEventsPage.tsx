@@ -1,4 +1,5 @@
-import React, { useState, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useMemo, useEffect, lazy, Suspense } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, Calendar, CheckCircle, MapPin, Users } from 'lucide-react';
 import { Button, Badge, Modal, useToast } from '@/components/ui/Common';
@@ -21,6 +22,7 @@ export const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
   // Only the events this page can show (KL host / co-host, national / area / JCI) instead of every event.
   const { events, loading } = useEvents({ publicMode: true, scope: 'klRelevant' });
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [isRegistrationModalOpen, setIsRegistrationModalOpen] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
   const [guestRegistrationData, setGuestRegistrationData] = useState({
@@ -42,6 +44,21 @@ export const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
       return eventDate >= today;
     });
   }, [events]);
+
+  // Arriving from the landing page with ?event=<id>: open that event's detail + registration window
+  // (same as clicking it here), then drop the parameter so closing the window doesn't reopen it.
+  useEffect(() => {
+    const eventId = searchParams.get('event');
+    if (!eventId || events.length === 0) return;
+    const event = events.find(e => e.id === eventId);
+    if (event) {
+      setSelectedEvent(event);
+      setIsRegistrationModalOpen(true);
+    }
+    const next = new URLSearchParams(searchParams);
+    next.delete('event');
+    setSearchParams(next, { replace: true });
+  }, [events, searchParams, setSearchParams]);
 
   const isKLRelevant = (e: Event) => isKlRelevantEvent(e as any);
   const publicEvents = upcomingEvents.filter(isKLRelevant);

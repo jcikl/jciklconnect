@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Users, Calendar, ChevronRight, FolderKanban, MapPin } from 'lucide-react';
+import { Users, ChevronRight, FolderKanban } from 'lucide-react';
 import { Button } from '@/components/ui/Common';
 import { useEvents } from '@/hooks/useEvents';
+import { EventRow } from '@/components/modules/Events/EventRow';
+import { useNavigate } from 'react-router-dom';
 import { isKlRelevantEvent } from '@/utils/loHosting.mjs';
 import { BoardManagementService } from '@/services/boardManagementService';
 import { trimCloudinaryImage } from '@/services/cloudinaryService';
@@ -19,6 +21,13 @@ export const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
   const [termSettings, setTermSettings] = useState<{ presidentTheme?: string; tagline?: string; shortDescription?: string; logoUrl?: string; memberGroupPhotoUrl?: string } | null>(null);
   // Today-and-later only (not every event, ~5 MB) — this is the first page a visitor sees.
   const { events } = useEvents({ publicMode: true, scope: 'upcoming' });
+
+  const navigate = useNavigate();
+  // Opens the event's detail + registration window on the guest events page (?event=<id>).
+  const openEvent = (eventId: string) => {
+    window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+    navigate(`/events?event=${encodeURIComponent(eventId)}`);
+  };
 
   const upcomingEvents = useMemo(() => {
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -46,14 +55,6 @@ export const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
     { image: '/pillars/international-portrait.webp', title: 'International', description: 'Join a worldwide network spanning 124 countries and 200,000 active members.', accent: 'from-emerald-900/70 to-emerald-600/50' },
     { image: '/pillars/individual-portrait.webp', title: 'Individual', description: 'Unlock your leadership potential through training, mentorship, and real experiences.', accent: 'from-amber-900/70 to-amber-600/50' },
   ];
-
-  const eventTypeColor: Record<string, string> = {
-    Meeting: 'from-blue-500 to-blue-600',
-    Training: 'from-violet-500 to-purple-600',
-    Social: 'from-emerald-500 to-teal-600',
-    Project: 'from-orange-500 to-amber-600',
-    International: 'from-jci-blue to-sky-500',
-  };
 
   const ogImage = termSettings?.memberGroupPhotoUrl || '/JCI%20Kuala%20Lumpur-transparent.png';
 
@@ -485,30 +486,17 @@ export const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                   View All <ChevronRight size={15} />
                 </button>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-4">
+              {/* Same cards and grid as the guest events page (EventRow); a card or Register opens
+                  that event's detail + registration on /events. */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {upcomingEvents.map(event => (
-                  <div key={event.id} onClick={() => onPageChange('events')}
-                    className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all overflow-hidden group cursor-pointer">
-                    <div className="h-36 overflow-hidden relative">
-                      {event.imageUrl ? (
-                        <img src={event.imageUrl} alt={event.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                      ) : (
-                        <div className={`w-full h-full bg-gradient-to-br ${eventTypeColor[event.type] || 'from-jci-blue to-sky-500'} flex items-center justify-center`}>
-                          <Calendar size={36} className="text-white/30" />
-                        </div>
-                      )}
-                      <span className="absolute top-3 left-3 text-[9px] font-black uppercase tracking-wider bg-white/90 text-slate-700 px-2.5 py-1 rounded-full shadow-sm">
-                        {event.type}
-                      </span>
-                    </div>
-                    <div className="p-4">
-                      <p className="text-[10px] font-bold text-jci-blue uppercase tracking-wider mb-1">
-                        {new Date(event.date).toLocaleDateString('en-MY', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </p>
-                      <h4 className="font-bold text-slate-900 text-sm line-clamp-2 mb-1">{event.title}</h4>
-                      {event.location && <p className="text-[11px] text-slate-400 flex items-center gap-1"><MapPin size={10} />{event.location}</p>}
-                    </div>
-                  </div>
+                  <EventRow
+                    key={event.id}
+                    event={event}
+                    horizontal
+                    onClick={() => openEvent(event.id)}
+                    onRegister={() => openEvent(event.id)}
+                  />
                 ))}
               </div>
             </div>

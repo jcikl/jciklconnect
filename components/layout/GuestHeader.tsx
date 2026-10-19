@@ -50,13 +50,14 @@ export const GuestHeader: React.FC<{
             <img src="/JCI Kuala Lumpur-transparent.png" alt="JCI Kuala Lumpur Logo" className="h-8 md:h-10 w-auto object-contain" />
           </Link>
 
-          <nav className="hidden md:flex space-x-8">
+          {/* Full nav needs ~910px in one line; below lg (1024px) the hamburger menu is used instead of wrapping. */}
+          <nav className="hidden lg:flex space-x-8">
             {navItems.map(item => (
               <Link
                 key={item.page}
                 to={item.page === 'home' ? '/' : `/${item.page}`}
                 onClick={() => handleNavigation(item.page)}
-                className={`no-underline font-medium transition-colors ${activePage === item.page ? 'text-jci-blue' : 'text-slate-600 hover:text-jci-blue'}`}
+                className={`no-underline font-medium whitespace-nowrap transition-colors ${activePage === item.page ? 'text-jci-blue' : 'text-slate-600 hover:text-jci-blue'}`}
               >
                 {item.label}
               </Link>
@@ -64,9 +65,9 @@ export const GuestHeader: React.FC<{
           </nav>
 
           <div className="flex items-center gap-3">
-            <Button onClick={onLogin} size="sm" className="h-10">Login / Join Now</Button>
+            <Button onClick={onLogin} size="sm" className="h-10 whitespace-nowrap">Login / Join Now</Button>
             <button
-              className="md:hidden w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200 transition-colors"
+              className="lg:hidden w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200 transition-colors"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               aria-label="Toggle navigation menu"
               aria-expanded={isMobileMenuOpen}
@@ -77,7 +78,7 @@ export const GuestHeader: React.FC<{
         </div>
       </header>
 
-      <div className={`md:hidden fixed top-16 left-0 right-0 z-40 overflow-hidden bg-white shadow-xl border-t border-slate-100 transition-all duration-300 ease-in-out ${isMobileMenuOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'}`}>
+      <div className={`lg:hidden fixed top-16 md:top-20 left-0 right-0 z-40 overflow-hidden bg-white shadow-xl border-t border-slate-100 transition-all duration-300 ease-in-out ${isMobileMenuOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'}`}>
         <nav className="px-4 py-3 space-y-1">
           {navItems.map(item => (
             <button
