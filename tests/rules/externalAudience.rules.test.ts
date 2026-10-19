@@ -112,6 +112,7 @@ const MEMBERS: Record<string, Doc> = {
   klMember: member('MEMBER', KL),
   klBoard: member('BOARD', KL),
   klAdmin: member('ADMIN', KL),
+  klGuest: member('GUEST', KL),
   aff1: member('AFFILIATE', SG, { affiliation: affiliation('active') }),
   affPending: member('AFFILIATE', SG, { affiliation: affiliation('pending_kl') }),
   chAdmin: member('CHAPTER_ADMIN', SG, { affiliation: affiliation('active') }),
@@ -281,6 +282,16 @@ describe.skipIf(!HOST)('firestore.rules — surveys / hobby clubs open to extern
       expect(await submit('aff1', 'counter', 2)).toBe(OK);
       bump('counter');
     });
+    it('L1: nobody can probe whether another user answered (missing ids of others are denied, not 404)', async () => {
+      expect(await getDoc('klMember', 'surveyResponses/counter_someoneElse')).toBe(DENIED);
+      expect(await getDoc('klMember', 'surveyResponses/klOnly_aff1')).toBe(DENIED);
+      // ids that merely end with the caller's uid
+      expect(await getDoc('klMember', 'surveyResponses/counter_xklMember')).toBe(DENIED);
+      expect(await getDoc('klMember', 'surveyResponses/counter_x_klMember')).toBe(DENIED);
+      expect(await getDoc('klMember', 'surveyResponses/klMember')).toBe(DENIED);
+      // own id still readable while missing
+      expect(await getDoc('klMember', 'surveyResponses/openActive_klMember')).toBe(404);
+    });
     it('the duplicate check cannot read someone else\'s existing response', async () => {
       expect(await getDoc('chAdmin', 'surveyResponses/counter_aff1')).toBe(DENIED);
     });
@@ -296,6 +307,40 @@ describe.skipIf(!HOST)('firestore.rules — surveys / hobby clubs open to extern
     it('an external cannot bump a survey it cannot read', async () => {
       expect(await submit('aff1', 'klOnly', 1)).toBe(DENIED);
       expect(await set('aff1', 'surveys/klOnly', { ...SURVEYS.klOnly, responsesCount: 1 })).toBe(DENIED);
+    });
+    // Review M3: the +1 is only allowed together with the caller's own new response, on an Active survey.
+    const countOnly = (uid: string, surveyId: string) =>
+      set(uid, `surveys/${surveyId}`, {
+        ...SURVEYS[surveyId],
+        responsesCount: (SURVEYS[surveyId].responsesCount as number) + 1,
+        updatedAt: '2026-10-20T00:00:00.000Z',
+      });
+    // Re-seed so a wrongly allowed write in one case cannot mask another case.
+    const reseed = async (...ids: string[]) => {
+      for (const id of ids) expect(await set('owner', `surveys/${id}`, SURVEYS[id])).toBe(OK);
+    };
+    it('M3: count +1 without creating a response is denied', async () => {
+      await reseed('counter', 'klOnly');
+      expect(await countOnly('chAdmin', 'counter')).toBe(DENIED);
+      expect(await countOnly('klMember', 'klOnly')).toBe(DENIED);
+    });
+    it('M3: a GUEST cannot bump the count without a response', async () => {
+      await reseed('openDraft', 'klOnly');
+      expect(await countOnly('klGuest', 'openDraft')).toBe(DENIED);
+      expect(await countOnly('klGuest', 'klOnly')).toBe(DENIED);
+    });
+    it('M3: submitting to a Draft survey is denied', async () => {
+      await reseed('openDraft');
+      expect(await submit('klMember', 'openDraft', 1)).toBe(DENIED);
+    });
+    it("M3: the response must be the caller's own id", async () => {
+      await reseed('counter');
+      expect(
+        await commit('chAdmin', [
+          ['surveyResponses/counter_someoneElse', response('chAdmin', 'counter')],
+          ['surveys/counter', { ...SURVEYS.counter, responsesCount: (SURVEYS.counter.responsesCount as number) + 1 }],
+        ]),
+      ).toBe(DENIED);
     });
     it('a non-board user still cannot edit a survey otherwise', async () => {
       expect(await set('klMember', 'surveys/counter', { ...SURVEYS.counter, title: 'Edited' })).toBe(DENIED);

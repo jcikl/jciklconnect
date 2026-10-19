@@ -906,14 +906,19 @@ service cloud.firestore {
                        (resource.data.openToExternals == true && resource.data.status == 'Active')));
       allow create, delete: if isBoard() || isAdmin();
       // Submitting a response (SurveysService.submitResponse) bumps responsesCount by exactly 1 in the same
-      // transaction: anyone who may read this survey may do that, and change nothing else but updatedAt.
+      // transaction: anyone who may read this survey may do that, and change nothing else but updatedAt —
+      // only while the survey is Active and only together with the caller's own new response
+      // (id {surveyId}_{uid}, created in this same write: absent before, present after).
       allow update: if isBoard() || isAdmin() ||
                       ((isInternalUser() ||
                         (isActiveExternal() &&
                          (request.auth.uid in resource.data.get('specificMemberIds', []) ||
                           (resource.data.get('openToExternals', false) == true && resource.data.get('status', '') == 'Active')))) &&
+                       resource.data.get('status', '') == 'Active' &&
                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['responsesCount', 'updatedAt']) &&
-                       request.resource.data.responsesCount == resource.data.get('responsesCount', 0) + 1);
+                       request.resource.data.responsesCount == resource.data.get('responsesCount', 0) + 1 &&
+                       !exists(/databases/$(database)/documents/surveyResponses/$(surveyId + '_' + request.auth.uid)) &&
+                       existsAfter(/databases/$(database)/documents/surveyResponses/$(surveyId + '_' + request.auth.uid)));
     }
     
     // Survey Responses collection
@@ -925,8 +930,12 @@ service cloud.firestore {
       }
       // resource.data valid for get; service-layer where(memberId == uid) handles list ownership
       // resource == null: submitResponse's duplicate check reads its own not-yet-existing id ({surveyId}_{uid}).
+      // Only the caller's own id (exact: everything after the first '_' is the uid; survey ids are auto-ids
+      // without '_'), so nobody can probe whether another member answered (404 vs 403).
       allow get: if isAuthenticated() &&
-                    (resource == null || resource.data.memberId == request.auth.uid || isBoard() || isAdmin());
+                    ((resource == null && responseId == responseId.split('_')[0] + '_' + request.auth.uid) ||
+                     (resource != null && resource.data.memberId == request.auth.uid) ||
+                     isBoard() || isAdmin());
       allow list: if isActiveMember() ||
                      (isActiveExternal() && resource.data.memberId == request.auth.uid);
       // FIX: added required field validation to prevent partial/malformed responses
@@ -1233,19 +1242,25 @@ service cloud.firestore {
     // Guest Registrations collection
     // FIX 22: allow update had no hasOnly whitelist — Board could overwrite any field including immutable registration data
     match /guestRegistrations/{registrationId} {
+      // The guest events page lists `projects` docs with status Active / Upcoming / Approved
+      // (EventsService LISTED_EVENT_STATUSES); guests may only register for one of those.
+      function guestEventIsListed() {
+        let eventPath = /databases/$(database)/documents/projects/$(request.resource.data.eventId);
+        return exists(eventPath) && get(eventPath).data.get('status', '') in ['Active', 'Upcoming', 'Approved'];
+      }
       allow read: if isBoard() || isAdmin();
       // FIX 5: allow create: if true had no field validation — bots could write arbitrary content
       // EventsService.registerGuestForEvent (signed-out guests) writes two docs in one batch with deterministic ids:
       //   {eventId}_{emailKey}       main doc: eventId, name, email, phone, registeredAt, status, organization?, notes?
       //   {eventId}_phone_{phoneKey} phone index doc: eventId, email, phone, status, _indexFor == 'phone'
       // Dedup: an existing id makes the set an update, which only board/admin may do — the whole batch is denied.
-      allow create: if (request.resource.data.keys().hasAll(['name', 'email', 'eventId', 'registeredAt', 'status'])
+      allow create: if guestEventIsListed() && ((request.resource.data.keys().hasAll(['name', 'email', 'eventId', 'registeredAt', 'status'])
                         && request.resource.data.keys().hasOnly(['name', 'email', 'phone', 'eventId', 'organization', 'notes', 'registeredAt', 'status'])
                         && request.resource.data.status == 'Pending')
                     || (request.resource.data.get('_indexFor', null) == 'phone'
                         && request.resource.data.keys().hasAll(['eventId', 'email', 'phone', 'status', '_indexFor'])
                         && request.resource.data.keys().hasOnly(['eventId', 'email', 'phone', 'status', '_indexFor'])
-                        && request.resource.data.status == 'Pending');
+                        && request.resource.data.status == 'Pending'));
       // Main doc: check-in / notes / cancel (cancelGuestRegistration writes status + cancelledAt).
       // Phone index doc: status only (cancelGuestRegistration marks it Cancelled).
       allow update: if (isBoard() || isAdmin()) &&
