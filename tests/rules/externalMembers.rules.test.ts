@@ -9,7 +9,7 @@
  * Run (needs Java 11+ and the firebase CLI):
  *   firebase emulators:exec --only firestore --project demo-jcikl-rules "npx vitest run tests/rules"
  */
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 
 const HOST = process.env.FIRESTORE_EMULATOR_HOST;
 const PROJECT = process.env.GCLOUD_PROJECT || 'demo-jcikl-rules';
@@ -120,6 +120,14 @@ const MEMBERS: Record<string, Doc> = {
   affOther: member('AFFILIATE', 'jcitokyo', { affiliation: { ...affiliation('active'), country: 'Japan' } }),
   chAdmin: member('CHAPTER_ADMIN', SG, { affiliation: affiliation('active') }),
   chAdminKl: member('CHAPTER_ADMIN', KL, { affiliation: affiliation('active') }),
+  // Review-fix fixtures
+  affBoard: member('AFFILIATE', SG, {
+    affiliation: affiliation('active'),
+    isCurrentBoardMember: true,
+    currentBoardPosition: 'Honorary Treasurer',
+  }),
+  inactiveBoard: member('INACTIVE', KL, { isCurrentBoardMember: true, currentBoardPosition: 'Secretary' }),
+  affSuspended: member('AFFILIATE', SG, { affiliation: affiliation('suspended') }),
 };
 
 const card = (memberId: string, international: boolean, extra: Doc = {}): Doc => ({
@@ -148,6 +156,11 @@ const OTHER_DOCS: Array<[string, Doc]> = [
   ['surveys/s1', { title: 'For aff1', status: 'Active', targetAudience: 'Specific Group', specificMemberIds: ['aff1'] }],
   ['surveys/s2', { title: 'KL only', status: 'Active', targetAudience: 'All Members', specificMemberIds: [] }],
   ['sisterChapters/jcicitysg', { name: 'JCI City Singapore', country: 'Singapore', isActive: true }],
+  ['transactions/tx1', { amount: 100, type: 'Income', date: '2026-10-01', bankAccountId: 'b1', loId: KL }],
+  // Events are stored in `projects` (eventRegistrationService writes doc(PROJECTS, eventId)).
+  ['projects/p1', { title: 'KL event', status: 'Upcoming', attendees: 2, registeredMembers: ['klMember', 'klBoard'] }],
+  ['hobbyClubs/h1', { name: 'Runners', memberIds: ['klMember'] }],
+  ['memberBenefits/b1', { title: 'Discount' }],
 ];
 
 describe.skipIf(!HOST)('firestore.rules — external members (emulator)', () => {
@@ -348,6 +361,136 @@ describe.skipIf(!HOST)('firestore.rules — external members (emulator)', () => 
       expect(await set('klBoard', 'members/klOptIn', { ...MEMBERS.klOptIn, role: 'CHAPTER_ADMIN' })).toBe(DENIED);
       expect(await set('klBoard', 'members/newChAdmin', member('CHAPTER_ADMIN', SG))).toBe(DENIED);
       expect(await set('klAdmin', 'members/newChAdmin', member('CHAPTER_ADMIN', SG))).toBe(OK);
+    });
+  });
+
+  // ── Adversarial review fixes ──────────────────────────────────────────────────────────────
+  describe('M1: board flags never elevate external or INACTIVE users', () => {
+    it('AFFILIATE with isCurrentBoardMember + Treasurer cannot read KL members or transactions', async () => {
+      expect(await getDoc('affBoard', 'members/klMember')).toBe(DENIED);
+      expect(await query('affBoard', 'members', [['loId', 'EQUAL', KL]])).toBe(DENIED);
+      expect(await getDoc('affBoard', 'transactions/tx1')).toBe(DENIED);
+      expect(await query('affBoard', 'transactions')).toBe(DENIED);
+    });
+    it('AFFILIATE board flag does not grant member editing', async () => {
+      expect(await set('affBoard', 'members/aff2', { ...MEMBERS.aff2, general: { name: 'Hijacked' } })).toBe(DENIED);
+    });
+    it('INACTIVE with a stale board flag cannot read members or transactions', async () => {
+      expect(await query('inactiveBoard', 'members', [['loId', 'EQUAL', KL]])).toBe(DENIED);
+      expect(await getDoc('inactiveBoard', 'transactions/tx1')).toBe(DENIED);
+    });
+    it('real BOARD keeps access', async () => {
+      expect(await getDoc('klBoard', 'transactions/tx1')).toBe(OK);
+      expect(await query('klBoard', 'members', [['loId', 'EQUAL', KL]])).toBe(OK);
+    });
+  });
+
+  describe('M2: externals may only add/remove their own uid on an event', () => {
+    const p1 = OTHER_DOCS.find(([path]) => path === 'projects/p1')![1];
+    const regs = p1.registeredMembers as string[];
+    it('cannot wipe or rewrite registeredMembers / attendees', async () => {
+      expect(await set('aff1', 'projects/p1', { ...p1, registeredMembers: [], attendees: 0 })).toBe(DENIED);
+      expect(await set('aff1', 'projects/p1', { ...p1, registeredMembers: [...regs, 'aff2'], attendees: 3 })).toBe(DENIED);
+      expect(await set('aff1', 'projects/p1', { ...p1, registeredMembers: [...regs, 'aff1'], attendees: 4 })).toBe(DENIED);
+      expect(await set('aff1', 'projects/p1', { ...p1, registeredMembers: ['aff1'], attendees: 1 })).toBe(DENIED);
+    });
+    it('can register (own uid, +1) and cancel (own uid, -1)', async () => {
+      const registered = { ...p1, registeredMembers: [...regs, 'aff1'], attendees: 3 };
+      expect(await set('aff1', 'projects/p1', registered)).toBe(OK);
+      expect(await set('aff1', 'projects/p1', { ...registered, registeredMembers: regs, attendees: 3 })).toBe(DENIED);
+      expect(await set('aff1', 'projects/p1', { ...registered, registeredMembers: regs, attendees: 2 })).toBe(OK);
+    });
+    it('the same tight check applies on /events', async () => {
+      const e1 = OTHER_DOCS.find(([path]) => path === 'events/e1')![1];
+      expect(await set('aff1', 'events/e1', { ...e1, registeredMembers: ['aff1'], attendees: 1 })).toBe(OK);
+      expect(await set('aff1', 'events/e1', { ...e1, registeredMembers: [], attendees: 5 })).toBe(DENIED);
+    });
+  });
+
+  describe('M3: non-admin BOARD cannot create or convert external members', () => {
+    beforeEach(async () => {
+      expect(await set('owner', 'members/klOptIn', MEMBERS.klOptIn)).toBe(OK);
+    });
+    it('cannot make a KL MEMBER an active AFFILIATE of SG', async () => {
+      const next = { ...MEMBERS.klOptIn, role: 'AFFILIATE', loId: SG, affiliation: affiliation('active') };
+      expect(await set('klBoard', 'members/klOptIn', next)).toBe(DENIED);
+    });
+    it('cannot create an active AFFILIATE', async () => {
+      expect(await set('klBoard', 'members/boardAff', member('AFFILIATE', SG, { affiliation: affiliation('active') }))).toBe(DENIED);
+    });
+    it('cannot move a KL MEMBER to another chapter or add affiliation', async () => {
+      expect(await set('klBoard', 'members/klOptIn', { ...MEMBERS.klOptIn, loId: SG })).toBe(DENIED);
+      expect(await set('klBoard', 'members/klOptIn', { ...MEMBERS.klOptIn, affiliation: affiliation('active') })).toBe(DENIED);
+    });
+    it('cannot create a KL doc in another chapter', async () => {
+      expect(await set('klBoard', 'members/boardSg', member('MEMBER', SG))).toBe(DENIED);
+    });
+    it('still edits and creates KL members normally', async () => {
+      expect(await set('klBoard', 'members/klOptIn', { ...MEMBERS.klOptIn, general: { name: 'Edited' } })).toBe(OK);
+      expect(await set('klBoard', 'members/boardKl', member('MEMBER', KL))).toBe(OK);
+      expect(await set('owner', 'members/klOptIn', MEMBERS.klOptIn)).toBe(OK); // restore
+    });
+    it('ADMIN can still create an active AFFILIATE', async () => {
+      expect(await set('klAdmin', 'members/adminAff', member('AFFILIATE', SG, { affiliation: affiliation('active') }))).toBe(OK);
+    });
+  });
+
+  describe('L1: pending / suspended externals get only their own docs', () => {
+    it('suspended affiliate cannot read events, hobby clubs, benefits or write feedback / email logs', async () => {
+      expect(await getDoc('affSuspended', 'events/e1')).toBe(DENIED);
+      expect(await getDoc('affSuspended', 'projects/p1')).toBe(DENIED);
+      expect(await getDoc('affSuspended', 'hobbyClubs/h1')).toBe(DENIED);
+      expect(await query('affSuspended', 'memberBenefits')).toBe(DENIED);
+      expect(
+        await set('affSuspended', 'eventFeedback/f1', { memberId: 'affSuspended', eventId: 'e1', rating: 5, submittedAt: 'x' }),
+      ).toBe(DENIED);
+      expect(await set('affSuspended', 'emailLogs/l1', { to: 'x@example.test' })).toBe(DENIED);
+    });
+    it('errorLogs stays open to any signed-in user (crash reports)', async () => {
+      expect(await set('affSuspended', 'errorLogs/err1', { message: 'crash' })).toBe(OK);
+    });
+    it('active affiliate keeps the whitelisted reads', async () => {
+      expect(await getDoc('aff1', 'hobbyClubs/h1')).toBe(OK);
+      expect(await query('aff1', 'memberBenefits')).toBe(OK);
+      expect(
+        await set('aff1', 'eventFeedback/f2', { memberId: 'aff1', eventId: 'e1', rating: 5, submittedAt: 'x' }),
+      ).toBe(OK);
+    });
+  });
+
+  describe('L2: external role ⇒ loId is not KL', () => {
+    it('ADMIN cannot create an external doc inside KL', async () => {
+      expect(await set('klAdmin', 'members/affInKl', member('AFFILIATE', KL, { affiliation: affiliation('active') }))).toBe(DENIED);
+      expect(await set('klAdmin', 'members/chInKl', member('CHAPTER_ADMIN', KL))).toBe(DENIED);
+    });
+    it('ADMIN cannot give a KL doc an external role while loId stays KL', async () => {
+      expect(await set('klAdmin', 'members/klOptIn', { ...MEMBERS.klOptIn, role: 'AFFILIATE' })).toBe(DENIED);
+    });
+    it('ADMIN can convert with a non-KL chapter', async () => {
+      const next = { ...MEMBERS.klOptIn, role: 'AFFILIATE', loId: SG, affiliation: affiliation('active') };
+      expect(await set('klAdmin', 'members/klOptIn', next)).toBe(OK);
+      expect(await set('owner', 'members/klOptIn', MEMBERS.klOptIn)).toBe(OK); // restore
+    });
+  });
+
+  describe('L6: chapter-admin audit fields must name the caller', () => {
+    beforeEach(async () => {
+      expect(await set('owner', 'members/aff2', MEMBERS.aff2)).toBe(OK);
+    });
+    const withAff = (extra: Doc, top: Doc = {}) => ({
+      ...MEMBERS.aff2,
+      ...top,
+      affiliation: { ...affiliation('suspended'), ...extra },
+    });
+    it('rejects forged statusUpdatedBy / chapterApprovedBy / updatedBy', async () => {
+      expect(await set('chAdmin', 'members/aff2', withAff({ statusUpdatedBy: 'klAdmin' }))).toBe(DENIED);
+      expect(await set('chAdmin', 'members/aff2', withAff({ chapterApprovedBy: 'klAdmin' }))).toBe(DENIED);
+      expect(await set('chAdmin', 'members/aff2', withAff({}, { updatedBy: 'klAdmin' }))).toBe(DENIED);
+    });
+    it('accepts audit fields equal to the caller', async () => {
+      const ok = withAff({ statusUpdatedBy: 'chAdmin', chapterApprovedBy: 'chAdmin', statusUpdatedAt: 'now' }, { updatedBy: 'chAdmin' });
+      expect(await set('chAdmin', 'members/aff2', ok)).toBe(OK);
+      expect(await set('owner', 'members/aff2', MEMBERS.aff2)).toBe(OK); // restore
     });
   });
 });
