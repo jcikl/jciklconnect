@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   MAX_PER_CALL, CHAPTER_MEMBER_CAP, isKlAdmin, isActiveChapterAdmin, emailSlotId, mmddFromDob, categoryForChapter,
   validateInvitees, resolveCreateScope, checkChapter, checkCap, buildExternalMemberDoc, cardFor,
-  checkStatusTransition, statusUpdates, withStatus, canManageMember,
+  checkStatusTransition, statusUpdates, withStatus, canManageMember, CAP_COUNTED_STATUSES, countsTowardCap,
 } from './externalAccounts.mjs';
 
 const SG = 'jcicitysg';
@@ -87,6 +87,13 @@ describe('chapter and cap checks', () => {
     expect(checkChapter(null)).toMatchObject({ ok: false, status: 404 });
     expect(checkChapter({ isActive: false })).toMatchObject({ ok: false, status: 409 });
     expect(checkChapter({ isActive: true })).toEqual({ ok: true });
+  });
+  it('M2: only active / suspended members count toward the cap (pending / rejected self-registrations do not)', () => {
+    expect([...CAP_COUNTED_STATUSES].sort()).toEqual(['active', 'suspended']);
+    expect(countsTowardCap(aff('active'))).toBe(true);
+    expect(countsTowardCap(aff('suspended'))).toBe(true);
+    for (const s of ['pending_chapter', 'pending_kl', 'rejected', 'expired']) expect(countsTowardCap(aff(s))).toBe(false);
+    expect(countsTowardCap({ role: 'MEMBER', loId: SG })).toBe(false);
   });
   it('cap of 100 per chapter', () => {
     expect(checkCap(CHAPTER_MEMBER_CAP - 2, 2).ok).toBe(true);

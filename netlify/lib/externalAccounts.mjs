@@ -94,7 +94,18 @@ export function checkChapter(chapter) {
   return { ok: true };
 }
 
-/** Per-chapter cap: existing member docs of the chapter + new ones. */
+/**
+ * Statuses that count toward the per-chapter cap (review M2). Anyone can self-register a pending_chapter doc,
+ * so pending_* / rejected / expired docs must not use up the chapter's places.
+ */
+export const CAP_COUNTED_STATUSES = ['active', 'suspended'];
+
+/** Whether a member doc counts toward its chapter's cap (external role with an active / suspended affiliation). */
+export function countsTowardCap(m) {
+  return !!m && EXTERNAL_ROLES.includes(m.role) && CAP_COUNTED_STATUSES.includes(m.affiliation?.status);
+}
+
+/** Per-chapter cap: counted members of the chapter (CAP_COUNTED_STATUSES) + new ones. */
 export function checkCap(existingCount, adding) {
   return existingCount + adding <= CHAPTER_MEMBER_CAP
     ? { ok: true }

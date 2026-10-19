@@ -12,7 +12,7 @@ import { db, auth, hasAdminCredentials } from '../lib/firebaseAdmin.mjs';
 import { sendPasswordSetupEmail, memberEmail } from '../lib/memberAuth.mjs';
 import {
   validateInvitees, resolveCreateScope, checkChapter, checkCap, buildExternalMemberDoc, buildEmailSlot,
-  emailSlotId, cardFor, checkStatusTransition, statusUpdates, withStatus, canManageMember,
+  emailSlotId, cardFor, checkStatusTransition, statusUpdates, withStatus, canManageMember, CAP_COUNTED_STATUSES,
 } from '../lib/externalAccounts.mjs';
 
 const ALLOWED_ORIGINS = ['https://app.jcikl.cc', 'http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'];
@@ -113,7 +113,11 @@ export default async (req) => {
       const chapterOk = checkChapter(chapter);
       if (!chapterOk.ok) return json({ error: chapterOk.error }, chapterOk.status);
 
-      const existing = (await db.collection('members').where('loId', '==', scope.loId).count().get()).data().count;
+      // Only active / suspended members use up a place (M2): self-registered pending / rejected docs do not.
+      const existing = (await db.collection('members')
+        .where('loId', '==', scope.loId)
+        .where('affiliation.status', 'in', CAP_COUNTED_STATUSES)
+        .count().get()).data().count;
       const cap = checkCap(existing, valid.invitees.length);
       if (!cap.ok) return json({ error: cap.error }, cap.status);
 
