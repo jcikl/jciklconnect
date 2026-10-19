@@ -2,6 +2,7 @@
 // No Firebase imports here so everything can be unit-tested (externalAccounts.test.ts).
 // Caller role / status / loId always come from the caller's Firestore member doc, never the request body.
 import { KL_LO_ID, shouldHaveCard, buildMemberCard } from '../../utils/memberCard.mjs';
+import { categoryForChapter } from '../../utils/affiliation.mjs';
 
 export const MAX_PER_CALL = 20;
 export const CHAPTER_MEMBER_CAP = 100;
@@ -33,14 +34,8 @@ export function mmddFromDob(dob) {
   return typeof dob === 'string' && DOB_RE.test(dob) ? dob.slice(5, 7) + dob.slice(8, 10) : null;
 }
 
-/** sisterChapters.type (array) → members.affiliation.category. */
-export function categoryForChapter(chapter) {
-  const types = Array.isArray(chapter?.type) ? chapter.type : [];
-  if (types.includes('sister_lo')) return 'sister';
-  if (types.includes('apicc')) return 'apicc';
-  if (types.includes('global')) return 'global';
-  return 'sister';
-}
+/** sisterChapters.type (array) → members.affiliation.category (shared with the app's self-registration). */
+export { categoryForChapter };
 
 /**
  * Validate the invitee list: 1–MAX_PER_CALL rows of { name, email, dob? }.

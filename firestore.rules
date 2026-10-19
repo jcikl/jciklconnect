@@ -201,6 +201,60 @@ service cloud.firestore {
       return isActiveChapterAdmin() && resource.data.loId == getMyLoId();
     }
 
+    // ── Self sign-up (members create) ─────────────────────────────────────────────────────────
+    // A brand-new user writing their own doc (uid == doc id, doc does not exist yet).
+    function isNewSelfSignUp(memberId) {
+      return request.auth.uid == memberId &&
+             !exists(/databases/$(database)/documents/members/$(memberId));
+    }
+
+    // Keys a self sign-up may write (GUEST: hooks/useAuth.tsx signUp, R-028).
+    function selfSignUpKeys() {
+      return ['email', 'name', 'displayName', 'photoURL', 'photoUrl',
+              'createdAt', 'role', 'status', 'loId',
+              'general', 'contact', 'membership',
+              'others', 'skills', 'surveyAnswers', 'personaType', 'tendencyTags',
+              'tier', 'points', 'churnRisk', 'attendanceRate', 'duesStatus', 'badges', 'jciCareer'];
+    }
+
+    // System-managed fields may only carry the sign-up defaults, and jciCareer may only hold joinDate,
+    // so a self-registered user cannot grant itself points, badges or a board position
+    // (isCurrentBoardMember / currentBoardPosition drive isBoard()). Name and email are required.
+    function selfSignUpDefaultsOk() {
+      let d = request.resource.data;
+      return d.get('tier', 'Bronze') == 'Bronze' &&
+             d.get('points', 0) == 0 &&
+             d.get('churnRisk', 'Low') == 'Low' &&
+             d.get('attendanceRate', 100) == 100 &&
+             d.get('duesStatus', 'Pending') == 'Pending' &&
+             d.get('badges', []).size() == 0 &&
+             d.get('jciCareer', {}).keys().hasOnly(['joinDate']) &&
+             (d.get('name', null) is string || d.get('general', {}).get('name', null) is string) &&
+             (d.get('email', null) is string || d.get('contact', {}).get('email', null) is string);
+    }
+
+    // Phase 1 WP-3: an external person registers themself for an ACTIVE sister chapter as an AFFILIATE
+    // waiting for their chapter admin (pending_chapter). Never CHAPTER_ADMIN, never KL, never active.
+    // affiliation holds exactly category / country / status; country must equal the chapter's country.
+    function isExternalSelfRegistration(memberId) {
+      let d = request.resource.data;
+      return isNewSelfSignUp(memberId) &&
+             d.role == 'AFFILIATE' &&
+             d.get('loId', null) is string &&
+             d.loId != '' &&
+             d.loId != klLoId() &&
+             exists(/databases/$(database)/documents/sisterChapters/$(d.loId)) &&
+             get(/databases/$(database)/documents/sisterChapters/$(d.loId)).data.get('isActive', false) == true &&
+             d.get('affiliation', null) is map &&
+             d.affiliation.keys().hasOnly(['category', 'country', 'status']) &&
+             d.affiliation.keys().hasAll(['category', 'country', 'status']) &&
+             d.affiliation.status == 'pending_chapter' &&
+             d.affiliation.category in ['sister', 'apicc', 'global'] &&
+             d.affiliation.country == get(/databases/$(database)/documents/sisterChapters/$(d.loId)).data.get('country', null) &&
+             d.keys().hasOnly(selfSignUpKeys().concat(['affiliation'])) &&
+             selfSignUpDefaultsOk();
+    }
+
     // Users collection (FCM tokens)
     match /users/{userId} {
       allow read, write: if isAuthenticated() && request.auth.uid == userId;
@@ -251,39 +305,22 @@ service cloud.firestore {
       allow create: if isAuthenticated() &&
                        request.resource.data.role is string &&
                        externalRoleHasChapter() &&
-                       // Only KL admins create external members (AFFILIATE / CHAPTER_ADMIN) or ADMIN /
-                       // SUPER_ADMIN docs (R-053, same guard as update). Non-admin creators (BOARD, self
-                       // sign-up) create KL docs only: loId 'jcikl' (or absent → KL) and no affiliation.
-                       (isAdmin() ||
-                        (!(request.resource.data.role in ['ADMIN', 'SUPER_ADMIN', 'AFFILIATE', 'CHAPTER_ADMIN']) &&
-                         request.resource.data.get('loId', klLoId()) == klLoId() &&
-                         !request.resource.data.keys().hasAny(['affiliation']))) &&
-                       (isBoard() ||
-                        (request.auth.uid == memberId &&
-                         !exists(/databases/$(database)/documents/members/$(memberId)) &&
-                         request.resource.data.get('role', 'GUEST') == 'GUEST' &&
-                         request.resource.data.keys().hasOnly([
-                           'email', 'name', 'displayName', 'photoURL', 'photoUrl',
-                           'createdAt', 'role', 'status', 'loId',
-                           'general', 'contact', 'membership',
-                           // R-028: fields the sign-up form writes (hooks/useAuth.tsx signUp)
-                           'others', 'skills', 'surveyAnswers', 'personaType', 'tendencyTags',
-                           'tier', 'points', 'churnRisk', 'attendanceRate', 'duesStatus', 'badges', 'jciCareer'
-                         ]) &&
-                         // System-managed fields may only carry the sign-up defaults, and jciCareer may only
-                         // hold joinDate, so a self-registered GUEST cannot grant itself points, badges or a
-                         // board position (isCurrentBoardMember / currentBoardPosition drive isBoard()).
-                         request.resource.data.get('tier', 'Bronze') == 'Bronze' &&
-                         request.resource.data.get('points', 0) == 0 &&
-                         request.resource.data.get('churnRisk', 'Low') == 'Low' &&
-                         request.resource.data.get('attendanceRate', 100) == 100 &&
-                         request.resource.data.get('duesStatus', 'Pending') == 'Pending' &&
-                         request.resource.data.get('badges', []).size() == 0 &&
-                         request.resource.data.get('jciCareer', {}).keys().hasOnly(['joinDate']) &&
-                         (request.resource.data.name is string ||
-                          request.resource.data.get('general', {}).get('name', null) is string) &&
-                         (request.resource.data.email is string ||
-                          request.resource.data.get('contact', {}).get('email', null) is string)));
+                       (
+                        // Only KL admins create external members (AFFILIATE / CHAPTER_ADMIN) or ADMIN /
+                        // SUPER_ADMIN docs (R-053, same guard as update). Non-admin creators (BOARD, self
+                        // sign-up) create KL docs only: loId 'jcikl' (or absent → KL) and no affiliation.
+                        ((isAdmin() ||
+                          (!(request.resource.data.role in ['ADMIN', 'SUPER_ADMIN', 'AFFILIATE', 'CHAPTER_ADMIN']) &&
+                           request.resource.data.get('loId', klLoId()) == klLoId() &&
+                           !request.resource.data.keys().hasAny(['affiliation']))) &&
+                         (isBoard() ||
+                          (isNewSelfSignUp(memberId) &&
+                           request.resource.data.get('role', 'GUEST') == 'GUEST' &&
+                           request.resource.data.keys().hasOnly(selfSignUpKeys()) &&
+                           selfSignUpDefaultsOk()))) ||
+                        // Phase 1 WP-3: external self-registration (hooks/useAuth.tsx signUpExternal).
+                        isExternalSelfRegistration(memberId)
+                       );
 
       // Self-write: members may update any profile field EXCEPT the locked list below.
       // INACTIVE users are blocked from self-write at the rules layer (not just service layer).
@@ -1618,10 +1655,11 @@ service cloud.firestore {
       allow read: if isInternalUser();
       allow create, update, delete: if isAdmin();
     }
-    // Sister chapters — any authenticated member can read; only SUPER_ADMIN can write
+    // Sister chapters — public read; only SUPER_ADMIN can write
     match /sisterChapters/{chapterId} {
-      // Active external users read the chapter list too (names/countries/logos — no PII).
-      allow read: if isActiveMember() || isActiveExternal();
+      // Public (owner decision 5): the external self-registration form picks the chapter from this list
+      // before the user has an account. Chapter docs hold names / countries / logos only — no PII.
+      allow read: if true;
       allow create, update, delete: if getUserRole() == 'SUPER_ADMIN';
     }
 

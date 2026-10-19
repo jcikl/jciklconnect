@@ -18,7 +18,7 @@ import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
-import { COLLECTIONS, DEFAULT_LO_ID } from '../config/constants';
+import { COLLECTIONS } from '../config/constants';
 import { Member, UserRole, MemberTier } from '../types';
 import { MOCK_DEV_ADMIN } from '../services/mockData';
 import { setDevMode, isDevMode as checkDevMode } from '../utils/devMode';
@@ -27,6 +27,7 @@ import { MembersService } from '../services/membersService';
 import { BoardManagementService } from '../services/boardManagementService';
 import { errorLoggingService } from '../services/errorLoggingService';
 import { retryOnPermissionDenied } from '../utils/retryOnPermissionDenied';
+import { buildSelfSignUpMember, buildExternalSignUpMember, type ExternalSignUpInput } from '../utils/signUpPayload';
 
 interface AuthContextType {
   user: User | null;
@@ -37,6 +38,7 @@ interface AuthContextType {
   simulatedMemberId: string | null;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, name: string, additionalData?: Record<string, any>) => Promise<void>;
+  signUpExternal: (password: string, input: ExternalSignUpInput) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -486,42 +488,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // 3. Create or Update member document
     // Self-registrations (no pre-imported profile) start as GUEST pending admin review
     const isNewSelfRegistration = !existingProfile;
-    const newMember = {
-      general: {
-        name,
-        avatarUrl: existingProfile?.general?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0097D7&color=fff`,
-        fullName: existingProfile?.general?.fullName || additionalData?.general?.fullName,
-        gender: existingProfile?.general?.gender || additionalData?.general?.gender,
-        dob: existingProfile?.general?.dob || additionalData?.general?.dob,
-        nationality: existingProfile?.general?.nationality || additionalData?.general?.nationality || 'Malaysia',
-      } as any,
-      contact: { email, phone: existingProfile?.contact?.phone || additionalData?.contact?.phone } as any,
-      others: {
-        hobbies: existingProfile?.others?.hobbies || (Array.isArray(additionalData?.selectedHobbies) ? additionalData.selectedHobbies : (Array.isArray(additionalData?.others?.hobbies) ? additionalData.others?.hobbies : [])),
-        bio: existingProfile?.others?.bio || additionalData?.others?.bio,
-      } as any,
-      role: existingProfile?.role || UserRole.GUEST,
-      tier: existingProfile?.tier || ('Bronze' as any),
-      points: existingProfile?.points || 0,
-      jciCareer: { joinDate: existingProfile?.jciCareer?.joinDate || new Date().toISOString().split('T')[0] } as any,
-      skills: existingProfile?.skills || additionalData?.skills || [],
-      churnRisk: existingProfile?.churnRisk || 'Low',
-      attendanceRate: existingProfile?.attendanceRate || 100,
-      duesStatus: existingProfile?.duesStatus || 'Pending',
-      badges: existingProfile?.badges || [],
-      // Persona & survey data from registration form
-      ...(additionalData?.surveyAnswers ? { surveyAnswers: additionalData.surveyAnswers } : {}),
-      ...(additionalData?.personaType ? { personaType: additionalData.personaType } : {}),
-      ...(additionalData?.tendencyTags ? { tendencyTags: additionalData.tendencyTags } : {}),
-      // Carry over any other imported data if matched
-      ...(existingProfile || {})
-    } as unknown as Partial<Member>;
-
-    // Strip undefined fields — Firestore rejects them
-    const cleanMember = Object.fromEntries(
-      Object.entries(newMember).filter(([, v]) => v !== undefined)
-    );
-    if (!cleanMember.loId) cleanMember.loId = DEFAULT_LO_ID;
+    // Payload builder (utils/signUpPayload.ts): strips undefined fields and defaults loId to KL.
+    const cleanMember = buildSelfSignUpMember(name, email, additionalData, existingProfile);
 
     // Save to the new UID (this links the Firebase Auth user to the profile data)
     await setDoc(doc(db, COLLECTIONS.MEMBERS, userCredential!.user.uid), cleanMember);
@@ -542,9 +510,43 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Update local state — reset the sign-up guard AFTER state is committed so
     // onAuthStateChanged never sees isSigningUpRef=false with member still null.
     setUser(userCredential!.user);
-    setMember({ id: userCredential!.user.uid, ...newMember } as Member);
+    setMember({ id: userCredential!.user.uid, ...cleanMember } as Member);
     isSigningUpRef.current = false;
   }, [applyAuthPersistence, isDevMode]);
+
+  /**
+   * External self-registration (Phase 1 WP-3): creates the Auth user and an AFFILIATE member doc for an
+   * active sister chapter with affiliation.status 'pending_chapter' (firestore.rules isExternalSelfRegistration).
+   * The person then sees ExternalAccessNotice until their chapter admin and JCI KL approve.
+   * No pre-imported-profile merge and no orphan-account retry (unlike signUp): an existing email is refused.
+   */
+  const signUpExternal = useCallback(async (password: string, input: ExternalSignUpInput) => {
+    if (checkDevMode()) throw new Error('External registration is not available in developer mode');
+    await applyAuthPersistence();
+    isSigningUpRef.current = true;
+    let userCredential;
+    try {
+      userCredential = await createUserWithEmailAndPassword(auth, input.email, password);
+    } catch (err) {
+      isSigningUpRef.current = false;
+      throw err;
+    }
+    const memberDoc = buildExternalSignUpMember(input);
+    try {
+      await updateProfile(userCredential.user, { displayName: input.name });
+      await setDoc(doc(db, COLLECTIONS.MEMBERS, userCredential.user.uid), memberDoc);
+    } catch (err) {
+      // Do not leave an Auth account without a profile behind.
+      try { await userCredential.user.delete(); } catch (e) {
+        errorLoggingService.logError(e, { action: 'signup-external-rollback-auth' });
+      }
+      isSigningUpRef.current = false;
+      throw err;
+    }
+    setUser(userCredential.user);
+    setMember({ id: userCredential.user.uid, ...memberDoc } as unknown as Member);
+    isSigningUpRef.current = false;
+  }, [applyAuthPersistence]);
 
   const signInWithGoogle = useCallback(async () => {
     await applyAuthPersistence();
@@ -752,6 +754,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     simulatedMemberId,
     signIn,
     signUp,
+    signUpExternal,
     signInWithGoogle,
     signOut,
     resetPassword,
@@ -761,7 +764,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     authError,
   }), [
     user, member, loading, isDevMode, simulatedRole, simulatedMemberId, authError,
-    signIn, signUp, signInWithGoogle, signOut, resetPassword, updateMemberProfile, simulateRole, simulateAsMember,
+    signIn, signUp, signUpExternal, signInWithGoogle, signOut, resetPassword, updateMemberProfile, simulateRole, simulateAsMember,
   ]);
 
   return (

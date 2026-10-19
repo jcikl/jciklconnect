@@ -51,7 +51,7 @@ describe('external access whitelist', () => {
     expect(isViewAllowedForRole(UserRole.AFFILIATE, 'active', 'MY_CHAPTER')).toBe(false);
   });
 
-  it.each(['pending_chapter', 'pending_kl', 'suspended', 'expired', undefined] as const)(
+  it.each(['pending_chapter', 'pending_kl', 'suspended', 'expired', 'rejected', undefined] as const)(
     'externals with status %s may only open their own profile',
     status => {
       for (const role of EXTERNAL_ROLES) {

@@ -64,6 +64,8 @@ export const getExternalStatusMessage = (status?: AffiliationStatus | null): { t
       return { title: 'Your membership is suspended', description: 'Please contact your chapter administrator or JCI KL for more information.' };
     case 'expired':
       return { title: 'Your membership has expired', description: 'Please contact your chapter administrator to renew your affiliation.' };
+    case 'rejected':
+      return { title: 'Your request was not approved', description: 'Your request to join JCI KL Connect was declined. Please contact your chapter administrator if you think this is a mistake.' };
     case 'pending_kl':
       return { title: 'Your membership is pending approval', description: 'Your chapter has approved your request. JCI KL is reviewing it and you will get access once it is approved.' };
     default:
