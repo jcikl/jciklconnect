@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { getBenefitEligibility, type BenefitViewer, type BenefitTargetable } from './benefitEligibility';
 
 const kl: BenefitViewer = { isKl: true, role: 'MEMBER', tier: 'Gold', country: 'Malaysia' };
-const admin: BenefitViewer = { isKl: true, role: 'ADMIN', country: 'Malaysia' };
 const sg: BenefitViewer = { isKl: false, role: 'AFFILIATE', category: 'sister', country: 'Singapore' };
 const apicc: BenefitViewer = { isKl: false, role: 'AFFILIATE', category: 'apicc', country: 'Thailand' };
 const glob: BenefitViewer = { isKl: false, role: 'CHAPTER_ADMIN', category: 'global', country: 'Japan' };
@@ -37,15 +36,10 @@ const rows: Row[] = [
   ['country list multi', item({ audiences: ['sister', 'apicc'], countries: ['Singapore', 'Thailand'] }), apicc, true],
   ['country set, external country missing', item({ audiences: ['sister'], countries: ['Singapore'] }), { isKl: false, category: 'sister' }, 'Not available in your country'],
   ['audience checked before country', item({ audiences: ['kl'], countries: ['Singapore'] }), sg, 'JCI KL members only'],
-  // role / tier
-  ['role match', item({ roles: ['MEMBER', 'BOARD'] }), kl, true],
-  ['role mismatch', item({ roles: ['BOARD'] }), kl, 'Not available for your role'],
-  ['admin bypasses role', item({ roles: ['BOARD'] }), admin, true],
-  ['legacy membership-type roles ignored', item({ roles: ['official member', 'probation member'] }), kl, true],
-  ['tier match', item({ tiers: ['Gold'] }), kl, true],
-  ['tier mismatch', item({ tiers: ['Platinum'] }), kl, 'Not available for your tier'],
-  ['tier required, viewer has none', item({ tiers: ['Gold'] }), { isKl: true, role: 'MEMBER' }, 'Not available for your tier'],
-  ['role mismatch external', item({ audiences: ['sister'], roles: ['MEMBER'] }), sg, 'Not available for your role'],
+  // roles / tiers are not enforced
+  ['roles ignored', item({ roles: ['BOARD'] }), kl, true],
+  ['tiers ignored', item({ tiers: ['Platinum'] }), kl, true],
+  ['roles ignored for external', item({ audiences: ['sister'], roles: ['MEMBER'] }), sg, true],
 ];
 
 describe('getBenefitEligibility', () => {
