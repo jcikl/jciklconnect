@@ -24,10 +24,10 @@ const EXTERNAL_COMMON_VIEWS: readonly ViewType[] = [
   'MEMBERS',
 ];
 
-/** Active externals, per role. CHAPTER_ADMIN gets its own entry (e.g. a chapter-management view in Phase 1). */
+/** Active externals, per role. CHAPTER_ADMIN also gets MY_CHAPTER (approvals / members / invite of own chapter). */
 export const EXTERNAL_ALLOWED_VIEWS: Record<ExternalRole, readonly ViewType[]> = {
   [UserRole.AFFILIATE]: EXTERNAL_COMMON_VIEWS,
-  [UserRole.CHAPTER_ADMIN]: EXTERNAL_COMMON_VIEWS,
+  [UserRole.CHAPTER_ADMIN]: [...EXTERNAL_COMMON_VIEWS, 'MY_CHAPTER'],
 };
 
 /** Externals whose affiliation is not `active` (pending / suspended / expired): own profile only. */
@@ -64,6 +64,8 @@ export const getExternalStatusMessage = (status?: AffiliationStatus | null): { t
       return { title: 'Your membership is suspended', description: 'Please contact your chapter administrator or JCI KL for more information.' };
     case 'expired':
       return { title: 'Your membership has expired', description: 'Please contact your chapter administrator to renew your affiliation.' };
+    case 'rejected':
+      return { title: 'Your request was not approved', description: 'Your request to join JCI KL Connect was declined. Please contact your chapter administrator if you think this is a mistake.' };
     case 'pending_kl':
       return { title: 'Your membership is pending approval', description: 'Your chapter has approved your request. JCI KL is reviewing it and you will get access once it is approved.' };
     default:

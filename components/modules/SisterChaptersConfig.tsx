@@ -1,27 +1,43 @@
 import React, { useState, useCallback } from 'react';
-import { Plus, Pencil, Trash2, Globe, ChevronDown, UserPlus, User } from 'lucide-react';
+import { Plus, Pencil, Trash2, Globe, ChevronDown, UserPlus, User, ShieldCheck } from 'lucide-react';
 import { Button, Modal, useToast, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
 import type { ConfirmState } from '../ui/Common';
 import { Input } from '../ui/Form';
 import { useSisterChapters } from '../../hooks/useSisterChapters';
+import { useExternalAccounts } from '../../hooks/useExternalAccounts';
+import { usePendingKlApprovals } from '../../hooks/useChapterMembers';
 import { SisterChaptersService } from '../../services/sisterChaptersService';
 import { MembersService } from '../../services/membersService';
+import type { ExternalCreateResponse } from '../../services/externalAccountsService';
 import type { SisterChapter, SisterChapterType } from '../../types/sisterChapter';
 import { SISTER_CHAPTER_TYPE_LABELS } from '../../types/sisterChapter';
 import type { Member } from '../../types';
-import { UserRole } from '../../types';
 
 const TYPE_OPTIONS: { value: SisterChapterType; label: string; desc: string }[] = [
   { value: 'sister_lo', label: 'Sister Chapter',                               desc: 'Peer local organization in another country' },
   { value: 'apicc',     label: 'Asia Pacific International City Council',      desc: 'APICC member city council' },
+  { value: 'global',    label: 'Global JCI Chapter',                           desc: 'Any other JCI local organization' },
 ];
+
+/** One-line summary of an external-accounts create call (the response carries no emails). */
+function describeCreateResult(res: ExternalCreateResponse): { text: string; ok: boolean } {
+  const r = res.results[0];
+  if (!r) return { text: 'Nothing was created', ok: false };
+  if (r.status === 'created') {
+    return r.emailSent === false
+      ? { text: 'Account created, but the password setup email failed. Use "Resend invite" later.', ok: true }
+      : { text: 'Account created. A password setup email was sent.', ok: true };
+  }
+  return { text: r.reason ? `Not created: ${r.reason}` : 'Not created', ok: false };
+}
 
 const EMPTY: Omit<SisterChapter, 'createdAt' | 'updatedAt'> = {
   id: '', name: '', country: '', type: ['sister_lo'], flagEmoji: '', logoUrl: '',
   partnerSince: '', website: '', isActive: true,
 };
 
-const MEMBER_EMPTY = { name: '', email: '', companyName: '', position: '' };
+const MEMBER_EMPTY = { name: '', email: '', dob: '' };
+type AccountMode = 'chapterAdmin' | 'invite';
 
 const Toggle: React.FC<{ checked: boolean; onChange: (v: boolean) => void }> = ({ checked, onChange }) => (
   <button
@@ -51,8 +67,30 @@ export const SisterChaptersConfig: React.FC = () => {
   const [chapterMembers, setChapterMembers] = useState<Record<string, Member[]>>({});
   const [memberLoading, setMemberLoading] = useState<Record<string, boolean>>({});
   const [memberModalChapterId, setMemberModalChapterId] = useState<string | null>(null);
+  const [accountMode, setAccountMode] = useState<AccountMode>('invite');
   const [memberForm, setMemberForm] = useState(MEMBER_EMPTY);
-  const [savingMember, setSavingMember] = useState(false);
+  const { busy: savingMember, createChapterAdmins, inviteMembers } = useExternalAccounts();
+
+  // KL approval queue (affiliation.status == 'pending_kl', all chapters). Status changes go through the
+  // external-accounts function so the member card follows.
+  const approvals = usePendingKlApprovals(true);
+  const decide = async (m: Member, status: 'active' | 'rejected') => {
+    try {
+      await approvals.setStatus(m.id, status);
+      showToast(status === 'active' ? 'Approved — the member now has access' : 'Request rejected', 'success');
+      if (chapterMembers[m.loId ?? '']) loadMembers(m.loId as string);
+    } catch (err: any) {
+      showToast(err?.message ?? 'Could not update status', 'error');
+    }
+  };
+  const confirmReject = (m: Member) => setConfirmState({
+    open: true,
+    title: 'Reject request',
+    message: `Reject the request from ${m.general?.name ?? 'this person'}? The record is kept with status "rejected".`,
+    confirmLabel: 'Reject',
+    variant: 'danger',
+    onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await decide(m, 'rejected'); },
+  });
 
   // ── Chapter CRUD ──────────────────────────────────────────────
   const openNew = () => { setForm(EMPTY); setEditingId(null); setModalOpen(true); };
@@ -145,43 +183,40 @@ export const SisterChaptersConfig: React.FC = () => {
     if (!chapterMembers[ch.id]) loadMembers(ch.id);
   };
 
-  const openAddMember = (chapterId: string) => {
+  const openAddAccount = (chapterId: string, mode: AccountMode) => {
     setMemberForm(MEMBER_EMPTY);
+    setAccountMode(mode);
     setMemberModalChapterId(chapterId);
   };
 
   const patchMember = (key: keyof typeof memberForm, value: string) =>
     setMemberForm(prev => ({ ...prev, [key]: value }));
 
-  const handleAddMember = async () => {
+  // Accounts are created server-side (netlify/functions/external-accounts): Auth user + member doc
+  // (AFFILIATE / CHAPTER_ADMIN, active) + email slot + card, then the password setup email.
+  const handleAddAccount = async () => {
     if (!memberModalChapterId) return;
     if (!memberForm.name.trim() || !memberForm.email.trim()) {
       showToast('Name and email are required', 'error');
       return;
     }
-    setSavingMember(true);
     const chapterId = memberModalChapterId;
+    const invitee = {
+      name: memberForm.name.trim(),
+      email: memberForm.email.trim(),
+      ...(memberForm.dob ? { dob: memberForm.dob } : {}),
+    };
     try {
-      await MembersService.createMember({
-        loId: chapterId,
-        name: memberForm.name.trim(),
-        email: memberForm.email.trim(),
-        companyName: memberForm.companyName.trim() || undefined,
-        position: memberForm.position.trim() || undefined,
-        role: UserRole.MEMBER,
-        points: 0,
-        joinDate: new Date().toISOString().split('T')[0],
-        badges: [],
-        whatsappGroup: false,
-        tshirtStatus: 'NA',
-      } as any);
-      showToast('Member added', 'success');
+      const res = accountMode === 'chapterAdmin'
+        ? await createChapterAdmins(chapterId, [invitee])
+        : await inviteMembers([invitee], chapterId);
+      const { text, ok } = describeCreateResult(res);
+      showToast(text, ok ? 'success' : 'error');
+      if (!ok) return;
       setMemberModalChapterId(null);
       await loadMembers(chapterId);
     } catch (err: any) {
-      showToast(err?.message ?? 'Failed to add member', 'error');
-    } finally {
-      setSavingMember(false);
+      showToast(err?.message ?? 'Failed to create account', 'error');
     }
   };
 
@@ -216,6 +251,38 @@ export const SisterChaptersConfig: React.FC = () => {
       <div>
         <h3 className="text-sm font-semibold text-slate-900">Global Relations</h3>
         <p className="text-xs text-slate-500 mt-0.5">Sister chapters and APICC city councils. Members from these organizations appear in the International Network tab.</p>
+      </div>
+
+      {/* ── Approvals: approved by their chapter, waiting for JCI KL ── */}
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Approvals{approvals.members.length > 0 ? ` (${approvals.members.length})` : ''}</p>
+          <button onClick={approvals.reload} className="text-xs text-jci-blue hover:underline">Refresh</button>
+        </div>
+        {approvals.loading ? (
+          <p className="text-xs text-slate-400 py-2 text-center">Loading…</p>
+        ) : approvals.error ? (
+          <p className="text-xs text-red-500 py-2 text-center">{approvals.error}</p>
+        ) : approvals.members.length === 0 ? (
+          <p className="text-xs text-slate-400 py-2 text-center">No requests waiting for JCI KL</p>
+        ) : (
+          approvals.members.map(m => {
+            const ch = chapters.find(c => c.id === m.loId);
+            const busy = approvals.busyId === m.id;
+            return (
+              <div key={m.id} className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-lg border border-slate-100 dark:border-slate-700 px-3 py-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">{m.general?.name ?? '—'}</p>
+                  <p className="text-[10px] text-slate-400 truncate">{[ch?.name ?? m.loId, m.contact?.email].filter(Boolean).join(' · ')}</p>
+                </div>
+                <div className="flex gap-1.5 shrink-0">
+                  <Button size="sm" variant="success" disabled={busy} onClick={() => decide(m, 'active')}>Approve</Button>
+                  <Button size="sm" variant="outline" disabled={busy} onClick={() => confirmReject(m)}>Reject</Button>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
 
       <div className="space-y-2">
@@ -317,14 +384,28 @@ export const SisterChaptersConfig: React.FC = () => {
                     ))
                   )}
 
-                  {/* Add member row */}
-                  <button
-                    onClick={() => openAddMember(ch.id)}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-slate-300 hover:border-jci-blue hover:bg-blue-50/50 text-slate-400 hover:text-jci-blue transition-colors"
-                  >
-                    <UserPlus size={13} />
-                    <span className="text-xs font-medium">Add Member</span>
-                  </button>
+                  {/* Account rows (KL admin): chapter admin / invite member */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    <button
+                      onClick={() => openAddAccount(ch.id, 'chapterAdmin')}
+                      disabled={!ch.isActive}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-slate-300 dark:border-slate-600 hover:border-jci-blue hover:bg-blue-50/50 dark:hover:bg-slate-800 text-slate-400 hover:text-jci-blue transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <ShieldCheck size={13} />
+                      <span className="text-xs font-medium">Add chapter admin</span>
+                    </button>
+                    <button
+                      onClick={() => openAddAccount(ch.id, 'invite')}
+                      disabled={!ch.isActive}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-slate-300 dark:border-slate-600 hover:border-jci-blue hover:bg-blue-50/50 dark:hover:bg-slate-800 text-slate-400 hover:text-jci-blue transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <UserPlus size={13} />
+                      <span className="text-xs font-medium">Invite member</span>
+                    </button>
+                  </div>
+                  {!ch.isActive && (
+                    <p className="text-[10px] text-slate-400 text-center">Activate the chapter to add accounts.</p>
+                  )}
                 </div>
               )}
             </div>
@@ -413,37 +494,40 @@ export const SisterChaptersConfig: React.FC = () => {
         </div>
       </Modal>
 
-      {/* ── Add Member Modal ── */}
+      {/* ── Add chapter admin / Invite member Modal ── */}
       <Modal
         isOpen={!!memberModalChapterId}
         onClose={() => setMemberModalChapterId(null)}
-        title="Add Member"
+        title={accountMode === 'chapterAdmin' ? 'Add chapter admin' : 'Invite member'}
         size="sm"
         footer={
           <div className="flex gap-3 justify-end w-full">
             <Button variant="outline" onClick={() => setMemberModalChapterId(null)}>Cancel</Button>
-            <Button variant="primary" onClick={handleAddMember} disabled={savingMember}>{savingMember ? 'Adding…' : 'Add Member'}</Button>
+            <Button variant="primary" onClick={handleAddAccount} disabled={savingMember}>
+              {savingMember ? 'Creating…' : accountMode === 'chapterAdmin' ? 'Add chapter admin' : 'Send invite'}
+            </Button>
           </div>
         }
       >
         <div className="space-y-4">
           <div>
-            <label className="text-xs font-semibold text-slate-600 block mb-1">Full Name <span className="text-red-500">*</span></label>
+            <label className="text-xs font-semibold text-slate-600 dark:text-slate-300 block mb-1">Full Name <span className="text-red-500">*</span></label>
             <Input value={memberForm.name} onChange={e => patchMember('name', e.target.value)} placeholder="e.g. Tan Wei Ming" />
           </div>
           <div>
-            <label className="text-xs font-semibold text-slate-600 block mb-1">Email <span className="text-red-500">*</span></label>
+            <label className="text-xs font-semibold text-slate-600 dark:text-slate-300 block mb-1">Email <span className="text-red-500">*</span></label>
             <Input type="email" value={memberForm.email} onChange={e => patchMember('email', e.target.value)} placeholder="member@example.com" />
           </div>
           <div>
-            <label className="text-xs font-semibold text-slate-600 block mb-1">Company Name</label>
-            <Input value={memberForm.companyName} onChange={e => patchMember('companyName', e.target.value)} placeholder="e.g. Acme Pte Ltd" />
+            <label className="text-xs font-semibold text-slate-600 dark:text-slate-300 block mb-1">Date of birth (optional)</label>
+            <Input type="date" value={memberForm.dob} onChange={e => patchMember('dob', e.target.value)} />
           </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-600 block mb-1">Position</label>
-            <Input value={memberForm.position} onChange={e => patchMember('position', e.target.value)} placeholder="e.g. Managing Director" />
-          </div>
-          <p className="text-[10px] text-slate-400">A login account will be created with this email. The member can update their own profile after logging in.</p>
+          <p className="text-[10px] text-slate-400">
+            {accountMode === 'chapterAdmin'
+              ? 'Creates an active chapter admin login for this chapter. They can then invite and approve their own members.'
+              : 'Creates an active member login for this chapter.'}
+            {' '}A "set your password" email is sent to this address.
+          </p>
         </div>
       </Modal>
 

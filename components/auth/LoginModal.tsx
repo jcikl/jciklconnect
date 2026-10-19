@@ -11,12 +11,15 @@ interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSwitchToRegister?: () => void;
+  /** Phase 1: members of another JCI chapter apply through ExternalRegisterModal. */
+  onSwitchToExternalRegister?: () => void;
 }
 
 export const LoginModal: React.FC<LoginModalProps> = ({
   isOpen,
   onClose,
-  onSwitchToRegister
+  onSwitchToRegister,
+  onSwitchToExternalRegister,
 }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -215,6 +218,21 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               className="text-jci-blue hover:underline font-medium"
             >
               Sign up
+            </button>
+          </div>
+        )}
+        {onSwitchToExternalRegister && (
+          <div className="text-center text-sm text-slate-600">
+            Member of another JCI chapter?{' '}
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onSwitchToExternalRegister();
+              }}
+              className="text-jci-blue hover:underline font-medium"
+            >
+              Request access
             </button>
           </div>
         )}

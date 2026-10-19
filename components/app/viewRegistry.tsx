@@ -37,6 +37,7 @@ const SystemConfigView = lazy(() => import('../modules/SystemConfigView').then(m
 const PublicationsView = lazy(() => import('../modules/PublicationsView').then(m => ({ default: m.PublicationsView })));
 const RadarDataImporter = lazy(() => import('../admin/RadarDataImporter').then(m => ({ default: m.RadarDataImporter })));
 const SponsorshipView = lazy(() => import('../modules/SponsorshipView').then(m => ({ default: m.SponsorshipView })));
+const ChapterAdminView = lazy(() => import('../modules/Chapter/ChapterAdminView').then(m => ({ default: m.ChapterAdminView })));
 
 export interface AppViewRenderContext {
   memberRole?: UserRole;
@@ -117,6 +118,10 @@ export const renderAppView = (view: ViewType, context: AppViewRenderContext): Re
     if (externalAllowedViews.includes(view)) {
       // The only whitelisted view that is a KL module is MEMBERS: externals get their OWN profile only,
       // rendered from the signed-in member (no members list query, no KL tabs).
+      // MY_CHAPTER is whitelisted only for an active CHAPTER_ADMIN (utils/externalAccess.ts).
+      if (view === 'MY_CHAPTER') {
+        return wrapErrorBoundary(<ChapterAdminView />, 'My Chapter');
+      }
       if (view === 'MEMBERS') {
         return wrapErrorBoundary(<ExternalSelfProfile />, '个人资料');
       }

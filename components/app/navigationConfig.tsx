@@ -20,6 +20,7 @@ import {
   MessageSquare,
   Package,
   Share2,
+  ShieldCheck,
   User,
   SlidersHorizontal,
   Sparkles,
@@ -96,6 +97,13 @@ export const sidebarNavigationSections: SidebarNavigationSection[] = [
         label: 'My Profile',
         view: 'MEMBERS',
         visible: ({ externalAllowedViews }) => !!externalAllowedViews,
+      },
+      {
+        icon: <ShieldCheck size={18} />,
+        label: 'My Chapter',
+        view: 'MY_CHAPTER',
+        // Only an external role can have MY_CHAPTER whitelisted (CHAPTER_ADMIN, active); never shown to KL roles.
+        visible: ({ externalAllowedViews }) => !!externalAllowedViews?.includes('MY_CHAPTER'),
       },
       {
         icon: <Building2 size={18} />,

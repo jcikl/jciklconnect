@@ -323,6 +323,8 @@ export interface Member {
      * rejects a card whose `international` differs from this flag. Self-editable.
      */
     shareCardInternationally?: boolean;
+    /** Hide my birthday (day / month) from birthday lists. Default false (missing = shown). Self-editable. */
+    hideBirthday?: boolean;
   };
   /**
    * Present only on external members (role AFFILIATE / CHAPTER_ADMIN). The chapter itself is the
@@ -337,10 +339,12 @@ export type AffiliationCategory = 'sister' | 'apicc' | 'global';
 /**
  * External member lifecycle:
  * pending_chapter (waiting for own chapter admin) → pending_kl (chapter approved, waiting for KL)
- * → active; active ↔ suspended; expired when the affiliation lapses.
+ * → active; active ↔ suspended; expired when the affiliation lapses; rejected when a pending
+ * request is turned down (the doc is kept as a record).
  * Only `active` external users pass isActiveExternal() in firestore.rules.
+ * Status changes go through netlify/functions/external-accounts.mjs (setStatus), which keeps memberCards in sync.
  */
-export type AffiliationStatus = 'pending_chapter' | 'pending_kl' | 'active' | 'suspended' | 'expired';
+export type AffiliationStatus = 'pending_chapter' | 'pending_kl' | 'active' | 'suspended' | 'expired' | 'rejected';
 
 /** `members.affiliation` — affiliation data of an external member. */
 export interface MemberAffiliation {
@@ -357,6 +361,8 @@ export interface MemberAffiliation {
   /** Last status change (any actor). */
   statusUpdatedAt?: string;
   statusUpdatedBy?: string;
+  /** First time the affiliation became active (server-set). A chapter admin may reactivate a suspended member only when this is set. */
+  activatedAt?: string;
 }
 
 /**
