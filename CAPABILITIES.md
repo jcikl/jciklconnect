@@ -19,7 +19,7 @@
 |---|---|---|
 | Service（業務邏輯與資料存取） | 68 | `services/` |
 | Hook（React 資料綁定） | 39 | `hooks/` |
-| Util（純函數工具） | 17 | `utils/` |
+| Util（純函數工具） | 18 | `utils/` |
 | UI 元件（通用） | 33 | `components/ui/` |
 | 共用業務元件 | 9 | `components/shared/` |
 | Context | 2 | `contexts/` |
@@ -1269,7 +1269,7 @@
 | `useActivityPlans.ts` | 130 | 1 | `useActivityPlans` | activityPlansService | ⚠️ 無說明 |
 | `useAdvertisements.ts` | 110 | 2 | `useAdvertisements` | advertisementService, errorLoggingService | Advertisements Data Hook |
 | `useAppNavigation.ts` | 239 | 1 | `useAppNavigation` | — | ⚠️ 無說明 |
-| `useAuth.tsx` | 774 | 54 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, membersService, mockData | Authentication Hook |
+| `useAuth.tsx` | 780 | 54 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, membersService, mockData | Authentication Hook |
 | `useAutomation.ts` | 149 | 3 | `useAutomation` | automationService | useAutomation Hook - Manage automation workflows and rules |
 | `useBusinessDirectory.ts` | 48 | 4 | `useBusinessDirectory` | businessDirectoryService | ⚠️ 無說明 |
 | `useCommunication.ts` | 118 | 2 | `useCommunication` | communicationService | Communication Data Hook |
@@ -1438,6 +1438,13 @@
 |---|---|---|
 | `resolveAreaFromAddress` | 814 | Resolve area and state from a free-text Malaysian address. Returns null when no match is found. |
 | `getSeedEntries` | 853 |  |
+
+### `utils/retryOnPermissionDenied.ts` （22 行，2 處引用）
+> Run `read`; if Firestore answers permission-denied, refresh the auth credential and try again. On a page reload Firebase Auth can report the…
+
+| 函數 | 行 | 說明 |
+|---|---|---|
+| `retryOnPermissionDenied` | 7 | Run `read`; if Firestore answers permission-denied, refresh the auth credential and try again. On a page reloa… |
 
 ### `utils/roadmapUtils.ts` （387 行，2 處引用）
 

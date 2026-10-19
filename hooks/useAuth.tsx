@@ -26,6 +26,7 @@ import { saveAuthState, loadAuthState, clearAuthState, isDevModeStored } from '.
 import { MembersService } from '../services/membersService';
 import { BoardManagementService } from '../services/boardManagementService';
 import { errorLoggingService } from '../services/errorLoggingService';
+import { retryOnPermissionDenied } from '../utils/retryOnPermissionDenied';
 
 interface AuthContextType {
   user: User | null;
@@ -143,8 +144,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           // null lets authenticated views render against a null member and crash (ErrorBoundary
           // on first Google login in the APK).
           try {
-            // 1. Try UID lookup first
-            const memberDoc = await getDoc(doc(db, COLLECTIONS.MEMBERS, firebaseUser.uid));
+            // 1. Try UID lookup first. On a reload this read can be rejected before Firestore has
+            // the ID token (errorLogs: useAuth-load-member-data permission-denied), which signed
+            // members out — refresh the credential and retry before treating it as a failure.
+            const memberDoc = await retryOnPermissionDenied(
+              () => getDoc(doc(db, COLLECTIONS.MEMBERS, firebaseUser.uid)),
+              () => firebaseUser.getIdToken(true),
+            );
             let memberData: Member | null = null;
             // Set when a profile exists for this email but under another id (an unlinked login account).
             let unlinkedProfileId: string | null = null;
