@@ -61,7 +61,7 @@ async function getDoc(uid: string, path: string): Promise<number> {
   return res.status;
 }
 
-type Filter = [field: string, op: 'EQUAL' | 'ARRAY_CONTAINS', value: Plain];
+type Filter = [field: string, op: 'EQUAL' | 'ARRAY_CONTAINS' | 'IN', value: Plain];
 
 async function query(uid: string, collectionId: string, filters: Filter[] = []): Promise<number> {
   const fieldFilters = filters.map(([field, op, value]) => ({
@@ -114,7 +114,8 @@ const MEMBERS: Record<string, Doc> = {
   klOptIn: member('MEMBER', KL, { privacy: { shareCardInternationally: true } }),
   klBoard: member('BOARD', KL),
   klAdmin: member('ADMIN', KL),
-  aff1: member('AFFILIATE', SG, { affiliation: affiliation('active') }),
+  // aff1 has opted in (reciprocity: only opted-in members may view other cards).
+  aff1: member('AFFILIATE', SG, { affiliation: affiliation('active'), privacy: { shareCardInternationally: true } }),
   aff2: member('AFFILIATE', SG, { affiliation: affiliation('active') }),
   affPending: member('AFFILIATE', SG, { affiliation: affiliation('pending_kl') }),
   affOther: member('AFFILIATE', 'jcitokyo', { affiliation: { ...affiliation('active'), country: 'Japan' } }),
@@ -128,6 +129,8 @@ const MEMBERS: Record<string, Doc> = {
   }),
   inactiveBoard: member('INACTIVE', KL, { isCurrentBoardMember: true, currentBoardPosition: 'Secretary' }),
   affSuspended: member('AFFILIATE', SG, { affiliation: affiliation('suspended') }),
+  // Reciprocity fixture: KL member who has not opted in.
+  klNoOpt: member('MEMBER', KL),
 };
 
 const card = (memberId: string, international: boolean, extra: Doc = {}): Doc => ({
@@ -144,6 +147,7 @@ const OTHER_DOCS: Array<[string, Doc]> = [
   ['members/klLegacy', { role: 'MEMBER', general: { name: 'Legacy member without loId' } }],
   ['memberCards/klMember', card('klMember', false)],
   ['memberCards/klOptIn', card('klOptIn', true)],
+  ['memberCards/klNoOpt', card('klNoOpt', false)],
   ['memberCards/aff2', card('aff2', false)],
   ['memberCards/affOther', card('affOther', false)],
   ['templates/t1', { name: 'Template' }],
@@ -197,7 +201,7 @@ describe.skipIf(!HOST)('firestore.rules — external members (emulator)', () => 
       expect(await set('aff1', 'members/aff1', { ...MEMBERS.aff1, loId: KL })).toBe(DENIED);
     });
     it('can update own privacy opt-in', async () => {
-      const next = { ...MEMBERS.aff1, privacy: { shareCardInternationally: true } };
+      const next = { ...MEMBERS.aff1, privacy: { shareCardInternationally: false } };
       expect(await set('aff1', 'members/aff1', next)).toBe(OK);
       expect(await set('aff1', 'members/aff1', MEMBERS.aff1)).toBe(OK); // restore
     });
@@ -225,10 +229,10 @@ describe.skipIf(!HOST)('firestore.rules — external members (emulator)', () => 
       expect(await getDoc('aff1', 'memberCards/affOther')).toBe(DENIED);
     });
     it('can write own card only with the exact field set and mirrored loId / international', async () => {
-      expect(await set('aff1', 'memberCards/aff1', card('aff1', false))).toBe(OK);
-      expect(await set('aff1', 'memberCards/aff1', card('aff1', true))).toBe(DENIED); // opt-in is false
-      expect(await set('aff1', 'memberCards/aff1', card('aff1', false, { loId: KL }))).toBe(DENIED);
-      expect(await set('aff1', 'memberCards/aff1', card('aff1', false, { email: 'leak@example.test' }))).toBe(DENIED);
+      expect(await set('aff1', 'memberCards/aff1', card('aff1', true))).toBe(OK);
+      expect(await set('aff1', 'memberCards/aff1', card('aff1', false))).toBe(DENIED); // opt-in is true
+      expect(await set('aff1', 'memberCards/aff1', card('aff1', true, { loId: KL }))).toBe(DENIED);
+      expect(await set('aff1', 'memberCards/aff1', card('aff1', true, { email: 'leak@example.test' }))).toBe(DENIED);
       expect(await set('aff1', 'memberCards/aff2', card('aff2', false))).toBe(DENIED); // not own
     });
     it('pending affiliate cannot read other cards', async () => {
@@ -338,9 +342,9 @@ describe.skipIf(!HOST)('firestore.rules — external members (emulator)', () => 
       expect(await query('klAdmin', 'members')).toBe(OK);
       expect(await query('klAdmin', 'members', [['loId', 'EQUAL', SG]])).toBe(OK);
     });
-    it('MEMBER can read all member cards and other modules', async () => {
-      expect(await query('klMember', 'memberCards')).toBe(OK);
-      expect(await getDoc('klMember', 'memberCards/aff2')).toBe(OK);
+    it('opted-in MEMBER can read all member cards; other modules unchanged', async () => {
+      expect(await query('klOptIn', 'memberCards')).toBe(OK);
+      expect(await getDoc('klOptIn', 'memberCards/aff2')).toBe(OK);
       expect(await getDoc('klMember', 'templates/t1')).toBe(OK);
       expect(await query('klMember', 'communication')).toBe(OK);
     });
@@ -491,6 +495,40 @@ describe.skipIf(!HOST)('firestore.rules — external members (emulator)', () => 
       const ok = withAff({ statusUpdatedBy: 'chAdmin', chapterApprovedBy: 'chAdmin', statusUpdatedAt: 'now' }, { updatedBy: 'chAdmin' });
       expect(await set('chAdmin', 'members/aff2', ok)).toBe(OK);
       expect(await set('owner', 'members/aff2', MEMBERS.aff2)).toBe(OK); // restore
+    });
+  });
+
+  describe('Reciprocity: only opted-in members may view other cards (admins exempt)', () => {
+    it('KL MEMBER not opted in: others denied (get, international, loId in); own card allowed', async () => {
+      expect(await getDoc('klNoOpt', 'memberCards/klOptIn')).toBe(DENIED);
+      expect(await query('klNoOpt', 'memberCards', [['international', 'EQUAL', true]])).toBe(DENIED);
+      expect(await query('klNoOpt', 'memberCards', [['loId', 'IN', [KL, SG]]])).toBe(DENIED);
+      expect(await query('klNoOpt', 'memberCards')).toBe(DENIED);
+      expect(await getDoc('klNoOpt', 'memberCards/klNoOpt')).toBe(OK);
+    });
+    it('KL MEMBER opted in: allowed as before', async () => {
+      expect(await getDoc('klOptIn', 'memberCards/klNoOpt')).toBe(OK);
+      expect(await query('klOptIn', 'memberCards', [['international', 'EQUAL', true]])).toBe(OK);
+      expect(await query('klOptIn', 'memberCards', [['loId', 'IN', [KL, SG]]])).toBe(OK);
+    });
+    it('active affiliate: denied before opting in (even own chapter), allowed after', async () => {
+      expect(await set('owner', 'members/aff2', MEMBERS.aff2)).toBe(OK); // not opted in
+      expect(await query('aff2', 'memberCards', [['loId', 'EQUAL', SG]])).toBe(DENIED);
+      expect(await query('aff2', 'memberCards', [['international', 'EQUAL', true]])).toBe(DENIED);
+      expect(await getDoc('aff2', 'memberCards/aff2')).toBe(OK); // own card
+      const optedIn = { ...MEMBERS.aff2, privacy: { shareCardInternationally: true } };
+      expect(await set('aff2', 'members/aff2', optedIn)).toBe(OK);
+      expect(await query('aff2', 'memberCards', [['loId', 'EQUAL', SG]])).toBe(OK);
+      expect(await query('aff2', 'memberCards', [['international', 'EQUAL', true]])).toBe(OK);
+      expect(await set('owner', 'members/aff2', MEMBERS.aff2)).toBe(OK); // restore
+    });
+    it('ADMIN not opted in: allowed', async () => {
+      expect(await query('klAdmin', 'memberCards')).toBe(OK);
+      expect(await getDoc('klAdmin', 'memberCards/klNoOpt')).toBe(OK);
+    });
+    it('BOARD not opted in: denied', async () => {
+      expect(await getDoc('klBoard', 'memberCards/klOptIn')).toBe(DENIED);
+      expect(await query('klBoard', 'memberCards', [['international', 'EQUAL', true]])).toBe(DENIED);
     });
   });
 });
