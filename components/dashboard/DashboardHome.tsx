@@ -26,6 +26,7 @@ import { DashboardProfileCompletionWidget } from './DashboardProfileCompletionWi
 import { DashboardUpgradeModal } from './DashboardUpgradeModal';
 import { getMemberDob, getProfileCompleteness, normalizeMembership } from './dashboardHomeUtils';
 import { isKlRelevantEvent } from '../../utils/loHosting.mjs';
+import { filterKlMembers } from '../../utils/memberScope';
 
 interface DashboardHomeProps {
   userRole: UserRole;
@@ -199,7 +200,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   const currentDay = parseInt(mytTodayStr.slice(3), 10);
   const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kuala_Lumpur' }));
   const birthdayMembers = React.useMemo(() => {
-    return members
+    return filterKlMembers(members)
       .filter(m => {
         const dob = getMemberDob(m);
         if (!dob) return false;

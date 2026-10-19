@@ -18,7 +18,7 @@ import {
     increment,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { COLLECTIONS } from '../config/constants';
+import { COLLECTIONS, DEFAULT_LO_ID } from '../config/constants';
 import { withDevMode, isDevMode } from '../utils/devMode';
 import { calculateAwardProgress as calculateAwardProgressUtil } from '../utils/gamificationUtils';
 import {
@@ -369,6 +369,7 @@ export class GamificationService {
                 // Count members recruited by this member (recruitedBy field)
                 const recruitSnap = await getDocs(query(
                     collection(db, COLLECTIONS.MEMBERS),
+                    where('loId', '==', DEFAULT_LO_ID),
                     where('recruitedBy', '==', memberId)
                 ));
                 progressValue = recruitSnap.size;
