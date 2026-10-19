@@ -21,7 +21,7 @@
 - `SUPER_ADMIN`：超级管理员。
 - `INACTIVE`：停用用户，应被硬性限制。
 - `AFFILIATE`（外部会员）：其他 JCI 分会的会员，`members.loId` 为 `sisterChapters` 中的分会。不属于 `isMember()` / `isActiveMember()`；只能打开白名单视图（见下表），且 `affiliation.status` 为 `active` 时才能使用，其他状态只能看自己的资料与提示。
-- `CHAPTER_ADMIN`（分会管理人）：某个外部分会的管理人，由 KL 管理员创建。前端视图比 `AFFILIATE` 多一个 `MY_CHAPTER`（Phase 1）；规则层另允许读取本分会的完整会员文档，并修改本分会 AFFILIATE 的 `affiliation` 状态字段（不能设为 `active`）；应用里的审批、停用、邀请都经 `netlify/functions/external-accounts` 在服务端完成。
+- `CHAPTER_ADMIN`（分会管理人）：某个外部分会的管理人，由 KL 管理员创建。前端视图比 `AFFILIATE` 多一个 `MY_CHAPTER`（Phase 1）；规则层另允许读取本分会的完整会员文档（客户端不能再写会员文档）；应用里的审批、停用、邀请都经 `netlify/functions/external-accounts` 在服务端完成。
 - `isBoard()`：Firestore Rules 中包含 `BOARD`、`ADMIN`、`SUPER_ADMIN`，也包含 current board member。
 - `isAdmin()`：Firestore Rules 中包含 `ADMIN`、`SUPER_ADMIN`。
 - `canOperateFinance`：前端 `usePermissions.ts` 中的财务操作权限，主要给当前年度 treasurer/secretary/president。
@@ -65,7 +65,8 @@
 - 状态与邀请（Phase 1，`netlify/functions/external-accounts`，权限判断在 `netlify/lib/externalAccounts.mjs`）：
   - 创建分会管理人（`createChapterAdmin`）：只有 KL 管理员（ADMIN / SUPER_ADMIN）。
   - 邀请成员（`inviteMember`，账号创建即 `active`，角色 AFFILIATE）：active 的 `CHAPTER_ADMIN`（只能邀请自己的分会）或 KL 管理员（须指定分会）。
-  - 状态变更（`setStatus`）：分会管理人只能处理本分会的 AFFILIATE：`pending_chapter` → `pending_kl`（批准）、`pending_chapter` / `pending_kl` → `rejected`、`active` → `suspended`、`suspended` → `active`（仅限曾经 active，即 `affiliation.activatedAt` 已有）；`pending_kl` → `active` 只有 KL 管理员；KL 管理员可在任意两个不同状态间切换。
+  - 状态变更（`setStatus`）：分会管理人只能处理本分会的 AFFILIATE：`pending_chapter` → `pending_kl`（批准）、`pending_chapter` / `pending_kl` → `rejected`、`active` → `suspended`、`suspended` → `active`（只能解除分会管理人自己做的停用，即 `affiliation.suspendedByRole` 为 `CHAPTER_ADMIN`；JCI KL 做的停用分会管理人不能解除）；`pending_kl` → `active` 只有 KL 管理员；KL 管理员可在任意两个不同状态间切换。
+  - 每个分会最多 100 个成员，名额只计算状态为 `active` 和 `suspended` 的成员（待审批、已拒绝、已过期的不占名额）。
   - 重发密码设置邮件（`resendInvite`）：KL 管理员，或 active 的 `CHAPTER_ADMIN`（只限本分会 AFFILIATE，不含自己）。
 - 配置页（`SYSTEM_CONFIG`，`utils/configAccess.ts`）：ADMIN 现在可以打开，但只能看到 Global Relations 标签（创建分会管理人、邀请成员、批准 `pending_kl`、停用）；增删改分会列表与启用开关仍只有 SUPER_ADMIN。
 - 外部用户在各视图的实际范围（Phase 1）：
@@ -74,7 +75,7 @@
   - 福利（`BENEFITS`）：不显示会员优惠与新增优惠入口；按 `targetCriteria.audiences` / `countries`（`utils/benefitEligibility.ts`）判断，不符合的福利灰显并说明原因、隐藏详情里的行动按钮。
   - 问卷（`SURVEYS`）：只看到定向给自己的，或 B+ 已开放（`openToExternals`）且 Active 的问卷；只能作答，不能创建、分发，也看不到结果。
   - 兴趣社群（`CLUBS`）：只看到已开放（`openToExternals`）的社群，不能创建；「Join」仍是打开社群群聊链接。
-  - 活动（`EVENTS`）：只看到 KL 主办或协办的活动（应用层查询过滤，规则对 `events` list 没有此限制，见 R-058）；价格数字以美元符号显示，不做换算；可以报名；付款方式为线下（说明文字见 `config/constants.ts` `EXTERNAL_OFFLINE_PAYMENT_NOTE`），由财务操作员 / 管理员标记已付款。
+  - 活动（`EVENTS`）：只看到 KL 主办或协办的活动（应用层查询过滤，规则对 `events` list 没有此限制，见 R-058）；价格数字以美元符号显示，不做换算；可以报名；付款方式为线下（说明文字见 `config/constants.ts` `EXTERNAL_OFFLINE_PAYMENT_NOTE`），由财务操作员 / 管理员标记已付款：标记时由财务确认实际收到的马币金额（窗口预填列出的价格，可修改）。
   - 「向其他分会开放」勾选（问卷、兴趣社群）只有 BOARD / ADMIN 能操作；`firestore.rules` 同样限制。
   - 活动「标记已付款」：只有 `canOperateFinance`（财务操作员 / 管理员）能完成（`EventDetailModal` 的 `handleMarkPaid` 校验），按钮本身仍对所有看得到报名列表的人显示（见 R-068）。
 - 前端白名单只是 UI 层限制；真正的数据边界是 `firestore.rules`，逐集合范围见 `SCHEMA-PERMISSIONS.md`「外部用户（AFFILIATE / CHAPTER_ADMIN）的规则范围」。

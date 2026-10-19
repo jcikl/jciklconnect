@@ -10,7 +10,7 @@ Updated 2026-10-18: R-028 to R-045 added from verification round 1 (permissions 
 
 Updated 2026-10-19: R-049 to R-058 added from the Phase 0 external-members review (`feat/affiliate-p0`, WP5); see the end of this file.
 
-Updated 2026-10-20: R-059 to R-072 added from the Phase 1 external-members work (`phase1/integration`, not merged or deployed yet); see the end of this file.
+Updated 2026-10-20: R-059 to R-072 added from the Phase 1 external-members work (`phase1/integration`, not merged or deployed yet); R-073 to R-086 added from its review fixes; see the end of this file.
 
 Severity scale: P0 critical, P1 high, P2 medium, P3 low.
 
@@ -687,7 +687,7 @@ Evidence: the event "Mark as paid" flow created the income transaction without a
 
 Risk: marking an event registration paid failed, so no payment could be recorded from the event screen.
 
-Resolution (2026-10-20, `phase1/integration`): `services/eventPaymentService.ts` `markRegistrationPaid` resolves the account (the project's `financialAccountId` when it is one of the LO's bank accounts, else the first MYR account, else the first account; a readable error when none exists), uses `price ?? priceMin`, and removes the transaction again if the registration update fails. See R-070 for what is left.
+Resolution (2026-10-20, `phase1/integration`): `services/eventPaymentService.ts` `markRegistrationPaid` resolves the account (the project's `financialAccountId` when it is one of the LO's bank accounts, else the first MYR account, else the first account; a readable error when none exists), prefills the amount from `price || priceMin` for finance to confirm (see R-080), and removes the transaction again if the registration update fails. See R-070 for what is left.
 
 ### R-064 International Directory Ran on Mock Data and Hid KL Cards From External Users (P2, resolved)
 
@@ -723,11 +723,11 @@ Recommended action: use `audiences` / `countries` as the one targeting source on
 
 ### R-068 External Event Payments Depend on Finance Discipline (P2)
 
-Evidence: `EventDetailModal` `handleMarkPaid` checks `canOperateFinance`, but the Mark Paid / Undo Payment buttons in `EventParticipantsTab`, `EventRegistrationsList` and `EventRoleParticipantsList` are not hidden by role, and `handleUndoPaid` has no role check; the real gate is the rules (`transactions` create and delete are Finance / admin). External events show the listed price number with a USD sign and no conversion; when finance leaves "MYR actually received" empty, `markRegistrationPaid` records that same number as the MYR `amount` (`originalAmount` / `originalCurrency` keep the USD reference). `transactions.currency` is declared but nothing writes it.
+Evidence: `EventDetailModal` `handleMarkPaid` checks `canOperateFinance`, but the Mark Paid / Undo Payment buttons in `EventParticipantsTab`, `EventRegistrationsList` and `EventRoleParticipantsList` are not hidden by role, and `handleUndoPaid` has no role check; the real gate is the rules (`transactions` create and delete are Finance / admin). External events show the listed price number with a USD sign and no conversion. The mark-paid window now prefills "Amount received (MYR)" with `price || priceMin` and finance must confirm or edit it (0 records no transaction), so a USD registration is booked as that same number of ringgit only if finance accepts the prefill. `transactions.currency` is declared but nothing writes it.
 
-Risk: wrong buttons shown to some roles, and a USD registration can be booked as the same number of ringgit.
+Risk: wrong buttons shown to some roles, and a careless confirmation books a USD price as ringgit.
 
-Recommended action: hide the buttons for roles without `canOperateFinance`; make "MYR received" required for USD registrations, or convert; write or drop `transactions.currency`.
+Recommended action: hide the buttons for roles without `canOperateFinance`; consider a conversion rate for USD registrations; write or drop `transactions.currency`.
 
 ### R-069 useEventParticipations Reads Firestore Directly and Reads the Wrong Name Field for Guests (P3)
 
@@ -760,3 +760,119 @@ Evidence: the guest registration id is `{eventId}_{emailKey}`; registering again
 Risk: a guest who cancelled cannot come back with the same email or phone for that event.
 
 Recommended action: accept it, or let board delete the cancelled docs (delete is allowed for board).
+
+## Added 2026-10-20: Phase 1 Review Fixes
+
+All fixes below are on `phase1/integration` (not merged or deployed yet).
+
+### R-073 KL Self Sign-Up Always Failed on a Nested undefined (P0, resolved)
+
+Evidence: the sign-up payload (`utils/signUpPayload.ts` `buildSelfSignUpMember`) left `others.bio: undefined` when the form gave no bio; the old `stripUndefined` only removed top-level undefined, and Firestore rejects nested undefined, so the `members` write failed. If it failed, the Firebase Auth user created a moment earlier stayed behind without a profile.
+
+Risk: new KL applicants could not register, and each failed attempt left an orphan Auth account.
+
+Resolution: `stripUndefined` now cleans plain objects at every depth (Timestamps and arrays are kept), and `buildExternalSignUpMember` uses it too. `hooks/useAuth.tsx` `signUp` now deletes the new Auth user when the profile write fails (the same rollback `signUpExternal` already had).
+
+### R-074 A Chapter Admin Could Undo KL Decisions (P1, resolved)
+
+Evidence: reactivation of a suspended member was allowed when `affiliation.activatedAt` was set, which says nothing about who suspended them, so a chapter admin could lift a suspension made by JCI KL. The client rules branch for CHAPTER_ADMIN also allowed `expired` → `suspended` and other writes of the status field from the browser.
+
+Risk: a chapter admin could override KL's suspension, and could change status in ways the `external-accounts` transition table does not allow.
+
+Resolution: `setStatus` stamps `affiliation.suspendedByRole` (`KL` or `CHAPTER_ADMIN`) on every change to suspended, and a chapter admin may reactivate only when it is `CHAPTER_ADMIN`; `ChapterAdminView` shows Reactivate on the same condition. The client branch in the `members` update rule was removed, so chapter admins write no member docs from the browser.
+
+### R-075 Anyone Could Fill a Chapter's Member Cap Through Self-Registration (P1, resolved)
+
+Evidence: the 100-member cap counted every member doc of the chapter, and anyone can self-register a `pending_chapter` doc.
+
+Risk: a flood of self-registrations could block real invites.
+
+Resolution: the function counts only members with `affiliation.status` in `CAP_COUNTED_STATUSES` (`active`, `suspended`); pending, rejected and expired docs do not use a place. See R-086 for the index.
+
+### R-076 Survey responsesCount Could Be Inflated (P2, resolved)
+
+Evidence: the `surveys` update rule let anyone who could read a survey add 1 to `responsesCount`, with no link to an actual response and regardless of the survey status.
+
+Risk: a user could push the response counter up without answering.
+
+Resolution: a non-board / non-admin update must be on an `Active` survey, change only `responsesCount` (+1) and `updatedAt`, and in the same write create the caller's own `surveyResponses/{surveyId}_{uid}` (the rule checks the doc is absent before and present after).
+
+### R-077 Self-Registration Category Was Not Tied to the Chapter (P2, resolved)
+
+Evidence: the external self-registration rule accepted any `affiliation.category` of `sister`, `apicc` or `global`.
+
+Risk: a self-registered person could pick a category that does not match their chapter and so change what they see (benefit audiences).
+
+Resolution: the rule requires `affiliation.category == categoryForChapterType(chapter.type)`. See R-083.
+
+### R-078 Registrations and Responses Could Be Probed by Id (P2, resolved)
+
+Evidence: `eventRegistrations` get and `surveyResponses` get allowed reading a missing doc under any id, so "not found" versus "permission denied" told a user whether another member had registered or answered.
+
+Risk: leaks who registered for an event or answered a survey.
+
+Resolution: a missing `eventRegistrations` doc may be read only when its id ends with `_` plus the caller's uid; a missing `surveyResponses` doc only under `{surveyId}_{uid}`. See R-084 and R-085.
+
+### R-079 Guest Registration Was Accepted for Events That Do Not Exist (P2, resolved)
+
+Evidence: the `guestRegistrations` create rule checked only the shape of the data, so a signed-out visitor could create registrations for any `eventId`.
+
+Risk: junk documents for made-up or unlisted events.
+
+Resolution: create also requires `projects/{eventId}` to exist with status Active, Upcoming or Approved (the statuses the guest events page lists). See R-082.
+
+### R-080 Mark-Paid Recorded the Lowest Tier of Tiered Prices (P2, resolved)
+
+Evidence: `markRegistrationPaid` used `price ?? priceMin`, and for an event with tiered prices that booked the lowest tier regardless of what the payer actually paid.
+
+Risk: wrong income amounts in finance.
+
+Resolution: the mark-paid window asks finance to confirm the MYR amount actually received, prefilled with `price || priceMin`; the transaction `amount` is that confirmed value, and `originalAmount` (USD registrations only) keeps the listed price.
+
+### R-081 Survey Responses Could Be Created Under Any Id (P2, resolved)
+
+Evidence: the `surveyResponses` create rule accepted any document id as long as the data fields matched, so one user could add several responses.
+
+Risk: duplicate or extra responses counted in survey results.
+
+Resolution: users other than board / admin must use the id `{surveyId}_{uid}` (the id `SurveysService.submitResponse` already used), and an existing id is still refused.
+
+### R-082 Accepted: A Signed-Out Visitor Can Pre-Claim a Guest's Email or Phone (P3, accepted)
+
+Evidence: guest registration ids are `{eventId}_{emailKey}` and `{eventId}_phone_{phoneKey}`, and creating them needs no login (R-060, R-072). Anyone can register an email or phone for a listed event, and the real owner is then refused as "already registered".
+
+Risk: a visitor can block someone else's guest registration for that event.
+
+Decision: accepted for now; board can delete the pre-claimed docs (delete is allowed for board).
+
+### R-083 Rules categoryForChapterType Duplicates categoryForChapter (P3)
+
+Evidence: `firestore.rules` `categoryForChapterType` and `utils/affiliation.mjs` `categoryForChapter` implement the same mapping (`sister_lo` then `apicc` then `global`, default `sister`), and rules cannot import code.
+
+Risk: if one changes alone, self-registration is refused (or accepts a wrong category).
+
+Recommended action: change both together; the rules tests in `tests/rules/wp3SelfRegister.rules.test.ts` and the unit tests should cover the same cases.
+
+### R-084 Survey Ids Must Not Contain an Underscore (P3)
+
+Evidence: the `surveyResponses` get rule takes everything before the first `_` as the survey id (`responseId.split('_')[0]`), and the `surveys` update rule builds `{surveyId}_{uid}`. Survey ids are Firestore auto-ids, which contain no `_`.
+
+Risk: a hand-made survey id with `_` would break the missing-doc read and the dedup check.
+
+Recommended action: never create surveys with custom ids.
+
+### R-085 The eventRegistrations Missing-Doc Check Is Suffix-Only (P3)
+
+Evidence: the `eventRegistrations` get rule allows a missing doc when its id ends with `_` plus the caller's uid; it does not check the part before it.
+
+Risk: theoretical only: a uid that itself contains `_` could match a suffix of another id. Firebase auto uids do not contain `_`, and a match only reveals that the doc is absent.
+
+Recommended action: none now; tighten if custom uids are ever introduced.
+
+### R-086 Deploy Note: Composite Index members (loId, affiliation.status) (P2)
+
+Evidence: the cap count (R-075) queries `members` with `loId ==` and `affiliation.status in [...]`; the index is in `firestore.indexes.json`.
+
+Risk: if the rules and function go live without the index, creating or inviting external accounts fails on the count query.
+
+Recommended action: deploy `firestore.indexes.json` together with `firestore.rules` (and wait for the index to build) before releasing the function.

@@ -30,7 +30,7 @@ esource.data 仅在 get 中可用，因此部分集合的 list 权限会比 get 
 
 | 集合 | get | list | create | update | delete | 备注 |
 |------|-----|------|--------|--------|--------|------|
-| members | 自己(登)；A+；M+/B+ 仅 KL 文档（loId 为 jcikl 或缺失，且非外部角色）；active CHAPTER_ADMIN 仅本分会文档 | A+；M+/B+ 且查询须带 `where('loId','==','jcikl')`；active CHAPTER_ADMIN 须带本分会 loId；非外部用户可按本人邮箱精确匹配 | B+ 或 自注册GUEST(注册表单字段，积分/等级/徽章只能是默认值，jciCareer 只能有 joinDate)；`role` 为 ADMIN / SUPER_ADMIN / AFFILIATE / CHAPTER_ADMIN 仅 A+ 可写（R-053）；例外：外部自助注册（`uid == 文档 id`、文档尚不存在、role 为 AFFILIATE、`loId` 不是 `jcikl` 且对应 `sisterChapters` 存在并 `isActive`、`affiliation` 恰好只有 `category` / `country` / `status`、`status` = `pending_chapter`、`category` 在 `sister` / `apicc` / `global` 内、`country` 等于该分会的 `country`、其余字段限自注册键加 `affiliation`、GUEST 默认值检查同自注册） | 自己(非锁定字段；`affiliation` 已锁定；name/email 顶层或嵌套均可) 或 B+（不能把人设为 ADMIN / SUPER_ADMIN / CHAPTER_ADMIN）；active CHAPTER_ADMIN 仅本分会 AFFILIATE 的 `affiliation` 状态字段（不能设 active，规则里也不允许设 rejected）；外部会员（AFFILIATE / CHAPTER_ADMIN）自己可在 `general.dob` 为空时设置一次（`birthdayMMDD` 须与之一致或不变）；分会管理人 / KL 管理员对外部会员的状态变更在服务端由 `external-accounts` function 完成（Admin SDK，不经过规则），规则里分会管理人的客户端分支未改 | A+(同LO；SA 不限 LO) | 2026-10-18 R-034：SA 删除不受 LO 限制；2026-10-19 Phase 0：外部用户只能读自己的完整文档（active CHAPTER_ADMIN 另可读本分会文档）；其他外部会员的完整文档仅 A+ 可读，KL 普通读者改用 `memberCards` |
+| members | 自己(登)；A+；M+/B+ 仅 KL 文档（loId 为 jcikl 或缺失，且非外部角色）；active CHAPTER_ADMIN 仅本分会文档 | A+；M+/B+ 且查询须带 `where('loId','==','jcikl')`；active CHAPTER_ADMIN 须带本分会 loId；非外部用户可按本人邮箱精确匹配 | B+ 或 自注册GUEST(注册表单字段，积分/等级/徽章只能是默认值，jciCareer 只能有 joinDate)；`role` 为 ADMIN / SUPER_ADMIN / AFFILIATE / CHAPTER_ADMIN 仅 A+ 可写（R-053）；例外：外部自助注册（`uid == 文档 id`、文档尚不存在、role 为 AFFILIATE、`loId` 不是 `jcikl` 且对应 `sisterChapters` 存在并 `isActive`、`affiliation` 恰好只有 `category` / `country` / `status`、`status` = `pending_chapter`、`category` 等于分会 `type` 的映射结果（规则函数 `categoryForChapterType`，对应 `utils/affiliation.mjs` `categoryForChapter`）、`country` 等于该分会的 `country`、其余字段限自注册键加 `affiliation`、GUEST 默认值检查同自注册） | 自己(非锁定字段；`affiliation` 已锁定；name/email 顶层或嵌套均可) 或 B+（不能把人设为 ADMIN / SUPER_ADMIN / CHAPTER_ADMIN）；（CHAPTER_ADMIN 的客户端状态分支已移除）；外部会员（AFFILIATE / CHAPTER_ADMIN）自己可在 `general.dob` 为空时设置一次（`birthdayMMDD` 须与之一致或不变）；分会管理人不再从客户端写会员文档：所有状态变更（批准、拒绝、停用、重新激活）都由 `external-accounts` function 在服务端完成（Admin SDK，不经过规则） | A+(同LO；SA 不限 LO) | 2026-10-18 R-034：SA 删除不受 LO 限制；2026-10-19 Phase 0：外部用户只能读自己的完整文档（active CHAPTER_ADMIN 另可读本分会文档）；其他外部会员的完整文档仅 A+ 可读，KL 普通读者改用 `memberCards` |
 | memberCards | 自己；isAdmin()；其余读者须本人已开放名片（`privacy.shareCardInternationally == true`，互惠规则）且为 M+ / canReadOrgMembers / active 外部用户（`international == true` 或 loId 为本分会） | 同 get，但不含「自己」（外部用户的查询须带 `where('international','==',true)` 或 `where('loId','==',本分会)`） | 自己(MEMBER+ 或 active 外部) 或 canEditMembers；字段必须与 `memberCardKeys()` 完全一致；`loId` 与 `international` 须与同批写入/已有的 members 文档一致；members 文档不存在则拒绝 | 同 create | 自己 或 canEditMembers | Phase 0 新集合，卡片由 `MemberCardsService.syncCards` 同步（见 `SCHEMA.md` `memberCards`） |
 | communication | 登 | 登 | M+(需含authorId) | 自己 或 B+ | 自己 或 B+ | |
 | events | 登 | 公 | B+ | B+ 或 M+(仅attendees字段) | B+ | list公开供宣传页使用 |
@@ -42,14 +42,14 @@ esource.data 仅在 get 中可用，因此部分集合的 list 权限会比 get 
 | projectTrx | B+/A+ | B+/A+ | B+(字段白名单) | B+(非对账，字段白名单) | B+(非对账) | |
 | ankAccounts | Finance(同LO) | A+/Finance | Finance | Finance | Finance | get 限同LO |
 | paymentRequests | 登(自己/Finance/A+) | M+/Finance/A+ | 登(自己) 或 B+/A+(代他人提交) | 自己(draft/cancel/resubmit) 或 Finance | 自己(draft) 或 A+ | 代他人提交来自 commit `b83d671`，2026-10-18 随 R-034 一起部署 |
-| eventRegistrations | 登(自己/B+)；文档不存在时也允许（报名事务要先读尚不存在的 `{eventId}_{uid}`） | M+/B+；active 外部用户只列自己的（查询须带 `where('memberId','==',uid)`） | 登(自己或B+)；外部用户须 active | B+(字段白名单) 或 自己(非财务字段；`registrantLoId`、`currency` 也被锁定) | B+ | Phase 1：新增 `registrantLoId`、`currency` |
+| eventRegistrations | 登(自己/B+)；文档不存在时，仅当 id 以 `_` 加调用者 uid 结尾才允许（报名事务要先读尚不存在的 `{eventId}_{uid}`） | M+/B+；active 外部用户只列自己的（查询须带 `where('memberId','==',uid)`） | 登(自己或B+)；外部用户须 active | B+(字段白名单) 或 自己(非财务字段；`registrantLoId`、`currency` 也被锁定) | B+ | Phase 1：新增 `registrantLoId`、`currency` |
 | points | 登 | 登 | B+ | B+/A+ | B+/A+ | |
 | 
 otifications | 自己 或 B+ | B+/A+ | B+ 或 M+(特定类型) | 自己(仅read字段) 或 B+ | 自己 或 B+ | list P0：resource.data 失效 |
 | documents | 登 | 登 | B+ | B+ | A+ | |
 | documentVersions | 登 | 登 | B+ | A+ | A+ | |
-| surveys | 内部用户（`isInternalUser()`）；active 外部用户仅限 `specificMemberIds` 含自己，或 `openToExternals == true` 且 `status == 'Active'`（list 查询须带对应过滤条件） | 同 get | B+ | B+；其他任何能读该问卷的人只能把 `responsesCount` 加 1 并更新 `updatedAt` | B+ | Phase 1：`openToExternals` 由 B+ 写入 |
-| surveyResponses | 自己/B+；文档不存在时也允许（重复提交检查要读自己尚未存在的 id） | M+；active 外部用户只列自己的（查询须带 `where('memberId','==',uid)`） | 登(自己，无重复提交)；外部用户还须是 active，且问卷定向给自己或 `openToExternals == true` 且 `Active` | B+ | B+ | list P0：resource.data 失效 |
+| surveys | 内部用户（`isInternalUser()`）；active 外部用户仅限 `specificMemberIds` 含自己，或 `openToExternals == true` 且 `status == 'Active'`（list 查询须带对应过滤条件） | 同 get | B+ | B+；其他人只有在问卷 `Active` 且自己能读时，才能只改 `responsesCount`（+1）和 `updatedAt`，并且同一次写入必须创建自己的 `surveyResponses/{surveyId}_{uid}` | B+ | Phase 1：`openToExternals` 由 B+ 写入 |
+| surveyResponses | 自己/B+；文档不存在时只允许读自己的 id `{surveyId}_{uid}`（重复提交检查） | M+；active 外部用户只列自己的（查询须带 `where('memberId','==',uid)`） | 登(自己，无重复提交)；非 B+ 必须使用 id `{surveyId}_{uid}`；外部用户还须是 active，且问卷定向给自己或 `openToExternals == true` 且 `Active` | B+ | B+ | list P0：resource.data 失效 |
 | workflows | B+ | B+ | B+ | B+ | A+ | |
 | workflow_executions | B+ | B+ | B+ | A+ | A+ | 执行记录不可随意修改 |
 | utomationRules | B+ | B+ | B+ | B+ | A+ | |
@@ -80,7 +80,7 @@ econciliations | B+/A+ | B+/A+ | B+/A+(必填字段) | A+ 或 B+(仅notes字段)
 | eventBudgets | B+/A+/创建者 | B+/A+ | B+/A+ | A+ 或 B+(字段白名单) | B+/A+ | |
 | eventFeedback | B+/A+/自己 | B+/A+ | 登(自己，必填字段) | B+/A+ | B+/A+ | P0：匿名反馈对所有人可读 |
 | projectReports | B+/A+ | B+/A+ | B+/A+ | B+/A+ | A+ | |
-| guestRegistrations | B+/A+ | B+/A+ | 公(主文档字段验证且 `status == 'Pending'`，或电话索引形状；已存在的 id 会变成更新，被拒绝) | B+(主文档：`status` / `checkedIn` / `checkedInAt` / `notes` / `updatedAt` / `cancelledAt`；电话索引文档：仅 `status`) | B+ | 访客报名用 `writeBatch` 同时写主文档与电话索引文档；访客取消后不能重新报名（见 `RISK_REGISTER.md` R-072） |
+| guestRegistrations | B+/A+ | B+/A+ | 公(主文档字段验证且 `status == 'Pending'`，或电话索引形状；`projects/{eventId}` 必须存在且状态为 Active / Upcoming / Approved；已存在的 id 会变成更新，被拒绝) | B+(主文档：`status` / `checkedIn` / `checkedInAt` / `notes` / `updatedAt` / `cancelledAt`；电话索引文档：仅 `status`) | B+ | 访客报名用 `writeBatch` 同时写主文档与电话索引文档；访客取消后不能重新报名（见 `RISK_REGISTER.md` R-072） |
 | oardMembers | 公 | 公 | B+ | B+(字段白名单) | B+ | |
 | oardTransitions | 公 | 公 | B+ | B+ | B+ | |
 | oardTermSettings | 公 | 公 | B+ | B+ | B+ | |

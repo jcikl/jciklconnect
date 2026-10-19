@@ -8,7 +8,7 @@
 
 2026-10-18 更新：第一轮核实（权限与规则）新增 R-028 至 R-045，见文末。
 
-2026-10-20 更新：Phase 1（外部会员）新增 R-059 至 R-072，见文末（`phase1/integration`，尚未合并、尚未部署）。R-049 至 R-058（Phase 0）的中文版尚未补写，以 `RISK_REGISTER.md` 为准。
+2026-10-20 更新：Phase 1（外部会员）新增 R-059 至 R-072，审查修复新增 R-073 至 R-086，见文末（`phase1/integration`，尚未合并、尚未部署）。R-049 至 R-058（Phase 0）的中文版尚未补写，以 `RISK_REGISTER.md` 为准。
 
 严重级别：P0 严重，P1 高，P2 中，P3 低。
 
@@ -586,7 +586,7 @@
 
 风险：活动页面无法记录付款。
 
-处理（2026-10-20，`phase1/integration`）：`services/eventPaymentService.ts` 的 `markRegistrationPaid` 自动选账户（项目的 `financialAccountId`，且它确实是本 LO 的银行账户；否则第一个 MYR 账户；再否则第一个账户；都没有则给出可读的错误），金额用 `price ?? priceMin`，报名状态更新失败时会把刚建的交易删掉。遗留问题见 R-070。
+处理（2026-10-20，`phase1/integration`）：`services/eventPaymentService.ts` 的 `markRegistrationPaid` 自动选账户（项目的 `financialAccountId`，且它确实是本 LO 的银行账户；否则第一个 MYR 账户；再否则第一个账户；都没有则给出可读的错误），金额由财务确认（窗口预填 `price || priceMin`，见 R-080），报名状态更新失败时会把刚建的交易删掉。遗留问题见 R-070。
 
 ### R-064 国际目录用的是假数据，外部用户看不到 KL 名片（P2，已解决）
 
@@ -622,11 +622,11 @@
 
 ### R-068 外部用户的活动付款依赖财务人员自觉（P2）
 
-证据：`EventDetailModal` 的 `handleMarkPaid` 会检查 `canOperateFinance`，但 `EventParticipantsTab`、`EventRegistrationsList`、`EventRoleParticipantsList` 里的「标记已付款 / 撤销付款」按钮没有按角色隐藏，`handleUndoPaid` 也没有角色检查；真正的门是规则（`transactions` 的创建和删除只有 Finance / admin）。外部用户看到的活动价格是同一个数字加美元符号，没有换算；财务把「实收马币」留空时，`markRegistrationPaid` 会把这个数字当作马币 `amount` 记账（`originalAmount` / `originalCurrency` 保留美元参考值）。`transactions.currency` 已在类型里声明，但没有任何代码写它。
+证据：`EventDetailModal` 的 `handleMarkPaid` 会检查 `canOperateFinance`，但 `EventParticipantsTab`、`EventRegistrationsList`、`EventRoleParticipantsList` 里的「标记已付款 / 撤销付款」按钮没有按角色隐藏，`handleUndoPaid` 也没有角色检查；真正的门是规则（`transactions` 的创建和删除只有 Finance / admin）。外部用户看到的活动价格是同一个数字加美元符号，没有换算。「标记已付款」窗口现在把「实收金额（MYR）」预填为 `price || priceMin`，财务必须确认或修改（填 0 则不建交易），所以只有财务直接接受预填值时，美元报名才会被记成同样数字的马币。`transactions.currency` 已在类型里声明，但没有任何代码写它。
 
-风险：部分角色会看到不该有的按钮；美元报名可能被记成同样数字的马币。
+风险：部分角色会看到不该有的按钮；财务不留意地确认，会把美元价当马币记账。
 
-建议行动：没有 `canOperateFinance` 的角色隐藏这些按钮；美元报名要求填写实收马币，或做换算；写入或删除 `transactions.currency`。
+建议行动：没有 `canOperateFinance` 的角色隐藏这些按钮；考虑为美元报名加入换算；写入或删除 `transactions.currency`。
 
 ### R-069 useEventParticipations 直接读 Firestore，并且读错了访客的姓名字段（P3）
 
@@ -659,3 +659,119 @@
 风险：取消过的访客不能用同一邮箱或电话再报同一个活动。
 
 建议行动：接受现状，或由 board 删除已取消的文档（board 有删除权限）。
+
+## 2026-10-20 新增：Phase 1 审查修复
+
+以下修复都在 `phase1/integration`（尚未合并、尚未部署）。
+
+### R-073 KL 自助注册因嵌套的 undefined 一直失败（P0，已解决）
+
+证据：注册资料构建函数（`utils/signUpPayload.ts` 的 `buildSelfSignUpMember`）在表单没有填简介时留下 `others.bio: undefined`；旧的 `stripUndefined` 只去掉顶层的 undefined，而 Firestore 不接受嵌套的 undefined，所以写 `members` 失败。失败时，刚创建的 Firebase Auth 账号会留下，没有资料。
+
+风险：新的 KL 申请人无法注册，每次失败还会留下一个孤立的 Auth 账号。
+
+处理：`stripUndefined` 现在会清理各层的普通对象（Timestamp 和数组保持原样），`buildExternalSignUpMember` 也用它。`hooks/useAuth.tsx` 的 `signUp` 在资料写入失败时会删除刚建的 Auth 账号（和 `signUpExternal` 原有的回滚一致）。
+
+### R-074 分会管理人可以撤销 KL 的决定（P1，已解决）
+
+证据：重新激活已停用成员的条件是 `affiliation.activatedAt` 已有，这并不说明是谁停用的，所以分会管理人可以解除 JCI KL 做的停用。规则里分会管理人的客户端分支还允许 `expired` → `suspended` 等从浏览器直接改状态字段的写法。
+
+风险：分会管理人能推翻 KL 的停用，也能做 `external-accounts` 转换表不允许的状态变更。
+
+处理：`setStatus` 在每次变为 `suspended` 时写 `affiliation.suspendedByRole`（`KL` 或 `CHAPTER_ADMIN`），分会管理人只有在值为 `CHAPTER_ADMIN` 时才能重新激活；`ChapterAdminView` 的「重新激活」按钮用同一条件显示。`members` 更新规则里的客户端分支已移除，分会管理人不再从浏览器写会员文档。
+
+### R-075 任何人都可以通过自助注册占满分会名额（P1，已解决）
+
+证据：每个分会 100 个成员的上限统计了该分会所有成员文档，而任何人都能自助注册出一个 `pending_chapter` 文档。
+
+风险：大量自助注册会让真正的邀请无法进行。
+
+处理：function 只统计 `affiliation.status` 在 `CAP_COUNTED_STATUSES`（`active`、`suspended`）内的成员；待审批、已拒绝、已过期的文档不占名额。索引见 R-086。
+
+### R-076 问卷的 responsesCount 可以被刷高（P2，已解决）
+
+证据：`surveys` 更新规则允许任何能读问卷的人给 `responsesCount` 加 1，与是否真的有回答无关，也不看问卷状态。
+
+风险：用户不作答也能把回答计数刷上去。
+
+处理：非 board / admin 的更新必须针对 `Active` 的问卷，只改 `responsesCount`（+1）和 `updatedAt`，并且同一次写入要创建自己的 `surveyResponses/{surveyId}_{uid}`（规则检查该文档写入前不存在、写入后存在）。
+
+### R-077 自助注册的类别没有和分会绑定（P2，已解决）
+
+证据：外部自助注册规则接受 `sister`、`apicc`、`global` 中任意一个 `affiliation.category`。
+
+风险：自助注册的人可以选一个与自己分会不符的类别，从而改变他能看到的内容（福利受众）。
+
+处理：规则要求 `affiliation.category == categoryForChapterType(chapter.type)`。见 R-083。
+
+### R-078 可以按 id 试探报名和问卷回答（P2，已解决）
+
+证据：`eventRegistrations` 和 `surveyResponses` 的 get 规则允许读取任意 id 下不存在的文档，「找不到」与「无权限」的区别会告诉用户别人是否报过名或答过卷。
+
+风险：泄露谁报名了某个活动、谁回答了某份问卷。
+
+处理：不存在的 `eventRegistrations` 文档只有在 id 以 `_` 加调用者 uid 结尾时才允许读；不存在的 `surveyResponses` 文档只允许读 `{surveyId}_{uid}`。见 R-084、R-085。
+
+### R-079 不存在的活动也能接受访客报名（P2，已解决）
+
+证据：`guestRegistrations` 创建规则只检查数据形状，未登录访客可以对任意 `eventId` 创建报名。
+
+风险：为虚构或未列出的活动产生垃圾文档。
+
+处理：创建时还要求 `projects/{eventId}` 存在，且状态为 Active、Upcoming 或 Approved（访客活动页列出的状态）。见 R-082。
+
+### R-080 标记已付款时，分档价格记成了最低档（P2，已解决）
+
+证据：`markRegistrationPaid` 用 `price ?? priceMin`，分档价格的活动会记成最低档，与付款人实际付的无关。
+
+风险：财务收入金额不对。
+
+处理：「标记已付款」窗口要求财务确认实际收到的马币金额（预填 `price || priceMin`）；交易的 `amount` 就是确认的金额，`originalAmount`（只有美元报名才写）保留列出的价格。
+
+### R-081 问卷回答可以用任意 id 创建（P2，已解决）
+
+证据：`surveyResponses` 创建规则只要数据字段符合就接受任何文档 id，一个用户可以提交多份回答。
+
+风险：重复或多余的回答被计入问卷结果。
+
+处理：非 board / admin 必须使用 id `{surveyId}_{uid}`（`SurveysService.submitResponse` 本来就用这个 id），已存在的 id 仍然被拒绝。
+
+### R-082 已接受：未登录访客可以抢先占用访客的邮箱或电话（P3，已接受）
+
+证据：访客报名 id 是 `{eventId}_{emailKey}` 和 `{eventId}_phone_{phoneKey}`，创建不需要登录（R-060、R-072）。任何人都可以为某个已列出的活动登记一个邮箱或电话，真正的主人之后会被提示「已报名」。
+
+风险：访客可以挡住别人对该活动的访客报名。
+
+决定：暂时接受；board 可以删除被抢占的文档（board 有删除权限）。
+
+### R-083 规则里的 categoryForChapterType 与 categoryForChapter 重复（P3）
+
+证据：`firestore.rules` 的 `categoryForChapterType` 与 `utils/affiliation.mjs` 的 `categoryForChapter` 是同一个映射（先 `sister_lo`，再 `apicc`，再 `global`，默认 `sister`），规则不能引用代码。
+
+风险：只改其中一处，自助注册会被拒绝（或接受错误的类别）。
+
+建议行动：两处一起改；`tests/rules/wp3SelfRegister.rules.test.ts` 与单元测试应覆盖同样的情况。
+
+### R-084 问卷 id 不能包含下划线（P3）
+
+证据：`surveyResponses` 的 get 规则把第一个 `_` 之前的部分当作问卷 id（`responseId.split('_')[0]`），`surveys` 更新规则则拼出 `{surveyId}_{uid}`。问卷 id 是 Firestore 自动 id，不含 `_`。
+
+风险：手工指定的带 `_` 的问卷 id 会破坏不存在文档的读取和重复提交检查。
+
+建议行动：不要用自定义 id 创建问卷。
+
+### R-085 eventRegistrations 的「文档不存在」检查只看后缀（P3）
+
+证据：`eventRegistrations` 的 get 规则在 id 以 `_` 加调用者 uid 结尾时允许读取不存在的文档，不检查前面的部分。
+
+风险：只是理论上的：本身含 `_` 的 uid 可能匹配到别的 id 的后缀。Firebase 自动 uid 不含 `_`，且匹配只会暴露「文档不存在」。
+
+建议行动：暂不处理；若将来引入自定义 uid 再收紧。
+
+### R-086 部署注意：复合索引 members (loId, affiliation.status)（P2）
+
+证据：名额统计（R-075）用 `loId ==` 加 `affiliation.status in [...]` 查询 `members`；索引已写在 `firestore.indexes.json`。
+
+风险：如果规则和 function 上线时没有这个索引，创建或邀请外部账号会在统计查询处失败。
+
+建议行动：发布 function 前，把 `firestore.indexes.json` 与 `firestore.rules` 一起部署，并等索引建好。
