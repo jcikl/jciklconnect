@@ -282,6 +282,16 @@ describe.skipIf(!HOST)('firestore.rules — surveys / hobby clubs open to extern
       expect(await submit('aff1', 'counter', 2)).toBe(OK);
       bump('counter');
     });
+    it('L1: nobody can probe whether another user answered (missing ids of others are denied, not 404)', async () => {
+      expect(await getDoc('klMember', 'surveyResponses/counter_someoneElse')).toBe(DENIED);
+      expect(await getDoc('klMember', 'surveyResponses/klOnly_aff1')).toBe(DENIED);
+      // ids that merely end with the caller's uid
+      expect(await getDoc('klMember', 'surveyResponses/counter_xklMember')).toBe(DENIED);
+      expect(await getDoc('klMember', 'surveyResponses/counter_x_klMember')).toBe(DENIED);
+      expect(await getDoc('klMember', 'surveyResponses/klMember')).toBe(DENIED);
+      // own id still readable while missing
+      expect(await getDoc('klMember', 'surveyResponses/openActive_klMember')).toBe(404);
+    });
     it('the duplicate check cannot read someone else\'s existing response', async () => {
       expect(await getDoc('chAdmin', 'surveyResponses/counter_aff1')).toBe(DENIED);
     });

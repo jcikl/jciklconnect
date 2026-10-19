@@ -926,8 +926,12 @@ service cloud.firestore {
       }
       // resource.data valid for get; service-layer where(memberId == uid) handles list ownership
       // resource == null: submitResponse's duplicate check reads its own not-yet-existing id ({surveyId}_{uid}).
+      // Only the caller's own id (exact: everything after the first '_' is the uid; survey ids are auto-ids
+      // without '_'), so nobody can probe whether another member answered (404 vs 403).
       allow get: if isAuthenticated() &&
-                    (resource == null || resource.data.memberId == request.auth.uid || isBoard() || isAdmin());
+                    ((resource == null && responseId == responseId.split('_')[0] + '_' + request.auth.uid) ||
+                     (resource != null && resource.data.memberId == request.auth.uid) ||
+                     isBoard() || isAdmin());
       allow list: if isActiveMember() ||
                      (isActiveExternal() && resource.data.memberId == request.auth.uid);
       // FIX: added required field validation to prevent partial/malformed responses
