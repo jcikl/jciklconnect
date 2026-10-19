@@ -91,7 +91,7 @@
 | `learningPathsService.ts` | 340 | 2 | Learning Paths & Learning Progress Service Fixes applied: P1 – startLearningPath uses runTransaction to prevent duplicate progress records P… | LEARNING_PATHS, LEARNING_PROGRESS |
 | `memberAuthService.ts` | 91 | 2 | 会员登录账号（Firebase Auth）的建立与补建；调用 Netlify 函数 member-auth（uid = 会员文档 ID）。 | — |
 | `memberBenefitsService.ts` | 329 | 1 | Member Benefits Service Handles the memberBenefits collection and benefitUsage write path. Read path for advertisements-as-benefits lives in… | ADVERTISEMENTS, BENEFIT_USAGE, MEMBER_BENEFITS |
-| `memberCardsService.ts` | 109 | 7 | Member Cards Service — keeps `memberCards/{memberId}` (the public directory card, Phase 0 WP2) in sync with `members`. The card is written A… | MEMBER_CARDS |
+| `memberCardsService.ts` | 132 | 7 | Member Cards Service — keeps `memberCards/{memberId}` (the public directory card, Phase 0 WP2) in sync with `members`. The card is written A… | MEMBER_CARDS |
 | `memberJourneyService.ts` | 155 | 2 | Leadership Journey + Trainer Pathway derivation (dashboard journey card for pre-2025 members) | — |
 | `memberStatsService.ts` | 319 | 2 | Member Statistics Service - Generates comprehensive member statistics and reports | — |
 | `membersService.ts` | 2,326 | 40 | Members Service - CRUD Operations | BOARD_MEMBERS, EVENT_REGISTRATIONS, MEMBERS, MEMBER_EMAILS, NOTIFICATIONS, PAYMENT_REQUESTS … |
@@ -146,16 +146,17 @@
 
 </details>
 
-<details><summary><code>services/memberCardsService.ts</code> — 6 個方法</summary>
+<details><summary><code>services/memberCardsService.ts</code> — 7 個方法</summary>
 
 | 方法 | 行 | 說明 |
 |---|---|---|
 | `getInternationalCards` | 41 | Cards shared with other chapters (`international == true`), all chapters, KL's own excluded. Query shape: ONE … |
-| `buildCard` | 56 |  |
-| `shouldHaveCard` | 60 |  |
-| `applyUpdates` | 65 | Member snapshot after an updateDoc-style payload (dot-paths supported). |
-| `plan` | 70 | Decide the card action for a before -> after member change (see planCardSync). |
-| `syncCards` | 79 | Applies the planned card upserts/deletes for already-committed member writes, chunked (<= 400 per batch). Neve… |
+| `getCardsByChapters` | 61 | Cards of the given chapters (KL users only: rules let active KL members list any card, by `loId ==` or `in`; e… |
+| `buildCard` | 79 |  |
+| `shouldHaveCard` | 83 |  |
+| `applyUpdates` | 88 | Member snapshot after an updateDoc-style payload (dot-paths supported). |
+| `plan` | 93 | Decide the card action for a before -> after member change (see planCardSync). |
+| `syncCards` | 102 | Applies the planned card upserts/deletes for already-committed member writes, chunked (<= 400 per batch). Neve… |
 
 </details>
 
@@ -1300,11 +1301,11 @@
 | `useMemberSearch.ts` | 53 | 1 | `useMemberSearch` | — | ⚠️ 無說明 |
 | `useMembers.ts` | 195 | 21 | `useMembers`, `usePaginatedMembers` | membersService | Members Data Hook |
 | `useNotifications.ts` | 107 | 0 | `useNotifications` | communicationService, errorLoggingService, mockData | ⚠️ 無說明 |
-| `usePermissions.ts` | 212 | 27 | `usePermissions` | — | Permission Management Hook |
+| `usePermissions.ts` | 212 | 28 | `usePermissions` | — | Permission Management Hook |
 | `usePoints.ts` | 61 | 2 | `usePoints` | pointsService | Points Data Hook |
 | `useProjects.ts` | 170 | 7 | `useProjects` | projectsService | Projects Data Hook |
 | `usePushNotifications.ts` | 63 | 1 | `usePushNotifications` | — | ⚠️ 無說明 |
-| `useSisterChapterMembers.ts` | 42 | 2 | `useSisterChapterMembers` | memberCardsService, sisterChaptersService | ⚠️ 無說明 |
+| `useSisterChapterMembers.ts` | 48 | 2 | `useSisterChapterMembers` | memberCardsService, sisterChaptersService | ⚠️ 無說明 |
 | `useSisterChapters.ts` | 26 | 3 | `useSisterChapters` | sisterChaptersService | ⚠️ 無說明 |
 | `useSocialPersonas.ts` | 46 | 2 | `useSocialPersonas` | socialPersonaService | ⚠️ 無說明 |
 | `useSocialPosts.ts` | 74 | 1 | `useSocialPosts` | socialPostService | ⚠️ 無說明 |
@@ -1443,11 +1444,12 @@
 |---|---|---|
 | `calculateAwardProgress` | 8 | Pure function: calculates progress percentage (0–100) toward an award. Milestone-based awards use segment logi… |
 
-### `utils/internationalCards.ts` （16 行，1 處引用）
+### `utils/internationalCards.ts` （27 行，1 處引用）
 
 | 函數 | 行 | 說明 |
 |---|---|---|
-| `attachSisterChapters` | 9 | Attach each card's active sister chapter; cards of unknown/inactive chapters are dropped. |
+| `planCardQuery` | 15 | Which memberCards query the signed-in user may run. KL users list the active sister chapters' cards (every sis… |
+| `attachSisterChapters` | 20 | Attach each card's active sister chapter; cards of unknown/inactive chapters are dropped. |
 
 ### `utils/malaysianIdUtils.ts` （110 行，6 處引用）
 > Malaysian IC (MyKad) utilities

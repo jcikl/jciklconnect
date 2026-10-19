@@ -53,6 +53,29 @@ export class MemberCardsService {
     }, CACHE_TTL_3MIN);
   }
 
+  /**
+   * Cards of the given chapters (KL users only: rules let active KL members list any card, by `loId ==`
+   * or `in`; externals must use getInternationalCards). `in` queries are chunked by 30 (Firestore limit).
+   * Cached 3 min per sorted id set.
+   */
+  static async getCardsByChapters(loIds: string[]): Promise<MemberCardWithId[]> {
+    const ids = Array.from(new Set(loIds)).sort();
+    if (isDevMode() || ids.length === 0) return [];
+    return apiCache.getOrSet(`memberCards:chapters:${ids.join(',')}`, async () => {
+      try {
+        const chunks: string[][] = [];
+        for (let i = 0; i < ids.length; i += 30) chunks.push(ids.slice(i, i + 30));
+        const snaps = await Promise.all(
+          chunks.map(chunk => getDocs(query(collection(db, COLLECTIONS.MEMBER_CARDS), where('loId', 'in', chunk)))),
+        );
+        return snaps.flatMap(snap => snap.docs.map(d => ({ id: d.id, ...(d.data() as MemberCard) })));
+      } catch (error) {
+        errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MemberCardsService.getCardsByChapters' });
+        throw error;
+      }
+    }, CACHE_TTL_3MIN);
+  }
+
   static buildCard(member: Partial<Member>, nowIso?: string): MemberCard {
     return buildMemberCard(member, nowIso) as MemberCard;
   }
