@@ -56,3 +56,12 @@ export function isKlRelevantEvent(item) {
   return involvesLo(item, KL_LO_NAME)
     || level === 'national' || level === 'jci' || level === 'area' || level.startsWith('area');
 }
+
+/**
+ * Events an external-chapter member (AFFILIATE / CHAPTER_ADMIN) sees: only what JCI KL hosts or co-hosts.
+ * National / area / JCI level events hosted by other LOs are not shown to externals.
+ * @param {{ hostingLo?: unknown, coHosting?: unknown } | null | undefined} item
+ */
+export function isEventVisibleToExternal(item) {
+  return involvesLo(item, KL_LO_NAME);
+}

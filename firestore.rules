@@ -735,13 +735,14 @@ service cloud.firestore {
         'matchedBankTxId', 'toyyibBillCode', 'toyyibPaymentUrl', 'toyyibPaymentStatus', 'billExternalReferenceNo',
         'cancelledAt', 'cancelledBy', 'cancelledByName', 'cancelledByRole',
         'registeredBy', 'registeredByName', 'memberName',
-        'eventId', 'memberId', 'loId', 'createdAt', 'updatedAt'];
+        'eventId', 'memberId', 'loId', 'registrantLoId', 'currency', 'createdAt', 'updatedAt'];
       return unchanged.toSet().difference(request.resource.data.diff(resource.data).affectedKeys()).size() == unchanged.size();
     }
     match /eventRegistrations/{regId} {
       // ER-R1: split get/list — resource.data is null in list queries; members can only self-read via get
+      // resource == null: registerForEvent's transaction reads the (not yet existing) {eventId}_{uid} doc first.
       allow get: if isAuthenticated() &&
-        (isAdmin() || resource.data.get('memberId', null) == request.auth.uid || canReadOrgMembers());
+        (isAdmin() || resource == null || resource.data.get('memberId', null) == request.auth.uid || canReadOrgMembers());
       // Members may list their own registrations (service adds where('memberId','==',uid)); Board+ lists all.
       // Active external users: own registrations only — the query must carry where('memberId','==',uid).
       allow list: if isAuthenticated() && (isAdmin() || canReadOrgMembers() || isMember() ||

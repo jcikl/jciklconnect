@@ -56,6 +56,10 @@ export interface EventRegistration {
   billExternalReferenceNo?: string;
   financeTransactionId?: string;
   paymentMethod?: 'toyyib' | 'bank_transfer' | 'cash';
+  /** Chapter (loId) of the registrant; `loId` stays the hosting LO. */
+  registrantLoId?: string | null;
+  /** Currency the registrant saw the price in: 'USD' for external-chapter members, 'MYR' otherwise. */
+  currency?: 'MYR' | 'USD' | null;
 }
 
 export interface NonMemberLead {

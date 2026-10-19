@@ -559,3 +559,10 @@ export const CONTRACT_STATUS = {
 } as const;
 
 
+
+/**
+ * Offline payment instructions shown to external-chapter members (events are priced in USD for display;
+ * a finance operator marks the payment as received). One global text; edit here.
+ */
+export const EXTERNAL_OFFLINE_PAYMENT_NOTE =
+  'Pay offline: after registering, contact JCI KL finance for bank transfer details. Your registration is confirmed once finance marks it as paid.';

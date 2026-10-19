@@ -28,6 +28,7 @@ import { errorLoggingService } from './errorLoggingService';
 import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 import { MOCK_EVENTS } from './mockData';
 import { getMYTTodayStr } from '../utils/dateUtils';
+import { isExternalRole } from '../utils/externalAccess';
 import { involvesLo, isKlRelevantEvent, KL_LO_NAME, KL_SHARED_LEVELS } from '../utils/loHosting.mjs';
 
 const CACHE_KEY_ALL_EVENTS = 'events:all';
@@ -440,6 +441,17 @@ export class EventsService {
           const deterministicRegId = `${eventId}_${memberId}`;
           const regRef = doc(db, COLLECTIONS.EVENT_REGISTRATIONS, deterministicRegId);
 
+          // Chapter + display currency of the registrant (external-chapter members see USD, everyone else MYR).
+          // Best effort: if the member doc cannot be read, treat as a KL member (loId stays the hosting LO either way).
+          let registrantLoId: string = DEFAULT_LO_ID;
+          let currency: 'MYR' | 'USD' = 'MYR';
+          try {
+            const memberSnap = await getDoc(doc(db, COLLECTIONS.MEMBERS, memberId));
+            const m = memberSnap.exists() ? (memberSnap.data() as { role?: string; loId?: string }) : null;
+            if (m?.loId) registrantLoId = m.loId;
+            if (isExternalRole(m?.role)) currency = 'USD';
+          } catch { /* keep defaults */ }
+
           await runTransaction(db, async (txn) => {
             const [existingSnap, eventSnap] = await Promise.all([
               txn.get(regRef),
@@ -479,6 +491,8 @@ export class EventsService {
                 createdAt: Timestamp.now(),
                 updatedAt: Timestamp.now(),
                 loId: DEFAULT_LO_ID,
+                registrantLoId,
+                currency,
               };
               if (extraFields?.dietary) payload.dietary = extraFields.dietary;
               if (extraFields?.isVegetarian != null) payload.isVegetarian = extraFields.isVegetarian;

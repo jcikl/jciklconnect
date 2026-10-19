@@ -88,6 +88,11 @@ export interface Transaction {
   eventRegistrationId?: string;
   paymentMethod?: 'toyyib' | 'bank_transfer' | 'cash';
   toyyibBillCode?: string;
+  /** Currency `amount` is recorded in. Missing = MYR. Immutable after create (not in the transactions update whitelist). */
+  currency?: 'MYR' | 'USD';
+  /** Reference only: the price the payer saw (e.g. USD for external-chapter members); `amount` stays the MYR received. */
+  originalAmount?: number;
+  originalCurrency?: 'USD';
   createdAt?: string;
   updatedAt?: string;
   // Nested groups

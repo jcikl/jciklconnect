@@ -11,6 +11,7 @@ import { MEMBER_SELF_EDITABLE_FIELDS } from '../../../config/constants';
 import { EventRegistrationService } from '../../../services/eventRegistrationService';
 import { EventsService } from '../../../services/eventsService';
 import { formatDateToDDMMMYYYY } from '../../../utils/dateUtils';
+import { isExternalRole } from '../../../utils/externalAccess';
 
 /** Dues status labels (Story 8.1) */
 const DUES_STATUS_LABEL: Record<string, string> = { Paid: 'Paid', Pending: 'Pending', Overdue: 'Overdue' };
@@ -50,7 +51,8 @@ export const MyProfileSelfView: React.FC<{ member: Member; onSave: (updates: Par
       try {
         const [regs, allEvents] = await Promise.all([
           EventRegistrationService.listByMember(member.id),
-          EventsService.getAllEvents(),
+          // External-chapter members can only read events KL hosts or co-hosts.
+          isExternalRole(member.role) ? EventsService.getKlEvents() : EventsService.getAllEvents(),
         ]);
         if (cancelled) return;
         setParticipations(regs);

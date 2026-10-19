@@ -7,7 +7,7 @@ import { EventRegistrationService } from '../../../services/eventRegistrationSer
 import { EventsService } from '../../../services/eventsService';
 import { MembersService } from '../../../services/membersService';
 import { FinanceService } from '../../../services/financeService';
-import { DEFAULT_LO_ID } from '../../../config/constants';
+import { EventPaymentService } from '../../../services/eventPaymentService';
 import { formatCurrency } from '../../../utils/formatUtils';
 import { formatDate } from '../../../utils/dateUtils';
 import { EventStatsTab } from './EventStatsTab';
@@ -71,7 +71,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   const [addingParticipant, setAddingParticipant] = useState(false);
   const [addForm, setAddForm] = useState<EventAddParticipantFormData>({ dietary: 'normal', tshirtSize: '' });
   const [cancelConfirmReg, setCancelConfirmReg] = useState<EventRegistration | null>(null);
-  const { isBoard, isAdmin } = usePermissions();
+  const { isBoard, isAdmin, isExternal, canOperateFinance } = usePermissions();
   const { showToast } = useToast();
   const {
     participations,
@@ -224,60 +224,27 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   };
 
   const handleMarkPaid = (reg: EventRegistration) => {
+    if (!canOperateFinance) {
+      showToast('Only finance operators and admins can mark payments as paid.', 'error');
+      return;
+    }
     setMarkPaidReg(reg);
   };
 
-  const handleConfirmMarkPaid = async (paymentMethod: 'bank_transfer' | 'cash') => {
+  const handleConfirmMarkPaid = async (paymentMethod: 'bank_transfer' | 'cash', receivedMyr?: number) => {
     const reg = markPaidReg;
     if (!reg) return;
     setMarkPaidReg(null);
     setUpdatingRegId(reg.id);
     try {
-      const now = new Date().toISOString();
       const actorName = member?.general?.name ?? member?.id ?? 'Admin';
-      const today = now.split('T')[0];
-
-      // Create income transaction (Pending) — only for paid events (amount > 0).
-      // Let createTransaction throw so a DB failure aborts the whole operation
-      // and EventReg is never left in 'paid' state without a finance record.
-      let financeTransactionId: string | undefined;
-      const amount = event?.price ?? 0;
-      if (amount > 0) {
-        financeTransactionId = await FinanceService.createTransaction({
-          loId: DEFAULT_LO_ID,
-          type: 'Income',
-          category: 'Projects & Activities',
-          status: 'Pending',
-          paymentMethod,
-          projectId: event?.id,
-          memberId: reg.memberId,
-          eventRegistrationId: reg.id,
-          amount,
-          description: `Event ticket — ${event?.title ?? reg.eventId}`,
-          date: today,
-          source: 'manual',
-        } as Parameters<typeof FinanceService.createTransaction>[0]);
-      }
-
-      try {
-        await EventRegistrationService.updateStatus(reg.id, 'paid', {
-          paidAt: now,
-          paidByName: actorName,
-          paymentMethod,
-          ...(financeTransactionId ? { financeTransactionId } : {}),
-        });
-      } catch (statusErr) {
-        // Registration update failed — delete the finance transaction we just created
-        // so we don't leave a dangling income record with no linked registration.
-        if (financeTransactionId) {
-          await FinanceService.deleteTransaction(financeTransactionId).catch(() => {});
-        }
-        throw statusErr;
-      }
+      // Creates the income transaction (bank account resolved by the service) and then flips the registration;
+      // a failure aborts the whole operation so a registration is never 'paid' without its finance record.
+      const { paidAt: now } = await EventPaymentService.markRegistrationPaid(reg, event, { paymentMethod, actorName, receivedMyr });
       setParticipations((prev) => prev.map((r) => (r.id === reg.id ? { ...r, status: 'paid' as const, paidAt: now, paidByName: actorName, paymentMethod } : r)));
       showToast('Marked as paid', 'success');
-    } catch {
-      showToast('Operation failed', 'error');
+    } catch (err) {
+      showToast(err instanceof Error && err.message ? err.message : 'Operation failed', 'error');
     } finally {
       setUpdatingRegId(null);
     }
@@ -362,7 +329,8 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
     priceMax,
     attendancePercent,
     isFull,
-  } = useEventDerivedDetails(event, localEvent);
+    priceCurrency,
+  } = useEventDerivedDetails(event, localEvent, isExternal);
 
   const registerButton = (
     <EventRegisterButton
@@ -396,6 +364,8 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
           <EventMobileRegistrationFooter
             priceMin={priceMin}
             priceMax={priceMax}
+            priceCurrency={priceCurrency}
+            offlinePayment={isExternal}
             registerButton={registerButton}
           />
         ) : null}
@@ -500,6 +470,8 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
               registerButton={registerButton}
               priceMin={priceMin}
               priceMax={priceMax}
+              priceCurrency={priceCurrency}
+              offlinePayment={isExternal}
               date={date}
               endDate={endDate}
               isMultiDay={isMultiDay}
@@ -541,6 +513,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
       />
 
       <EventMarkPaidModal
+        key={markPaidReg?.id}
         registration={markPaidReg}
         onClose={() => setMarkPaidReg(null)}
         onConfirm={handleConfirmMarkPaid}
