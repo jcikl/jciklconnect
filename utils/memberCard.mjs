@@ -52,7 +52,8 @@ export function buildMemberCard(member, nowIso = new Date().toISOString()) {
   /** @type {Record<string, unknown>} */
   const optional = {
     avatarUrl: str(g.avatarUrl) ?? str(g.avatar),
-    country: external ? str(member?.affiliation?.country) : 'Malaysia',
+    // 'Malaysia' only for KL (loId jcikl / missing); other chapters get a country only from affiliation.country.
+    country: str(member?.affiliation?.country) ?? (!external && (str(member?.loId) ?? KL_LO_ID) === KL_LO_ID ? 'Malaysia' : undefined),
     companyName: str(b.companyName) ?? str(member?.companyName),
     position: str(b.position),
     department: str(b.departmentAndPosition),
