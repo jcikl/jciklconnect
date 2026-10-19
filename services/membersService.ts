@@ -144,7 +144,8 @@ export class MembersService {
             orderBy('updatedAt', 'desc')
           );
         } else {
-          q = query(collection(db, COLLECTIONS.MEMBERS), limit(500));
+          // Rules require every non-admin members list query to be constrained to the KL chapter.
+          q = query(collection(db, COLLECTIONS.MEMBERS), where('loId', '==', DEFAULT_LO_ID), limit(500));
         }
         const snapshot = await getDocs(q);
         const docs = snapshot.docs.map(d => ({ ...(d.data() as Omit<Member, 'id'>), id: d.id } as Member));
@@ -210,28 +211,28 @@ export class MembersService {
       }
 
       // 2. Otherwise, check if it matches a member name
-      const q = query(collection(db, COLLECTIONS.MEMBERS), where('name', '==', trimmed));
+      const q = query(collection(db, COLLECTIONS.MEMBERS), where('loId', '==', DEFAULT_LO_ID), where('name', '==', trimmed));
       const snap = await getDocs(q);
       for (const d of snap.docs) {
         await PointsService.recalculateMemberRadarStats(d.id);
       }
 
       // 3. Also check general.name
-      const q2 = query(collection(db, COLLECTIONS.MEMBERS), where('general.name', '==', trimmed));
+      const q2 = query(collection(db, COLLECTIONS.MEMBERS), where('loId', '==', DEFAULT_LO_ID), where('general.name', '==', trimmed));
       const snap2 = await getDocs(q2);
       for (const d of snap2.docs) {
         await PointsService.recalculateMemberRadarStats(d.id);
       }
 
       // 4. Also check top-level fullName
-      const q3 = query(collection(db, COLLECTIONS.MEMBERS), where('fullName', '==', trimmed));
+      const q3 = query(collection(db, COLLECTIONS.MEMBERS), where('loId', '==', DEFAULT_LO_ID), where('fullName', '==', trimmed));
       const snap3 = await getDocs(q3);
       for (const d of snap3.docs) {
         await PointsService.recalculateMemberRadarStats(d.id);
       }
 
       // 5. Also check general.fullName (nested path)
-      const q4 = query(collection(db, COLLECTIONS.MEMBERS), where('general.fullName', '==', trimmed));
+      const q4 = query(collection(db, COLLECTIONS.MEMBERS), where('loId', '==', DEFAULT_LO_ID), where('general.fullName', '==', trimmed));
       const snap4 = await getDocs(q4);
       for (const d of snap4.docs) {
         await PointsService.recalculateMemberRadarStats(d.id);
@@ -1116,6 +1117,7 @@ export class MembersService {
     try {
       const q = query(
         collection(db, COLLECTIONS.MEMBERS),
+        where('loId', '==', DEFAULT_LO_ID),
         where('role', '==', role),
         // PERF11: Increased from 200 to 500 to match getAllMembers cap. TODO: implement pagination for very large chapters.
         limit(500)
@@ -1146,6 +1148,7 @@ export class MembersService {
     try {
       const q = query(
         collection(db, COLLECTIONS.MEMBERS),
+        where('loId', '==', DEFAULT_LO_ID),
         where('email', '==', email),
         limit(1)
       );
@@ -1160,6 +1163,7 @@ export class MembersService {
       // only under contact.email and the flat field may not be populated.
       const q2 = query(
         collection(db, COLLECTIONS.MEMBERS),
+        where('loId', '==', DEFAULT_LO_ID),
         where('contact.email', '==', email),
         limit(1)
       );
@@ -1181,6 +1185,7 @@ export class MembersService {
     try {
       const q = query(
         collection(db, COLLECTIONS.MEMBERS),
+        where('loId', '==', DEFAULT_LO_ID),
         where('churnRisk', 'in', ['High', 'Medium'])
       );
 
@@ -2261,12 +2266,14 @@ export class MembersService {
 
     let q = query(
       collection(db, COLLECTIONS.MEMBERS),
+      where('loId', '==', DEFAULT_LO_ID),
       orderBy('name'),
       limit(pageSize)
     );
     if (lastDoc) {
       q = query(
         collection(db, COLLECTIONS.MEMBERS),
+        where('loId', '==', DEFAULT_LO_ID),
         orderBy('name'),
         startAfter(lastDoc),
         limit(pageSize)

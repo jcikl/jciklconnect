@@ -35,6 +35,7 @@ import { errorLoggingService } from '../services/errorLoggingService';
 import type { Transaction, BankAccount, ProjectFinancialAccount, TransactionSplit, InventoryItem } from '../types';
 import type { PaymentRequest, Project, MembershipType } from '../types';
 import { involvesLo, KL_LO_NAME } from '../utils/loHosting.mjs';
+import { filterKlMembers } from '../utils/memberScope';
 
 export const UNASSIGNED_PROJECT_ID = 'UNASSIGNED_PROJECT';
 
@@ -290,7 +291,7 @@ export function useFinanceData(searchQuery?: string) {
   const loadMembers = useCallback(async (getIgnore?: () => boolean) => {
     const stale = () => getIgnore?.() ?? false;
     try {
-      const list = await MembersService.getAllMembers();
+      const list = filterKlMembers(await MembersService.getAllMembers());
       if (stale()) return [];
       const mappedMembers = list.map(m => ({
         id: m.id,
