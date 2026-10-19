@@ -18,7 +18,8 @@ export const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
   onRegister: () => void;
   onPageChange: (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'partnerships') => void;
 }) => {
-  const { events, loading } = useEvents({ publicMode: true });
+  // Only the events this page can show (KL host / co-host, national / area / JCI) instead of every event.
+  const { events, loading } = useEvents({ publicMode: true, scope: 'klRelevant' });
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [isRegistrationModalOpen, setIsRegistrationModalOpen] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);

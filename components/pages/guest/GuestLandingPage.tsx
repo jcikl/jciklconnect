@@ -3,6 +3,7 @@ import { Helmet } from 'react-helmet-async';
 import { Users, Calendar, ChevronRight, FolderKanban, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/Common';
 import { useEvents } from '@/hooks/useEvents';
+import { isKlRelevantEvent } from '@/utils/loHosting.mjs';
 import { BoardManagementService } from '@/services/boardManagementService';
 import { trimCloudinaryImage } from '@/services/cloudinaryService';
 import { GuestHeader } from '@/components/layout/GuestHeader';
@@ -16,12 +17,14 @@ export const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
   const currentYear = String(new Date().getFullYear());
   const [president, setPresident] = useState<{ name: string; avatar: string; company: string } | null>(null);
   const [termSettings, setTermSettings] = useState<{ presidentTheme?: string; tagline?: string; shortDescription?: string; logoUrl?: string; memberGroupPhotoUrl?: string } | null>(null);
-  const { events } = useEvents({ publicMode: true });
+  // Today-and-later only (not every event, ~5 MB) — this is the first page a visitor sees.
+  const { events } = useEvents({ publicMode: true, scope: 'upcoming' });
 
   const upcomingEvents = useMemo(() => {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     return events
-      .filter(e => e.date && new Date(e.date) >= today)
+      // Same rule as the member home / guest events page: KL host or co-host, or national / area / JCI.
+      .filter(e => e.date && new Date(e.date) >= today && isKlRelevantEvent(e as any))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
       .slice(0, 3);
   }, [events]);
@@ -482,7 +485,7 @@ export const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
                   View All <ChevronRight size={15} />
                 </button>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-4">
                 {upcomingEvents.map(event => (
                   <div key={event.id} onClick={() => onPageChange('events')}
                     className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all overflow-hidden group cursor-pointer">
