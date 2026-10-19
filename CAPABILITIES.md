@@ -184,17 +184,17 @@
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `syncComputedMembershipType` | 98 | Recompute membershipType from profile + promotion (Full); always persisted on save. |
-| `invalidateMembersCache` | 125 | Invalidate all members cache (call after any write to members collection). |
-| `getAllMembers` | 133 | Get all members, optionally filtered by loId (for multi-LO). |
-| `getMemberById` | 178 | Get member by ID |
-| `recalculateIntroducerStats` | 200 | Helper to recalculate radar stats for an introducer (dynamic import to avoid circular dependency) |
-| `normalizeMemberData` | 247 | Helper to map flat properties to standard nested sub-objects (general, contact, etc.) for database consistency… |
-| `createMember` | 568 | Create new member. Caller should pass loId (or use DEFAULT_LO_ID for single-LO). |
-| `updateMember` | 649 | Update member. Sets updatedAt and optionally updatedBy (audit). |
-| `validateSenatorshipByBoard` | 869 | Board of Directors validates a member's senatorship number (locks future edits). |
-| `revokeSenatorshipValidation` | 895 | Revoke board validation (admin / board only). Clears certification. |
-| `deleteMember` | 989 | Delete member |
+| `syncComputedMembershipType` | 99 | Recompute membershipType from profile + promotion (Full); always persisted on save. |
+| `invalidateMembersCache` | 126 | Invalidate all members cache (call after any write to members collection). |
+| `getAllMembers` | 134 | Get all members, optionally filtered by loId (for multi-LO). |
+| `getMemberById` | 179 | Get member by ID |
+| `recalculateIntroducerStats` | 201 | Helper to recalculate radar stats for an introducer (dynamic import to avoid circular dependency) |
+| `normalizeMemberData` | 248 | Helper to map flat properties to standard nested sub-objects (general, contact, etc.) for database consistency… |
+| `createMember` | 569 | Create new member. Caller should pass loId (or use DEFAULT_LO_ID for single-LO). |
+| `updateMember` | 650 | Update member. Sets updatedAt and optionally updatedBy (audit). |
+| `validateSenatorshipByBoard` | 870 | Board of Directors validates a member's senatorship number (locks future edits). |
+| `revokeSenatorshipValidation` | 896 | Revoke board validation (admin / board only). Clears certification. |
+| `deleteMember` | 990 | Delete member |
 | `searchMembers` | 1103 | Search members |
 | `getMembersByRole` | 1122 | Get members by role |
 | `getMemberByEmail` | 1153 | Get member by email (for account linking) |
@@ -1315,7 +1315,7 @@
 | `useActivityPlans.ts` | 130 | 1 | `useActivityPlans` | activityPlansService | ⚠️ 無說明 |
 | `useAdvertisements.ts` | 110 | 2 | `useAdvertisements` | advertisementService, errorLoggingService | Advertisements Data Hook |
 | `useAppNavigation.ts` | 239 | 1 | `useAppNavigation` | — | ⚠️ 無說明 |
-| `useAuth.tsx` | 795 | 58 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, memberCardsService, membersService, mockData | Authentication Hook |
+| `useAuth.tsx` | 804 | 58 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, memberCardsService, membersService, mockData | Authentication Hook |
 | `useAutomation.ts` | 149 | 3 | `useAutomation` | automationService | useAutomation Hook - Manage automation workflows and rules |
 | `useBusinessDirectory.ts` | 48 | 4 | `useBusinessDirectory` | businessDirectoryService | ⚠️ 無說明 |
 | `useChapterBirthdays.ts` | 23 | 1 | `useChapterBirthdays` | chapterBirthdaysService | Own-chapter birthdays for an active external user (dashboard birthday widget). `month` null → nothing loads. |
@@ -1527,11 +1527,12 @@
 | `getGenderFromIC` | 86 | Derives gender from last digit of IC: odd = Male, even = Female. |
 | `getDateOfBirthFromIC` | 97 | Derives date of birth (YYYY-MM-DD) from first 6 digits of IC. Uses sliding-window century: YY <= current year'… |
 
-### `utils/memberScope.ts` （10 行，5 處引用）
+### `utils/memberScope.ts` （26 行，6 處引用）
 
 | 函數 | 行 | 說明 |
 |---|---|---|
 | `isKlMember` | 4 | True for KL-chapter members. Legacy docs without a loId count as KL. |
+| `isCrossLoDeleteBlocked` | 12 | MembersService.deleteMember client guard: true when the caller may not soft-delete a member of another LO. Exc… |
 
 ### `utils/myPostcodes.ts` （870 行，3 處引用）
 > Malaysia postcode → area/state lookup. Lookup order: exact postcode match → prefix range → keyword scan → null.
@@ -1561,13 +1562,13 @@
 | `ROLE_PERMISSIONS` | 18 | Static permission baseline per role. Dynamic board elevation is applied at runtime in usePermissions. |
 | `ALL_PERMISSIONS_GRANTED` | 127 |  |
 
-### `utils/signUpPayload.ts` （107 行，1 處引用）
+### `utils/signUpPayload.ts` （117 行，1 處引用）
 > Member doc payloads written by hooks/useAuth.tsx on self sign-up. Pure (no Firebase) so they can be unit-tested against what firestore.rules…
 
 | 函數 | 行 | 說明 |
 |---|---|---|
-| `buildSelfSignUpMember` | 22 | KL self sign-up (GUEST, or a matched pre-imported profile). Same fields signUp always wrote; reads profile fie… |
-| `buildExternalSignUpMember` | 84 | External self-registration (Phase 1 WP-3): an AFFILIATE of an active sister chapter waiting for their chapter … |
+| `buildSelfSignUpMember` | 32 | KL self sign-up (GUEST, or a matched pre-imported profile). Same fields signUp always wrote; reads profile fie… |
+| `buildExternalSignUpMember` | 94 | External self-registration (Phase 1 WP-3): an AFFILIATE of an active sister chapter waiting for their chapter … |
 
 ### `utils/transactionCategoryUtils.ts` （277 行，4 處引用）
 > Shared category-field derivation and cleanup logic for bank transactions and splits. WHY this file exists: the same "if Membership → auto-se…
