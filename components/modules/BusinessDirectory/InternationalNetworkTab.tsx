@@ -48,7 +48,8 @@ function toIntlView(m: SisterChapterMember): IntlMemberView {
 }
 
 interface InternationalNetworkTabProps {
-  onContact: (biz: BusinessProfile) => void;
+  /** Omit to hide Contact (externals have no inquiry flow). */
+  onContact?: (biz: BusinessProfile) => void;
 }
 
 export const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onContact }) => {
@@ -278,10 +279,10 @@ export const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = (
                       className="disabled:opacity-40 flex-1 border border-slate-200 text-slate-600 text-xs font-bold py-2 rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-1.5">
                       <Globe size={11} /> Website
                     </button>
-                    <button onClick={(e) => { e.stopPropagation(); onContact(getMappedBiz(member)); }}
+                    {onContact && <button onClick={(e) => { e.stopPropagation(); onContact(getMappedBiz(member)); }}
                       className="flex-1 bg-jci-blue text-white text-xs font-bold py-2 rounded-lg hover:bg-jci-blue/90 transition-colors flex items-center justify-center gap-1.5">
                       <Send size={11} /> Contact
-                    </button>
+                    </button>}
                   </div>
                 </div>
               ))}
@@ -437,7 +438,7 @@ export const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = (
               onClick={() => window.open(detailMember.website, '_blank', 'noopener')}>
               <Globe size={14} className="mr-2" /> Website
             </Button>
-            <Button variant="primary" size="sm" className="flex-1 bg-jci-blue text-white"
+            {onContact && <Button variant="primary" size="sm" className="flex-1 bg-jci-blue text-white"
               onClick={() => {
                 setIsDetailOpen(false);
                 const mappedBiz: BusinessProfile = {
@@ -453,7 +454,7 @@ export const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = (
                 onContact(mappedBiz);
               }}>
               <Send size={14} className="mr-2" /> Contact
-            </Button>
+            </Button>}
           </div>
         </Modal>
       )}

@@ -13,7 +13,7 @@ export const useSisterChapterFilters = (members: SisterChapterFilterMember[]) =>
 
   const sisterChapters = useMemo(() => ['All', ...Array.from(new Set(members.map(member => member.jciChapter)))], [members]);
   const sisterCountries = useMemo(() => ['All', ...Array.from(new Set(members.map(member => member.country)))], [members]);
-  const sisterIndustries = useMemo(() => ['All', ...Array.from(new Set(members.map(member => member.industry)))], [members]);
+  const sisterIndustries = useMemo(() => ['All', ...Array.from(new Set(members.map(member => member.industry).filter(Boolean)))], [members]);
 
   const sisterFiltersCount = useMemo(() => {
     let count = 0;
