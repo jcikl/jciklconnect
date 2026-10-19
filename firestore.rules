@@ -1238,19 +1238,25 @@ service cloud.firestore {
     // Guest Registrations collection
     // FIX 22: allow update had no hasOnly whitelist — Board could overwrite any field including immutable registration data
     match /guestRegistrations/{registrationId} {
+      // The guest events page lists `projects` docs with status Active / Upcoming / Approved
+      // (EventsService LISTED_EVENT_STATUSES); guests may only register for one of those.
+      function guestEventIsListed() {
+        let eventPath = /databases/$(database)/documents/projects/$(request.resource.data.eventId);
+        return exists(eventPath) && get(eventPath).data.get('status', '') in ['Active', 'Upcoming', 'Approved'];
+      }
       allow read: if isBoard() || isAdmin();
       // FIX 5: allow create: if true had no field validation — bots could write arbitrary content
       // EventsService.registerGuestForEvent (signed-out guests) writes two docs in one batch with deterministic ids:
       //   {eventId}_{emailKey}       main doc: eventId, name, email, phone, registeredAt, status, organization?, notes?
       //   {eventId}_phone_{phoneKey} phone index doc: eventId, email, phone, status, _indexFor == 'phone'
       // Dedup: an existing id makes the set an update, which only board/admin may do — the whole batch is denied.
-      allow create: if (request.resource.data.keys().hasAll(['name', 'email', 'eventId', 'registeredAt', 'status'])
+      allow create: if guestEventIsListed() && ((request.resource.data.keys().hasAll(['name', 'email', 'eventId', 'registeredAt', 'status'])
                         && request.resource.data.keys().hasOnly(['name', 'email', 'phone', 'eventId', 'organization', 'notes', 'registeredAt', 'status'])
                         && request.resource.data.status == 'Pending')
                     || (request.resource.data.get('_indexFor', null) == 'phone'
                         && request.resource.data.keys().hasAll(['eventId', 'email', 'phone', 'status', '_indexFor'])
                         && request.resource.data.keys().hasOnly(['eventId', 'email', 'phone', 'status', '_indexFor'])
-                        && request.resource.data.status == 'Pending');
+                        && request.resource.data.status == 'Pending'));
       // Main doc: check-in / notes / cancel (cancelGuestRegistration writes status + cancelledAt).
       // Phone index doc: status only (cancelGuestRegistration marks it Cancelled).
       allow update: if (isBoard() || isAdmin()) &&

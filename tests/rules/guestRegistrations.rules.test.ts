@@ -136,7 +136,26 @@ describe.skipIf(!HOST)('firestore.rules — guestRegistrations (emulator)', () =
   beforeAll(async () => {
     await fetch(`http://${HOST}/emulator/v1/projects/${PROJECT}/databases/(default)/documents`, { method: 'DELETE' });
     const writes: Array<[string, Doc]> = Object.entries(MEMBERS).map(([id, d]): [string, Doc] => [`members/${id}`, d]);
+    // Guest events live in `projects` (EventsService.getKlRelevantEvents / registerGuestForEvent ids).
+    writes.push([`projects/${EVENT}`, { title: 'Open event', status: 'Upcoming', createdAt: '2026-10-01' }]);
+    writes.push(['projects/evDraft', { title: 'Draft event', status: 'Draft', createdAt: '2026-10-01' }]);
+    writes.push(['projects/evDone', { title: 'Past event', status: 'Completed', createdAt: '2026-10-01' }]);
     expect(await commit('owner', writes)).toBe(OK);
+  });
+
+  describe('L2: only for an existing, listed event', () => {
+    const forEvent = (eventId: string, email: string, phone: string): Array<[string, Doc]> => [
+      [`guestRegistrations/${eventId}_${emailKey(email)}`, mainDoc(email, phone, { eventId })],
+      [`guestRegistrations/${eventId}_phone_${phoneKey(phone)}`, indexDoc(email, phone, { eventId })],
+    ];
+    it('an event that does not exist is denied', async () => {
+      expect(await commit(null, forEvent('noSuchEvent', 'l2@example.test', '+60 12-700 0001'))).toBe(DENIED);
+      expect(await commit(null, [forEvent('noSuchEvent', 'l2@example.test', '+60 12-700 0001')[1]])).toBe(DENIED);
+    });
+    it('a Draft or Completed event is denied', async () => {
+      expect(await commit(null, forEvent('evDraft', 'l2@example.test', '+60 12-700 0002'))).toBe(DENIED);
+      expect(await commit(null, forEvent('evDone', 'l2@example.test', '+60 12-700 0003'))).toBe(DENIED);
+    });
   });
 
   describe('signed-out create', () => {
