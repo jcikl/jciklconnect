@@ -8,6 +8,8 @@ Updated 2026-10-12: R-025 to R-027 added.
 
 Updated 2026-10-18: R-028 to R-045 added from verification round 1 (permissions and rules); see the end of this file.
 
+Updated 2026-10-19: R-049 to R-058 added from the Phase 0 external-members review (`feat/affiliate-p0`, WP5); see the end of this file.
+
 Severity scale: P0 critical, P1 high, P2 medium, P3 low.
 
 ## P0 Risks
@@ -543,3 +545,94 @@ Evidence (errorLogs, 2026-09 to 2026-10-19): 34 `useAuth-load-member-data` error
 Risk: members are logged out at random after a reload and must sign in again.
 
 Resolution (branch `fix/auth-reload-signout`, awaiting merge): the own-profile read goes through `utils/retryOnPermissionDenied.ts` — on permission-denied it refreshes the ID token and retries (2×); the auth loading state stays on meanwhile. A genuinely forbidden read still fails after the retries. 3 unit tests; 10 consecutive reloads in the preview stayed signed in. Confirm after deploy that the error stops appearing in errorLogs.
+
+### R-049 External Access Is Enforced in the Client UI; firestore.rules Is the Real Boundary (P1)
+
+Evidence (Phase 0, 2026-10-19): `utils/externalAccess.ts` is the view whitelist for `AFFILIATE` / `CHAPTER_ADMIN`, read by navigation and `viewRegistry`; `hooks/usePermissions.ts` derives `externalAllowedViews`. `firestore.rules` has `isExternal()` / `isActiveExternal()` and an explicit list of collections (see `SCHEMA-PERMISSIONS.md`, 外部用户的规则范围). Rules tests: `tests/rules/externalMembers.rules.test.ts`, `tests/rules/memberCards.rules.test.ts`.
+
+Risk: the whitelist only hides screens. An active external user can still query every collection the rules allow for authenticated users (for example `events`, `projects`, `memberBenefits`, `hobbyClubs`, `sisterChapters`), and any rule that is wider than intended is reachable from the client.
+
+Recommended action:
+
+- Treat `firestore.rules` as the only security boundary; keep `utils/externalAccess.ts` as the only view whitelist.
+- Every new collection or view needs an explicit decision for externals, with an emulator test in `tests/rules/`.
+
+### R-050 memberCards Can Stay Stale After a Failed Sync (P2)
+
+Evidence: `membersService` calls `MemberCardsService.syncCards` after the member write, in a separate batch (`services/membersService.ts`, createMember / updateMember / soft delete / updateMemberRole / bulk update). `services/memberCardsService.ts` catches and logs a failure and does not rethrow, so the member save stands.
+
+Risk: after a failed sync the card keeps its old data until the member is saved again or `scripts/backfillMemberCards.mjs --apply` runs. If a member was set to INACTIVE or soft-deleted and the delete-card batch failed, the old card stays readable by external users with `international == true` or the same chapter. The backfill reports orphan cards but never deletes them, so those need a manual fix.
+
+Recommended action: search errorLogs for `MemberCardsService.syncCards`; after any incident, run the backfill in dry-run mode first, then with `--apply`; delete orphan cards of deleted or INACTIVE members by hand, or extend the backfill.
+
+### R-051 Writers That Bypass the Client Service Do Not Sync Cards (P1)
+
+Evidence (2026-10-19):
+
+- `hooks/useAuth.tsx` writes `members` directly: `setDoc` at sign-up (about line 527) and `deleteDoc` of an old profile (about line 536). Neither calls `MemberCardsService.syncCards`.
+- At least eight `netlify/functions/*.mjs` files reference `members` together with write calls (`annual-dues-reminders`, `auto-invite`, `birthday-notifications`, `lark-sync`, `member-auth`, `send-invite`, `toyyibpay-api`, `toyyibpay-callback`). This was a rough grep, not a per-file check; those functions use the Admin SDK and do not sync cards.
+
+Risk: cards can be missing for members who became MEMBER+ through these paths, and cards can be orphaned when a member doc is deleted or demoted through them. The card rules block writing a card without a member doc, but they do not remove an existing card when the member doc goes away.
+
+Recommended action: confirm each function's `members` writes one by one; move card sync into the server writers (`utils/memberCard.mjs` is plain JS and can be imported from `netlify/`), or schedule the backfill; decide what the old-profile delete in `useAuth` should do with the card.
+
+### R-052 Member Docs Without loId Disappear From KL List Queries (P1)
+
+Evidence: since Phase 0, non-admin `members` list queries carry `where('loId', '==', 'jcikl')` (`services/membersService.ts`: getAllMembers, role lookup, email lookup, churn-risk lookup). `firestore.rules` `members` list requires `resource.data.loId == 'jcikl'` for non-admins. Client-side `isKlMember` (`utils/memberScope.ts`) treats a missing `loId` as KL, but the server query does not return such docs.
+
+Risk: legacy or imported member docs without `loId` are invisible to non-admin KL users (board, members) in every list, while admins still see them. Nothing fails visibly.
+
+Recommended action: find members with no `loId` and set `loId = 'jcikl'` after review (data fix, not a code change); check `loId` on every import path.
+
+### R-053 BOARD Can Create a Member Doc With Any Role, Including ADMIN and SUPER_ADMIN (P1, pre-existing)
+
+Evidence: `firestore.rules` `match /members/{memberId}` create: the branch `isBoard() || (...)` skips field checks, and the only role check on create is `(isAdmin() || role != 'CHAPTER_ADMIN')`. The update rule stops BOARD from setting ADMIN / SUPER_ADMIN / CHAPTER_ADMIN; the create rule does not.
+
+Risk: a BOARD user can create a member doc with an admin role. It is not a one-step takeover (the doc must be created under a uid that has no member doc yet), but it is a privilege gap that the update rule already closed.
+
+Recommended action: apply the same role guard on create as on update (`isAdmin()` required for ADMIN, SUPER_ADMIN and CHAPTER_ADMIN), and add a rules test.
+
+### R-054 Hobby Club Join Fails for Non-Lead Members (P1, pre-existing)
+
+Evidence: `services/hobbyClubsService.ts` adds the member to `memberIds` on the club doc inside `runTransaction` (about lines 169-190). `firestore.rules` `match /hobbyClubs` update allows only Board / Admin, or the club lead (`isMember() && leadId == uid`) with descriptive fields. A member joining is therefore denied.
+
+Risk: joining a hobby club fails for everyone who is not the lead or board, and the failure is only visible as a permission error.
+
+Recommended action: allow a member to add only their own uid to `memberIds` (with the capacity check and no other field changes), and add a rules test for join and leave.
+
+### R-055 Members List Email Clause Uses request.query.filters, Which Rules Do Not Provide (P2, pre-existing)
+
+Evidence: the `members` list rule contains `request.query.filters.get('email', [])` and `request.query.filters.email` clauses (email lookup for account linking).
+
+Risk: the email lookup is either never allowed or behaves unpredictably. No test covers it, and the rule reads as if it works.
+
+Recommended action: replace the clauses with a form Firestore supports (a list query that is constrained by a field in the rule, or the `memberEmails` lookup), and cover the account-linking lookup with an emulator test.
+
+### R-056 Several List Rules Are Broad and Rely on Service-Layer Filtering (P2, pre-existing)
+
+Evidence (rule text, 2026-10-19): `eventRegistrations` list allows any `isMember()`; `paymentRequests` list allows any `isMember()` (comment: "ownership enforced by service-layer filter only"); `toyyibBills` list allows any `isMember()`.
+
+Risk: any member can list every event registration, payment request and ToyyibPay bill with a direct query, not only through the app's own service.
+
+Recommended action: narrow each list rule to a field the rule can check (for example `where('memberId','==',uid)` for member lists), and add emulator tests for a member listing another member's records.
+
+### R-057 Property Test for pointsRule Fails With "doc() cannot be called with an empty path" (P3, pre-existing)
+
+Evidence: `tests/property/pointsRule.properties.test.ts` (uses `services/pointsRuleService`). The failure was reported in the Phase 0 integration run; it was not re-run in WP5, which changed docs only.
+
+Risk: a red property test hides whether the points-rule code has a real defect.
+
+Recommended action: reproduce with `npm test -- tests/property/pointsRule`; fix the generator (an empty id) or guard the service call.
+
+### R-058 Phase 1 Gaps for External Members (P2)
+
+Evidence (2026-10-19 code check):
+
+- The external directory and birthdays are not wired to `memberCards`: no app code reads `COLLECTIONS.MEMBER_CARDS` outside the sync service and tests.
+- The external own-profile view (`components/modules/Members/MyProfileSelfView.tsx`) does not import `MembersView`; the reuse of `MembersView` is still a Phase 1 item.
+- `events` `allow list: if true` (`firestore.rules`), and no external-specific KL filter exists for the events list.
+
+Risk: until these are done, externals either see nothing in the directory and birthdays, or see events from every chapter.
+
+Recommended action: point the directory and birthday views at `memberCards` (with the rules' query constraints: `international == true` or own `loId`); reuse `MembersView` for the own-profile view or document why not; add a chapter filter for external users to the events list.
+

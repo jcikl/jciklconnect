@@ -28,7 +28,8 @@ esource.data 仅在 get 中可用，因此部分集合的 list 权限会比 get 
 
 | 集合 | get | list | create | update | delete | 备注 |
 |------|-----|------|--------|--------|--------|------|
-| members | M+(自己:登) | M+ | B+ 或 自注册GUEST(注册表单字段，积分/等级/徽章只能是默认值，jciCareer 只能有 joinDate) | 自己(非锁定字段；name/email 顶层或嵌套均可) 或 B+ | A+(同LO；SA 不限 LO) | 2026-10-18 R-034：SA 删除不受 LO 限制 |
+| members | 自己(登)；A+；M+/B+ 仅 KL 文档（loId 为 jcikl 或缺失，且非外部角色）；active CHAPTER_ADMIN 仅本分会文档 | A+；M+/B+ 且查询须带 `where('loId','==','jcikl')`；active CHAPTER_ADMIN 须带本分会 loId；非外部用户可按本人邮箱精确匹配 | B+ 或 自注册GUEST(注册表单字段，积分/等级/徽章只能是默认值，jciCareer 只能有 joinDate)；`role = CHAPTER_ADMIN` 仅 A+ 可写 | 自己(非锁定字段；`affiliation` 已锁定；name/email 顶层或嵌套均可) 或 B+（不能把人设为 ADMIN / SUPER_ADMIN / CHAPTER_ADMIN）；active CHAPTER_ADMIN 仅本分会 AFFILIATE 的 `affiliation` 状态字段（不能设 active） | A+(同LO；SA 不限 LO) | 2026-10-18 R-034：SA 删除不受 LO 限制；2026-10-19 Phase 0：外部用户只能读自己的完整文档（active CHAPTER_ADMIN 另可读本分会文档）；其他外部会员的完整文档仅 A+ 可读，KL 普通读者改用 `memberCards` |
+| memberCards | 自己；M+；canReadOrgMembers；active 外部用户（`international == true` 或 loId 为本分会） | 同 get（外部用户的查询须带 `where('international','==',true)` 或 `where('loId','==',本分会)`） | 自己(MEMBER+ 或 active 外部) 或 canEditMembers；字段必须与 `memberCardKeys()` 完全一致；`loId` 与 `international` 须与同批写入/已有的 members 文档一致；members 文档不存在则拒绝 | 同 create | 自己 或 canEditMembers | Phase 0 新集合，卡片由 `MemberCardsService.syncCards` 同步（见 `SCHEMA.md` `memberCards`） |
 | communication | 登 | 登 | M+(需含authorId) | 自己 或 B+ | 自己 或 B+ | |
 | events | 登 | 公 | B+ | B+ 或 M+(仅attendees字段) | B+ | list公开供宣传页使用 |
 | projects | 登(或Active状态公开) | 公 | B+ | B+ 或 M+(仅attendees字段) | B+ | |
@@ -126,6 +127,32 @@ econciliations | B+/A+ | B+/A+ | B+/A+(必填字段) | A+ 或 B+(仅notes字段)
 | positionPermissions | 登 | 登 | A+ | A+ | A+ | 可配置权限规则引擎：按担任职位 |
 
 ---
+
+## 外部用户（AFFILIATE / CHAPTER_ADMIN）的规则范围
+
+> 依据 `firestore.rules`（Phase 0）。外部角色不在 `isMember()` / `isActiveMember()` / `canReadOrgMembers()` / `isBoard()` / `isAdmin()` 中，因此依赖这些函数的规则对外部用户默认拒绝。下表只列规则里显式使用 `isExternal()` / `isInternalUser()` / `isActiveExternal()` 的集合；应用层的视图白名单见 `utils/externalAccess.ts`，不等同于规则范围。
+
+**显式允许 active 外部用户（`isActiveExternal()`，或登录即可读且规则未排除外部）：**
+
+| 集合 | 外部用户可做的事 | 限制 |
+|------|------------------|------|
+| `members` | 读自己的完整文档；active CHAPTER_ADMIN 读本分会文档；自己改非锁定字段 | 不能读其他外部会员完整文档；`affiliation` 锁定 |
+| `memberCards` | 读 `international == true` 或本分会的卡片 | 只读；卡片写入由成员本人或 KL 编辑者完成 |
+| `events` | 读（`get` 登录即可，`list` 公开）；更新 `attendees` / `registeredMembers` / `updatedAt` | 不能创建、删除；列表未按 KL 过滤（见 `RISK_REGISTER.md` R-058） |
+| `eventRegistrations` | 只读和创建自己的报名 | 查询须带 `where('memberId','==',uid)` |
+| `surveys` | 读仅限 `specificMemberIds` 包含自己的问卷 | 不能写 |
+| `surveyResponses` | 只列自己的回答；只能回答指定给自己的问卷 | 不能改、删 |
+| `benefitUsage` | 读自己的使用记录；创建自己的记录 | 字段白名单 |
+| `sisterChapters` | 读 | 只有 SUPER_ADMIN 可写 |
+| `projects` | `get`：登录即可，或状态为 Active | 规则层未排除外部 |
+| `memberBenefits` | 读（`isAuthenticated()`） | 只有 Board 可写 |
+| `hobbyClubs` | 读（`isAuthenticated()`） | 写入规则不变（见 `RISK_REGISTER.md` R-054） |
+| `advertisements` / `partnerships` | 读（公开） | 只有 Board / Admin 可写 |
+
+**显式拒绝外部用户（规则条件中含 `isInternalUser()`，外部用户在该条件下被排除）：**
+`communication`、`finance`、`paymentRequests`、`documents`、`documentVersions`、`points`、`pointsRules`、`pointsRuleExecutions`、`achievements`、`achievementAwards`、`achievementProgress`、`badges`、`badgeAwards`、`businessProfiles`、`inquiries`、`activityPlans`、`templates`、`promotionPackages`、`incentivePrograms`、`incentiveStandards`、`incentiveSubmissions`、`learningPaths`、`learningProgress`、`mentorMatches`、`mentorshipFeedback`、`publicBusinessListings`、`sponsorships`、`system`、`system_config`、`systemSettings`、`RegistrationHistory`、`toyyibBills`、`toyyibCategories`、`guestPageStats`、`counters`、`permissionCatalog`、`userRolePermissions`、`membershipTypePermissions`、`positionPermissions`（`surveys` 与 `benefitUsage` 只对白名单内的记录放行）。
+
+其余集合依赖 `isMember()` / `isActiveMember()` / `canReadOrgMembers()` / `isBoard()` / `isAdmin()` 等角色函数，外部用户默认被拒绝。
 
 ## P0 规则缺陷速查
 

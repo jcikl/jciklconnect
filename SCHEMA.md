@@ -152,6 +152,42 @@
 | tier | MemberTier \| string | — | |  | 系统: tier/gamification calculation；角色: B+ | member segmentation |
 | skills | string[] | — | |  | 角色: 自己(非锁定字段) 或 B+ | 会员资料展示、项目技能匹配 |
 | badges | Badge[] | — | |  | 系统: gamification service；角色: B+ | dashboard / member profile |
+| privacy | object | — | 顶层隐私设置（注意：不同于上方平铺别名为 `privacy` 的 `contact.privacy`） |  | 角色: 自己(非锁定字段) 或 B+ | 见 `privacy.shareCardInternationally` |
+| privacy.shareCardInternationally | boolean | — | 默认 false（缺省 = false）；opt-in，允许其他分会外部会员看到公开名片 |  | 角色: 自己（`MyProfileSelfView` 开关，非锁定字段）；系统: 无 | `memberCards.international`：`MemberCardsService.syncCards` → `utils/memberCard.mjs` `buildMemberCard` 复制；firestore.rules `validMemberCard` 要求两者相等 |
+| affiliation | MemberAffiliation | — | 仅外部会员（role `AFFILIATE` / `CHAPTER_ADMIN`）存在；所属分会为顶层 `loId`（`sisterChapters` id）。`firestore.rules` 锁定自己不可写 |  | 角色: KL 管理员（`canEditMembers`，通用会员更新）；分会管理人（active `CHAPTER_ADMIN`，仅本分会 AFFILIATE 的状态字段，不能设 `active`）；系统: 无专用写入代码 | `utils/externalAccess.ts`、`hooks/usePermissions.ts`（外部可访问视图）；firestore.rules `isActiveExternal()`；`shouldHaveCard`（仅 active 外部有卡） |
+| affiliation.category | enum | 外部必填 | `sister` \| `apicc` \| `global` |  | 同 `affiliation`（无专用写入代码） | 外部会员来源分类展示 |
+| affiliation.country | string | 外部必填 | 分会所在国家（自由文本） |  | 同 `affiliation`（无专用写入代码） | `memberCards.country`（外部卡取此值；内部卡固定为 `'Malaysia'`） |
+| affiliation.status | enum | 外部必填 | `pending_chapter` \| `pending_kl` \| `active` \| `suspended` \| `expired` |  | 同 `affiliation`；分会管理人可改为 `pending_*` / `suspended` / `expired`，不能设 `active` | `isActiveExternal()` 访问判断；`memberCards` 生成/删除（`planCardSync`） |
+| affiliation.chapterApprovedAt / chapterApprovedBy | string | — | 分会管理人批准 `pending_chapter` → `pending_kl` 的时间与人（类型注释） |  | 角色: 分会管理人（rules 允许写入 `chapterApprovedAt` / `chapterApprovedBy`） | 审计展示 |
+| affiliation.klApprovedAt / klApprovedBy | string | — | KL 管理员批准 `pending_kl` → `active` 的时间与人（类型注释） |  | 角色: KL 管理员（类型注释；无专用写入代码） | 审计展示 |
+| affiliation.statusUpdatedAt / statusUpdatedBy | string | — | 最近一次状态变更的时间与人（任何操作者） |  | 同 `affiliation` | 审计展示 |
+
+---
+
+## `memberCards`
+> **TS Interface:** `MemberCard`（`types/member.ts`） | **Constants key:** `COLLECTIONS.MEMBER_CARDS`（`'memberCards'`） | **Doc ID:** 等于 `members` 文档 ID
+> 目录安全的公开名片，不含 PII。它是外部用户能读到的其他人资料的唯一来源（见 `SCHEMA-PERMISSIONS.md`）。
+> **来：** 只由 `MemberCardsService.syncCards`（`services/memberCardsService.ts`）写入，`membersService` 在成员写入成功之后调用（create / update / 软删除 / 角色变更 / 批量更新），卡片写入失败只记日志、不回滚成员写入；另有 `scripts/backfillMemberCards.mjs --apply` 回填。卡片构建逻辑在 `utils/memberCard.mjs`（`buildMemberCard`，`shouldHaveCard`，`planCardSync`）。
+> **往：** 应用代码目前没有读取 `memberCards` 的界面（Phase 1 的外部会员目录与生日列表尚未接入）；读取范围由 firestore.rules 决定（`externalCanReadCard`、`isActiveMember`、`canReadOrgMembers`）。
+> 卡片只在 `shouldHaveCard` 为真时存在：role `MEMBER` / `BOARD` / `ADMIN` / `SUPER_ADMIN`，或 active 外部会员；GUEST / INACTIVE 与软删除的成员没有卡。
+
+| 字段路径 | 类型 | 必填 | 枚举值 / 说明 | 平铺冗余字段（等待替换） | 来 | 往 |
+|--------|------|:----:|------------|--------------|----|----|
+| displayName | string | ✓ | 显示名 |  | 系统: `members.general.name`，回退 `members.name`，再回退空字符串（`buildMemberCard`） | 尚无应用读取者（规划：Phase 1 目录） |
+| avatarUrl | string | — | |  | 系统: `members.general.avatarUrl`，回退 `general.avatar` | 尚无应用读取者（规划：Phase 1 目录） |
+| loId | string | ✓ | 分会 ID；须等于 `members.loId`（缺省 `jcikl`） |  | 系统: `members.loId` | `firestore.rules` `externalCanReadCard`（本分会）；list 查询约束 |
+| country | string | — | 外部：`members.affiliation.country`；内部：固定 `'Malaysia'` |  | 系统: `members.affiliation.country`（外部）或代码常量（内部） | 尚无应用读取者（规划：Phase 1 目录） |
+| companyName | string | — | |  | 系统: `members.business.companyName`，回退 `members.companyName` | 尚无应用读取者（规划：Phase 1 目录） |
+| position | string | — | |  | 系统: `members.business.position` | 尚无应用读取者（规划：Phase 1 目录） |
+| department | string | — | |  | 系统: `members.business.departmentAndPosition` | 尚无应用读取者（规划：Phase 1 目录） |
+| industry | string | — | |  | 系统: `members.business.industry`，回退 `members.industry` | 尚无应用读取者（规划：Phase 1 目录） |
+| businessCategory | string[] | — | 仅保留非空字符串，空数组不写入 |  | 系统: `members.business.businessCategory` | 尚无应用读取者（规划：Phase 1 目录） |
+| companyDescription | string | — | |  | 系统: `members.business.companyDescription`，回退 `business.introduction` | 尚无应用读取者（规划：Phase 1 目录） |
+| website | string | — | |  | 系统: `members.business.companyWebsite` | 尚无应用读取者（规划：Phase 1 目录） |
+| acceptInternationalBusiness | enum | — | `Yes` \| `No` \| `Willing to Explore` |  | 系统: `members.business.acceptInternationalBusiness` | 尚无应用读取者（规划：Phase 1 目录） |
+| specialOfferSummary | string | — | 优惠摘要（字符串，或 `specialOffer.description`） |  | 系统: `members.business.specialOffer` | 尚无应用读取者（规划：Phase 1 目录） |
+| international | boolean | ✓ | 与 `members.privacy.shareCardInternationally` 相等（缺省 false） |  | 系统: `members.privacy.shareCardInternationally`（`buildMemberCard`） | `firestore.rules` `externalCanReadCard`：`international == true` 时外部用户可读 |
+| updatedAt | string | ✓ | 卡片写入时的 ISO 时间 |  | 系统: 同步时刻（`syncCards` / 回填脚本） | 尚无应用读取者 |
 
 ---
 

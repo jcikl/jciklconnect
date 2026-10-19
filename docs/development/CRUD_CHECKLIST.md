@@ -56,6 +56,11 @@
 
 ---
 
+### Members 专用规则（Phase 0）
+
+- **`members` 列表查询（非管理员）必须带 `where('loId', '==', DEFAULT_LO_ID)`**，否则 `firestore.rules` 拒绝该查询。管理员的查询可以不带。没有 `loId` 字段的会员文档因此不会出现在 KL 的列表查询中（见 `RISK_REGISTER.md` R-052）。
+- **改动卡片字段的成员写入，必须在成员文档写入成功后调用 `MemberCardsService.syncCards`。** 卡片字段包括：`general.name` / `name`、`general.avatarUrl`、`business.*`（公司、职位、行业、类别、简介、网站、国际合作、优惠）、`affiliation.country`、`privacy.shareCardInternationally`、`loId`、`role`、`affiliation.status`。`syncCards` 不抛错，失败只记日志；现有调用点见 `services/membersService.ts`（createMember / updateMember / softDelete / updateMemberRole / 批量更新）。直接写 `members` 而不经过这些路径的代码，会造成卡片过期或孤儿（见 `RISK_REGISTER.md` R-050、R-051）。
+
 ### Firestore 权限规则注意事项
 
 - `resource.data` **不能**用于 collection-level list/query 规则（仅 document-level get 可用）。批量扫描/迁移规则必须在最前加 `isAdmin() ||` 绕过 resource.data 检查。
