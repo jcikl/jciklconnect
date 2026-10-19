@@ -247,6 +247,16 @@ service cloud.firestore {
              (d.get('email', null) is string || d.get('contact', {}).get('email', null) is string);
     }
 
+    // Same mapping as utils/affiliation.mjs categoryForChapter (review M4): sisterChapters.type (list) →
+    // members.affiliation.category. sister_lo → 'sister', else apicc → 'apicc', else global → 'global',
+    // no type → 'sister'. Keep the two in sync.
+    function categoryForChapterType(types) {
+      return types.hasAny(['sister_lo']) ? 'sister'
+           : types.hasAny(['apicc']) ? 'apicc'
+           : types.hasAny(['global']) ? 'global'
+           : 'sister';
+    }
+
     // Phase 1 WP-3: an external person registers themself for an ACTIVE sister chapter as an AFFILIATE
     // waiting for their chapter admin (pending_chapter). Never CHAPTER_ADMIN, never KL, never active.
     // affiliation holds exactly category / country / status; country must equal the chapter's country.
@@ -263,7 +273,8 @@ service cloud.firestore {
              d.affiliation.keys().hasOnly(['category', 'country', 'status']) &&
              d.affiliation.keys().hasAll(['category', 'country', 'status']) &&
              d.affiliation.status == 'pending_chapter' &&
-             d.affiliation.category in ['sister', 'apicc', 'global'] &&
+             d.affiliation.category == categoryForChapterType(
+               get(/databases/$(database)/documents/sisterChapters/$(d.loId)).data.get('type', [])) &&
              d.affiliation.country == get(/databases/$(database)/documents/sisterChapters/$(d.loId)).data.get('country', null) &&
              d.keys().hasOnly(selfSignUpKeys().concat(['affiliation'])) &&
              selfSignUpDefaultsOk();
