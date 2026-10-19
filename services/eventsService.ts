@@ -11,6 +11,7 @@ import {
   runTransaction,
   query,
   where,
+  or,
   orderBy,
   limit,
   Timestamp,
@@ -26,15 +27,22 @@ import { isDevMode, withDevMode } from '../utils/devMode';
 import { errorLoggingService } from './errorLoggingService';
 import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 import { MOCK_EVENTS } from './mockData';
+import { getMYTTodayStr } from '../utils/dateUtils';
+import { involvesLo, KL_LO_NAME } from '../utils/loHosting.mjs';
 
 const CACHE_KEY_ALL_EVENTS = 'events:all';
+const CACHE_KEY_UPCOMING_EVENTS = 'events:upcoming';
+const CACHE_KEY_KL_EVENTS = 'events:kl';
 const EVENTS_TTL = CACHE_TTL_3MIN;
+const LISTED_EVENT_STATUSES = ['Active', 'Upcoming', 'Approved'];
 
 export class EventsService {
   private static mockEvents: Event[] = [...MOCK_EVENTS];
 
   static invalidateEventsCache(): void {
     apiCache.delete(CACHE_KEY_ALL_EVENTS);
+    apiCache.delete(CACHE_KEY_UPCOMING_EVENTS);
+    apiCache.delete(CACHE_KEY_KL_EVENTS);
     apiCache.deleteByPrefix('events:id:');
   }
 
@@ -89,7 +97,7 @@ export class EventsService {
           const snapshot = await getDocs(
             query(
               collection(db, COLLECTIONS.PROJECTS),
-              where('status', 'in', ['Active', 'Upcoming', 'Approved'])
+              where('status', 'in', LISTED_EVENT_STATUSES)
             )
           );
 
@@ -110,6 +118,60 @@ export class EventsService {
           throw error;
         }
       }, EVENTS_TTL, 'eventsService.getAllEvents')
+    );
+  }
+
+  /**
+   * Events starting today (MYT) or later, same statuses as getAllEvents. Filters on
+   * eventStartDate (YYYY-MM-DD strings) so the dashboard reads a handful of docs instead of
+   * the whole projects collection; status is checked in code to avoid a composite index.
+   * Sorted soonest first; pass `limitCount` to keep only the first N.
+   */
+  static async getUpcomingEvents(limitCount?: number): Promise<Event[]> {
+    const today = getMYTTodayStr();
+    const events = await withDevMode(
+      () => this.mockEvents.filter(e => String(e.date).slice(0, 10) >= today),
+      () => apiCache.getOrSet(CACHE_KEY_UPCOMING_EVENTS, async () => {
+        try {
+          const snapshot = await getDocs(
+            query(collection(db, COLLECTIONS.PROJECTS), where('eventStartDate', '>=', today))
+          );
+          return snapshot.docs
+            .filter(d => LISTED_EVENT_STATUSES.includes(d.data().status))
+            .map(d => this.projectDocToEvent({ id: d.id, data: () => d.data() }))
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        } catch (error) {
+          errorLoggingService.logError(error as Error, { component: 'EventsService', action: 'getUpcomingEvents' });
+          throw error;
+        }
+      }, EVENTS_TTL, 'eventsService.getUpcomingEvents')
+    );
+    return limitCount === undefined ? events : events.slice(0, limitCount);
+  }
+
+  /**
+   * Every event JCI Kuala Lumpur hosts or co-hosts (any date / status except Cancelled), newest
+   * first — the board dashboard's stats. One OR query (hostingLo == KL, coHosting contains KL)
+   * instead of the whole projects collection; coHosting must be a list (see utils/loHosting.mjs).
+   */
+  static async getKlEvents(): Promise<Event[]> {
+    return withDevMode(
+      () => this.mockEvents.filter(e => involvesLo(e as any, KL_LO_NAME)),
+      () => apiCache.getOrSet(CACHE_KEY_KL_EVENTS, async () => {
+        try {
+          const snapshot = await getDocs(query(
+            collection(db, COLLECTIONS.PROJECTS),
+            or(where('hostingLo', '==', KL_LO_NAME), where('coHosting', 'array-contains', KL_LO_NAME)),
+          ));
+          return snapshot.docs
+            .filter(d => d.data().status !== 'Cancelled')
+            .map(d => this.projectDocToEvent({ id: d.id, data: () => d.data() }))
+            .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
+        } catch (error) {
+          errorLoggingService.logError(error as Error, { component: 'EventsService', action: 'getKlEvents' });
+          throw error;
+        }
+      }, EVENTS_TTL, 'eventsService.getKlEvents')
     );
   }
 
@@ -888,21 +950,6 @@ export class EventsService {
         }
       }
     );
-  }
-
-  // Get upcoming events (approved, date >= now)
-  static async getUpcomingEvents(limitCount: number = 10): Promise<Event[]> {
-    try {
-      const allEvents = await this.getAllEvents();
-      const now = new Date().getTime();
-      return allEvents
-        .filter(e => e.date && new Date(e.date).getTime() >= now)
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-        .slice(0, limitCount);
-    } catch (error) {
-      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'EventsService.getUpcomingEvents' });
-      throw error;
-    }
   }
 
   // Get events by type

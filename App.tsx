@@ -20,7 +20,6 @@ import { AuthProvider, useAuth } from './hooks/useAuth';
 import { usePermissions } from './hooks/usePermissions';
 import { useMembers } from './hooks/useMembers';
 import { useBusinessDirectory } from './hooks/useBusinessDirectory';
-import { useEvents } from './hooks/useEvents';
 import { useProjects } from './hooks/useProjects';
 import { useCommunication } from './hooks/useCommunication';
 import { usePoints } from './hooks/usePoints';
@@ -249,51 +248,25 @@ export const JCIKLApp: React.FC = () => {
     effectiveRole,
     hasPermission,
   } = usePermissions();
-  const { projects } = useProjects();
+  // Roles below member only get events management as a project creator / committee member;
+  // only they need the (large) projects list, so other roles skip loading it.
+  const hasRoleEventsAccess = isAdmin || isBoard || isDeveloper || isMember;
+  const { projects } = useProjects({ enabled: !!member && !hasRoleEventsAccess });
   const canViewEventsManagement = React.useMemo(() => {
     if (!member) return false;
-    if (isAdmin || isBoard || isDeveloper || isMember) return true;
+    if (hasRoleEventsAccess) return true;
     return projects.some(p => {
       const isCreator = p.organizerId === member.id || p.submittedBy === member.id;
       const isCommittee = p.committee?.some(c => c.memberId === member.id) ?? false;
       return isCreator || isCommittee;
     });
-  }, [member, isAdmin, isBoard, isDeveloper, isMember, projects]);
+  }, [member, hasRoleEventsAccess, projects]);
 
 
   // useCommunication hook is safe to call even without authentication
   // It handles the case when member is null internally
   const { notifications, markNotificationAsRead } = useCommunication();
   const { members } = useMembers();
-  const { events } = useEvents();
-
-  const metrics = React.useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    const totalMembers = members.length;
-    const activeMembers = members.filter(m => {
-      const record = m.jciCareer?.membershipDuesHistory?.[currentYear];
-      const isPaid = record?.status === 'paid' || record?.status === 'over paid';
-      return m.role !== UserRole.GUEST && isPaid;
-    }).length;
-
-    const newMembersThisMonth = members.filter(m => {
-      if (!m.jciCareer?.joinDate) return false;
-      const joinDate = new Date(m.jciCareer?.joinDate);
-      const now = new Date();
-      return joinDate.getMonth() === now.getMonth() && joinDate.getFullYear() === now.getFullYear();
-    }).length;
-
-    const upcomingEvents = events.filter(e => new Date(e.date + 'T00:00:00+08:00') >= new Date() && e.status === 'Upcoming').length;
-    const activeProjects = projects.filter(p => p.status === 'Active').length;
-
-    return {
-      totalMembers,
-      activeMembers,
-      newMembersThisMonth,
-      upcomingEvents,
-      activeProjects,
-    };
-  }, [members, events, projects]);
 
   // FCM push notification registration
   useEffect(() => {
@@ -492,7 +465,6 @@ export const JCIKLApp: React.FC = () => {
       clearSelectedBusiness,
       wrapErrorBoundary: wrapEB,
       members,
-      projects,
     });
   };
 

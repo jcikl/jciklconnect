@@ -7,6 +7,7 @@ import type { ProjectFinancialAccount as ProjectFinancialAccountType, ProjectTra
 import { EventTemplate } from '../../../services/templatesService';
 import { ProjectGrid } from './ProjectGrid';
 import { ProjectsTemplatesTab } from './ProjectsTemplatesTab';
+import { loRoleIn } from '../../../utils/loHosting.mjs';
 
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -104,12 +105,7 @@ export const ProjectsListShell: React.FC<ProjectsListShellProps> = ({
       : projects;
     if (hostingFilter === 'all') return bySearch;
     return bySearch.filter(p => {
-      const lo = ((p as any).hostingLo ?? '') as string;
-      const coRaw = (p as any).coHosting;
-      const isHosting = lo.trim().toLowerCase() === KL;
-      const isCo = Array.isArray(coRaw)
-        ? coRaw.some((c: string) => typeof c === 'string' && c.trim().toLowerCase() === KL)
-        : typeof coRaw === 'string' && coRaw.trim().toLowerCase() === KL;
+      const { isHosting, isCoHosting: isCo } = loRoleIn(p as any, KL);
       if (hostingFilter === 'hosting') return isHosting;
       if (hostingFilter === 'cohosting') return isCo;
       return !isHosting && !isCo;

@@ -84,7 +84,8 @@ export interface Project {
   roadmapId?: string;
   roadmapUrl?: string;
   hostingLo?: string;
-  coHosting?: string;
+  /** Co-hosting LO names. Legacy docs / old clients may hold one comma-separated string — read via utils/loHosting.mjs parseCoHosting. */
+  coHosting?: string[];
   area?: string;
   createdAt?: string;
   updatedAt?: string;

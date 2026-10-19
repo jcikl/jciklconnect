@@ -34,6 +34,7 @@ import {
 import { errorLoggingService } from '../services/errorLoggingService';
 import type { Transaction, BankAccount, ProjectFinancialAccount, TransactionSplit, InventoryItem } from '../types';
 import type { PaymentRequest, Project, MembershipType } from '../types';
+import { involvesLo, KL_LO_NAME } from '../utils/loHosting.mjs';
 
 export const UNASSIGNED_PROJECT_ID = 'UNASSIGNED_PROJECT';
 
@@ -772,16 +773,7 @@ export function useFinanceData(searchQuery?: string) {
   }, [projects]);
 
   const filteredProjectAccounts = useMemo(() => {
-    const KL = 'jci kuala lumpur';
-    const isKlProject = (p: Project) => {
-      const lo = ((p as any).hostingLo ?? '').trim().toLowerCase();
-      const coRaw = (p as any).coHosting;
-      const isHosting = lo === KL;
-      const isCo = Array.isArray(coRaw)
-        ? coRaw.some((c: string) => typeof c === 'string' && c.trim().toLowerCase() === KL)
-        : typeof coRaw === 'string' && coRaw.trim().toLowerCase() === KL;
-      return isHosting || isCo;
-    };
+    const isKlProject = (p: Project) => involvesLo(p as any, KL_LO_NAME);
 
     const byKl = projectAccounts.filter(acc => {
       const project = projects.find(p => p.id === acc.projectId);
@@ -822,16 +814,7 @@ export function useFinanceData(searchQuery?: string) {
   }, [projects]);
 
   const filteredProjectsForModal = useMemo(() => {
-    const KL = 'jci kuala lumpur';
-    const isKlProject = (p: Project) => {
-      const lo = ((p as any).hostingLo ?? '').trim().toLowerCase();
-      const coRaw = (p as any).coHosting;
-      const isHosting = lo === KL;
-      const isCo = Array.isArray(coRaw)
-        ? coRaw.some((c: string) => typeof c === 'string' && c.trim().toLowerCase() === KL)
-        : typeof coRaw === 'string' && coRaw.trim().toLowerCase() === KL;
-      return isHosting || isCo;
-    };
+    const isKlProject = (p: Project) => involvesLo(p as any, KL_LO_NAME);
     const klProjects = projects.filter(isKlProject);
     if (editingModalYear === 'All') return klProjects;
     const yearInt = parseInt(editingModalYear, 10);

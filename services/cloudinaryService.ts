@@ -11,6 +11,16 @@ export const trimCloudinaryImage = (url: string): string => {
   return url.replace('/image/upload/', '/image/upload/e_trim/');
 };
 
+/**
+ * Serve a Cloudinary image resized for display: at most `width` px wide (never upscaled),
+ * best format and quality for the browser (f_auto / q_auto). The original stays untouched.
+ * Non-Cloudinary URLs are returned unchanged.
+ */
+export const resizeCloudinaryImage = (url: string, width: number): string => {
+  if (!url || !url.includes('cloudinary.com') || !url.includes('/image/upload/')) return url;
+  return url.replace('/image/upload/', `/image/upload/c_limit,w_${Math.round(width)},f_auto,q_auto/`);
+};
+
 // Module-level assignment only — validation is deferred to uploadToCloudinary() so that
 // lazy-importing this module does not throw during page initialisation.
 const CLOUD_NAME: string = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;

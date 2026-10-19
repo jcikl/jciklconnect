@@ -7,13 +7,14 @@ import { useAuth } from './useAuth';
 import { isDevMode } from '../utils/devMode';
 import { useFirestoreCollection } from './useFirestoreCollection';
 
-export const useProjects = () => {
+/** @param options.enabled false skips loading (the whole projects collection) when the caller doesn't need it. */
+export const useProjects = (options?: { enabled?: boolean }) => {
   const { showToast } = useToast();
   const { member, loading: authLoading, isDevMode: isDevModeFromAuth } = useAuth();
   const isSubmittingRef = useRef(false);
 
   const inDevMode = isDevMode() || isDevModeFromAuth;
-  const enabled = !authLoading && (!!member || inDevMode);
+  const enabled = (options?.enabled ?? true) && !authLoading && (!!member || inDevMode);
 
   const { data: projects, loading: loading1, error, reload: loadProjects } = useFirestoreCollection<Project>({
     loader: () => ProjectsService.getAllProjects(),

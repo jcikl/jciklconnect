@@ -28,6 +28,7 @@ import { invalidateFinanceCache } from './financeService';
 import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 import { MOCK_PROJECTS, MOCK_TASKS } from './mockData';
 import { errorLoggingService } from './errorLoggingService';
+import { parseCoHosting } from '../utils/loHosting.mjs';
 
 const CACHE_KEY_ALL_PROJECTS = 'projects:all';
 const PROJECTS_TTL = CACHE_TTL_3MIN;
@@ -174,7 +175,11 @@ export class ProjectsService {
       if (projectData.roadmapId != null) payload.roadmapId = projectData.roadmapId;
       if (projectData.hostingLo != null) payload.hostingLo = projectData.hostingLo;
       if (projectData.area != null) payload.area = projectData.area;
-      if (projectData.coHosting != null) payload.coHosting = projectData.coHosting;
+      // Stored as a list so it can be queried (array-contains); callers may still pass legacy text.
+      if (projectData.coHosting != null) {
+        const coHosting = parseCoHosting(projectData.coHosting);
+        if (coHosting.length > 0) payload.coHosting = coHosting;
+      }
       if (projectData.location != null) payload.location = projectData.location;
 
       const docRef = await addDoc(collection(db, COLLECTIONS.PROJECTS), payload);
@@ -252,6 +257,8 @@ export class ProjectsService {
               updateData[key] = value;
             }
           });
+          // Co-hosting LOs are stored as a list (array-contains queries); normalise legacy text.
+          if (updates.coHosting !== undefined) updateData.coHosting = parseCoHosting(updates.coHosting);
 
           // P1-C: when a review decision is made, stamp reviewedBy + reviewedDate atomically
           const reviewStatus = updates.status as string | undefined;

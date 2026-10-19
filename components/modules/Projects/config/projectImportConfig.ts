@@ -16,6 +16,7 @@ import {
 } from '../../../shared/batchImport/batchImportUtils';
 import { ProjectsService } from '../../../../services/projectsService';
 import { ProjectCommitteeMember } from '../../../../types';
+import { parseCoHosting } from '../../../../utils/loHosting.mjs';
 
 interface JciMalaysiaEvent {
   id: string;
@@ -512,7 +513,7 @@ export const projectImportConfig: BatchImportConfig = {
             roadmapId: row.roadmapId || undefined,
             roadmapUrl: row.roadmapId ? `https://jcimalaysia.cc/roadmap/event-details-public.php?eventid=${row.roadmapId}` : undefined,
             hostingLo: row.hostingLo || undefined,
-            coHosting: row.coHosting || undefined,
+            coHosting: row.coHosting ? parseCoHosting(row.coHosting) : undefined, // Roadmap gives one comma-separated string
             area: row.area || undefined,
             logoUrl: row.logoUrl || undefined,
             priceMin: row.priceMin ? parseFloat(row.priceMin) || undefined : undefined,

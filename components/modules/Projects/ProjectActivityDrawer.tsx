@@ -5,6 +5,7 @@ import { Input, Select, Textarea } from '../../ui/Form';
 import { Project, ProjectLevel, ProjectPillar } from '../../../types';
 import { PROJECT_CATEGORIES_BY_TYPE, PROJECT_LEVELS, PROJECT_PILLARS, PROJECT_TYPES, PROJECT_TYPE_LABELS } from '../../../config/constants';
 import { fetchRoadmapEventDetails } from '../../../utils/roadmapUtils';
+import { formatCoHosting, parseCoHosting } from '../../../utils/loHosting.mjs';
 
 interface ProjectActivityDrawerProps {
   isOpen: boolean;
@@ -81,7 +82,7 @@ export const ProjectActivityDrawer: React.FC<ProjectActivityDrawerProps> = ({
     setRoadmapId(project?.roadmapId ?? '');
     setHostingLo(project?.hostingLo ?? '');
     setArea(project?.area ?? '');
-    setCoHosting(project?.coHosting ?? '');
+    setCoHosting(formatCoHosting(project?.coHosting)); // edited as "A, B, C" text
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, project?.id]);
 
@@ -157,7 +158,7 @@ export const ProjectActivityDrawer: React.FC<ProjectActivityDrawerProps> = ({
         roadmapId: roadmapId || undefined,
         hostingLo: hostingLo || undefined,
         area: area || undefined,
-        coHosting: coHosting || undefined,
+        coHosting: parseCoHosting(coHosting), // stored as a list
       });
       handleClose();
     } catch {

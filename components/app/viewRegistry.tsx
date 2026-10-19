@@ -1,5 +1,5 @@
 import React, { lazy } from 'react';
-import { UserRole, Member, Project } from '../../types';
+import { UserRole, Member } from '../../types';
 import { ViewType } from '../../types/views';
 
 const FinanceView = lazy(() => import('../modules/FinanceView').then(m => ({ default: m.FinanceView })));
@@ -60,7 +60,6 @@ export interface AppViewRenderContext {
   clearSelectedBusiness: () => void;
   wrapErrorBoundary: (component: React.ReactNode, moduleName: string) => React.ReactNode;
   members: Member[];
-  projects: Project[];
 }
 
 export const renderAppView = (view: ViewType, context: AppViewRenderContext): React.ReactNode => {
@@ -90,7 +89,6 @@ export const renderAppView = (view: ViewType, context: AppViewRenderContext): Re
     clearSelectedBusiness,
     wrapErrorBoundary,
     members,
-    projects,
   } = context;
 
   const dashboardFallback = (
@@ -101,7 +99,6 @@ export const renderAppView = (view: ViewType, context: AppViewRenderContext): Re
       onSearchChange={onSearchChange}
       scrollRef={scrollRef}
       members={members}
-      projects={projects}
     />
   );
 

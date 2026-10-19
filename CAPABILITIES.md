@@ -19,7 +19,7 @@
 |---|---|---|
 | Service（業務邏輯與資料存取） | 68 | `services/` |
 | Hook（React 資料綁定） | 39 | `hooks/` |
-| Util（純函數工具） | 16 | `utils/` |
+| Util（純函數工具） | 17 | `utils/` |
 | UI 元件（通用） | 33 | `components/ui/` |
 | 共用業務元件 | 9 | `components/shared/` |
 | Context | 2 | `contexts/` |
@@ -76,7 +76,7 @@
 | `services/financeService.ts` | 5,320 |
 | `services/pointsService.ts` | 2,492 |
 | `services/membersService.ts` | 2,284 |
-| `hooks/useFinanceData.ts` | 2,046 |
+| `hooks/useFinanceData.ts` | 2,029 |
 | `services/inventoryService.ts` | 1,638 |
 
 ## 2. Service 層（按業務領域）
@@ -91,7 +91,7 @@
 | `learningPathsService.ts` | 340 | 2 | Learning Paths & Learning Progress Service Fixes applied: P1 – startLearningPath uses runTransaction to prevent duplicate progress records P… | LEARNING_PATHS, LEARNING_PROGRESS |
 | `memberAuthService.ts` | 91 | 2 | 会员登录账号（Firebase Auth）的建立与补建；调用 Netlify 函数 member-auth（uid = 会员文档 ID）。 | — |
 | `memberBenefitsService.ts` | 329 | 1 | Member Benefits Service Handles the memberBenefits collection and benefitUsage write path. Read path for advertisements-as-benefits lives in… | ADVERTISEMENTS, BENEFIT_USAGE, MEMBER_BENEFITS |
-| `memberJourneyService.ts` | 170 | 2 | Leadership Journey + Trainer Pathway derivation (dashboard journey card for pre-2025 members) | — |
+| `memberJourneyService.ts` | 155 | 2 | Leadership Journey + Trainer Pathway derivation (dashboard journey card for pre-2025 members) | — |
 | `memberStatsService.ts` | 318 | 2 | Member Statistics Service - Generates comprehensive member statistics and reports | — |
 | `membersService.ts` | 2,284 | 41 | Members Service - CRUD Operations | BOARD_MEMBERS, EVENT_REGISTRATIONS, MEMBERS, MEMBER_EMAILS, NOTIFICATIONS, PAYMENT_REQUESTS … |
 | `membershipConfigService.ts` | 373 | 17 | ⚠️ 無說明 | SYSTEM_SETTINGS |
@@ -149,9 +149,9 @@
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `getLeadershipJourney` | 46 | Leadership Journey — derived from project committee assignments + Board of Directors records |
-| `getTrainerJourney` | 149 | Trainer Pathway — derived from member skills + points (same criteria as the profile card) |
-| `getJourney` | 164 |  |
+| `getLeadershipJourney` | 45 | Leadership Journey — derived from project committee assignments + Board of Directors records |
+| `getTrainerJourney` | 134 | Trainer Pathway — derived from member skills + points (same criteria as the profile card) |
+| `getJourney` | 149 |  |
 
 </details>
 
@@ -464,11 +464,11 @@
 |---|---|---|---|---|
 | `activityPlansService.ts` | 621 | 2 | Activity Plans Service - CRUD Operations P0 fix: all methods now query COLLECTIONS.ACTIVITY_PLANS (was COLLECTIONS.PROJECTS) P1 fixes: isDev… | ACTIVITY_PLANS, PROJECTS |
 | `eventFeedbackService.ts` | 226 | 3 | Event Feedback Service - Collects and manages event feedback | EVENT_FEEDBACK |
-| `eventRegistrationService.ts` | 391 | 8 | Event Registration Service - 报名/缴费/签到统一名单（Story 8.1） | EVENT_REGISTRATIONS, PROJECTS |
-| `eventsService.ts` | 1,054 | 14 | Events Service - CRUD Operations | EVENT_BUDGETS, EVENT_FEEDBACK, EVENT_REGISTRATIONS, GUEST_REGISTRATIONS, NOTIFICATIONS, POINTS … |
+| `eventRegistrationService.ts` | 391 | 7 | Event Registration Service - 报名/缴费/签到统一名单（Story 8.1） | EVENT_REGISTRATIONS, PROJECTS |
+| `eventsService.ts` | 1,101 | 14 | Events Service - CRUD Operations | EVENT_BUDGETS, EVENT_FEEDBACK, EVENT_REGISTRATIONS, GUEST_REGISTRATIONS, NOTIFICATIONS, POINTS … |
 | `flagshipProjectsService.ts` | 156 | 3 | ⚠️ 無說明 | FLAGSHIP_PROJECTS |
 | `projectReportService.ts` | 775 | 3 | Project Report Service - Generates automated project reports | TEMPLATES |
-| `projectsService.ts` | 816 | 22 | Projects Service - CRUD Operations | ACTIVITY_PLANS, MEMBERS, POINTS, PROJECTS, PROJECT_REPORTS, PROJECT_TRANSACTIONS … |
+| `projectsService.ts` | 823 | 21 | Projects Service - CRUD Operations | ACTIVITY_PLANS, MEMBERS, POINTS, PROJECTS, PROJECT_REPORTS, PROJECT_TRANSACTIONS … |
 | `zoomBookingService.ts` | 168 | 1 | ⚠️ 無說明 | ZOOM_BOOKINGS |
 
 <details><summary><code>services/activityPlansService.ts</code> — 11 個方法</summary>
@@ -507,27 +507,28 @@
 
 </details>
 
-<details><summary><code>services/eventsService.ts</code> — 17 個方法</summary>
+<details><summary><code>services/eventsService.ts</code> — 18 個方法</summary>
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `invalidateEventsCache` | 36 |  |
-| `getAllEvents` | 84 | Approved projects with eventStartDate (for Event List: Upcoming + Completed) |
-| `getEventById` | 117 | Get event by ID (from projects collection) |
-| `createEvent` | 153 | Create new event |
-| `updateEvent` | 207 | Update event |
-| `deleteEvent` | 241 | Delete event |
-| `registerForEvent` | 320 | Register member for event |
-| `cancelRegistration` | 413 | Cancel event registration |
-| `completeEvent` | 516 | P1-A: Mark an event as Completed (no existing method existed) |
-| `cancelEvent` | 550 | Cancel entire event — batch-cancels all active registrations and their income transactions |
-| `markAttendance` | 719 | Mark attendance (check-in) P0 guard: only BOARD+ or ADMIN callers should mark attendance; MEMBER/GUEST are blo… |
-| `undoAttendance` | 789 | Undo attendance (un-check-in) — FIX E3 P0 guard: only BOARD+ or ADMIN callers should undo attendance. |
-| `getUpcomingEvents` | 894 | Get upcoming events (approved, date >= now) |
-| `getEventsByType` | 909 | Get events by type |
-| `registerGuestForEvent` | 926 | Register a guest for an event. Uses runTransaction to atomically prevent duplicate registrations — reads first… |
-| `getGuestRegistrations` | 992 | Fetch all guest registrations for an event. Exposes a service-layer method so components don't query Firestore… |
-| `cancelGuestRegistration` | 1026 | Cancel a guest registration. P1 FIX: also updates the phone-index sentinel doc so the phone number is freed fo… |
+| `invalidateEventsCache` | 42 |  |
+| `getAllEvents` | 92 | Approved projects with eventStartDate (for Event List: Upcoming + Completed) |
+| `getUpcomingEvents` | 130 | Events starting today (MYT) or later, same statuses as getAllEvents. Filters on eventStartDate (YYYY-MM-DD str… |
+| `getKlEvents` | 157 | Every event JCI Kuala Lumpur hosts or co-hosts (any date / status except Cancelled), newest first — the board … |
+| `getEventById` | 179 | Get event by ID (from projects collection) |
+| `createEvent` | 215 | Create new event |
+| `updateEvent` | 269 | Update event |
+| `deleteEvent` | 303 | Delete event |
+| `registerForEvent` | 382 | Register member for event |
+| `cancelRegistration` | 475 | Cancel event registration |
+| `completeEvent` | 578 | P1-A: Mark an event as Completed (no existing method existed) |
+| `cancelEvent` | 612 | Cancel entire event — batch-cancels all active registrations and their income transactions |
+| `markAttendance` | 781 | Mark attendance (check-in) P0 guard: only BOARD+ or ADMIN callers should mark attendance; MEMBER/GUEST are blo… |
+| `undoAttendance` | 851 | Undo attendance (un-check-in) — FIX E3 P0 guard: only BOARD+ or ADMIN callers should undo attendance. |
+| `getEventsByType` | 956 | Get events by type |
+| `registerGuestForEvent` | 973 | Register a guest for an event. Uses runTransaction to atomically prevent duplicate registrations — reads first… |
+| `getGuestRegistrations` | 1039 | Fetch all guest registrations for an event. Exposes a service-layer method so components don't query Firestore… |
+| `cancelGuestRegistration` | 1073 | Cancel a guest registration. P1 FIX: also updates the phone-index sentinel doc so the phone number is freed fo… |
 
 </details>
 
@@ -567,22 +568,22 @@
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `invalidateProjectsCache` | 36 |  |
-| `getAllProjects` | 41 | Get all projects (includes all statuses - no filtering) |
-| `getExistingRoadmapIds` | 85 | Return Set of roadmapId values that already exist in Firestore — used by the batch importer to skip duplicates… |
-| `getProjectById` | 103 | Get project by ID |
-| `createProject` | 121 | Create new project P1-B: accept optional currentUserId so organizerId is reliably written |
-| `cloneProject` | 190 | Clone a project as a new version (P1-D) |
-| `updateProject` | 208 | Update project P1-C: pass currentUserId so review approval/rejection stamps reviewedBy + reviewedDate together |
-| `deleteProject` | 340 | Delete project |
-| `registerMember` | 417 | P1-E: Register a member with capacity guard |
-| `unregisterMember` | 452 | Unregister a member from a project |
-| `getProjectTasks` | 476 | Get tasks for a project P1-C: supports optional filters (priority). Requires composite Firestore index on (pro… |
-| `getTaskById` | 522 | Get task by ID |
-| `createTask` | 547 | Create or update task (if taskId is provided, use it as document ID) |
-| `updateTask` | 611 | Update task |
-| `deleteTask` | 770 | Delete a task by ID and update project completion |
-| `updateProjectCompletion` | 802 | Update project completion percentage |
+| `invalidateProjectsCache` | 37 |  |
+| `getAllProjects` | 42 | Get all projects (includes all statuses - no filtering) |
+| `getExistingRoadmapIds` | 86 | Return Set of roadmapId values that already exist in Firestore — used by the batch importer to skip duplicates… |
+| `getProjectById` | 104 | Get project by ID |
+| `createProject` | 122 | Create new project P1-B: accept optional currentUserId so organizerId is reliably written |
+| `cloneProject` | 195 | Clone a project as a new version (P1-D) |
+| `updateProject` | 213 | Update project P1-C: pass currentUserId so review approval/rejection stamps reviewedBy + reviewedDate together |
+| `deleteProject` | 347 | Delete project |
+| `registerMember` | 424 | P1-E: Register a member with capacity guard |
+| `unregisterMember` | 459 | Unregister a member from a project |
+| `getProjectTasks` | 483 | Get tasks for a project P1-C: supports optional filters (priority). Requires composite Firestore index on (pro… |
+| `getTaskById` | 529 | Get task by ID |
+| `createTask` | 554 | Create or update task (if taskId is provided, use it as document ID) |
+| `updateTask` | 618 | Update task |
+| `deleteTask` | 777 | Delete a task by ID and update project completion |
+| `updateProjectCompletion` | 809 | Update project completion percentage |
 
 </details>
 
@@ -1106,9 +1107,9 @@
 
 | Service | 行數 | 引用 | 用途 | 集合 |
 |---|---|---|---|---|
-| `aiPredictionService.ts` | 949 | 5 | AI Prediction Service - Advanced AI predictions for events, projects, and sponsors | — |
+| `aiPredictionService.ts` | 949 | 4 | AI Prediction Service - Advanced AI predictions for events, projects, and sponsors | — |
 | `cacheService.ts` | 314 | 32 | 缓存服务 - 提供内存缓存和本地存储缓存功能 Cache Service - Provides in-memory and localStorage caching capabilities | — |
-| `cloudinaryService.ts` | 327 | 13 | Cloudinary Upload Service | — |
+| `cloudinaryService.ts` | 337 | 14 | Cloudinary Upload Service | — |
 | `dataImportExportService.ts` | 892 | 3 | ⚠️ 無說明 | EVENTS, MEMBERS, MEMBER_EMAILS |
 | `errorLoggingService.ts` | 354 | 66 | ⚠️ 無說明 | ERROR_LOGS |
 | `firestoreLogger.ts` | 197 | 3 | System Logger — Firestore ops + Performance monitoring Fire-and-forget buffered logger. Buffers events for 3 seconds then writes one batched… | SYSTEM_LOGS |
@@ -1136,10 +1137,10 @@
 
 </details>
 
-<details><summary><code>services/cloudinaryService.ts</code> — 0 個方法、13 個函數/常數</summary>
+<details><summary><code>services/cloudinaryService.ts</code> — 0 個方法、14 個函數/常數</summary>
 
 
-**其他 export：** `trimCloudinaryImage` (L9), `getMemberAvatarKey` (L48), `getMemberAvatarFolder` (L55), `uploadMemberAvatarToCloudinary` (L59), `uploadBoardAvatarToCloudinary` (L79), `uploadPresidentialLogoToCloudinary` (L98), `uploadMemberGroupPhotoToCloudinary` (L114), `uploadMemberOfferLogoToCloudinary` (L131), `uploadMemberOfferBannerToCloudinary` (L146), `uploadBodGroupPhotoToCloudinary` (L161), `uploadToCloudinary` (L186), `getPublicIdFromUrl` (L269), `deleteFromCloudinary` (L290)
+**其他 export：** `trimCloudinaryImage` (L9), `resizeCloudinaryImage` (L19), `getMemberAvatarKey` (L58), `getMemberAvatarFolder` (L65), `uploadMemberAvatarToCloudinary` (L69), `uploadBoardAvatarToCloudinary` (L89), `uploadPresidentialLogoToCloudinary` (L108), `uploadMemberGroupPhotoToCloudinary` (L124), `uploadMemberOfferLogoToCloudinary` (L141), `uploadMemberOfferBannerToCloudinary` (L156), `uploadBodGroupPhotoToCloudinary` (L171), `uploadToCloudinary` (L196), `getPublicIdFromUrl` (L279), `deleteFromCloudinary` (L300)
 
 </details>
 
@@ -1271,8 +1272,8 @@
 | `useAutomation.ts` | 149 | 3 | `useAutomation` | automationService | useAutomation Hook - Manage automation workflows and rules |
 | `useBusinessDirectory.ts` | 48 | 4 | `useBusinessDirectory` | businessDirectoryService | ⚠️ 無說明 |
 | `useCommunication.ts` | 118 | 2 | `useCommunication` | communicationService | Communication Data Hook |
-| `useEvents.ts` | 181 | 9 | `useEvents` | errorLoggingService, eventsService, membersService | Events Data Hook |
-| `useFinanceData.ts` | 2,046 | 4 | `useFinanceData` | errorLoggingService, financeService, inventoryService, membersService, membershipConfigService, paymentRequestService, projectFinancialService, projectsService | TODO (PERF-A-004): This hook has ~90 useState declarations, causing full FinanceView re-renders on any state update. Planned refactor: split… |
+| `useEvents.ts` | 189 | 8 | `useEvents` | errorLoggingService, eventsService, membersService | Events Data Hook |
+| `useFinanceData.ts` | 2,029 | 4 | `useFinanceData` | errorLoggingService, financeService, inventoryService, membersService, membershipConfigService, paymentRequestService, projectFinancialService, projectsService | TODO (PERF-A-004): This hook has ~90 useState declarations, causing full FinanceView re-renders on any state update. Planned refactor: split… |
 | `useFirestoreCollection.ts` | 171 | 18 | `useFirestoreCollection` | — | ⚠️ 無說明 |
 | `useGamification.ts` | 148 | 1 | `useGamification` | gamificationService | useGamification.ts - Unified Hook for Awards (Achievements + Badges) |
 | `useGuestAnalytics.ts` | 21 | 0 | `useGuestAnalytics` | guestAnalyticsService | ⚠️ 無說明 |
@@ -1289,7 +1290,7 @@
 | `useNotifications.ts` | 107 | 0 | `useNotifications` | communicationService, errorLoggingService, mockData | ⚠️ 無說明 |
 | `usePermissions.ts` | 199 | 26 | `usePermissions` | — | Permission Management Hook |
 | `usePoints.ts` | 59 | 2 | `usePoints` | pointsService | Points Data Hook |
-| `useProjects.ts` | 169 | 8 | `useProjects` | projectsService | Projects Data Hook |
+| `useProjects.ts` | 170 | 7 | `useProjects` | projectsService | Projects Data Hook |
 | `usePushNotifications.ts` | 63 | 1 | `usePushNotifications` | — | ⚠️ 無說明 |
 | `useSisterChapterMembers.ts` | 49 | 2 | `useSisterChapterMembers` | membersService, sisterChaptersService | ⚠️ 無說明 |
 | `useSisterChapters.ts` | 26 | 3 | `useSisterChapters` | sisterChaptersService | ⚠️ 無說明 |
@@ -1305,6 +1306,12 @@
 | `useZoomBookings.ts` | 52 | 1 | `useZoomBookings` | zoomBookingService | ⚠️ 無說明 |
 
 ## 4. Util 層（純函數，優先複用）
+
+### `utils/activityPhase.ts` （23 行，2 處引用）
+
+| 函數 | 行 | 說明 |
+|---|---|---|
+| `activityPhase` | 11 | Phase of an activity from its dates (MYT, YYYY-MM-DD strings compare as dates): completed = status "Completed"… |
 
 ### `utils/administrativeProjectsStorage.ts` （26 行，4 處引用）
 
@@ -1348,7 +1355,7 @@
 |---|---|---|
 | `removeUndefined` | 6 | recursivley removes undefined values from an object. Firestore does not support 'undefined' values, so this he… |
 
-### `utils/dateUtils.ts` （176 行，43 處引用）
+### `utils/dateUtils.ts` （176 行，46 處引用）
 > Date Utility Functions
 
 | 函數 | 行 | 說明 |
@@ -1525,6 +1532,6 @@
 
 ## 8. 文件債：缺少檔頭說明的檔案
 
-共 52 個。請在檔案第一行補上 `/** 一句話說明此檔案職責 */`，下次重新生成時就會自動帶入本文件。
+共 53 個。請在檔案第一行補上 `/** 一句話說明此檔案職責 */`，下次重新生成時就會自動帶入本文件。
 
-`services/auditLogService.ts`, `services/contractService.ts`, `services/dataImportExportService.ts`, `services/engagementAutoSuggestService.ts`, `services/errorLoggingService.ts`, `services/financeService.ts`, `services/flagshipProjectsService.ts`, `services/guestAnalyticsService.ts`, `services/incentiveCalculatorService.ts`, `services/inquiryService.ts`, `services/larkSyncService.ts`, `services/membershipConfigService.ts`, `services/mockData.ts`, `services/notificationService.ts`, `services/partnershipsService.ts`, `services/permissionConfigService.ts`, `services/postcodeService.ts`, `services/promotionService.ts`, `services/reportService.ts`, `services/sisterChaptersService.ts`, `services/socialPersonaService.ts`, `services/socialPostService.ts`, `services/sponsorshipService.ts`, `services/toyyibService.ts`, `services/zoomBookingService.ts`, `hooks/useActivityPlans.ts`, `hooks/useAppNavigation.ts`, `hooks/useBusinessDirectory.ts`, `hooks/useFirestoreCollection.ts`, `hooks/useGuestAnalytics.ts`, `hooks/useHobbyClubs.ts`, `hooks/useInstallPrompt.ts`, `hooks/useKnowledge.ts`, `hooks/useMemberMutations.ts`, `hooks/useMemberSearch.ts`, `hooks/useNotifications.ts`, `hooks/usePushNotifications.ts`, `hooks/useSisterChapterMembers.ts`, `hooks/useSisterChapters.ts`, `hooks/useSocialPersonas.ts`, `hooks/useSocialPosts.ts`, `hooks/useSurveys.ts`, `hooks/useToyyibMode.ts`, `hooks/useToyyibPay.ts`, `hooks/useToyyibPayment.ts`, `hooks/useZoomBookings.ts`, `utils/administrativeProjectsStorage.ts`, `utils/boardMembership.ts`, `utils/financeUtils.ts`, `utils/gamificationUtils.ts`, `utils/roadmapUtils.ts`, `utils/rolePermissions.ts`
+`services/auditLogService.ts`, `services/contractService.ts`, `services/dataImportExportService.ts`, `services/engagementAutoSuggestService.ts`, `services/errorLoggingService.ts`, `services/financeService.ts`, `services/flagshipProjectsService.ts`, `services/guestAnalyticsService.ts`, `services/incentiveCalculatorService.ts`, `services/inquiryService.ts`, `services/larkSyncService.ts`, `services/membershipConfigService.ts`, `services/mockData.ts`, `services/notificationService.ts`, `services/partnershipsService.ts`, `services/permissionConfigService.ts`, `services/postcodeService.ts`, `services/promotionService.ts`, `services/reportService.ts`, `services/sisterChaptersService.ts`, `services/socialPersonaService.ts`, `services/socialPostService.ts`, `services/sponsorshipService.ts`, `services/toyyibService.ts`, `services/zoomBookingService.ts`, `hooks/useActivityPlans.ts`, `hooks/useAppNavigation.ts`, `hooks/useBusinessDirectory.ts`, `hooks/useFirestoreCollection.ts`, `hooks/useGuestAnalytics.ts`, `hooks/useHobbyClubs.ts`, `hooks/useInstallPrompt.ts`, `hooks/useKnowledge.ts`, `hooks/useMemberMutations.ts`, `hooks/useMemberSearch.ts`, `hooks/useNotifications.ts`, `hooks/usePushNotifications.ts`, `hooks/useSisterChapterMembers.ts`, `hooks/useSisterChapters.ts`, `hooks/useSocialPersonas.ts`, `hooks/useSocialPosts.ts`, `hooks/useSurveys.ts`, `hooks/useToyyibMode.ts`, `hooks/useToyyibPay.ts`, `hooks/useToyyibPayment.ts`, `hooks/useZoomBookings.ts`, `utils/activityPhase.ts`, `utils/administrativeProjectsStorage.ts`, `utils/boardMembership.ts`, `utils/financeUtils.ts`, `utils/gamificationUtils.ts`, `utils/roadmapUtils.ts`, `utils/rolePermissions.ts`

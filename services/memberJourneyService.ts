@@ -1,7 +1,6 @@
 // Leadership Journey + Trainer Pathway derivation (dashboard journey card for pre-2025 members)
 import { Member } from '../types';
 import { BoardManagementService } from './boardManagementService';
-import { ProjectsService } from './projectsService';
 import { withDevMode } from '../utils/devMode';
 
 export interface JourneyStep {
@@ -74,8 +73,8 @@ export class MemberJourneyService {
     return withDevMode(
       () => buildResult(false, false, false, false, false, false, false, false, {}, {}),
       async () => {
-        let hasCommittee = false;
-        let hasOC = false;
+        const hasCommittee = false;
+        const hasOC = false;
         let hasCommissionDirector = false;
         let hasBoard = false;
         let hasPresident = false;
@@ -85,27 +84,13 @@ export class MemberJourneyService {
         const details: Record<string, string> = {};
         const multiDetails: Record<string, string[]> = {};
 
-        const [boardPositions, commissionPositions, projects] = await Promise.all([
+        // Project committee / OC steps are not derived here: it took a scan of the whole projects
+        // collection (~8 MB, on every dashboard load), and no project records a committee
+        // memberId yet. Needs a queryable field (e.g. committeeMemberIds) before it can return.
+        const [boardPositions, commissionPositions] = await Promise.all([
           BoardManagementService.getMemberBoardPositions(member.id).catch(() => []),
           BoardManagementService.getMemberCommissionDirectorPositions(member.id).catch(() => []),
-          ProjectsService.getAllProjects().catch(() => []),
         ]);
-
-        // Project committee / OC (from project committee assignments)
-        for (const proj of projects as any[]) {
-          if (!Array.isArray(proj.committee)) continue;
-          for (const c of proj.committee) {
-            if (c.memberId !== member.id) continue;
-            const role = (c.role || '').toLowerCase();
-            if (role.includes('organising chairman') || role.includes('organizing chairman') || role === 'oc') {
-              hasOC = true;
-              details['Project OC'] = proj.name || proj.title || '';
-            } else {
-              hasCommittee = true;
-              if (!details['Project Committee']) details['Project Committee'] = proj.name || proj.title || '';
-            }
-          }
-        }
 
         // Board of Directors records
         const sortByTermDesc = (a: { term: string }, b: { term: string }) =>

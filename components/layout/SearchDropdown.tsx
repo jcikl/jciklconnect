@@ -13,12 +13,19 @@ import { useProjects } from '../../hooks/useProjects';
 import { useBusinessDirectory } from '../../hooks/useBusinessDirectory';
 import { ViewType } from '../../types';
 
-export const SearchDropdown: React.FC<{
+type SearchDropdownProps = {
   isOpen: boolean;
   onClose: () => void;
   searchQuery: string;
   onNavigate: (view: ViewType, selectedId?: string) => void;
-}> = ({ isOpen, onClose, searchQuery, onNavigate }) => {
+};
+
+// Mounted on every page; the member / event / project / business lists are loaded only once
+// search is opened (they used to download on every page load, even with search closed).
+export const SearchDropdown: React.FC<SearchDropdownProps> = (props) =>
+  props.isOpen ? <SearchDropdownContent {...props} /> : null;
+
+const SearchDropdownContent: React.FC<SearchDropdownProps> = ({ isOpen, onClose, searchQuery, onNavigate }) => {
   const { members } = useMembers();
   const { events } = useEvents();
   const { projects } = useProjects();
