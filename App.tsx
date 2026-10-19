@@ -16,6 +16,7 @@ import * as Forms from './components/ui/Form';
 import { LoginModal } from './components/auth/LoginModal';
 import { RegisterModal } from './components/auth/RegisterModal';
 import { ExternalRegisterModal } from './components/auth/ExternalRegisterModal';
+import { canOpenSystemConfig } from './utils/configAccess';
 import { UserRole, Notification, Event, Project } from './types';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { usePermissions } from './hooks/usePermissions';
@@ -1035,7 +1036,7 @@ export const JCIKLApp: React.FC = () => {
                           <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><Zap size={22} /></div>
                           <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Radar</span>
                         </div>
-                        {effectiveRole === UserRole.SUPER_ADMIN && (
+                        {canOpenSystemConfig(effectiveRole) && (
                           <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('SYSTEM_CONFIG'); setShowMobileMenu(false); }}>
                             <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><SlidersHorizontal size={22} /></div>
                             <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Config</span>

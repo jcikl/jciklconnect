@@ -4,6 +4,7 @@ import { ViewType } from '../../types/views';
 import type { AffiliationStatus } from '../../types/member';
 import { ExternalAccessNotice } from './ExternalAccessNotice';
 import { ExternalSelfProfile } from './ExternalSelfProfile';
+import { canOpenSystemConfig } from '../../utils/configAccess';
 
 const FinanceView = lazy(() => import('../modules/FinanceView').then(m => ({ default: m.FinanceView })));
 const PaymentRequestsView = lazy(() => import('../modules/PaymentRequestsView').then(m => ({ default: m.PaymentRequestsView })));
@@ -228,7 +229,8 @@ export const renderAppView = (view: ViewType, context: AppViewRenderContext): Re
       if (memberRole !== UserRole.SUPER_ADMIN) return dashboardFallback;
       return wrapErrorBoundary(<SystemConfigView initialTab="access" />, '访问配置');
     case 'SYSTEM_CONFIG':
-      if (memberRole !== UserRole.SUPER_ADMIN) return dashboardFallback;
+      // ADMIN opens Config with the Global Relations tab only (SystemConfigView filters the tabs).
+      if (!canOpenSystemConfig(memberRole)) return dashboardFallback;
       return wrapErrorBoundary(<SystemConfigView />, '系统配置');
     case 'PUBLICATIONS':
       if (memberRole === UserRole.GUEST || isPlainMember) return dashboardFallback;

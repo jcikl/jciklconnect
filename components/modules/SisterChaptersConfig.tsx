@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Plus, Pencil, Trash2, Globe, ChevronDown, UserPlus, User, ShieldCheck } from 'lucide-react';
+import { Plus, Pencil, Trash2, Globe, ChevronDown, UserPlus, User, ShieldCheck, PauseCircle } from 'lucide-react';
 import { Button, Modal, useToast, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
 import type { ConfirmState } from '../ui/Common';
 import { Input } from '../ui/Form';
@@ -12,6 +12,7 @@ import type { ExternalCreateResponse } from '../../services/externalAccountsServ
 import type { SisterChapter, SisterChapterType } from '../../types/sisterChapter';
 import { SISTER_CHAPTER_TYPE_LABELS } from '../../types/sisterChapter';
 import type { Member } from '../../types';
+import { UserRole } from '../../types';
 
 const TYPE_OPTIONS: { value: SisterChapterType; label: string; desc: string }[] = [
   { value: 'sister_lo', label: 'Sister Chapter',                               desc: 'Peer local organization in another country' },
@@ -51,7 +52,11 @@ const Toggle: React.FC<{ checked: boolean; onChange: (v: boolean) => void }> = (
   </button>
 );
 
-export const SisterChaptersConfig: React.FC = () => {
+/**
+ * Global Relations (Config). canEditChapters (SUPER_ADMIN): add / edit / delete / activate chapters.
+ * Every KL admin (ADMIN + SUPER_ADMIN) may add chapter admins, invite members and handle approvals.
+ */
+export const SisterChaptersConfig: React.FC<{ canEditChapters?: boolean }> = ({ canEditChapters = false }) => {
   const { chapters, loading, reload } = useSisterChapters();
   const { showToast } = useToast();
 
@@ -69,7 +74,7 @@ export const SisterChaptersConfig: React.FC = () => {
   const [memberModalChapterId, setMemberModalChapterId] = useState<string | null>(null);
   const [accountMode, setAccountMode] = useState<AccountMode>('invite');
   const [memberForm, setMemberForm] = useState(MEMBER_EMPTY);
-  const { busy: savingMember, createChapterAdmins, inviteMembers } = useExternalAccounts();
+  const { busy: savingMember, createChapterAdmins, inviteMembers, setStatus: setMemberStatus, removeLegacyMember } = useExternalAccounts();
 
   // KL approval queue (affiliation.status == 'pending_kl', all chapters). Status changes go through the
   // external-accounts function so the member card follows.
@@ -220,6 +225,31 @@ export const SisterChaptersConfig: React.FC = () => {
     }
   };
 
+  // Login-backed external docs are suspended through the external-accounts function (card deleted,
+  // login and record kept — reactivate later). Legacy non-login MEMBER docs are soft-deleted (card deleted too).
+  const isExternalDoc = (m: Member) => m.role === UserRole.AFFILIATE || m.role === UserRole.CHAPTER_ADMIN;
+
+  const handleSuspendMember = (member: Member, chapterId: string) => {
+    const displayName = member.general?.name ?? member.id;
+    setConfirmState({
+      open: true,
+      title: 'Suspend member',
+      message: `Suspend ${displayName}? They lose access and their card is hidden until reactivated.`,
+      confirmLabel: 'Suspend',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmState(CONFIRM_CLOSED);
+        try {
+          await setMemberStatus(member.id, 'suspended');
+          showToast('Member suspended', 'success');
+          await loadMembers(chapterId);
+        } catch (err: any) {
+          showToast(err?.message ?? 'Failed to suspend member', 'error');
+        }
+      },
+    });
+  };
+
   const handleDeleteMember = (member: Member, chapterId: string) => {
     const displayName = member.general?.name ?? member.id;
     setConfirmState({
@@ -230,14 +260,14 @@ export const SisterChaptersConfig: React.FC = () => {
       variant: 'danger',
       onConfirm: async () => {
         try {
-          await MembersService.deleteMember(member.id);
+          await removeLegacyMember(member.id);
           setChapterMembers(prev => ({
             ...prev,
             [chapterId]: (prev[chapterId] ?? []).filter(m => m.id !== member.id),
           }));
           showToast('Member removed', 'success');
-        } catch {
-          showToast('Failed to remove member', 'error');
+        } catch (err: any) {
+          showToast(err?.message ?? 'Failed to remove member', 'error');
         }
         setConfirmState(CONFIRM_CLOSED);
       },
@@ -286,7 +316,8 @@ export const SisterChaptersConfig: React.FC = () => {
       </div>
 
       <div className="space-y-2">
-        {/* Add chapter row */}
+        {/* Add chapter row (SUPER_ADMIN only) */}
+        {canEditChapters && (
         <button
           onClick={openNew}
           className="w-full flex items-center gap-3 p-3 rounded-xl border border-dashed border-slate-300 hover:border-jci-blue hover:bg-blue-50/50 text-slate-400 hover:text-jci-blue transition-colors"
@@ -296,6 +327,7 @@ export const SisterChaptersConfig: React.FC = () => {
           </div>
           <span className="text-sm font-medium">Add Chapter / Council</span>
         </button>
+        )}
 
         {/* Chapter cards grouped by type */}
         {TYPE_OPTIONS.map(({ value: typeKey, label: typeLabel }) => {
@@ -341,13 +373,17 @@ export const SisterChaptersConfig: React.FC = () => {
                   >
                     <ChevronDown size={14} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                   </button>
-                  <Toggle checked={ch.isActive} onChange={() => handleToggleActive(ch)} />
-                  <button onClick={() => openEdit(ch)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
-                    <Pencil size={14} />
-                  </button>
-                  <button onClick={() => handleDeleteChapter(ch)} className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors">
-                    <Trash2 size={14} />
-                  </button>
+                  {canEditChapters && (
+                    <>
+                      <Toggle checked={ch.isActive} onChange={() => handleToggleActive(ch)} />
+                      <button onClick={() => openEdit(ch)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
+                        <Pencil size={14} />
+                      </button>
+                      <button onClick={() => handleDeleteChapter(ch)} className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors">
+                        <Trash2 size={14} />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -374,12 +410,31 @@ export const SisterChaptersConfig: React.FC = () => {
                             <p className="text-[10px] text-slate-400 truncate">{[m.business?.position, m.companyName ?? m.business?.companyName].filter(Boolean).join(' · ')}</p>
                           )}
                         </div>
-                        <button
-                          onClick={() => handleDeleteMember(m, ch.id)}
-                          className="p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-400 transition-colors shrink-0"
-                        >
-                          <Trash2 size={12} />
-                        </button>
+                        {isExternalDoc(m) ? (
+                          m.affiliation?.status === 'suspended' ? (
+                            <span className="text-[10px] text-slate-400 shrink-0">Suspended</span>
+                          ) : (
+                            <button
+                              onClick={() => handleSuspendMember(m, ch.id)}
+                              disabled={savingMember}
+                              className="p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-400 transition-colors shrink-0"
+                              aria-label="Suspend member"
+                              title="Suspend"
+                            >
+                              <PauseCircle size={12} />
+                            </button>
+                          )
+                        ) : m.role !== UserRole.INACTIVE && (
+                          <button
+                            onClick={() => handleDeleteMember(m, ch.id)}
+                            disabled={savingMember}
+                            className="p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-400 transition-colors shrink-0"
+                            aria-label="Remove member"
+                            title="Remove"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
                       </div>
                     ))
                   )}

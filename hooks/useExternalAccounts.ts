@@ -1,6 +1,7 @@
 /** External (sister-chapter) account actions for components: create chapter admins, invite, status, resend. */
 import { useCallback, useState } from 'react';
 import { ExternalAccountsService, type ExternalInvitee, type ExternalCreateResponse } from '../services/externalAccountsService';
+import { MembersService } from '../services/membersService';
 import type { AffiliationStatus } from '../types/member';
 
 export function useExternalAccounts() {
@@ -30,5 +31,15 @@ export function useExternalAccounts() {
     [wrap]
   );
 
-  return { busy, createChapterAdmins, inviteMembers, setStatus, resendInvite };
+  /**
+   * Legacy sister-chapter doc without a login (old "Add Member": role MEMBER, loId != jcikl): soft-delete via
+   * MembersService.deleteMember, which also releases the email slot and deletes the memberCards doc
+   * (MemberCardsService.syncCards with forceDelete). Login-backed external docs are suspended instead (setStatus).
+   */
+  const removeLegacyMember = useCallback(
+    (memberId: string): Promise<void> => wrap(() => MembersService.deleteMember(memberId)),
+    [wrap]
+  );
+
+  return { busy, createChapterAdmins, inviteMembers, setStatus, resendInvite, removeLegacyMember };
 }
