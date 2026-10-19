@@ -464,8 +464,8 @@
 |---|---|---|---|---|
 | `activityPlansService.ts` | 621 | 2 | Activity Plans Service - CRUD Operations P0 fix: all methods now query COLLECTIONS.ACTIVITY_PLANS (was COLLECTIONS.PROJECTS) P1 fixes: isDev… | ACTIVITY_PLANS, PROJECTS |
 | `eventFeedbackService.ts` | 226 | 3 | Event Feedback Service - Collects and manages event feedback | EVENT_FEEDBACK |
-| `eventRegistrationService.ts` | 391 | 8 | Event Registration Service - 报名/缴费/签到统一名单（Story 8.1） | EVENT_REGISTRATIONS, PROJECTS |
-| `eventsService.ts` | 1,054 | 14 | Events Service - CRUD Operations | EVENT_BUDGETS, EVENT_FEEDBACK, EVENT_REGISTRATIONS, GUEST_REGISTRATIONS, NOTIFICATIONS, POINTS … |
+| `eventRegistrationService.ts` | 391 | 7 | Event Registration Service - 报名/缴费/签到统一名单（Story 8.1） | EVENT_REGISTRATIONS, PROJECTS |
+| `eventsService.ts` | 1,071 | 14 | Events Service - CRUD Operations | EVENT_BUDGETS, EVENT_FEEDBACK, EVENT_REGISTRATIONS, GUEST_REGISTRATIONS, NOTIFICATIONS, POINTS … |
 | `flagshipProjectsService.ts` | 156 | 3 | ⚠️ 無說明 | FLAGSHIP_PROJECTS |
 | `projectReportService.ts` | 775 | 3 | Project Report Service - Generates automated project reports | TEMPLATES |
 | `projectsService.ts` | 816 | 22 | Projects Service - CRUD Operations | ACTIVITY_PLANS, MEMBERS, POINTS, PROJECTS, PROJECT_REPORTS, PROJECT_TRANSACTIONS … |
@@ -511,23 +511,23 @@
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `invalidateEventsCache` | 36 |  |
-| `getAllEvents` | 84 | Approved projects with eventStartDate (for Event List: Upcoming + Completed) |
-| `getEventById` | 117 | Get event by ID (from projects collection) |
-| `createEvent` | 153 | Create new event |
-| `updateEvent` | 207 | Update event |
-| `deleteEvent` | 241 | Delete event |
-| `registerForEvent` | 320 | Register member for event |
-| `cancelRegistration` | 413 | Cancel event registration |
-| `completeEvent` | 516 | P1-A: Mark an event as Completed (no existing method existed) |
-| `cancelEvent` | 550 | Cancel entire event — batch-cancels all active registrations and their income transactions |
-| `markAttendance` | 719 | Mark attendance (check-in) P0 guard: only BOARD+ or ADMIN callers should mark attendance; MEMBER/GUEST are blo… |
-| `undoAttendance` | 789 | Undo attendance (un-check-in) — FIX E3 P0 guard: only BOARD+ or ADMIN callers should undo attendance. |
-| `getUpcomingEvents` | 894 | Get upcoming events (approved, date >= now) |
-| `getEventsByType` | 909 | Get events by type |
-| `registerGuestForEvent` | 926 | Register a guest for an event. Uses runTransaction to atomically prevent duplicate registrations — reads first… |
-| `getGuestRegistrations` | 992 | Fetch all guest registrations for an event. Exposes a service-layer method so components don't query Firestore… |
-| `cancelGuestRegistration` | 1026 | Cancel a guest registration. P1 FIX: also updates the phone-index sentinel doc so the phone number is freed fo… |
+| `invalidateEventsCache` | 39 |  |
+| `getAllEvents` | 88 | Approved projects with eventStartDate (for Event List: Upcoming + Completed) |
+| `getUpcomingEvents` | 126 | Events starting today (MYT) or later, same statuses as getAllEvents. Filters on eventStartDate (YYYY-MM-DD str… |
+| `getEventById` | 149 | Get event by ID (from projects collection) |
+| `createEvent` | 185 | Create new event |
+| `updateEvent` | 239 | Update event |
+| `deleteEvent` | 273 | Delete event |
+| `registerForEvent` | 352 | Register member for event |
+| `cancelRegistration` | 445 | Cancel event registration |
+| `completeEvent` | 548 | P1-A: Mark an event as Completed (no existing method existed) |
+| `cancelEvent` | 582 | Cancel entire event — batch-cancels all active registrations and their income transactions |
+| `markAttendance` | 751 | Mark attendance (check-in) P0 guard: only BOARD+ or ADMIN callers should mark attendance; MEMBER/GUEST are blo… |
+| `undoAttendance` | 821 | Undo attendance (un-check-in) — FIX E3 P0 guard: only BOARD+ or ADMIN callers should undo attendance. |
+| `getEventsByType` | 926 | Get events by type |
+| `registerGuestForEvent` | 943 | Register a guest for an event. Uses runTransaction to atomically prevent duplicate registrations — reads first… |
+| `getGuestRegistrations` | 1009 | Fetch all guest registrations for an event. Exposes a service-layer method so components don't query Firestore… |
+| `cancelGuestRegistration` | 1043 | Cancel a guest registration. P1 FIX: also updates the phone-index sentinel doc so the phone number is freed fo… |
 
 </details>
 
@@ -1271,7 +1271,7 @@
 | `useAutomation.ts` | 149 | 3 | `useAutomation` | automationService | useAutomation Hook - Manage automation workflows and rules |
 | `useBusinessDirectory.ts` | 48 | 4 | `useBusinessDirectory` | businessDirectoryService | ⚠️ 無說明 |
 | `useCommunication.ts` | 118 | 2 | `useCommunication` | communicationService | Communication Data Hook |
-| `useEvents.ts` | 181 | 9 | `useEvents` | errorLoggingService, eventsService, membersService | Events Data Hook |
+| `useEvents.ts` | 186 | 8 | `useEvents` | errorLoggingService, eventsService, membersService | Events Data Hook |
 | `useFinanceData.ts` | 2,046 | 4 | `useFinanceData` | errorLoggingService, financeService, inventoryService, membersService, membershipConfigService, paymentRequestService, projectFinancialService, projectsService | TODO (PERF-A-004): This hook has ~90 useState declarations, causing full FinanceView re-renders on any state update. Planned refactor: split… |
 | `useFirestoreCollection.ts` | 171 | 18 | `useFirestoreCollection` | — | ⚠️ 無說明 |
 | `useGamification.ts` | 148 | 1 | `useGamification` | gamificationService | useGamification.ts - Unified Hook for Awards (Achievements + Badges) |
@@ -1289,7 +1289,7 @@
 | `useNotifications.ts` | 107 | 0 | `useNotifications` | communicationService, errorLoggingService, mockData | ⚠️ 無說明 |
 | `usePermissions.ts` | 199 | 26 | `usePermissions` | — | Permission Management Hook |
 | `usePoints.ts` | 59 | 2 | `usePoints` | pointsService | Points Data Hook |
-| `useProjects.ts` | 169 | 8 | `useProjects` | projectsService | Projects Data Hook |
+| `useProjects.ts` | 170 | 8 | `useProjects` | projectsService | Projects Data Hook |
 | `usePushNotifications.ts` | 63 | 1 | `usePushNotifications` | — | ⚠️ 無說明 |
 | `useSisterChapterMembers.ts` | 49 | 2 | `useSisterChapterMembers` | membersService, sisterChaptersService | ⚠️ 無說明 |
 | `useSisterChapters.ts` | 26 | 3 | `useSisterChapters` | sisterChaptersService | ⚠️ 無說明 |
@@ -1348,7 +1348,7 @@
 |---|---|---|
 | `removeUndefined` | 6 | recursivley removes undefined values from an object. Firestore does not support 'undefined' values, so this he… |
 
-### `utils/dateUtils.ts` （176 行，43 處引用）
+### `utils/dateUtils.ts` （176 行，44 處引用）
 > Date Utility Functions
 
 | 函數 | 行 | 說明 |

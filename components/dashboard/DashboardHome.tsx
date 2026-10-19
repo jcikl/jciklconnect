@@ -5,13 +5,12 @@ import { useAuth } from '../../hooks/useAuth';
 import { useEvents } from '../../hooks/useEvents';
 
 import { AIPredictionService, PersonalizedRecommendation } from '../../services/aiPredictionService';
-import { EventRegistrationService } from '../../services/eventRegistrationService';
 import { ContractService, CommitmentContract } from '../../services/contractService';
 import { PromotionService, type MemberEngagementProgressSummary } from '../../services/promotionService';
 import { MembersService } from '../../services/membersService';
 import { MemberJourneyService, MemberJourney } from '../../services/memberJourneyService';
 import { AdvertisementService, Advertisement } from '../../services/advertisementService';
-import type { Event, Member, Project } from '../../types';
+import type { Event, Member } from '../../types';
 import { UserRole } from '../../types';
 import { EventDetailModal } from '../modules/EventsView';
 import { PartnershipDetailModal } from './PartnershipDetailModal';
@@ -34,7 +33,6 @@ interface DashboardHomeProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   scrollRef?: React.RefObject<HTMLDivElement>;
-  projects: Project[];
   members: Member[];
 }
 
@@ -44,18 +42,16 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   searchQuery,
   onSearchChange,
   scrollRef,
-  projects,
   members,
 }) => {
 
   const { member } = useAuth();
-  const { events, loading: eventsLoading, registerForEvent, markAttendance, cancelRegistration } = useEvents();
+  // Only today-and-later events: the dashboard shows upcoming events, and loading every event
+  // (3,000+ docs) made the home page take several seconds.
+  const { events, loading: eventsLoading, registerForEvent, markAttendance, cancelRegistration } = useEvents({ scope: 'upcoming' });
 
   const [recommendations, setRecommendations] = useState<PersonalizedRecommendation[]>([]);
   const [topRecommendation, setTopRecommendation] = useState<PersonalizedRecommendation | null>(null);
-  const [myRegistrationEventIds, setMyRegistrationEventIds] = useState<string[]>([]);
-  const [loadingRegistrations, setLoadingRegistrations] = useState(false);
-  const eventTab: 'upcoming' | 'past' = 'upcoming';
   const [contracts, setContracts] = useState<CommitmentContract[]>([]);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [homepageAds, setHomepageAds] = useState<Advertisement[]>([]);
@@ -170,23 +166,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     loadEngagement();
   }, [member]);
 
-  // Load member's event registrations (for guest dashboard: Activity Timeline + Upcoming Registered)
-  useEffect(() => {
-    const load = async () => {
-      if (!member) return;
-      setLoadingRegistrations(true);
-      try {
-        const list = await EventRegistrationService.listByMember(member.id);
-        setMyRegistrationEventIds(list.map((r) => r.eventId));
-      } catch {
-        setMyRegistrationEventIds([]);
-      } finally {
-        setLoadingRegistrations(false);
-      }
-    };
-    load();
-  }, [member]);
-
   const openJourneyModal = () => {
     if (!member) return;
     const joinDateStr = typeof member.jciCareer?.joinDate === 'string' ? member.jciCareer?.joinDate : '';
@@ -222,10 +201,9 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
   // Calculate stats from real data
   const upcomingEvents = React.useMemo(() => {
-    const now = new Date();
     const KL = 'jci kuala lumpur';
     return events.filter(e => {
-      if (new Date(e.date) < now || e.status === 'Cancelled') return false;
+      if (e.status === 'Cancelled') return false;
       const lo = ((e as any).hostingLo ?? '').trim().toLowerCase();
       const coRaw = (e as any).coHosting;
       const level = ((e as any).level ?? '').trim().toLowerCase();
@@ -239,33 +217,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     });
   }, [events]);
 
-  const myProjects = React.useMemo(
-    () => projects.filter(p => p.lead === member?.id),
-    [projects, member?.id]
-  );
-  const pendingTasks = myProjects.length; // Simplified - would need to fetch tasks
-
-  // Guest: only events this member has registered for
-  const myRegistrationEventIdSet = React.useMemo(
-    () => new Set(myRegistrationEventIds),
-    [myRegistrationEventIds]
-  );
-  const myRegisteredEvents = React.useMemo(
-    () => events.filter(e => myRegistrationEventIdSet.has(e.id)),
-    [events, myRegistrationEventIdSet]
-  );
-  const pastRegisteredEvents = React.useMemo(
-    () => myRegisteredEvents
-      .filter(e => new Date(e.date) < new Date())
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
-    [myRegisteredEvents]
-  );
-  const upcomingRegisteredEvents = React.useMemo(
-    () => myRegisteredEvents
-      .filter(e => new Date(e.date) >= new Date())
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
-    [myRegisteredEvents]
-  );
 
 
   // Birthday calculation — all comparisons use MYT midnight to avoid UTC-offset misfires
@@ -427,9 +378,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       <div className="grid lg:grid-cols-3 gap-4">
         <DashboardEventsPanel
           eventsLoading={eventsLoading}
-          eventTab={eventTab}
           upcomingEvents={upcomingEvents}
-          events={events}
           member={member}
           onNavigate={onNavigate}
           onSelectEvent={setSelectedEventForDetail}

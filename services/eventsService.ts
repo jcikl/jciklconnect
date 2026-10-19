@@ -26,15 +26,19 @@ import { isDevMode, withDevMode } from '../utils/devMode';
 import { errorLoggingService } from './errorLoggingService';
 import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 import { MOCK_EVENTS } from './mockData';
+import { getMYTTodayStr } from '../utils/dateUtils';
 
 const CACHE_KEY_ALL_EVENTS = 'events:all';
+const CACHE_KEY_UPCOMING_EVENTS = 'events:upcoming';
 const EVENTS_TTL = CACHE_TTL_3MIN;
+const LISTED_EVENT_STATUSES = ['Active', 'Upcoming', 'Approved'];
 
 export class EventsService {
   private static mockEvents: Event[] = [...MOCK_EVENTS];
 
   static invalidateEventsCache(): void {
     apiCache.delete(CACHE_KEY_ALL_EVENTS);
+    apiCache.delete(CACHE_KEY_UPCOMING_EVENTS);
     apiCache.deleteByPrefix('events:id:');
   }
 
@@ -89,7 +93,7 @@ export class EventsService {
           const snapshot = await getDocs(
             query(
               collection(db, COLLECTIONS.PROJECTS),
-              where('status', 'in', ['Active', 'Upcoming', 'Approved'])
+              where('status', 'in', LISTED_EVENT_STATUSES)
             )
           );
 
@@ -111,6 +115,34 @@ export class EventsService {
         }
       }, EVENTS_TTL, 'eventsService.getAllEvents')
     );
+  }
+
+  /**
+   * Events starting today (MYT) or later, same statuses as getAllEvents. Filters on
+   * eventStartDate (YYYY-MM-DD strings) so the dashboard reads a handful of docs instead of
+   * the whole projects collection; status is checked in code to avoid a composite index.
+   * Sorted soonest first; pass `limitCount` to keep only the first N.
+   */
+  static async getUpcomingEvents(limitCount?: number): Promise<Event[]> {
+    const today = getMYTTodayStr();
+    const events = await withDevMode(
+      () => this.mockEvents.filter(e => String(e.date).slice(0, 10) >= today),
+      () => apiCache.getOrSet(CACHE_KEY_UPCOMING_EVENTS, async () => {
+        try {
+          const snapshot = await getDocs(
+            query(collection(db, COLLECTIONS.PROJECTS), where('eventStartDate', '>=', today))
+          );
+          return snapshot.docs
+            .filter(d => LISTED_EVENT_STATUSES.includes(d.data().status))
+            .map(d => this.projectDocToEvent({ id: d.id, data: () => d.data() }))
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        } catch (error) {
+          errorLoggingService.logError(error as Error, { component: 'EventsService', action: 'getUpcomingEvents' });
+          throw error;
+        }
+      }, EVENTS_TTL, 'eventsService.getUpcomingEvents')
+    );
+    return limitCount === undefined ? events : events.slice(0, limitCount);
   }
 
   // Get event by ID (from projects collection)
@@ -888,21 +920,6 @@ export class EventsService {
         }
       }
     );
-  }
-
-  // Get upcoming events (approved, date >= now)
-  static async getUpcomingEvents(limitCount: number = 10): Promise<Event[]> {
-    try {
-      const allEvents = await this.getAllEvents();
-      const now = new Date().getTime();
-      return allEvents
-        .filter(e => e.date && new Date(e.date).getTime() >= now)
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-        .slice(0, limitCount);
-    } catch (error) {
-      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'EventsService.getUpcomingEvents' });
-      throw error;
-    }
   }
 
   // Get events by type

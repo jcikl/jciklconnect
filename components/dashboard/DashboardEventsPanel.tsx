@@ -6,9 +6,7 @@ import { EventRow } from '../modules/Events/EventRow';
 
 interface DashboardEventsPanelProps {
   eventsLoading: boolean;
-  eventTab: 'upcoming' | 'past';
   upcomingEvents: Event[];
-  events: Event[];
   member: any;
   onNavigate?: (view: string) => void;
   onSelectEvent: (event: Event) => void;
@@ -16,17 +14,11 @@ interface DashboardEventsPanelProps {
 
 export const DashboardEventsPanel: React.FC<DashboardEventsPanelProps> = ({
   eventsLoading,
-  eventTab,
   upcomingEvents,
-  events,
   member,
   onNavigate,
   onSelectEvent,
 }) => {
-  const visibleEvents = eventTab === 'upcoming'
-    ? upcomingEvents
-    : events.filter(event => new Date(event.date) < new Date());
-
   return (
     <div className="lg:col-span-3">
       <div className="flex items-center gap-2 mb-3">
@@ -43,15 +35,15 @@ export const DashboardEventsPanel: React.FC<DashboardEventsPanelProps> = ({
         <div className="flex overflow-x-auto gap-3 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-2 lg:grid-cols-4">
           {[1, 2, 3, 4].map(index => <Skeleton key={index} className="flex-none w-[60.6%] sm:w-auto h-[200px]" rounded="2xl" />)}
         </div>
-      ) : visibleEvents.length === 0 ? (
+      ) : upcomingEvents.length === 0 ? (
         <div className="text-center py-8 text-slate-400 font-medium">
           <Calendar size={32} className="mx-auto mb-2 text-slate-300" />
-          <p className="text-sm">No {eventTab} events</p>
+          <p className="text-sm">No upcoming events</p>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          {visibleEvents
-            .sort((first, second) => eventTab === 'upcoming' ? new Date(first.date).getTime() - new Date(second.date).getTime() : new Date(second.date).getTime() - new Date(first.date).getTime())
+          {[...upcomingEvents]
+            .sort((first, second) => new Date(first.date).getTime() - new Date(second.date).getTime())
             .slice(0, 5)
             .map(event => (
               <EventRow
@@ -65,9 +57,9 @@ export const DashboardEventsPanel: React.FC<DashboardEventsPanelProps> = ({
             ))}
         </div>
       )}
-      {visibleEvents.length > 8 && onNavigate && (
+      {upcomingEvents.length > 8 && onNavigate && (
         <Button variant="ghost" className="w-full mt-3 text-sm text-jci-blue hover:bg-blue-50" onClick={() => onNavigate('EVENTS')}>
-          View All {visibleEvents.length} Events
+          View All {upcomingEvents.length} Events
         </Button>
       )}
     </div>

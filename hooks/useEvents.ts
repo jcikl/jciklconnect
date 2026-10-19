@@ -9,8 +9,13 @@ import { useAuth } from './useAuth';
 import { isDevMode } from '../utils/devMode';
 import { useFirestoreCollection } from './useFirestoreCollection';
 
-export const useEvents = (options?: { publicMode?: boolean }) => {
+/**
+ * @param options.scope 'upcoming' loads only events starting today or later (dashboard);
+ *   default 'all' loads every listed event (event list, reports, search).
+ */
+export const useEvents = (options?: { publicMode?: boolean; scope?: 'all' | 'upcoming' }) => {
   const publicMode = options?.publicMode ?? false;
+  const scope = options?.scope ?? 'all';
   const { showToast } = useToast();
   const { member, loading: authLoading, isDevMode: isDevModeFromAuth } = useAuth();
   // Prevents duplicate submissions from rapid double-clicks.
@@ -22,7 +27,7 @@ export const useEvents = (options?: { publicMode?: boolean }) => {
 
   const { data: events, loading: loading1, error, reload: loadEvents } = useFirestoreCollection<Event>({
     loader: () =>
-      EventsService.getAllEvents().catch(err => {
+      (scope === 'upcoming' ? EventsService.getUpcomingEvents() : EventsService.getAllEvents()).catch(err => {
         if (publicMode) {
           // In public mode, silently fail — Firestore rules may block unauthenticated reads
           errorLoggingService.logError(err, { action: 'useEvents-public-fetch' });
@@ -31,7 +36,7 @@ export const useEvents = (options?: { publicMode?: boolean }) => {
         throw err;
       }),
     enabled,
-    deps: [enabled, publicMode],
+    deps: [enabled, publicMode, scope],
   });
 
   // Keep auth spinner going while auth is still resolving (non-public mode)
