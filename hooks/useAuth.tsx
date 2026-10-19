@@ -22,7 +22,7 @@ import { COLLECTIONS, DEFAULT_LO_ID } from '../config/constants';
 import { Member, UserRole, MemberTier } from '../types';
 import { MOCK_DEV_ADMIN } from '../services/mockData';
 import { setDevMode, isDevMode as checkDevMode } from '../utils/devMode';
-import { saveAuthState, loadAuthState, clearAuthState, isDevModeStored } from '../utils/authStorage';
+import { saveAuthState, loadAuthState, clearAuthState, isDevModeStored, setSignedInHint } from '../utils/authStorage';
 import { MembersService } from '../services/membersService';
 import { BoardManagementService } from '../services/boardManagementService';
 import { errorLoggingService } from '../services/errorLoggingService';
@@ -178,6 +178,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               // Atomic: user + member land in the same commit so no render sees user without member
               setUser(firebaseUser);
               setMember(memberData);
+              setSignedInHint(true);
 
               // AUTH-001: Subscribe to real-time role changes so demotions/promotions take
               // effect within seconds instead of waiting up to 60 min for a token refresh.
@@ -242,6 +243,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           if (isMounted && !checkDevMode()) {
             setUser(null);
             setMember(null);
+            setSignedInHint(false);
             // Clean up simulated role state regardless of how sign-out was triggered (e.g., idle timeout)
             setSimulatedRole(null);
             setSimulatedMemberId(null);

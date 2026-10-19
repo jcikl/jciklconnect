@@ -58,6 +58,10 @@ const appTree = (
   </HelmetProvider>
 );
 
+// Keep the static shell (member or guest, picked in index.html) so App can show it until the
+// sign-in check finishes, instead of flashing a separate loading screen.
+(window as unknown as { __appShellHtml?: string }).__appShellHtml = rootElement.innerHTML;
+
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   import.meta.env.DEV ? <React.StrictMode>{appTree}</React.StrictMode> : appTree

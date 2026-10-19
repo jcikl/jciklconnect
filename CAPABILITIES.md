@@ -1269,7 +1269,7 @@
 | `useActivityPlans.ts` | 130 | 1 | `useActivityPlans` | activityPlansService | ⚠️ 無說明 |
 | `useAdvertisements.ts` | 110 | 2 | `useAdvertisements` | advertisementService, errorLoggingService | Advertisements Data Hook |
 | `useAppNavigation.ts` | 239 | 1 | `useAppNavigation` | — | ⚠️ 無說明 |
-| `useAuth.tsx` | 780 | 54 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, membersService, mockData | Authentication Hook |
+| `useAuth.tsx` | 782 | 54 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, membersService, mockData | Authentication Hook |
 | `useAutomation.ts` | 149 | 3 | `useAutomation` | automationService | useAutomation Hook - Manage automation workflows and rules |
 | `useBusinessDirectory.ts` | 48 | 4 | `useBusinessDirectory` | businessDirectoryService | ⚠️ 無說明 |
 | `useCommunication.ts` | 118 | 2 | `useCommunication` | communicationService | Communication Data Hook |
@@ -1321,7 +1321,7 @@
 | `getAdministrativeProjectIds` | 5 |  |
 | `addAdministrativeProjectId` | 18 |  |
 
-### `utils/authStorage.ts` （73 行，3 處引用）
+### `utils/authStorage.ts` （88 行，3 處引用）
 > SEC-A-002: Store only minimal bootstrap fields — never the full Member object. The full Member record is loaded from Firestore on app start …
 
 | 函數 | 行 | 說明 |
@@ -1330,6 +1330,7 @@
 | `loadAuthState` | 38 | Load authentication state from localStorage |
 | `clearAuthState` | 53 | Clear authentication state from localStorage |
 | `isDevModeStored` | 65 | Check if dev mode is enabled in localStorage |
+| `setSignedInHint` | 80 |  |
 
 ### `utils/avatarUtils.ts` （8 行，2 處引用）
 > Generate an inline SVG data URI with initials so avatars do not rely on external requests. URI-encoded (not btoa) so non-Latin names such as…

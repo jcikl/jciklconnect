@@ -323,7 +323,12 @@ export const JCIKLApp: React.FC = () => {
   const openLogin = () => setLoginModalOpen(true);
   const closeLogin = () => setLoginModalOpen(false);
 
-  // Show loading state while checking auth
+  // While checking auth, keep showing index.html's static shell (member layout when the last
+  // session was signed in, guest layout otherwise) so a reload doesn't flash guest page → spinner.
+  const appShellHtml = (window as unknown as { __appShellHtml?: string }).__appShellHtml;
+  if (authLoading && appShellHtml) {
+    return <div dangerouslySetInnerHTML={{ __html: appShellHtml }} />;
+  }
   if (authLoading) {
     return (
       <main id="main-content" role="main" className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -687,11 +692,13 @@ export const JCIKLApp: React.FC = () => {
           <div ref={scrollContainerRef} className="flex-1 overflow-y-auto no-scrollbar pt-4 pb-32 md:pb-4 px-5 sm:px-8">
             <AsyncErrorBoundary>
               <Suspense fallback={
+                // Same light blocks as the index.html member shell (the app has no dark theme, so a
+                // dark variant here flashed dark blocks between two light screens on reload).
                 <div className="flex flex-col gap-4 animate-pulse pt-2">
-                  <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded-lg w-1/3" />
-                  <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-xl" />
-                  <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-xl" />
-                  <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-xl" />
+                  <div className="h-8 bg-gray-200 rounded-lg w-1/3" />
+                  <div className="h-32 bg-gray-200 rounded-xl" />
+                  <div className="h-32 bg-gray-200 rounded-xl" />
+                  <div className="h-32 bg-gray-200 rounded-xl" />
                 </div>
               }>
                 {renderCurrentView(scrollContainerRef)}
