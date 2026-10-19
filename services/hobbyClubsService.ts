@@ -98,7 +98,7 @@ export class HobbyClubsService {
       () => `mock-club-${Date.now()}`,
       async () => {
         try {
-          // P0 fix: always persist leadId so leaveClub can guard against the lead leaving.
+          // P0 fix: always persist leadId (club lead; checked by firestore.rules for lead edits).
           const currentUid = auth?.currentUser?.uid ?? null;
           const newClub = {
             ...clubData,
@@ -159,80 +159,6 @@ export class HobbyClubsService {
         component: 'HobbyClubsService',
         action: 'deleteClub',
         additionalData: { clubId },
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Join a club.
-   * Uses runTransaction to atomically: read current doc → check capacity → add member + increment count.
-   * Prevents race conditions where two members join simultaneously and exceed capacity.
-   */
-  static async joinClub(clubId: string, memberId: string): Promise<void> {
-    if (isDevMode()) return;
-    try {
-      await runTransaction(db, async (txn) => {
-        const clubRef = doc(db, COLLECTIONS.HOBBY_CLUBS, clubId);
-        const clubSnap = await txn.get(clubRef);
-        if (!clubSnap.exists()) throw new Error('Club not found.');
-
-        const data = clubSnap.data();
-        const currentMembers: string[] = data.memberIds || [];
-        if (currentMembers.includes(memberId)) return; // already a member — idempotent
-
-        const capacity: number | undefined = data.capacity;
-        if (capacity !== undefined && currentMembers.length >= capacity) {
-          throw new Error('This club has reached its maximum capacity.');
-        }
-
-        txn.update(clubRef, {
-          memberIds: [...currentMembers, memberId],
-          membersCount: currentMembers.length + 1,
-          updatedAt: Timestamp.now(),
-        });
-      });
-      this.invalidateClubsCache(clubId);
-    } catch (error) {
-      errorLoggingService.logError(error as Error, {
-        component: 'HobbyClubsService',
-        action: 'joinClub',
-        additionalData: { clubId, memberId },
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Leave a club.
-   * Guard: the club lead cannot leave without reassigning first.
-   */
-  static async leaveClub(clubId: string, memberId: string): Promise<void> {
-    if (isDevMode()) return;
-    try {
-      await runTransaction(db, async (txn) => {
-        const clubRef = doc(db, COLLECTIONS.HOBBY_CLUBS, clubId);
-        const clubSnap = await txn.get(clubRef);
-        if (!clubSnap.exists()) throw new Error('Club not found.');
-
-        const data = clubSnap.data();
-        if (data.leadId === memberId) {
-          throw new Error('Club lead cannot leave without assigning a new lead first.');
-        }
-
-        const currentMembers: string[] = data.memberIds || [];
-        txn.update(clubRef, {
-          memberIds: currentMembers.filter(id => id !== memberId),
-          membersCount: Math.max(0, currentMembers.length - 1),
-          updatedAt: Timestamp.now(),
-        });
-      });
-      this.invalidateClubsCache(clubId);
-    } catch (error) {
-      errorLoggingService.logError(error as Error, {
-        component: 'HobbyClubsService',
-        action: 'leaveClub',
-        additionalData: { clubId, memberId },
       });
       throw error;
     }
@@ -386,21 +312,5 @@ export class HobbyClubsService {
   /** @deprecated kept for backward compatibility — adds an activity */
   static async scheduleActivity(clubId: string, activityDate: string, description: string): Promise<void> {
     return this.addActivity(clubId, activityDate, description);
-  }
-
-  // Get club members
-  static async getClubMembers(clubId: string): Promise<string[]> {
-    if (isDevMode()) return [];
-    try {
-      const club = await this.getClubById(clubId);
-      return club?.memberIds || [];
-    } catch (error) {
-      errorLoggingService.logError(error as Error, {
-        component: 'HobbyClubsService',
-        action: 'getClubMembers',
-        additionalData: { clubId },
-      });
-      throw error;
-    }
   }
 }

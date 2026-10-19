@@ -1926,19 +1926,19 @@
 | id | string | ✓ | Firestore doc ID | 系统: Firestore doc id | 社团查询与成员关联 |
 | name | string | ✓ | 社团名称 | 角色: 社团负责人；系统: 社团表单 | 社团列表与详情 |
 | category | string | — | 社团分类 | 角色: 社团负责人；系统: 社团表单 | 社团分类筛选 |
-| membersCount | number | ✓ | 当前成员数（冗余快照） | 系统: 加入/退出社团流程 | 成员数量展示与容量检查 |
+| membersCount | number | ✓ | 成员数快照（2026-10-19 起应用内不再加入/退出，值不再更新） | 系统: 建立社团时写 1；旧的加入/退出流程（已移除） | `BoardDashboard` 社团统计 |
 | nextActivity | string | — | 下一次活动描述 | 角色: 社团负责人；系统: 活动安排 | 社团详情展示 |
 | activities | ClubActivity[] | — | 活动历史 | 角色: 社团负责人；系统: 活动记录 | 社团活动历史展示 |
 | activities[].id | string | ✓ | | 系统: 活动记录生成 | 活动详情定位 |
 | activities[].date | string | ✓ | | 角色: 社团负责人；系统: 活动表单 | 活动排序 |
 | activities[].description | string | ✓ | | 角色: 社团负责人；系统: 活动表单 | 活动详情展示 |
 | lead | string | ✓ | 负责人姓名（冗余） | 系统: `members.general.name` 复制 | 社团负责人展示 |
-| leadId | string | — | 负责人 member UID，用于 leaveClub 权限守卫 | 系统: `members.id` / 社团负责人设置 | 负责人权限校验 |
+| leadId | string | — | 负责人 member UID | 系统: `members.id` / 社团负责人设置 | `firestore.rules` 负责人编辑权限 |
 | image | string | ✓ | 封面图 URL | 角色: 社团负责人；系统: 媒体上传 | 社团封面展示 |
-| memberIds | string[] | — | 成员 member ID 数组 | 系统: 加入/退出社团流程 | 成员列表与权限校验 |
+| memberIds | string[] | — | 成员 member ID 数组（2026-10-19 起不再更新，仅保留历史数据） | 旧的加入/退出流程（已移除） | `MemberDetail` 显示会员所属社团 |
 | description | string | — | | 角色: 社团负责人；系统: 社团表单 | 社团详情展示 |
-| whatsappUrl | string | — | WhatsApp 群组链接 | 角色: 社团负责人；系统: 社团表单 | 社团联系入口 |
-| capacity | number | — | 最大成员数，joinClub 时强制检查 | 角色: 社团负责人；系统: 社团表单 | 加入容量校验 |
+| whatsappUrl | string | — | 群组聊天邀请链接（WhatsApp / LINE / Discord 等，仅限 http/https） | 角色: 社团负责人；系统: `HobbyClubsView` 建立/编辑表单「Group Chat Link」 | 社团卡片「Join Group Chat」按钮（`utils/clubLink.getClubGroupLink`） |
+| capacity | number | — | 旧字段：原由已移除的 joinClub 检查 | — | 无 |
 | isDeleted | boolean | — | 软删除标记；getAllClubs 过滤掉此字段为 true 的记录 | 系统: 社团删除流程 | 社团列表过滤 |
 
 ---

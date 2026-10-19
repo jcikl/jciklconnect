@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 // Generate an inline SVG data URI with initials — avoids external ui-avatars.com requests blocked by CSP
 const getInitialsSvg = (name: string, size = 200): string => {
@@ -6,14 +6,14 @@ const getInitialsSvg = (name: string, size = 200): string => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><rect width="${size}" height="${size}" fill="#0097D7" rx="${size / 2}"/><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" fill="white" font-family="sans-serif" font-size="${Math.round(size * 0.4)}px">${initials}</text></svg>`;
   return `data:image/svg+xml;base64,${btoa(svg)}`;
 };
-import { Users, Calendar, Plus, Heart, Edit, Trash2 } from 'lucide-react';
-import { Card, Button, AvatarGroup, Badge, Modal, useToast, PageHeader, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
+import { Calendar, Plus, Heart, Edit, Trash2 } from 'lucide-react';
+import { Card, Button, Badge, Modal, PageHeader, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
 import type { ConfirmState } from '../ui/Common';
 import { Input, Select, Textarea } from '../ui/Form';
 import { LoadingState } from '../ui/Loading';
 import { useHobbyClubs } from '../../hooks/useHobbyClubs';
 import { useAuth } from '../../hooks/useAuth';
-import { useMembers } from '../../hooks/useMembers';
+import { getClubGroupLink } from '../../utils/clubLink';
 import { HobbyClub, ClubActivity } from '../../types';
 import { Tabs } from '../ui/Common';
 
@@ -22,14 +22,11 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
     const [isCreateModalOpen, setCreateModalOpen] = useState(false);
     const [isEditModalOpen, setEditModalOpen] = useState(false);
     const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
-    const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
     const [selectedClub, setSelectedClub] = useState<HobbyClub | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [activeTab, setActiveTab] = useState<'clubs' | 'activities'>('clubs');
-    const { clubs, loading, error, createClub, updateClub, deleteClub, joinClub, leaveClub, scheduleActivity, updateActivity, deleteActivity, getClubMembers } = useHobbyClubs();
+    const { clubs, loading, error, createClub, updateClub, deleteClub, scheduleActivity, updateActivity, deleteActivity } = useHobbyClubs();
     const { member } = useAuth();
-    const { members } = useMembers();
-    const { showToast } = useToast();
 
     const filteredClubs = React.useMemo(() => {
         const term = (searchQuery || '').toLowerCase();
@@ -52,6 +49,7 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
                 category: (formData.get('category') as HobbyClub['category']) || 'Social',
                 lead: member?.general?.name || '',
                 image: formData.get('image') as string || getInitialsSvg(formData.get('name') as string, 200),
+                whatsappUrl: ((formData.get('whatsappUrl') as string) || '').trim(),
             };
 
             await createClub(newClub);
@@ -74,6 +72,7 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
                 name: formData.get('name') as string,
                 category: (formData.get('category') as HobbyClub['category']) || 'Social',
                 image: formData.get('image') as string || selectedClub.image,
+                whatsappUrl: ((formData.get('whatsappUrl') as string) || '').trim(),
             });
             setEditModalOpen(false);
             setSelectedClub(null);
@@ -175,12 +174,8 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
 
                                         {/* Body */}
                                         <div className="flex flex-col flex-1 p-3.5 gap-3">
-                                            {/* Members + Lead */}
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2">
-                                                    <AvatarGroup count={club.membersCount} />
-                                                    <span className="text-xs text-slate-400 font-medium">{club.membersCount || 0} member{(club.membersCount || 0) !== 1 ? 's' : ''}</span>
-                                                </div>
+                                            {/* Lead */}
+                                            <div className="flex items-center justify-end">
                                                 <div className="text-right min-w-0">
                                                     <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Lead</p>
                                                     <p className="text-xs font-bold text-slate-700 truncate max-w-[110px]">{club.lead}</p>
@@ -204,43 +199,24 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
                                             )}
 
                                             {/* Actions */}
+                                            {/* "Join" opens the club's group chat (WhatsApp / LINE / Discord ...); membership is not tracked in the app. */}
                                             <div className="mt-auto flex gap-2">
-                                                {isOwner(club) ? (
-                                                    <>
-                                                        <Button
-                                                            variant="outline"
-                                                            className="flex-1"
-                                                            onClick={() => { setSelectedClub(club); setIsMembersModalOpen(true); }}
-                                                        >
-                                                            <Users size={14} className="mr-2" />
-                                                            Members
-                                                        </Button>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => { setSelectedClub(club); setIsActivityModalOpen(true); }}
-                                                        >
-                                                            <Calendar size={14} />
-                                                        </Button>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Button
-                                                            className="flex-1"
-                                                            onClick={() => joinClub(club.id)}
-                                                            disabled={!member}
-                                                        >
-                                                            <Heart size={14} className="mr-2" />
-                                                            Join Club
-                                                        </Button>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => { setSelectedClub(club); setIsMembersModalOpen(true); }}
-                                                        >
-                                                            <Users size={14} />
-                                                        </Button>
-                                                    </>
+                                                <Button
+                                                    className="flex-1"
+                                                    onClick={() => { const link = getClubGroupLink(club); if (link) window.open(link, '_blank', 'noopener,noreferrer'); }}
+                                                    disabled={!getClubGroupLink(club)}
+                                                >
+                                                    <Heart size={14} className="mr-2" />
+                                                    {getClubGroupLink(club) ? 'Join Group Chat' : 'No group link yet'}
+                                                </Button>
+                                                {isOwner(club) && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => { setSelectedClub(club); setIsActivityModalOpen(true); }}
+                                                    >
+                                                        <Calendar size={14} />
+                                                    </Button>
                                                 )}
                                             </div>
                                         </div>
@@ -274,6 +250,7 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
                         { label: 'Arts', value: 'Arts' }
                     ]} required />
                     <Input name="image" label="Image URL" type="url" placeholder="https://..." />
+                    <Input name="whatsappUrl" label="Group Chat Link" type="url" placeholder="WhatsApp / LINE / Discord invite link" />
                     <div className="pt-4">
                         <Button className="w-full" type="submit" disabled={!member}>Create Club</Button>
                     </div>
@@ -300,6 +277,7 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
                             { label: 'Arts', value: 'Arts' }
                         ]} defaultValue={selectedClub.category} required />
                         <Input name="image" label="Image URL" type="url" defaultValue={selectedClub.image} />
+                        <Input name="whatsappUrl" label="Group Chat Link" type="url" placeholder="WhatsApp / LINE / Discord invite link" defaultValue={selectedClub.whatsappUrl} />
                         <div className="pt-4">
                             <Button className="w-full" type="submit" disabled={isSaving} isLoading={isSaving}>Update Club</Button>
                         </div>
@@ -322,25 +300,6 @@ export const HobbyClubsView: React.FC<{ searchQuery?: string }> = ({ searchQuery
                 />
             )}
 
-            {/* Members Modal */}
-            {selectedClub && (
-                <ClubMembersModal
-                    isOpen={isMembersModalOpen}
-                    onClose={() => { setIsMembersModalOpen(false); setSelectedClub(null); }}
-                    club={selectedClub}
-                    members={members}
-                    getClubMembers={getClubMembers}
-                    onRemoveMember={async (memberId: string) => {
-                        if (!selectedClub) return;
-                        try {
-                            await leaveClub(selectedClub.id);
-                            showToast('Member removed successfully', 'success');
-                        } catch (err) {
-                            // Error handled by hook
-                        }
-                    }}
-                />
-            )}
             <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
         </div>
     );
@@ -557,92 +516,6 @@ const ClubActivitiesModal: React.FC<ClubActivitiesModalProps> = ({ isOpen, onClo
                         </Button>
                     </div>
                 </form>
-            </div>
-        </Modal>
-        <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />
-        </>
-    );
-};
-
-// Club Members Modal Component
-interface ClubMembersModalProps {
-    isOpen: boolean;
-    onClose: () => void;
-    club: HobbyClub;
-    members: any[];
-    getClubMembers: (clubId: string) => Promise<string[]>;
-    onRemoveMember: (memberId: string) => Promise<void>;
-}
-
-const ClubMembersModal: React.FC<ClubMembersModalProps> = ({ isOpen, onClose, club, members, getClubMembers, onRemoveMember }) => {
-    const [confirmState, setConfirmState] = useState<ConfirmState>(CONFIRM_CLOSED);
-    const [clubMemberIds, setClubMemberIds] = useState<string[]>([]);
-    const [loadingMembers, setLoadingMembers] = useState(false);
-    const { showToast } = useToast();
-    const { member: currentMember } = useAuth();
-
-    useEffect(() => {
-        if (isOpen && club.id) {
-            loadMembers();
-        }
-    }, [isOpen, club.id]);
-
-    const loadMembers = async () => {
-        if (!club.id) return;
-        setLoadingMembers(true);
-        try {
-            const memberIds = await getClubMembers(club.id);
-            setClubMemberIds(memberIds);
-        } catch (err) {
-            showToast('Failed to load club members', 'error');
-        } finally {
-            setLoadingMembers(false);
-        }
-    };
-
-    const clubMembers = members.filter(m => clubMemberIds.includes(m.id));
-    const isOwner = currentMember && club.lead === (currentMember.general?.name || currentMember.id);
-
-    return (
-        <>
-        <Modal isOpen={isOpen} onClose={onClose} title={`Members - ${club.name}`} size="lg" drawerOnMobile>
-            <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                    <p className="text-sm text-slate-600">Total Members: {club.membersCount || 0}</p>
-                    {isOwner && (
-                        <Badge variant="info">Club Leader</Badge>
-                    )}
-                </div>
-
-                <LoadingState loading={loadingMembers} error={null} empty={clubMembers.length === 0} emptyMessage="No members found">
-                    <div className="space-y-2 max-h-96 overflow-y-auto">
-                        {clubMembers.map(member => (
-                            <Card key={member.id} className="p-3">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-jci-blue text-white flex items-center justify-center font-semibold">
-                                            {(member.general?.name ?? '?').charAt(0).toUpperCase()}
-                                        </div>
-                                        <div>
-                                            <p className="font-semibold text-slate-900">{member.general?.name}</p>
-                                            <p className="text-xs text-slate-500">{member.contact?.email ?? member.contact?.email}</p>
-                                        </div>
-                                    </div>
-                                    {isOwner && member.id !== currentMember?.id && (
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => setConfirmState({ open: true, title: 'Remove Member', message: `Remove ${member.name ?? member.name} from ${club.name}?`, variant: 'warning', onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); try { await onRemoveMember(member.id); await loadMembers(); } catch (err) { /* Error handled */ } } })}
-                                            className="text-red-500 hover:text-red-700"
-                                        >
-                                            Remove
-                                        </Button>
-                                    )}
-                                </div>
-                            </Card>
-                        ))}
-                    </div>
-                </LoadingState>
             </div>
         </Modal>
         <ConfirmDialog open={confirmState.open} title={confirmState.title} message={confirmState.message} confirmLabel={confirmState.confirmLabel} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={() => setConfirmState(CONFIRM_CLOSED)} />

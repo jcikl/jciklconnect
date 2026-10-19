@@ -594,13 +594,15 @@ Recommended action: apply the same role guard on create as on update (`isAdmin()
 
 Resolution (2026-10-19): the `members` create rule now requires `isAdmin()` for ADMIN, SUPER_ADMIN, AFFILIATE and CHAPTER_ADMIN, the same guard as update. Rules tests in `tests/rules/externalMembers.rules.test.ts` ("R-053") confirm BOARD is denied ADMIN / SUPER_ADMIN creates and can still create MEMBER and BOARD docs, and ADMIN can still create ADMIN. Live once `firestore.rules` is deployed.
 
-### R-054 Hobby Club Join Fails for Non-Lead Members (P1, pre-existing)
+### R-054 Hobby Club Join Fails for Non-Lead Members (P1, resolved)
 
 Evidence: `services/hobbyClubsService.ts` adds the member to `memberIds` on the club doc inside `runTransaction` (about lines 169-190). `firestore.rules` `match /hobbyClubs` update allows only Board / Admin, or the club lead (`isMember() && leadId == uid`) with descriptive fields. A member joining is therefore denied.
 
 Risk: joining a hobby club fails for everyone who is not the lead or board, and the failure is only visible as a permission error.
 
 Recommended action: allow a member to add only their own uid to `memberIds` (with the capacity check and no other field changes), and add a rules test for join and leave.
+
+Resolution (2026-10-19, owner decision): "Join" means joining the club's external group chat (WhatsApp / LINE / Discord), not an in-app membership. The club card's button now opens the club's `whatsappUrl` (set by the lead in the create/edit form as "Group Chat Link"; http/https only) and is disabled with "No group link yet" when none is set. The in-app join, leave, member count and member list were removed (`HobbyClubsService.joinClub` / `leaveClub` / `getClubMembers` and the hook wrappers), so no write to `memberIds` happens and the rules need no change. Leftover data: `membersCount` and `memberIds` stay as historical snapshots, still read by `BoardDashboard` (club stats) and `MemberDetail` (a member's clubs).
 
 ### R-055 Members List Email Clause Uses request.query.filters, Which Rules Do Not Provide (P2, pre-existing)
 
