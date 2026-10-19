@@ -361,8 +361,13 @@ export interface MemberAffiliation {
   /** Last status change (any actor). */
   statusUpdatedAt?: string;
   statusUpdatedBy?: string;
-  /** First time the affiliation became active (server-set). A chapter admin may reactivate a suspended member only when this is set. */
+  /** First time the affiliation became active (server-set). */
   activatedAt?: string;
+  /**
+   * Who made the last → suspended change (server-set by external-accounts setStatus). A chapter admin may
+   * reactivate only a suspension made by a chapter admin, never one made by JCI KL.
+   */
+  suspendedByRole?: 'CHAPTER_ADMIN' | 'KL';
 }
 
 /**

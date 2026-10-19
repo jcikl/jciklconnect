@@ -146,7 +146,8 @@ export function cardFor(member, nowIso) {
  *  KL admin: any change between two different known statuses on an external doc (AFFILIATE / CHAPTER_ADMIN).
  *  Active CHAPTER_ADMIN, own-chapter AFFILIATE docs only (never themselves):
  *    pending_chapter → pending_kl (approve), pending_chapter | pending_kl → rejected (reject),
- *    active → suspended, suspended → active only if the member was active before (affiliation.activatedAt set).
+ *    active → suspended, suspended → active only if a chapter admin made that suspension
+ *    (affiliation.suspendedByRole == 'CHAPTER_ADMIN', stamped by statusUpdates on every → suspended).
  *  pending_kl → active is KL-admin only.
  * Returns { ok: true } or { ok: false, status, error }.
  */
@@ -167,7 +168,8 @@ export function checkStatusTransition(caller, callerUid, targetId, target, nextS
     (current === 'pending_chapter' && nextStatus === 'pending_kl') ||
     ((current === 'pending_chapter' || current === 'pending_kl') && nextStatus === 'rejected') ||
     (current === 'active' && nextStatus === 'suspended') ||
-    (current === 'suspended' && nextStatus === 'active' && typeof target.affiliation?.activatedAt === 'string');
+    // M1: only a suspension the chapter itself made can be lifted by the chapter (never one by JCI KL).
+    (current === 'suspended' && nextStatus === 'active' && target.affiliation?.suspendedByRole === 'CHAPTER_ADMIN');
   return allowed ? { ok: true } : { ok: false, status: 403, error: `Transition ${current} → ${nextStatus} not allowed` };
 }
 
@@ -189,6 +191,7 @@ export function statusUpdates(caller, callerUid, target, nextStatus, nowIso) {
     u['affiliation.klApprovedBy'] = callerUid;
   }
   if (nextStatus === 'active' && !target.affiliation?.activatedAt) u['affiliation.activatedAt'] = nowIso;
+  if (nextStatus === 'suspended') u['affiliation.suspendedByRole'] = isKlAdmin(caller) ? 'KL' : 'CHAPTER_ADMIN';
   return u;
 }
 
