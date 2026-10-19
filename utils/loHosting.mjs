@@ -44,6 +44,9 @@ export function involvesLo(item, loName) {
   return isHosting || isCoHosting;
 }
 
+/** `level` values of events every JCI KL member sees (stored exactly like this). */
+export const KL_SHARED_LEVELS = ['National', 'Area', 'JCI'];
+
 /**
  * Events JCI KL members see: KL hosts or co-hosts, or the event is national / area / JCI level.
  * @param {{ hostingLo?: unknown, coHosting?: unknown, level?: unknown } | null | undefined} item

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Event } from '../../../types';
+import { EventsService } from '../../../services/eventsService';
 
 export type EventsListTab = 'Upcoming' | 'Completed';
 
@@ -32,7 +33,18 @@ export const useEventsListState = ({
       if (eventToSelect) {
         setSelectedEvent(eventToSelect);
         onClearSelection?.();
+        return;
       }
+      // Opened from search but not in this page's list (another LO's event): load it on its own.
+      let cancelled = false;
+      EventsService.getEventById(initialSelectedEventId)
+        .then(event => {
+          if (cancelled || !event) return;
+          setSelectedEvent(event);
+          onClearSelection?.();
+        })
+        .catch(() => {});
+      return () => { cancelled = true; };
     }
   }, [initialSelectedEventId, events, onClearSelection]);
 

@@ -15,7 +15,9 @@ export type { RegistrationFormData } from './Events/EventRegistrationFormModal';
 
 export const EventsView: React.FC<{ searchQuery?: string; initialSelectedEventId?: string | null; onClearSelection?: () => void }> = ({ searchQuery, initialSelectedEventId, onClearSelection }) => {
   const [viewMode, setViewMode] = useState<EventsViewMode>('list');
-  const { events, loading, error, loadEvents, registerForEvent, markAttendance, updateEvent, cancelRegistration } = useEvents();
+  // Only the events this page can show (KL host / co-host, national / area / JCI) — loading every
+  // event (~3,200, 5 MB) took several seconds.
+  const { events, loading, error, loadEvents, registerForEvent, markAttendance, updateEvent, cancelRegistration } = useEvents({ scope: 'klRelevant' });
   const { member } = useAuth();
   const { showToast } = useToast();
   const loId = (member as { loId?: string })?.loId ?? DEFAULT_LO_ID;

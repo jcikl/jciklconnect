@@ -12,9 +12,10 @@ import { useFirestoreCollection } from './useFirestoreCollection';
 /**
  * @param options.scope 'upcoming' loads only events starting today or later (dashboard);
  *   'kl' loads every event JCI KL hosts or co-hosts (board dashboard stats);
+ *   'klRelevant' loads what a KL member sees: KL host / co-host or national / area / JCI level (event list);
  *   default 'all' loads every listed event (event list, reports, search).
  */
-export const useEvents = (options?: { publicMode?: boolean; scope?: 'all' | 'upcoming' | 'kl' }) => {
+export const useEvents = (options?: { publicMode?: boolean; scope?: 'all' | 'upcoming' | 'kl' | 'klRelevant' }) => {
   const publicMode = options?.publicMode ?? false;
   const scope = options?.scope ?? 'all';
   const { showToast } = useToast();
@@ -30,6 +31,7 @@ export const useEvents = (options?: { publicMode?: boolean; scope?: 'all' | 'upc
     loader: () =>
       (scope === 'upcoming' ? EventsService.getUpcomingEvents()
         : scope === 'kl' ? EventsService.getKlEvents()
+        : scope === 'klRelevant' ? EventsService.getKlRelevantEvents()
         : EventsService.getAllEvents()).catch(err => {
         if (publicMode) {
           // In public mode, silently fail — Firestore rules may block unauthenticated reads
