@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, TrendingUp, Users, DollarSign, Calendar, Briefcase, Award, AlertTriangle, CheckCircle, BarChart3, FileText, Download, PieChart, Activity, Package, Building2, Heart, CreditCard, RefreshCw, Clock, Sparkles, AlertCircle, Lightbulb, Cake, Gift, Zap, Eye, LayoutDashboard, CheckSquare, BookOpen, Target, Smartphone, FileCheck, Edit3, MessageCircle, Phone, XCircle } from 'lucide-react';
+import { Search, TrendingUp, Users, DollarSign, Calendar, Briefcase, Award, AlertTriangle, CheckCircle, BarChart3, FileText, Download, PieChart, Activity, Package, Building2, Heart, CreditCard, RefreshCw, Clock, Sparkles, Cake, Gift, Zap, Eye, LayoutDashboard, CheckSquare, BookOpen, Target, Smartphone, FileCheck, Edit3, MessageCircle, Phone, XCircle } from 'lucide-react';
 import { Card, StatCard, Badge, Button, Tabs, Modal, useToast } from '../ui/Common';
 import { Select, Input } from '../ui/Form';
 import { useMembers } from '../../hooks/useMembers';
@@ -13,7 +13,6 @@ import { useHobbyClubs } from '../../hooks/useHobbyClubs';
 import { useBusinessDirectory } from '../../hooks/useBusinessDirectory';
 import { FinanceService } from '../../services/financeService';
 import { ReportService, ReportOptions } from '../../services/reportService';
-import { AIPredictionService, MemberChurnPrediction, PersonalizedRecommendation, EventDemandPrediction, ProjectSuccessPrediction } from '../../services/aiPredictionService';
 import { formatCurrency } from '../../utils/formatUtils';
 import { UserRole, Member } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
@@ -146,18 +145,6 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
   const [insightSearch, setInsightSearch] = useState('');
   const [selectedBirthdayMonth, setSelectedBirthdayMonth] = useState<number>(new Date().getMonth());
   const [selectedHobbies, setSelectedHobbies] = useState<string[]>([]);
-  const [aiInsights, setAiInsights] = useState<{
-    churnRisk: MemberChurnPrediction[];
-    topRecommendations: PersonalizedRecommendation[];
-    eventPredictions: EventDemandPrediction[];
-    projectPredictions: ProjectSuccessPrediction[];
-  }>({
-    churnRisk: [],
-    topRecommendations: [],
-    eventPredictions: [],
-    projectPredictions: [],
-  });
-  const [loadingAI, setLoadingAI] = useState(false);
   const handleGenerateReport = async (reportName: string) => {
     try {
       showToast(`Generating ${reportName}...`, 'info');
@@ -277,29 +264,6 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
     }
   }, []);
 
-  const loadAIInsights = useCallback(async () => {
-    try {
-      setLoadingAI(true);
-      const [churnRisk, recommendations, eventPreds, projectPreds] = await Promise.all([
-        Promise.all(members.slice(0, 10).map(m => AIPredictionService.predictMemberChurn(m.id))).catch(() => []),
-        AIPredictionService.getPersonalizedRecommendations(members[0]?.id || '', 5).catch(() => []),
-        Promise.all(events.slice(0, 5).map(e => AIPredictionService.predictEventDemand(e.id))).catch(() => []),
-        Promise.all(events.slice(0, 5).map(p => AIPredictionService.predictProjectSuccess(p.id))).catch(() => []),
-      ]);
-
-      setAiInsights({
-        churnRisk: churnRisk.filter(r => r && r.riskLevel === 'High'),
-        topRecommendations: recommendations.slice(0, 3),
-        eventPredictions: eventPreds.filter(p => p),
-        projectPredictions: projectPreds.filter(p => p),
-      });
-    } catch (error) {
-      console.error('Failed to load AI insights:', error);
-    } finally {
-      setLoadingAI(false);
-    }
-  }, [members, events]);
-
   useEffect(() => {
     loadFinancialData();
 
@@ -312,12 +276,6 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
       return () => clearInterval(interval);
     }
   }, [autoRefreshEnabled, loadFinancialData]);
-
-  useEffect(() => {
-    if (members.length > 0 && events.length > 0) {
-      loadAIInsights();
-    }
-  }, [loadAIInsights]);
 
   // Calculate key metrics
   const metrics = useMemo(() => {
@@ -899,92 +857,19 @@ export const BoardDashboard: React.FC<BoardDashboardProps> = ({ onNavigate, sear
                 {/* AI Insights & Predictions */}
                 <Card noPadding noHeaderPadding className="mb-6 border-l-4 border-l-purple-500" title={<div className="px-4 py-3 font-semibold text-slate-800 text-base">AI Insights & Predictions</div>}>
                   <div className="p-4">
-                    <div className="space-y-4">
-                      {loadingAI ? (
-                        <div className="text-center py-4 text-slate-400 text-sm">Loading AI insights...</div>
-                      ) : (
-                        <>
-                          {aiInsights.churnRisk.length > 0 && (
-                            <div className="p-3 bg-red-50 rounded-lg border border-red-200">
-                              <div className="flex items-center gap-2 mb-2">
-                                <AlertCircle size={16} className="text-red-600" />
-                                <span className="text-sm font-semibold text-red-900">High Churn Risk</span>
-                              </div>
-                              <p className="text-xs text-red-700">
-                                {aiInsights.churnRisk.length} member(s) at high risk of leaving.
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-xs h-auto p-0 ml-1 text-red-700 hover:text-red-900"
-                                  onClick={() => onNavigate?.('AI_INSIGHTS')}
-                                >
-                                  View Details →
-                                </Button>
-                              </p>
-                            </div>
-                          )}
-
-                          {aiInsights.topRecommendations.length > 0 && (
-                            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                              <div className="flex items-center gap-2 mb-2">
-                                <Lightbulb size={16} className="text-blue-600" />
-                                <span className="text-sm font-semibold text-blue-900">Top Recommendations</span>
-                              </div>
-                              <div className="space-y-2">
-                                {aiInsights.topRecommendations.slice(0, 2).map((rec: any, idx: number) => (
-                                  <div key={idx} className="text-xs text-blue-700">
-                                    • {rec.itemName} ({rec.matchScore}% match)
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {aiInsights.eventPredictions.length > 0 && (
-                            <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                              <div className="flex items-center gap-2 mb-2">
-                                <TrendingUp size={16} className="text-green-600" />
-                                <span className="text-sm font-semibold text-green-900">Event Predictions</span>
-                              </div>
-                              <p className="text-xs text-green-700">
-                                {aiInsights.eventPredictions.length} upcoming event(s) analyzed for demand
-                              </p>
-                            </div>
-                          )}
-
-                          {aiInsights.projectPredictions.length > 0 && (
-                            <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
-                              <div className="flex items-center gap-2 mb-2">
-                                <Sparkles size={16} className="text-amber-600" />
-                                <span className="text-sm font-semibold text-amber-900">Project Forecasts</span>
-                              </div>
-                              <p className="text-xs text-amber-700">
-                                {aiInsights.projectPredictions.length} active project(s) with success predictions
-                              </p>
-                            </div>
-                          )}
-
-                          {(aiInsights.churnRisk.length === 0 &&
-                            aiInsights.topRecommendations.length === 0 &&
-                            aiInsights.eventPredictions.length === 0 &&
-                            aiInsights.projectPredictions.length === 0) && (
-                              <div className="text-center py-4 text-slate-400 text-sm">
-                                No AI insights available yet
-                              </div>
-                            )}
-
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full"
-                            onClick={() => onNavigate?.('AI_INSIGHTS')}
-                          >
-                            <Sparkles size={14} className="mr-2" />
-                            View Full AI Insights
-                          </Button>
-                        </>
-                      )}
-                    </div>
+                    {/* Predictions are no longer computed here: they downloaded every event and project
+                        (~13 MB) and showed little (counts only; recommendations were for the first member
+                        in the list). The AI Insights page has the full view. */}
+                    <p className="text-sm text-slate-500 mb-3">Churn risk, event demand and project forecasts are on the AI Insights page.</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => onNavigate?.('AI_INSIGHTS')}
+                    >
+                      <Sparkles size={14} className="mr-2" />
+                      View Full AI Insights
+                    </Button>
                   </div>
                 </Card>
 
