@@ -1021,7 +1021,10 @@ export class MembersService {
 
       // Firestore rule requires (resource == null || resourceInMyLo(resource.data)).
       // If target has an loId and current admin has a different loId, deny client-side to avoid permission error.
-      if (targetLoId != null && myLoId != null && targetLoId !== myLoId) {
+      // Exception: a KL admin soft-deleting a legacy sister-chapter doc (old "Add Member", role MEMBER with
+      // loId != jcikl). The rules' update branch lets isAdmin() edit any LO, so this would not be denied.
+      const klAdminOnSisterDoc = myLoId === DEFAULT_LO_ID && targetLoId != null && targetLoId !== DEFAULT_LO_ID;
+      if (targetLoId != null && myLoId != null && targetLoId !== myLoId && !klAdminOnSisterDoc) {
         const e: any = new Error('Cannot delete member from a different LO');
         e.code = 'permission-denied';
         console.warn(`Delete blocked by LO mismatch: user ${currentUid} lo=${myLoId} target ${memberId} lo=${targetLoId}`);
