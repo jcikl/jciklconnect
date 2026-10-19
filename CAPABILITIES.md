@@ -17,9 +17,9 @@
 
 | 層 | 檔案數 | 位置 |
 |---|---|---|
-| Service（業務邏輯與資料存取） | 69 | `services/` |
-| Hook（React 資料綁定） | 39 | `hooks/` |
-| Util（純函數工具） | 23 | `utils/` |
+| Service（業務邏輯與資料存取） | 72 | `services/` |
+| Hook（React 資料綁定） | 42 | `hooks/` |
+| Util（純函數工具） | 26 | `utils/` |
 | UI 元件（通用） | 33 | `components/ui/` |
 | 共用業務元件 | 9 | `components/shared/` |
 | Context | 2 | `contexts/` |
@@ -75,7 +75,7 @@
 |---|---|
 | `services/financeService.ts` | 5,325 |
 | `services/pointsService.ts` | 2,492 |
-| `services/membersService.ts` | 2,326 |
+| `services/membersService.ts` | 2,329 |
 | `hooks/useFinanceData.ts` | 2,034 |
 | `services/inventoryService.ts` | 1,638 |
 
@@ -91,10 +91,10 @@
 | `learningPathsService.ts` | 340 | 2 | Learning Paths & Learning Progress Service Fixes applied: P1 – startLearningPath uses runTransaction to prevent duplicate progress records P… | LEARNING_PATHS, LEARNING_PROGRESS |
 | `memberAuthService.ts` | 91 | 2 | 会员登录账号（Firebase Auth）的建立与补建；调用 Netlify 函数 member-auth（uid = 会员文档 ID）。 | — |
 | `memberBenefitsService.ts` | 329 | 1 | Member Benefits Service Handles the memberBenefits collection and benefitUsage write path. Read path for advertisements-as-benefits lives in… | ADVERTISEMENTS, BENEFIT_USAGE, MEMBER_BENEFITS |
-| `memberCardsService.ts` | 138 | 7 | Member Cards Service — keeps `memberCards/{memberId}` (the public directory card, Phase 0 WP2) in sync with `members`. The card is written A… | MEMBER_CARDS |
+| `memberCardsService.ts` | 136 | 9 | Member Cards Service — keeps `memberCards/{memberId}` (the public directory card, Phase 0 WP2) in sync with `members`. The card is written A… | MEMBER_CARDS |
 | `memberJourneyService.ts` | 155 | 2 | Leadership Journey + Trainer Pathway derivation (dashboard journey card for pre-2025 members) | — |
 | `memberStatsService.ts` | 319 | 2 | Member Statistics Service - Generates comprehensive member statistics and reports | — |
-| `membersService.ts` | 2,326 | 41 | Members Service - CRUD Operations | BOARD_MEMBERS, EVENT_REGISTRATIONS, MEMBERS, MEMBER_EMAILS, NOTIFICATIONS, PAYMENT_REQUESTS … |
+| `membersService.ts` | 2,329 | 43 | Members Service - CRUD Operations | BOARD_MEMBERS, EVENT_REGISTRATIONS, MEMBERS, MEMBER_EMAILS, NOTIFICATIONS, PAYMENT_REQUESTS … |
 | `membershipConfigService.ts` | 373 | 17 | ⚠️ 無說明 | SYSTEM_SETTINGS |
 | `mentorshipService.ts` | 638 | 4 | Mentorship Matching Service | MEMBERS, MENTORSHIP_FEEDBACK, MENTOR_MATCHES |
 | `promotionService.ts` | 1,191 | 4 | ⚠️ 無說明 | MANUAL_PROMOTION_REQUESTS, MEMBERS, PROMOTION_HISTORY, SYSTEM |
@@ -150,14 +150,14 @@
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `getInternationalCards` | 41 | Cards shared with other chapters (`international == true`), all chapters, KL's own excluded. Query shape: ONE … |
-| `getCardsByChapters` | 61 | Cards of the given chapters (KL users only: rules let active KL members list any card, by `loId ==` or `in`; e… |
-| `invalidateCardsCache` | 80 | Drop cached card lists (call after the viewer opts in, so a stale result is not served). |
-| `buildCard` | 85 |  |
-| `shouldHaveCard` | 89 |  |
-| `applyUpdates` | 94 | Member snapshot after an updateDoc-style payload (dot-paths supported). |
-| `plan` | 99 | Decide the card action for a before -> after member change (see planCardSync). |
-| `syncCards` | 108 | Applies the planned card upserts/deletes for already-committed member writes, chunked (<= 400 per batch). Neve… |
+| `getInternationalCards` | 41 | Cards shared with other chapters (`international == true`), all chapters, including KL cards that opted in (ex… |
+| `getCardsByChapters` | 59 | Cards of the given chapters (KL users only: rules let active KL members list any card, by `loId ==` or `in`; e… |
+| `invalidateCardsCache` | 78 | Drop cached card lists (call after the viewer opts in, so a stale result is not served). |
+| `buildCard` | 83 |  |
+| `shouldHaveCard` | 87 |  |
+| `applyUpdates` | 92 | Member snapshot after an updateDoc-style payload (dot-paths supported). |
+| `plan` | 97 | Decide the card action for a before -> after member change (see planCardSync). |
+| `syncCards` | 106 | Applies the planned card upserts/deletes for already-committed member writes, chunked (<= 400 per batch). Neve… |
 
 </details>
 
@@ -195,27 +195,27 @@
 | `validateSenatorshipByBoard` | 869 | Board of Directors validates a member's senatorship number (locks future edits). |
 | `revokeSenatorshipValidation` | 895 | Revoke board validation (admin / board only). Clears certification. |
 | `deleteMember` | 989 | Delete member |
-| `searchMembers` | 1100 | Search members |
-| `getMembersByRole` | 1119 | Get members by role |
-| `getMemberByEmail` | 1150 | Get member by email (for account linking) |
-| `getMembersAtRisk` | 1191 | Get members at risk (churn prediction) |
-| `computeAttendanceMonths` | 1212 | 当年应计月份数：入会年份从入会月起算，否则从 1 月起算 |
-| `recalculateAttendance` | 1226 | 按当年 checked_in 记录重算出席对比（签到次数 vs 已过月份），写回会员档案 |
-| `updateMemberRole` | 1258 |  |
-| `assignMentor` | 1327 | Assign mentor |
-| `batchUpdateMembers` | 1350 | Batch update members — uses writeBatch for atomicity (E01) |
-| `batchDeleteMembers` | 1521 | Batch delete members — uses writeBatch for atomicity (E02) |
-| `getFirstMembershipYearKey` | 1689 | Earliest year key on member.jciCareer?.membershipDuesHistory (e.g. "2024"). |
-| `statusFromMembershipAmount` | 1702 |  |
-| `fixFirstMembershipDuesTo350` | 1720 | Set dues on each member's first membership year to RM350 and recalculate status from paid amount. SYNC-004 NOT… |
-| `getEffectiveJoinYear` | 1827 | Effective membership start year (calendar Oct rollover or first payment year). |
-| `inferMembershipType` | 1858 | Infer membershipType from role, senatorship, and membership[year].dues (Config rules). |
-| `batchSyncMembershipTypes` | 1881 | Batch-sync members.jciCareer?.membershipType from membership dues + role + Config. Does not modify members.jci… |
-| `batchSyncMembershipRecords` | 1993 | Batch-sync members.jciCareer?.membershipDuesHistory[year] from each member's membershipType + Membership Confi… |
-| `syncMembershipFromMembershipType` | 2209 |  |
-| `migrateMembershipTypeFullToOfficial` | 2216 | TEMP MIGRATION: membershipType 'Full' → 'Official' |
-| `migrateDobToGeneralDob` | 2251 | TEMP MIGRATION: copy root-level dateOfBirth/dob into general.dob for members missing it |
-| `getMembersPaginated` | 2293 | Cursor-based paginated member fetch (ordered by name). Pass `lastDoc` from the previous page's result to advan… |
+| `searchMembers` | 1103 | Search members |
+| `getMembersByRole` | 1122 | Get members by role |
+| `getMemberByEmail` | 1153 | Get member by email (for account linking) |
+| `getMembersAtRisk` | 1194 | Get members at risk (churn prediction) |
+| `computeAttendanceMonths` | 1215 | 当年应计月份数：入会年份从入会月起算，否则从 1 月起算 |
+| `recalculateAttendance` | 1229 | 按当年 checked_in 记录重算出席对比（签到次数 vs 已过月份），写回会员档案 |
+| `updateMemberRole` | 1261 |  |
+| `assignMentor` | 1330 | Assign mentor |
+| `batchUpdateMembers` | 1353 | Batch update members — uses writeBatch for atomicity (E01) |
+| `batchDeleteMembers` | 1524 | Batch delete members — uses writeBatch for atomicity (E02) |
+| `getFirstMembershipYearKey` | 1692 | Earliest year key on member.jciCareer?.membershipDuesHistory (e.g. "2024"). |
+| `statusFromMembershipAmount` | 1705 |  |
+| `fixFirstMembershipDuesTo350` | 1723 | Set dues on each member's first membership year to RM350 and recalculate status from paid amount. SYNC-004 NOT… |
+| `getEffectiveJoinYear` | 1830 | Effective membership start year (calendar Oct rollover or first payment year). |
+| `inferMembershipType` | 1861 | Infer membershipType from role, senatorship, and membership[year].dues (Config rules). |
+| `batchSyncMembershipTypes` | 1884 | Batch-sync members.jciCareer?.membershipType from membership dues + role + Config. Does not modify members.jci… |
+| `batchSyncMembershipRecords` | 1996 | Batch-sync members.jciCareer?.membershipDuesHistory[year] from each member's membershipType + Membership Confi… |
+| `syncMembershipFromMembershipType` | 2212 |  |
+| `migrateMembershipTypeFullToOfficial` | 2219 | TEMP MIGRATION: membershipType 'Full' → 'Official' |
+| `migrateDobToGeneralDob` | 2254 | TEMP MIGRATION: copy root-level dateOfBirth/dob into general.dob for members missing it |
+| `getMembersPaginated` | 2296 | Cursor-based paginated member fetch (ordered by name). Pass `lastDoc` from the previous page's result to advan… |
 
 </details>
 
@@ -277,7 +277,7 @@
 |---|---|---|---|---|
 | `eventBudgetService.ts` | 306 | 3 | Event Budget Management Service | EVENT_BUDGETS |
 | `eventPaymentMatchingService.ts` | 310 | 1 | EventPaymentMatchingService Matches event registration income transactions (Pending) to imported bank transactions. Three matching paths: A … | TRANSACTIONS |
-| `financeService.ts` | 5,325 | 32 | ⚠️ 無說明 | BANK_ACCOUNTS, FINANCE_ALERTS, FINANCE_META, MEMBERS, PAYMENT_REQUESTS, PROJECT_TRANSACTIONS … |
+| `financeService.ts` | 5,325 | 33 | ⚠️ 無說明 | BANK_ACCOUNTS, FINANCE_ALERTS, FINANCE_META, MEMBERS, PAYMENT_REQUESTS, PROJECT_TRANSACTIONS … |
 | `incentiveCalculatorService.ts` | 385 | 1 | ⚠️ 無說明 | BANK_ACCOUNTS, EVENTS, EVENT_REGISTRATIONS, INCENTIVE_SUBMISSIONS, MEMBERS, PROJECTS … |
 | `paymentRequestService.ts` | 999 | 4 | Payment Request Service (Story 2.1) | BANK_ACCOUNTS, COUNTERS, NOTIFICATIONS, PAYMENT_REQUESTS, TRANSACTIONS |
 | `projectAccountsService.ts` | 236 | 0 | Project Financial Accounts Service | PROJECTS |
@@ -480,8 +480,9 @@
 |---|---|---|---|---|
 | `activityPlansService.ts` | 621 | 2 | Activity Plans Service - CRUD Operations P0 fix: all methods now query COLLECTIONS.ACTIVITY_PLANS (was COLLECTIONS.PROJECTS) P1 fixes: isDev… | ACTIVITY_PLANS, PROJECTS |
 | `eventFeedbackService.ts` | 226 | 3 | Event Feedback Service - Collects and manages event feedback | EVENT_FEEDBACK |
-| `eventRegistrationService.ts` | 391 | 7 | Event Registration Service - 报名/缴费/签到统一名单（Story 8.1） | EVENT_REGISTRATIONS, PROJECTS |
-| `eventsService.ts` | 1,136 | 15 | Events Service - CRUD Operations | EVENT_BUDGETS, EVENT_FEEDBACK, EVENT_REGISTRATIONS, GUEST_REGISTRATIONS, NOTIFICATIONS, POINTS … |
+| `eventPaymentService.ts` | 89 | 1 | Event payment (mark-paid) — creates the finance income record, then flips the registration to 'paid'. | PROJECTS |
+| `eventRegistrationService.ts` | 391 | 8 | Event Registration Service - 报名/缴费/签到统一名单（Story 8.1） | EVENT_REGISTRATIONS, PROJECTS |
+| `eventsService.ts` | 1,136 | 15 | Events Service - CRUD Operations | EVENT_BUDGETS, EVENT_FEEDBACK, EVENT_REGISTRATIONS, GUEST_REGISTRATIONS, MEMBERS, NOTIFICATIONS … |
 | `flagshipProjectsService.ts` | 156 | 3 | ⚠️ 無說明 | FLAGSHIP_PROJECTS |
 | `projectReportService.ts` | 775 | 3 | Project Report Service - Generates automated project reports | TEMPLATES |
 | `projectsService.ts` | 823 | 21 | Projects Service - CRUD Operations | ACTIVITY_PLANS, MEMBERS, POINTS, PROJECTS, PROJECT_REPORTS, PROJECT_TRANSACTIONS … |
@@ -516,6 +517,15 @@
 
 </details>
 
+<details><summary><code>services/eventPaymentService.ts</code> — 2 個方法</summary>
+
+| 方法 | 行 | 說明 |
+|---|---|---|
+| `resolveBankAccountId` | 15 | Bank account an event's income goes into: the project's `financialAccountId` when it is a real bank account of… |
+| `markRegistrationPaid` | 37 | Mark a registration paid. The transaction records MYR; for a USD (external) registration the price the payer s… |
+
+</details>
+
 <details><summary><code>services/eventRegistrationService.ts</code> — 0 個方法、1 個函數/常數</summary>
 
 
@@ -527,23 +537,23 @@
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `invalidateEventsCache` | 43 |  |
-| `getAllEvents` | 94 | Approved projects with eventStartDate (for Event List: Upcoming + Completed) |
-| `getUpcomingEvents` | 132 | Events starting today (MYT) or later, same statuses as getAllEvents. Filters on eventStartDate (YYYY-MM-DD str… |
-| `getKlEvents` | 159 | Every event JCI Kuala Lumpur hosts or co-hosts (any date / status except Cancelled), newest first — the board … |
-| `getKlRelevantEvents` | 185 | Events a JCI KL member sees in the event list / calendar (same rule as isKlRelevantEvent): KL hosts or co-host… |
-| `getEventById` | 214 | Get event by ID (from projects collection) |
-| `createEvent` | 250 | Create new event |
-| `updateEvent` | 304 | Update event |
-| `deleteEvent` | 338 | Delete event |
-| `registerForEvent` | 417 | Register member for event |
-| `cancelRegistration` | 510 | Cancel event registration |
-| `completeEvent` | 613 | P1-A: Mark an event as Completed (no existing method existed) |
-| `cancelEvent` | 647 | Cancel entire event — batch-cancels all active registrations and their income transactions |
-| `markAttendance` | 816 | Mark attendance (check-in) P0 guard: only BOARD+ or ADMIN callers should mark attendance; MEMBER/GUEST are blo… |
-| `undoAttendance` | 886 | Undo attendance (un-check-in) — FIX E3 P0 guard: only BOARD+ or ADMIN callers should undo attendance. |
-| `getEventsByType` | 991 | Get events by type |
-| `registerGuestForEvent` | 1008 | Register a guest for an event. Uses runTransaction to atomically prevent duplicate registrations — reads first… |
+| `invalidateEventsCache` | 44 |  |
+| `getAllEvents` | 95 | Approved projects with eventStartDate (for Event List: Upcoming + Completed) |
+| `getUpcomingEvents` | 133 | Events starting today (MYT) or later, same statuses as getAllEvents. Filters on eventStartDate (YYYY-MM-DD str… |
+| `getKlEvents` | 160 | Every event JCI Kuala Lumpur hosts or co-hosts (any date / status except Cancelled), newest first — the board … |
+| `getKlRelevantEvents` | 186 | Events a JCI KL member sees in the event list / calendar (same rule as isKlRelevantEvent): KL hosts or co-host… |
+| `getEventById` | 215 | Get event by ID (from projects collection) |
+| `createEvent` | 251 | Create new event |
+| `updateEvent` | 305 | Update event |
+| `deleteEvent` | 339 | Delete event |
+| `registerForEvent` | 418 | Register member for event |
+| `cancelRegistration` | 524 | Cancel event registration |
+| `completeEvent` | 627 | P1-A: Mark an event as Completed (no existing method existed) |
+| `cancelEvent` | 661 | Cancel entire event — batch-cancels all active registrations and their income transactions |
+| `markAttendance` | 830 | Mark attendance (check-in) P0 guard: only BOARD+ or ADMIN callers should mark attendance; MEMBER/GUEST are blo… |
+| `undoAttendance` | 900 | Undo attendance (un-check-in) — FIX E3 P0 guard: only BOARD+ or ADMIN callers should undo attendance. |
+| `getEventsByType` | 1005 | Get events by type |
+| `registerGuestForEvent` | 1022 | Register a guest (signed out) for an event. Writes the registration and a phone-index doc in one writeBatch wi… |
 | `getGuestRegistrations` | 1074 | Fetch all guest registrations for an event. Exposes a service-layer method so components don't query Firestore… |
 | `cancelGuestRegistration` | 1108 | Cancel a guest registration. P1 FIX: also updates the phone-index sentinel doc so the phone number is freed fo… |
 
@@ -712,7 +722,7 @@
 | `boardManagementService.ts` | 1,264 | 11 | Board Management Service - Handles "One Year to Lead" principle | BOARD_MEMBERS, BOARD_TERM_SETTINGS, BOARD_TRANSITIONS, MEMBERS |
 | `contractService.ts` | 344 | 2 | ⚠️ 無說明 | CONTRACTS, FINANCE_ALERTS, POINT_ESCROW |
 | `documentsService.ts` | 431 | 1 | Documents Service with Version Control | DOCUMENTS, DOCUMENT_VERSIONS |
-| `hobbyClubsService.ts` | 317 | 3 | Hobby Clubs Service - CRUD Operations | HOBBY_CLUBS |
+| `hobbyClubsService.ts` | 343 | 3 | Hobby Clubs Service - CRUD Operations | HOBBY_CLUBS |
 | `permissionConfigService.ts` | 151 | 1 | ⚠️ 無說明 | PERMISSION_CATALOG |
 | `sisterChaptersService.ts` | 62 | 3 | ⚠️ 無說明 | SISTER_CHAPTERS |
 | `templatesService.ts` | 433 | 7 | Templates Service - Event Templates Management | TEMPLATES |
@@ -801,22 +811,23 @@
 
 </details>
 
-<details><summary><code>services/hobbyClubsService.ts</code> — 12 個方法</summary>
+<details><summary><code>services/hobbyClubsService.ts</code> — 13 個方法</summary>
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `invalidateClubsCache` | 34 | Invalidate all hobby-clubs cache entries after any write. |
-| `getAllClubs` | 41 | Get all clubs |
-| `getClubById` | 70 | Get club by ID |
-| `createClub` | 96 | Create club |
-| `updateClub` | 125 | Update club |
-| `deleteClub` | 148 | Soft-delete a club by setting isDeleted: true. Hard deletion is avoided to prevent stale memberIds references … |
-| `getClubsByCategory` | 168 | Get clubs by category |
-| `getActivities` | 206 | Read a club's activities (non-transactional convenience helper) |
-| `addActivity` | 216 | P1 fix: Add a club activity. Uses runTransaction so the read → modify → write is atomic; concurrent modificati… |
-| `updateActivity` | 253 | P1 fix: Update a club activity. Uses runTransaction to prevent read/write races. |
-| `deleteActivity` | 286 | P1 fix: Delete a club activity. Uses runTransaction to prevent read/write races. |
-| `scheduleActivity` | 313 |  |
+| `invalidateClubsCache` | 35 | Invalidate all hobby-clubs cache entries after any write. |
+| `getAllClubs` | 42 | Get all clubs |
+| `getClubsForExternal` | 70 | Clubs visible to externals (other chapters): openToExternals == true only (firestore.rules hobbyClubs read). S… |
+| `getClubById` | 96 | Get club by ID |
+| `createClub` | 122 | Create club |
+| `updateClub` | 151 | Update club |
+| `deleteClub` | 174 | Soft-delete a club by setting isDeleted: true. Hard deletion is avoided to prevent stale memberIds references … |
+| `getClubsByCategory` | 194 | Get clubs by category |
+| `getActivities` | 232 | Read a club's activities (non-transactional convenience helper) |
+| `addActivity` | 242 | P1 fix: Add a club activity. Uses runTransaction so the read → modify → write is atomic; concurrent modificati… |
+| `updateActivity` | 279 | P1 fix: Update a club activity. Uses runTransaction to prevent read/write races. |
+| `deleteActivity` | 312 | P1 fix: Delete a club activity. Uses runTransaction to prevent read/write races. |
+| `scheduleActivity` | 339 |  |
 
 </details>
 
@@ -877,7 +888,7 @@
 
 | Service | 行數 | 引用 | 用途 | 集合 |
 |---|---|---|---|---|
-| `advertisementService.ts` | 418 | 11 | Advertisement & Promotions Service | ADVERTISEMENTS, BENEFIT_USAGE, PROMOTION_PACKAGES |
+| `advertisementService.ts` | 422 | 11 | Advertisement & Promotions Service | ADVERTISEMENTS, BENEFIT_USAGE, PROMOTION_PACKAGES |
 | `businessDirectoryService.ts` | 259 | 1 | Business Directory Service - CRUD Operations | MEMBERS, PUBLIC_BUSINESS_LISTINGS |
 | `communicationService.ts` | 651 | 9 | Communication Service - CRUD Operations | COMMUNICATION, NOTIFICATIONS, SYSTEM_CONFIG |
 | `emailService.ts` | 442 | 2 | Email Service - Email Integration Service | EMAIL_LOGS |
@@ -891,24 +902,24 @@
 | `socialPersonaService.ts` | 52 | 1 | ⚠️ 無說明 | SOCIAL_PERSONAS |
 | `socialPostService.ts` | 182 | 2 | ⚠️ 無說明 | SOCIAL_POSTS |
 | `surveyAnalyticsService.ts` | 256 | 2 | Survey Analytics Service - Analyzes survey responses and generates statistics | — |
-| `surveysService.ts` | 439 | 7 | Surveys Service - CRUD Operations | SURVEYS, SURVEY_RESPONSES |
+| `surveysService.ts` | 476 | 7 | Surveys Service - CRUD Operations | SURVEYS, SURVEY_RESPONSES |
 | `webhookService.ts` | 546 | 2 | Webhook Configuration Service | SYSTEM_LOGS, WEBHOOKS, WEBHOOK_LOGS |
 
 <details><summary><code>services/advertisementService.ts</code> — 11 個方法</summary>
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `invalidateAdsCache` | 127 | ── Cache helpers ────────────────────────────────────────────────────────── |
-| `invalidatePackagesCache` | 131 |  |
-| `getAllAdvertisements` | 136 | ── Get all advertisements ───────────────────────────────────────────────── |
-| `getActiveAdvertisements` | 164 | ── Get active advertisements for a placement ────────────────────────────── |
-| `recordImpression` | 217 | ── Record impression (fire-and-forget, no cache clear needed) ───────────── |
-| `recordClick` | 233 | ── Record click (fire-and-forget, no cache clear needed) ────────────────── |
-| `createAdvertisement` | 250 | ── Create advertisement ─────────────────────────────────────────────────── FIX P1: all Advertisement fields a… |
-| `updateAdvertisement` | 296 | ── Update advertisement ─────────────────────────────────────────────────── |
-| `deleteAdvertisement` | 335 | ── Delete advertisement ─────────────────────────────────────────────────── |
-| `getPromotionPackages` | 351 | ── Get promotion packages ───────────────────────────────────────────────── |
-| `getBenefitUsageHistory` | 383 | ── Get benefit usage history ────────────────────────────────────────────── |
+| `invalidateAdsCache` | 131 | ── Cache helpers ────────────────────────────────────────────────────────── |
+| `invalidatePackagesCache` | 135 |  |
+| `getAllAdvertisements` | 140 | ── Get all advertisements ───────────────────────────────────────────────── |
+| `getActiveAdvertisements` | 168 | ── Get active advertisements for a placement ────────────────────────────── |
+| `recordImpression` | 221 | ── Record impression (fire-and-forget, no cache clear needed) ───────────── |
+| `recordClick` | 237 | ── Record click (fire-and-forget, no cache clear needed) ────────────────── |
+| `createAdvertisement` | 254 | ── Create advertisement ─────────────────────────────────────────────────── FIX P1: all Advertisement fields a… |
+| `updateAdvertisement` | 300 | ── Update advertisement ─────────────────────────────────────────────────── |
+| `deleteAdvertisement` | 339 | ── Delete advertisement ─────────────────────────────────────────────────── |
+| `getPromotionPackages` | 355 | ── Get promotion packages ───────────────────────────────────────────────── |
+| `getBenefitUsageHistory` | 387 | ── Get benefit usage history ────────────────────────────────────────────── |
 
 </details>
 
@@ -1080,19 +1091,20 @@
 
 </details>
 
-<details><summary><code>services/surveysService.ts</code> — 9 個方法</summary>
+<details><summary><code>services/surveysService.ts</code> — 10 個方法</summary>
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `getAllSurveys` | 102 | Get all surveys |
-| `getSurveyById` | 119 | Get survey by ID |
-| `createSurvey` | 138 | Create survey |
-| `updateSurvey` | 162 | Update survey |
-| `deleteSurvey` | 190 | Delete survey — also batch-deletes all associated responses P1 fix: chunk deletes in batches of 400 to stay we… |
-| `submitResponse` | 225 | Submit survey response — uses runTransaction to prevent duplicate submissions and to atomically increment resp… |
-| `getSurveyResponses` | 281 | Get survey responses |
-| `getMemberResponses` | 306 | Get survey responses submitted by a specific member (P0 fix: non-admin owner-scoped listing) Always adds where… |
-| `distributeSurvey` | 336 | Distribute survey — sends in-app notifications to target members |
+| `getAllSurveys` | 107 | Get all surveys |
+| `getSurveysForExternal` | 126 | Surveys an external (other-chapter) user may read: targeted to them, or open to externals and Active. Two quer… |
+| `getSurveyById` | 156 | Get survey by ID |
+| `createSurvey` | 175 | Create survey |
+| `updateSurvey` | 199 | Update survey |
+| `deleteSurvey` | 227 | Delete survey — also batch-deletes all associated responses P1 fix: chunk deletes in batches of 400 to stay we… |
+| `submitResponse` | 262 | Submit survey response — uses runTransaction to prevent duplicate submissions and to atomically increment resp… |
+| `getSurveyResponses` | 318 | Get survey responses |
+| `getMemberResponses` | 343 | Get survey responses submitted by a specific member (P0 fix: non-admin owner-scoped listing) Always adds where… |
+| `distributeSurvey` | 373 | Distribute survey — sends in-app notifications to target members |
 
 </details>
 
@@ -1119,10 +1131,10 @@
 | Service | 行數 | 引用 | 用途 | 集合 |
 |---|---|---|---|---|
 | `aiPredictionService.ts` | 949 | 3 | AI Prediction Service - Advanced AI predictions for events, projects, and sponsors | — |
-| `cacheService.ts` | 314 | 33 | 缓存服务 - 提供内存缓存和本地存储缓存功能 Cache Service - Provides in-memory and localStorage caching capabilities | — |
+| `cacheService.ts` | 314 | 35 | 缓存服务 - 提供内存缓存和本地存储缓存功能 Cache Service - Provides in-memory and localStorage caching capabilities | — |
 | `cloudinaryService.ts` | 337 | 14 | Cloudinary Upload Service | — |
 | `dataImportExportService.ts` | 913 | 3 | ⚠️ 無說明 | EVENTS, MEMBERS, MEMBER_EMAILS |
-| `errorLoggingService.ts` | 354 | 67 | ⚠️ 無說明 | ERROR_LOGS |
+| `errorLoggingService.ts` | 354 | 70 | ⚠️ 無說明 | ERROR_LOGS |
 | `firestoreLogger.ts` | 197 | 3 | System Logger — Firestore ops + Performance monitoring Fire-and-forget buffered logger. Buffers events for 3 seconds then writes one batched… | SYSTEM_LOGS |
 | `inventoryService.ts` | 1,638 | 3 | Inventory Service - CRUD Operations | INVENTORY, INVENTORY_ALERTS, MAINTENANCE_SCHEDULES, STOCK_MOVEMENTS, TRANSACTIONS |
 | `mockData.ts` | 689 | 17 | ⚠️ 無說明 | — |
@@ -1251,7 +1263,31 @@
 
 | Service | 行數 | 引用 | 用途 | 集合 |
 |---|---|---|---|---|
+| `chapterBirthdaysService.ts` | 46 | 1 | Own-chapter birthdays for external users: calls the Netlify function chapter-birthdays (read-only). | — |
+| `externalAccountsService.ts` | 151 | 3 | External (sister-chapter) accounts. Writes go through the Netlify function external-accounts (uid = member doc id); reads (chapter roster, K… | MEMBERS |
 | `reportService.ts` | 615 | 2 | ⚠️ 無說明 | — |
+
+<details><summary><code>services/chapterBirthdaysService.ts</code> — 1 個方法</summary>
+
+| 方法 | 行 | 說明 |
+|---|---|---|
+| `getForMonth` | 21 | Birthdays in `month` (1-12) among active members of the signed-in external user's own chapter. |
+
+</details>
+
+<details><summary><code>services/externalAccountsService.ts</code> — 7 個方法</summary>
+
+| 方法 | 行 | 說明 |
+|---|---|---|
+| `invalidateCache` | 86 | Server wrote member docs / cards: drop cached member lists (all + per-LO keys), cards, and our own lists. |
+| `getChapterMembers` | 96 | All member docs of one chapter (any status), sorted by name. No orderBy: self-registered docs carry no updated… |
+| `getPendingKlApprovals` | 110 | KL admins: external members waiting for KL approval (affiliation.status == 'pending_kl'), all chapters. |
+| `createChapterAdmins` | 124 | KL ADMIN / SUPER_ADMIN: create CHAPTER_ADMIN accounts for a sister chapter (1–20 per call). |
+| `inviteMembers` | 133 | Invite AFFILIATE members (active immediately). A chapter admin's own chapter is enforced by the server (loId i… |
+| `setStatus` | 139 | Change an external member's affiliation status (server checks the transition table and syncs the card). |
+| `resendInvite` | 145 | Send the password setup email again. Returns whether the email was sent. |
+
+</details>
 
 <details><summary><code>services/reportService.ts</code> — 10 個方法</summary>
 
@@ -1279,16 +1315,19 @@
 | `useActivityPlans.ts` | 130 | 1 | `useActivityPlans` | activityPlansService | ⚠️ 無說明 |
 | `useAdvertisements.ts` | 110 | 2 | `useAdvertisements` | advertisementService, errorLoggingService | Advertisements Data Hook |
 | `useAppNavigation.ts` | 239 | 1 | `useAppNavigation` | — | ⚠️ 無說明 |
-| `useAuth.tsx` | 782 | 56 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, membersService, mockData | Authentication Hook |
+| `useAuth.tsx` | 795 | 58 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, memberCardsService, membersService, mockData | Authentication Hook |
 | `useAutomation.ts` | 149 | 3 | `useAutomation` | automationService | useAutomation Hook - Manage automation workflows and rules |
 | `useBusinessDirectory.ts` | 48 | 4 | `useBusinessDirectory` | businessDirectoryService | ⚠️ 無說明 |
+| `useChapterBirthdays.ts` | 23 | 1 | `useChapterBirthdays` | chapterBirthdaysService | Own-chapter birthdays for an active external user (dashboard birthday widget). `month` null → nothing loads. |
+| `useChapterMembers.ts` | 75 | 2 | `useChapterMembers`, `usePendingKlApprovals` | externalAccountsService | Chapter roster for an active CHAPTER_ADMIN (own chapter) and the KL approval queue (pending_kl, KL admins). Status changes / invites go thro… |
 | `useCommunication.ts` | 118 | 2 | `useCommunication` | communicationService | Communication Data Hook |
 | `useEvents.ts` | 191 | 8 | `useEvents` | errorLoggingService, eventsService, membersService | Events Data Hook |
+| `useExternalAccounts.ts` | 46 | 1 | `useExternalAccounts` | externalAccountsService, membersService | External (sister-chapter) account actions for components: create chapter admins, invite, status, resend. |
 | `useFinanceData.ts` | 2,034 | 4 | `useFinanceData` | errorLoggingService, financeService, inventoryService, membersService, membershipConfigService, paymentRequestService, projectFinancialService, projectsService | TODO (PERF-A-004): This hook has ~90 useState declarations, causing full FinanceView re-renders on any state update. Planned refactor: split… |
 | `useFirestoreCollection.ts` | 171 | 18 | `useFirestoreCollection` | — | ⚠️ 無說明 |
 | `useGamification.ts` | 148 | 1 | `useGamification` | gamificationService | useGamification.ts - Unified Hook for Awards (Achievements + Badges) |
 | `useGuestAnalytics.ts` | 21 | 0 | `useGuestAnalytics` | guestAnalyticsService | ⚠️ 無說明 |
-| `useHobbyClubs.ts` | 128 | 2 | `useHobbyClubs` | hobbyClubsService | ⚠️ 無說明 |
+| `useHobbyClubs.ts` | 132 | 2 | `useHobbyClubs` | hobbyClubsService | ⚠️ 無說明 |
 | `useInstallPrompt.ts` | 47 | 1 | `useInstallPrompt` | — | ⚠️ 無說明 |
 | `useInventory.ts` | 232 | 2 | `useInventory` | inventoryService | Inventory Data Hook |
 | `useKnowledge.ts` | 68 | 1 | `useKnowledge` | knowledgeService | ⚠️ 無說明 |
@@ -1299,16 +1338,16 @@
 | `useMemberSearch.ts` | 53 | 1 | `useMemberSearch` | — | ⚠️ 無說明 |
 | `useMembers.ts` | 195 | 20 | `useMembers`, `usePaginatedMembers` | membersService | Members Data Hook |
 | `useNotifications.ts` | 107 | 0 | `useNotifications` | communicationService, errorLoggingService, mockData | ⚠️ 無說明 |
-| `usePermissions.ts` | 212 | 28 | `usePermissions` | — | Permission Management Hook |
+| `usePermissions.ts` | 212 | 30 | `usePermissions` | — | Permission Management Hook |
 | `usePoints.ts` | 61 | 2 | `usePoints` | pointsService | Points Data Hook |
 | `useProjects.ts` | 170 | 7 | `useProjects` | projectsService | Projects Data Hook |
 | `usePushNotifications.ts` | 63 | 1 | `usePushNotifications` | — | ⚠️ 無說明 |
-| `useSisterChapterMembers.ts` | 84 | 2 | `useSisterChapterMembers` | memberCardsService, membersService, sisterChaptersService | ⚠️ 無說明 |
-| `useSisterChapters.ts` | 26 | 3 | `useSisterChapters` | sisterChaptersService | ⚠️ 無說明 |
+| `useSisterChapterMembers.ts` | 87 | 2 | `useSisterChapterMembers` | memberCardsService, membersService, sisterChaptersService | ⚠️ 無說明 |
+| `useSisterChapters.ts` | 26 | 6 | `useSisterChapters` | sisterChaptersService | ⚠️ 無說明 |
 | `useSocialPersonas.ts` | 46 | 2 | `useSocialPersonas` | socialPersonaService | ⚠️ 無說明 |
 | `useSocialPosts.ts` | 74 | 1 | `useSocialPosts` | socialPostService | ⚠️ 無說明 |
 | `useSponsorships.ts` | 74 | 1 | `useSponsorships` | sponsorshipService | Sponsorships Data Hook |
-| `useSurveys.ts` | 105 | 1 | `useSurveys` | surveysService | ⚠️ 無說明 |
+| `useSurveys.ts` | 109 | 1 | `useSurveys` | surveysService | ⚠️ 無說明 |
 | `useTemplates.ts` | 175 | 2 | `useTemplates` | templatesService | Templates Data Hook |
 | `useToyyibMode.ts` | 34 | 2 | `useToyyibMode` | toyyibService | ⚠️ 無說明 |
 | `useToyyibPay.ts` | 98 | 1 | `useToyyibCategories`, `useToyyibBills`, `useCreateBill` | toyyibService | ⚠️ 無說明 |
@@ -1349,6 +1388,12 @@
 |---|---|---|
 | `getInitialsSvg` | 3 | Generate an inline SVG data URI with initials so avatars do not rely on external requests. URI-encoded (not bt… |
 
+### `utils/benefitEligibility.ts` （68 行，4 處引用）
+
+| 函數 | 行 | 說明 |
+|---|---|---|
+| `getBenefitEligibility` | 44 | Decide whether `viewer` may redeem/claim `item`. Pure; no I/O. - audiences: missing/empty = ['kl']; the viewer… |
+
 ### `utils/boardMembership.ts` （86 行，5 處引用）
 
 | 函數 | 行 | 說明 |
@@ -1371,6 +1416,14 @@
 | 函數 | 行 | 說明 |
 |---|---|---|
 | `getClubGroupLink` | 7 | The club's group chat link (WhatsApp / LINE / Discord / Telegram …) that "Join" opens, or null when none is se… |
+
+### `utils/configAccess.ts` （24 行，4 處引用）
+
+| 函數 | 行 | 說明 |
+|---|---|---|
+| `canOpenSystemConfig` | 12 |  |
+| `allowedConfigTabs` | 16 | Tabs a role may open; null = all tabs (SUPER_ADMIN); [] = none. |
+| `canEditChapterList` | 23 | Add / edit / delete a sister chapter or toggle it active (sisterChapters writes are SUPER_ADMIN in firestore.r… |
 
 ### `utils/dataUtils.ts` （33 行，4 處引用）
 > recursivley removes undefined values from an object. Firestore does not support 'undefined' values, so this helper is essential before savin…
@@ -1401,7 +1454,7 @@
 | `getStartOfYear` | 163 |  |
 | `getEndOfYear` | 170 |  |
 
-### `utils/devMode.ts` （36 行，70 處引用）
+### `utils/devMode.ts` （36 行，72 處引用）
 > Developer Mode Utility This utility helps services detect if the app is running in developer mode and return mock data instead of accessing …
 
 | 函數 | 行 | 說明 |
@@ -1410,12 +1463,12 @@
 | `isDevMode` | 12 |  |
 | `withDevMode` | 29 | Service helper: returns mock data in dev mode, calls the real async loader in production. Eliminates the repet… |
 
-### `utils/externalAccess.ts` （73 行，4 處引用）
+### `utils/externalAccess.ts` （75 行，9 處引用）
 
 | 函數 | 行 | 說明 |
 |---|---|---|
 | `isExternalRole` | 13 |  |
-| `EXTERNAL_ALLOWED_VIEWS` | 28 | Active externals, per role. CHAPTER_ADMIN gets its own entry (e.g. a chapter-management view in Phase 1). |
+| `EXTERNAL_ALLOWED_VIEWS` | 28 | Active externals, per role. CHAPTER_ADMIN also gets MY_CHAPTER (approvals / members / invite of own chapter). |
 | `getExternalAllowedViews` | 43 | Views an external may open, or null when the role is not external (= no whitelist applies). A missing affiliat… |
 | `isViewAllowedForRole` | 52 | True when `view` may be opened. Non-external roles are unrestricted here (their own rules still apply). |
 | `getExternalStatusMessage` | 61 |  |
@@ -1435,18 +1488,19 @@
 | `isTransactionInCategory` | 59 |  |
 | `getTransactionAccountLabel` | 71 |  |
 
-### `utils/formatUtils.ts` （53 行，36 處引用）
+### `utils/formatUtils.ts` （64 行，39 處引用）
 > Formatting Utility Functions
 
 | 函數 | 行 | 說明 |
 |---|---|---|
 | `formatCurrency` | 2 | Formatting Utility Functions |
-| `formatNumber` | 16 |  |
-| `formatPercentage` | 23 |  |
-| `truncateText` | 27 |  |
-| `capitalizeFirst` | 32 |  |
-| `formatPhoneNumber` | 36 |  |
-| `formatFileSize` | 45 |  |
+| `formatEventPrice` | 20 | Event price range ("From" label). MYR keeps the existing "RM 50 – 80" look; any other currency (USD for extern… |
+| `formatNumber` | 27 |  |
+| `formatPercentage` | 34 |  |
+| `truncateText` | 38 |  |
+| `capitalizeFirst` | 43 |  |
+| `formatPhoneNumber` | 47 |  |
+| `formatFileSize` | 56 |  |
 
 ### `utils/gamificationUtils.ts` （36 行，1 處引用）
 
@@ -1454,12 +1508,14 @@
 |---|---|---|
 | `calculateAwardProgress` | 8 | Pure function: calculates progress percentage (0–100) toward an award. Milestone-based awards use segment logi… |
 
-### `utils/internationalCards.ts` （27 行，1 處引用）
+### `utils/internationalCards.ts` （39 行，1 處引用）
 
 | 函數 | 行 | 說明 |
 |---|---|---|
-| `planCardQuery` | 15 | Which memberCards query the signed-in user may run. KL users list the active sister chapters' cards (every sis… |
-| `attachSisterChapters` | 20 | Attach each card's active sister chapter; cards of unknown/inactive chapters are dropped. |
+| `KL_CHAPTER` | 11 | Synthetic chapter entry so KL cards resolve a chapter for externals (KL is not a `sisterChapters` doc). |
+| `planCardQuery` | 19 | Which memberCards query the signed-in user may run. KL users list the active sister chapters' cards (every sis… |
+| `mergeCards` | 26 | Merge card lists, keeping the first occurrence of each card id. |
+| `attachSisterChapters` | 32 | Attach each card's active sister chapter; cards of unknown/inactive chapters are dropped (KL is always known). |
 
 ### `utils/malaysianIdUtils.ts` （110 行，6 處引用）
 > Malaysian IC (MyKad) utilities
@@ -1505,6 +1561,14 @@
 | `ROLE_PERMISSIONS` | 18 | Static permission baseline per role. Dynamic board elevation is applied at runtime in usePermissions. |
 | `ALL_PERMISSIONS_GRANTED` | 127 |  |
 
+### `utils/signUpPayload.ts` （107 行，1 處引用）
+> Member doc payloads written by hooks/useAuth.tsx on self sign-up. Pure (no Firebase) so they can be unit-tested against what firestore.rules…
+
+| 函數 | 行 | 說明 |
+|---|---|---|
+| `buildSelfSignUpMember` | 22 | KL self sign-up (GUEST, or a matched pre-imported profile). Same fields signUp always wrote; reads profile fie… |
+| `buildExternalSignUpMember` | 84 | External self-registration (Phase 1 WP-3): an AFFILIATE of an active sister chapter waiting for their chapter … |
+
 ### `utils/transactionCategoryUtils.ts` （277 行，4 處引用）
 > Shared category-field derivation and cleanup logic for bank transactions and splits. WHY this file exists: the same "if Membership → auto-se…
 
@@ -1529,7 +1593,7 @@
 | `Card.tsx` | 77 | 1 | `Card`, `StatCardsContainer` |
 | `ColumnFilterHeader.tsx` | 118 | 2 | `ColumnFilterHeader` |
 | `Combobox.tsx` | 255 | 11 | `Combobox` |
-| `Common.tsx` | 26 | 231 | — |
+| `Common.tsx` | 26 | 233 | — |
 | `ConfirmDialog.tsx` | 100 | 2 | `ConfirmDialog`, `CONFIRM_CLOSED` |
 | `DataTable.tsx` | 172 | 0 | `DataTable` |
 | `Drawer.tsx` | 139 | 2 | `Drawer` |
@@ -1537,7 +1601,7 @@
 | `ErrorBoundary.tsx` | 261 | 3 | `ErrorFallback`, `SectionErrorFallback`, `ErrorBoundary`, `AsyncErrorBoundary`, `withErrorBoundary`, `useErrorHandler` |
 | `FilterDrawer.tsx` | 65 | 1 | `FilterDrawer` |
 | `FirstUseBanner.tsx` | 82 | 2 | `FirstUseBanner` |
-| `Form.tsx` | 502 | 96 | `Input`, `Select`, `Textarea`, `Checkbox`, `RadioGroup`, `ButtonGroup` |
+| `Form.tsx` | 502 | 98 | `Input`, `Select`, `Textarea`, `Checkbox`, `RadioGroup`, `ButtonGroup` |
 | `IntroducerSelector.tsx` | 338 | 6 | `IntroducerSelector` |
 | `LedgerTable.tsx` | 183 | 1 | `LedgerTable` |
 | `Loading.tsx` | 47 | 31 | `LoadingSpinner`, `LoadingOverlay` |
@@ -1546,7 +1610,7 @@
 | `MembersOnlyOverlay.tsx` | 42 | 3 | `MembersOnlyOverlay` |
 | `Modal.tsx` | 204 | 1 | `Modal` |
 | `ModuleToolbar.tsx` | 76 | 1 | `ModuleToolbar` |
-| `MultiSelectDropdown.tsx` | 204 | 5 | `MultiSelectDropdown` |
+| `MultiSelectDropdown.tsx` | 204 | 6 | `MultiSelectDropdown` |
 | `PageHeader.tsx` | 25 | 2 | `PageHeader` |
 | `PageScaffold.tsx` | 89 | 1 | `PageScaffold` |
 | `Pagination.tsx` | 201 | 5 | `Pagination` |
@@ -1579,6 +1643,6 @@
 
 ## 8. 文件債：缺少檔頭說明的檔案
 
-共 58 個。請在檔案第一行補上 `/** 一句話說明此檔案職責 */`，下次重新生成時就會自動帶入本文件。
+共 60 個。請在檔案第一行補上 `/** 一句話說明此檔案職責 */`，下次重新生成時就會自動帶入本文件。
 
-`services/auditLogService.ts`, `services/contractService.ts`, `services/dataImportExportService.ts`, `services/engagementAutoSuggestService.ts`, `services/errorLoggingService.ts`, `services/financeService.ts`, `services/flagshipProjectsService.ts`, `services/guestAnalyticsService.ts`, `services/incentiveCalculatorService.ts`, `services/inquiryService.ts`, `services/larkSyncService.ts`, `services/membershipConfigService.ts`, `services/mockData.ts`, `services/notificationService.ts`, `services/partnershipsService.ts`, `services/permissionConfigService.ts`, `services/postcodeService.ts`, `services/promotionService.ts`, `services/reportService.ts`, `services/sisterChaptersService.ts`, `services/socialPersonaService.ts`, `services/socialPostService.ts`, `services/sponsorshipService.ts`, `services/toyyibService.ts`, `services/zoomBookingService.ts`, `hooks/useActivityPlans.ts`, `hooks/useAppNavigation.ts`, `hooks/useBusinessDirectory.ts`, `hooks/useFirestoreCollection.ts`, `hooks/useGuestAnalytics.ts`, `hooks/useHobbyClubs.ts`, `hooks/useInstallPrompt.ts`, `hooks/useKnowledge.ts`, `hooks/useMemberMutations.ts`, `hooks/useMemberSearch.ts`, `hooks/useNotifications.ts`, `hooks/usePushNotifications.ts`, `hooks/useSisterChapterMembers.ts`, `hooks/useSisterChapters.ts`, `hooks/useSocialPersonas.ts`, `hooks/useSocialPosts.ts`, `hooks/useSurveys.ts`, `hooks/useToyyibMode.ts`, `hooks/useToyyibPay.ts`, `hooks/useToyyibPayment.ts`, `hooks/useZoomBookings.ts`, `utils/activityPhase.ts`, `utils/administrativeProjectsStorage.ts`, `utils/boardMembership.ts`, `utils/cardAccess.ts`, `utils/clubLink.ts`, `utils/externalAccess.ts`, `utils/financeUtils.ts`, `utils/gamificationUtils.ts`, `utils/internationalCards.ts`, `utils/memberScope.ts`, `utils/roadmapUtils.ts`, `utils/rolePermissions.ts`
+`services/auditLogService.ts`, `services/contractService.ts`, `services/dataImportExportService.ts`, `services/engagementAutoSuggestService.ts`, `services/errorLoggingService.ts`, `services/financeService.ts`, `services/flagshipProjectsService.ts`, `services/guestAnalyticsService.ts`, `services/incentiveCalculatorService.ts`, `services/inquiryService.ts`, `services/larkSyncService.ts`, `services/membershipConfigService.ts`, `services/mockData.ts`, `services/notificationService.ts`, `services/partnershipsService.ts`, `services/permissionConfigService.ts`, `services/postcodeService.ts`, `services/promotionService.ts`, `services/reportService.ts`, `services/sisterChaptersService.ts`, `services/socialPersonaService.ts`, `services/socialPostService.ts`, `services/sponsorshipService.ts`, `services/toyyibService.ts`, `services/zoomBookingService.ts`, `hooks/useActivityPlans.ts`, `hooks/useAppNavigation.ts`, `hooks/useBusinessDirectory.ts`, `hooks/useFirestoreCollection.ts`, `hooks/useGuestAnalytics.ts`, `hooks/useHobbyClubs.ts`, `hooks/useInstallPrompt.ts`, `hooks/useKnowledge.ts`, `hooks/useMemberMutations.ts`, `hooks/useMemberSearch.ts`, `hooks/useNotifications.ts`, `hooks/usePushNotifications.ts`, `hooks/useSisterChapterMembers.ts`, `hooks/useSisterChapters.ts`, `hooks/useSocialPersonas.ts`, `hooks/useSocialPosts.ts`, `hooks/useSurveys.ts`, `hooks/useToyyibMode.ts`, `hooks/useToyyibPay.ts`, `hooks/useToyyibPayment.ts`, `hooks/useZoomBookings.ts`, `utils/activityPhase.ts`, `utils/administrativeProjectsStorage.ts`, `utils/benefitEligibility.ts`, `utils/boardMembership.ts`, `utils/cardAccess.ts`, `utils/clubLink.ts`, `utils/configAccess.ts`, `utils/externalAccess.ts`, `utils/financeUtils.ts`, `utils/gamificationUtils.ts`, `utils/internationalCards.ts`, `utils/memberScope.ts`, `utils/roadmapUtils.ts`, `utils/rolePermissions.ts`
