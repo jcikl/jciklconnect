@@ -251,11 +251,11 @@ service cloud.firestore {
       allow create: if isAuthenticated() &&
                        request.resource.data.role is string &&
                        externalRoleHasChapter() &&
-                       // Only KL admins create external members (AFFILIATE / CHAPTER_ADMIN). Non-admin
-                       // creators (BOARD, self sign-up) create KL docs only: loId 'jcikl' (or absent → KL)
-                       // and no affiliation.
+                       // Only KL admins create external members (AFFILIATE / CHAPTER_ADMIN) or ADMIN /
+                       // SUPER_ADMIN docs (R-053, same guard as update). Non-admin creators (BOARD, self
+                       // sign-up) create KL docs only: loId 'jcikl' (or absent → KL) and no affiliation.
                        (isAdmin() ||
-                        (!(request.resource.data.role in ['AFFILIATE', 'CHAPTER_ADMIN']) &&
+                        (!(request.resource.data.role in ['ADMIN', 'SUPER_ADMIN', 'AFFILIATE', 'CHAPTER_ADMIN']) &&
                          request.resource.data.get('loId', klLoId()) == klLoId() &&
                          !request.resource.data.keys().hasAny(['affiliation']))) &&
                        (isBoard() ||
