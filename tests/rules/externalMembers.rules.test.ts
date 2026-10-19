@@ -535,6 +535,9 @@ describe.skipIf(!HOST)('firestore.rules — external members (emulator)', () => 
       expect(await set('aff2', 'members/aff2', optedIn)).toBe(OK);
       expect(await query('aff2', 'memberCards', [['loId', 'EQUAL', SG]])).toBe(OK);
       expect(await query('aff2', 'memberCards', [['international', 'EQUAL', true]])).toBe(OK);
+      // Phase 1 WP-7: useSisterChapterMembers lists own-chapter cards with where('loId','in',[ownLoId])
+      expect(await query('aff2', 'memberCards', [['loId', 'IN', [SG]]])).toBe(OK);
+      expect(await query('aff2', 'memberCards', [['loId', 'IN', [SG, KL]]])).toBe(DENIED);
       expect(await set('owner', 'members/aff2', MEMBERS.aff2)).toBe(OK); // restore
     });
     it('ADMIN not opted in: allowed', async () => {
