@@ -3,7 +3,7 @@ import { MemberCardsService } from '../services/memberCardsService';
 import { MembersService } from '../services/membersService';
 import { SisterChaptersService } from '../services/sisterChaptersService';
 import type { SisterChapter } from '../types/sisterChapter';
-import { attachSisterChapters, planCardQuery, type SisterChapterCard } from '../utils/internationalCards';
+import { attachSisterChapters, mergeCards, planCardQuery, type SisterChapterCard } from '../utils/internationalCards';
 import { canViewCards } from '../utils/cardAccess';
 import { useAuth } from './useAuth';
 import { usePermissions } from './usePermissions';
@@ -15,7 +15,7 @@ export type SisterChapterMember = SisterChapterCard;
 /**
  * Sister-chapter people for the international directory, read from `memberCards` (never from `members`,
  * whose list rule only allows KL docs). KL users list the active chapters' cards (all people, as before);
- * externals list only `international == true` cards (the only shape the rules allow them).
+ * externals list the `international == true` cards (incl. opted-in KL) plus their own chapter's cards.
  * Reciprocity: unless the viewer shares their own card (or is a KL admin) the cards query does NOT run
  * (`canView` false); `optIn()` turns sharing on, then loads the cards.
  * Chapters and cards fail independently (allSettled): a card failure keeps the chapter list.
@@ -47,10 +47,13 @@ export function useSisterChapterMembers() {
         setLoading(false);
         return;
       }
-      const plan = planCardQuery(isExternal, activeChapters);
+      const plan = planCardQuery(isExternal, activeChapters, member?.loId);
       const [cardsRes] = await Promise.allSettled([
         plan.kind === 'international'
-          ? MemberCardsService.getInternationalCards()
+          ? Promise.all([
+              MemberCardsService.getInternationalCards(),
+              plan.ownLoId ? MemberCardsService.getCardsByChapters([plan.ownLoId]) : Promise.resolve([]),
+            ]).then(([intl, own]) => mergeCards(intl, own))
           : MemberCardsService.getCardsByChapters(plan.loIds),
       ]);
       if (cancelled) return;
@@ -61,7 +64,7 @@ export function useSisterChapterMembers() {
     };
     load();
     return () => { cancelled = true; };
-  }, [isExternal, canView, reloadKey]);
+  }, [isExternal, canView, member?.loId, reloadKey]);
 
   /** Turn on `privacy.shareCardInternationally` through MembersService.updateMember (which also syncs the card). */
   const optIn = useCallback(async () => {
