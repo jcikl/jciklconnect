@@ -73,9 +73,9 @@
 
 | 檔案 | 行數 |
 |---|---|
-| `services/financeService.ts` | 5,320 |
+| `services/financeService.ts` | 5,325 |
 | `services/pointsService.ts` | 2,492 |
-| `services/membersService.ts` | 2,312 |
+| `services/membersService.ts` | 2,326 |
 | `hooks/useFinanceData.ts` | 2,034 |
 | `services/inventoryService.ts` | 1,638 |
 
@@ -91,13 +91,13 @@
 | `learningPathsService.ts` | 340 | 2 | Learning Paths & Learning Progress Service Fixes applied: P1 – startLearningPath uses runTransaction to prevent duplicate progress records P… | LEARNING_PATHS, LEARNING_PROGRESS |
 | `memberAuthService.ts` | 91 | 2 | 会员登录账号（Firebase Auth）的建立与补建；调用 Netlify 函数 member-auth（uid = 会员文档 ID）。 | — |
 | `memberBenefitsService.ts` | 329 | 1 | Member Benefits Service Handles the memberBenefits collection and benefitUsage write path. Read path for advertisements-as-benefits lives in… | ADVERTISEMENTS, BENEFIT_USAGE, MEMBER_BENEFITS |
-| `memberCardsService.ts` | 109 | 4 | Member Cards Service — keeps `memberCards/{memberId}` (the public directory card, Phase 0 WP2) in sync with `members`. The card is written A… | MEMBER_CARDS |
+| `memberCardsService.ts` | 109 | 7 | Member Cards Service — keeps `memberCards/{memberId}` (the public directory card, Phase 0 WP2) in sync with `members`. The card is written A… | MEMBER_CARDS |
 | `memberJourneyService.ts` | 155 | 2 | Leadership Journey + Trainer Pathway derivation (dashboard journey card for pre-2025 members) | — |
 | `memberStatsService.ts` | 319 | 2 | Member Statistics Service - Generates comprehensive member statistics and reports | — |
-| `membersService.ts` | 2,312 | 40 | Members Service - CRUD Operations | BOARD_MEMBERS, EVENT_REGISTRATIONS, MEMBERS, MEMBER_EMAILS, NOTIFICATIONS, PAYMENT_REQUESTS … |
+| `membersService.ts` | 2,326 | 40 | Members Service - CRUD Operations | BOARD_MEMBERS, EVENT_REGISTRATIONS, MEMBERS, MEMBER_EMAILS, NOTIFICATIONS, PAYMENT_REQUESTS … |
 | `membershipConfigService.ts` | 373 | 17 | ⚠️ 無說明 | SYSTEM_SETTINGS |
 | `mentorshipService.ts` | 638 | 4 | Mentorship Matching Service | MEMBERS, MENTORSHIP_FEEDBACK, MENTOR_MATCHES |
-| `promotionService.ts` | 1,187 | 4 | ⚠️ 無說明 | MANUAL_PROMOTION_REQUESTS, MEMBERS, PROMOTION_HISTORY, SYSTEM |
+| `promotionService.ts` | 1,191 | 4 | ⚠️ 無說明 | MANUAL_PROMOTION_REQUESTS, MEMBERS, PROMOTION_HISTORY, SYSTEM |
 
 <details><summary><code>services/engagementAutoSuggestService.ts</code> — 0 個方法、1 個函數/常數</summary>
 
@@ -200,20 +200,20 @@
 | `computeAttendanceMonths` | 1212 | 当年应计月份数：入会年份从入会月起算，否则从 1 月起算 |
 | `recalculateAttendance` | 1226 | 按当年 checked_in 记录重算出席对比（签到次数 vs 已过月份），写回会员档案 |
 | `updateMemberRole` | 1258 |  |
-| `assignMentor` | 1313 | Assign mentor |
-| `batchUpdateMembers` | 1336 | Batch update members — uses writeBatch for atomicity (E01) |
-| `batchDeleteMembers` | 1507 | Batch delete members — uses writeBatch for atomicity (E02) |
-| `getFirstMembershipYearKey` | 1675 | Earliest year key on member.jciCareer?.membershipDuesHistory (e.g. "2024"). |
-| `statusFromMembershipAmount` | 1688 |  |
-| `fixFirstMembershipDuesTo350` | 1706 | Set dues on each member's first membership year to RM350 and recalculate status from paid amount. SYNC-004 NOT… |
-| `getEffectiveJoinYear` | 1813 | Effective membership start year (calendar Oct rollover or first payment year). |
-| `inferMembershipType` | 1844 | Infer membershipType from role, senatorship, and membership[year].dues (Config rules). |
-| `batchSyncMembershipTypes` | 1867 | Batch-sync members.jciCareer?.membershipType from membership dues + role + Config. Does not modify members.jci… |
-| `batchSyncMembershipRecords` | 1979 | Batch-sync members.jciCareer?.membershipDuesHistory[year] from each member's membershipType + Membership Confi… |
-| `syncMembershipFromMembershipType` | 2195 |  |
-| `migrateMembershipTypeFullToOfficial` | 2202 | TEMP MIGRATION: membershipType 'Full' → 'Official' |
-| `migrateDobToGeneralDob` | 2237 | TEMP MIGRATION: copy root-level dateOfBirth/dob into general.dob for members missing it |
-| `getMembersPaginated` | 2279 | Cursor-based paginated member fetch (ordered by name). Pass `lastDoc` from the previous page's result to advan… |
+| `assignMentor` | 1327 | Assign mentor |
+| `batchUpdateMembers` | 1350 | Batch update members — uses writeBatch for atomicity (E01) |
+| `batchDeleteMembers` | 1521 | Batch delete members — uses writeBatch for atomicity (E02) |
+| `getFirstMembershipYearKey` | 1689 | Earliest year key on member.jciCareer?.membershipDuesHistory (e.g. "2024"). |
+| `statusFromMembershipAmount` | 1702 |  |
+| `fixFirstMembershipDuesTo350` | 1720 | Set dues on each member's first membership year to RM350 and recalculate status from paid amount. SYNC-004 NOT… |
+| `getEffectiveJoinYear` | 1827 | Effective membership start year (calendar Oct rollover or first payment year). |
+| `inferMembershipType` | 1858 | Infer membershipType from role, senatorship, and membership[year].dues (Config rules). |
+| `batchSyncMembershipTypes` | 1881 | Batch-sync members.jciCareer?.membershipType from membership dues + role + Config. Does not modify members.jci… |
+| `batchSyncMembershipRecords` | 1993 | Batch-sync members.jciCareer?.membershipDuesHistory[year] from each member's membershipType + Membership Confi… |
+| `syncMembershipFromMembershipType` | 2209 |  |
+| `migrateMembershipTypeFullToOfficial` | 2216 | TEMP MIGRATION: membershipType 'Full' → 'Official' |
+| `migrateDobToGeneralDob` | 2251 | TEMP MIGRATION: copy root-level dateOfBirth/dob into general.dob for members missing it |
+| `getMembersPaginated` | 2293 | Cursor-based paginated member fetch (ordered by name). Pass `lastDoc` from the previous page's result to advan… |
 
 </details>
 
@@ -248,24 +248,24 @@
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `getPromotionProgress` | 339 | Get promotion progress for a Probation Member |
-| `getPromotionProgressForMember` | 345 |  |
-| `buildEngagementProgress` | 354 |  |
-| `saveEngagementRequirement` | 386 |  |
-| `checkAllRequirements` | 426 | Check all four promotion requirements for a member |
-| `checkRequirement` | 434 | Check a specific requirement for a member |
-| `processAutomaticPromotions` | 449 | Process automatic promotion for eligible members |
-| `promoteToOfficialMember` | 480 | Promote a Probation Member to Full Member |
-| `createManualPromotionRequest` | 607 | Create manual promotion request |
-| `updateMemberActivity` | 697 | Update member activity that might affect promotion requirements |
-| `getPromotionStatistics` | 724 | Get promotion statistics |
-| `getPromotionTrackingOverview` | 735 |  |
-| `getProbationMembersForDisplay` | 835 | Public API for UI: probation members with computed membership type |
-| `savePromotionProgressField` | 893 | Save a single promotion progress field for a member |
-| `getManualPromotionRequests` | 963 | List manual promotion requests, optionally filtered by status. |
-| `backfillOfficialMembershipType` | 982 | Backfill: sync jciCareer.membershipType for all members where root membershipType === 'Official' but jciCareer… |
-| `approveManualPromotionRequest` | 1011 | Approve a manual promotion request and trigger the actual promotion. |
-| `rejectManualPromotionRequest` | 1041 | Reject a manual promotion request with a reason. |
+| `getPromotionProgress` | 340 | Get promotion progress for a Probation Member |
+| `getPromotionProgressForMember` | 346 |  |
+| `buildEngagementProgress` | 355 |  |
+| `saveEngagementRequirement` | 387 |  |
+| `checkAllRequirements` | 427 | Check all four promotion requirements for a member |
+| `checkRequirement` | 435 | Check a specific requirement for a member |
+| `processAutomaticPromotions` | 450 | Process automatic promotion for eligible members |
+| `promoteToOfficialMember` | 481 | Promote a Probation Member to Full Member |
+| `createManualPromotionRequest` | 611 | Create manual promotion request |
+| `updateMemberActivity` | 701 | Update member activity that might affect promotion requirements |
+| `getPromotionStatistics` | 728 | Get promotion statistics |
+| `getPromotionTrackingOverview` | 739 |  |
+| `getProbationMembersForDisplay` | 839 | Public API for UI: probation members with computed membership type |
+| `savePromotionProgressField` | 897 | Save a single promotion progress field for a member |
+| `getManualPromotionRequests` | 967 | List manual promotion requests, optionally filtered by status. |
+| `backfillOfficialMembershipType` | 986 | Backfill: sync jciCareer.membershipType for all members where root membershipType === 'Official' but jciCareer… |
+| `approveManualPromotionRequest` | 1015 | Approve a manual promotion request and trigger the actual promotion. |
+| `rejectManualPromotionRequest` | 1045 | Reject a manual promotion request with a reason. |
 
 </details>
 
@@ -275,7 +275,7 @@
 |---|---|---|---|---|
 | `eventBudgetService.ts` | 306 | 3 | Event Budget Management Service | EVENT_BUDGETS |
 | `eventPaymentMatchingService.ts` | 310 | 1 | EventPaymentMatchingService Matches event registration income transactions (Pending) to imported bank transactions. Three matching paths: A … | TRANSACTIONS |
-| `financeService.ts` | 5,320 | 32 | ⚠️ 無說明 | BANK_ACCOUNTS, FINANCE_ALERTS, FINANCE_META, MEMBERS, PAYMENT_REQUESTS, PROJECT_TRANSACTIONS … |
+| `financeService.ts` | 5,325 | 32 | ⚠️ 無說明 | BANK_ACCOUNTS, FINANCE_ALERTS, FINANCE_META, MEMBERS, PAYMENT_REQUESTS, PROJECT_TRANSACTIONS … |
 | `incentiveCalculatorService.ts` | 385 | 1 | ⚠️ 無說明 | BANK_ACCOUNTS, EVENTS, EVENT_REGISTRATIONS, INCENTIVE_SUBMISSIONS, MEMBERS, PROJECTS … |
 | `paymentRequestService.ts` | 999 | 4 | Payment Request Service (Story 2.1) | BANK_ACCOUNTS, COUNTERS, NOTIFICATIONS, PAYMENT_REQUESTS, TRANSACTIONS |
 | `projectAccountsService.ts` | 236 | 0 | Project Financial Accounts Service | PROJECTS |
@@ -314,68 +314,68 @@
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `getAllTransactions` | 169 | Get all transactions |
-| `getHistoricalNetFlowBeforeYear` | 230 | Get cumulative net flow of bank accounts before a specific year |
-| `getTransactionYearsForAccount` | 299 | Get all transaction years for a specific bank account |
-| `getAllTransactionYears` | 342 | Get all unique transaction years across all accounts |
-| `getProjectTransactions` | 389 | Get project transactions |
-| `getBankTransactionsByProject` | 435 | Get bank transactions associated with a project (from transactions collection) |
-| `createTransaction` | 552 | Create transaction |
-| `batchCreateBankTransactions` | 662 | Batch-optimised path for bank statement imports. Replaces N individual createTransaction calls (N reads + N co… |
-| `createProjectTransaction` | 760 | Create project transaction ATOMIC-001: accepts an optional externalBatch so callers can keep multi-document op… |
-| `updateProjectTransaction` | 823 | Update project transaction |
-| `createTransactionSplit` | 861 | Create transaction split (upsert: update existing or create new) |
-| `getTransactionSplits` | 1168 | Get transaction splits |
-| `getAllTransactionSplits` | 1192 | Get ALL transaction splits in bulk |
-| `updateTransactionSplit` | 1234 | Update transaction split |
-| `deleteTransactionSplit` | 1354 | Delete transaction split |
-| `getTransactionsByType` | 1470 | Get transactions by type (including splits) Uses cached getAllTransactions + getAllTransactionSplits to avoid … |
-| `updateTransaction` | 1501 | Update transaction Accepts Partial<Transaction> for typed fields, or a string-keyed map for Firestore dot-nota… |
-| `batchUpdateTransactionCategory` | 1697 | Batch update Transaction Category fields for multiple transactions |
-| `batchUpdateSplitCategory` | 1868 | Batch update Transaction Category fields for multiple split records |
-| `getTransactionById` | 2039 | Get transaction by ID from either TRANSACTIONS or PROJECT_TRANSACTIONS |
-| `deleteTransaction` | 2074 | Delete transaction |
-| `reverseTransaction` | 2204 | Reverse a transaction by creating a counter-entry and voiding the original |
-| `deleteProjectTransaction` | 2276 | Delete project transaction |
-| `syncTransactionWithInventory` | 2441 | Synchronize transaction with inventory |
-| `syncMemberMembership` | 2486 | Synchronize member membership summary based on transactions |
-| `getAllBankAccounts` | 2775 | P0-fix: added `loId` parameter. When provided (non-admin callers) the query is scoped to that LO's accounts. W… |
-| `recalculateAllBankAccountBalances` | 2841 | Recalculate currentBalance for all bank accounts from transaction history |
-| `createBankAccount` | 2869 | Create bank account |
-| `updateBankAccount` | 2912 | Update bank account |
-| `deleteBankAccount` | 2941 | Delete bank account — guarded: refuses if linked transactions, reconciliation records, or payment requests exi… |
-| `getTransactionsByCategory` | 2979 | Get transactions by category |
-| `getFinancialSummary` | 3005 | Get financial summary |
-| `initiateDuesRenewal` | 3101 | Automated dues renewal with membership type support Handles membership types: Probation (RM300), Official (RM3… |
-| `sendDuesReminders` | 3300 | Send reminder notifications for overdue dues (excludes senators) |
-| `getDuesRenewalStatus` | 3368 | Get dues renewal status for a specific year |
-| `getMembersDuesList` | 3462 | Get members sorted by dues year and membership type |
-| `processDuesPayment` | 3579 | Process dues payment and update member status |
-| `calculateSystemBalance` | 3651 | Calculate system balance for reconciliation (includes all transaction types) |
-| `detectDiscrepancies` | 3740 | Detect reconciliation discrepancies |
-| `reconcileBankAccount` | 3810 | Reconcile bank account with enhanced transaction type support |
-| `getReconciliationHistory` | 4000 | Get reconciliation history |
-| `deleteReconciliation` | 4026 |  |
-| `getUnmatchedForReconciliation` | 4143 | Get unmatched transactions for reconciliation matching UI Returns bank_import and manual transactions separate… |
-| `matchTransactions` | 4171 | Link a bank import transaction to a manually-entered transaction Sets matchStatus:'full' on the bank import an… |
-| `unmatchTransactions` | 4222 | Unmatch a previously matched pair — restores each side to the status it had before matching (tracked via prevS… |
-| `getBankAccountById` | 4265 | Get bank account by ID with dynamic balance |
-| `generateFinancialReport` | 4307 | Generate financial reports |
-| `exportFinancialReportAsCSV` | 4426 | Export financial report as CSV |
-| `exportTransactionsAsCSV` | 4490 | Export detailed transaction list as CSV |
-| `generateIncomeStatement` | 4532 | Generate comprehensive Income Statement (P&L Statement) |
-| `generateBalanceSheet` | 4634 | Generate comprehensive Balance Sheet |
-| `generateCashFlowStatement` | 4802 | Generate comprehensive Cash Flow Statement |
-| `generateIncomeDetailsStatement` | 4955 | Generate Income Details Statement (detailed breakdown of income sources) |
-| `getTransactionsPaginated` | 5035 | Cursor-based paginated transaction fetch (ordered by date desc). Pass `lastDoc` from the previous page's resul… |
-| `getFinanceAlerts` | 5078 | ── Finance Alerts ──────────────────────────────────────────────────────── |
-| `resolveFinanceAlert` | 5115 |  |
-| `voidTransaction` | 5138 | ── Void Transaction ────────────────────────────────────────────────────── |
-| `getReclassificationGroups` | 5206 | Returns distinct (loId, category, projectId, unmatchedProjectTitle) combos across all transactions, ordered by… |
-| `batchReclassifyTransactions` | 5241 | Batch-updates all transactions matching each rule's (loId, category, projectId, unmatchedProjectTitle) with th… |
-| `backfillMissingLoId` | 5293 | Backfills loId = DEFAULT_LO_ID on all transactions where loId is missing or null. |
+| `getAllTransactions` | 170 | Get all transactions |
+| `getHistoricalNetFlowBeforeYear` | 231 | Get cumulative net flow of bank accounts before a specific year |
+| `getTransactionYearsForAccount` | 300 | Get all transaction years for a specific bank account |
+| `getAllTransactionYears` | 343 | Get all unique transaction years across all accounts |
+| `getProjectTransactions` | 390 | Get project transactions |
+| `getBankTransactionsByProject` | 436 | Get bank transactions associated with a project (from transactions collection) |
+| `createTransaction` | 553 | Create transaction |
+| `batchCreateBankTransactions` | 663 | Batch-optimised path for bank statement imports. Replaces N individual createTransaction calls (N reads + N co… |
+| `createProjectTransaction` | 761 | Create project transaction ATOMIC-001: accepts an optional externalBatch so callers can keep multi-document op… |
+| `updateProjectTransaction` | 824 | Update project transaction |
+| `createTransactionSplit` | 862 | Create transaction split (upsert: update existing or create new) |
+| `getTransactionSplits` | 1169 | Get transaction splits |
+| `getAllTransactionSplits` | 1193 | Get ALL transaction splits in bulk |
+| `updateTransactionSplit` | 1235 | Update transaction split |
+| `deleteTransactionSplit` | 1355 | Delete transaction split |
+| `getTransactionsByType` | 1471 | Get transactions by type (including splits) Uses cached getAllTransactions + getAllTransactionSplits to avoid … |
+| `updateTransaction` | 1502 | Update transaction Accepts Partial<Transaction> for typed fields, or a string-keyed map for Firestore dot-nota… |
+| `batchUpdateTransactionCategory` | 1698 | Batch update Transaction Category fields for multiple transactions |
+| `batchUpdateSplitCategory` | 1869 | Batch update Transaction Category fields for multiple split records |
+| `getTransactionById` | 2040 | Get transaction by ID from either TRANSACTIONS or PROJECT_TRANSACTIONS |
+| `deleteTransaction` | 2075 | Delete transaction |
+| `reverseTransaction` | 2205 | Reverse a transaction by creating a counter-entry and voiding the original |
+| `deleteProjectTransaction` | 2277 | Delete project transaction |
+| `syncTransactionWithInventory` | 2442 | Synchronize transaction with inventory |
+| `syncMemberMembership` | 2487 | Synchronize member membership summary based on transactions |
+| `getAllBankAccounts` | 2780 | P0-fix: added `loId` parameter. When provided (non-admin callers) the query is scoped to that LO's accounts. W… |
+| `recalculateAllBankAccountBalances` | 2846 | Recalculate currentBalance for all bank accounts from transaction history |
+| `createBankAccount` | 2874 | Create bank account |
+| `updateBankAccount` | 2917 | Update bank account |
+| `deleteBankAccount` | 2946 | Delete bank account — guarded: refuses if linked transactions, reconciliation records, or payment requests exi… |
+| `getTransactionsByCategory` | 2984 | Get transactions by category |
+| `getFinancialSummary` | 3010 | Get financial summary |
+| `initiateDuesRenewal` | 3106 | Automated dues renewal with membership type support Handles membership types: Probation (RM300), Official (RM3… |
+| `sendDuesReminders` | 3305 | Send reminder notifications for overdue dues (excludes senators) |
+| `getDuesRenewalStatus` | 3373 | Get dues renewal status for a specific year |
+| `getMembersDuesList` | 3467 | Get members sorted by dues year and membership type |
+| `processDuesPayment` | 3584 | Process dues payment and update member status |
+| `calculateSystemBalance` | 3656 | Calculate system balance for reconciliation (includes all transaction types) |
+| `detectDiscrepancies` | 3745 | Detect reconciliation discrepancies |
+| `reconcileBankAccount` | 3815 | Reconcile bank account with enhanced transaction type support |
+| `getReconciliationHistory` | 4005 | Get reconciliation history |
+| `deleteReconciliation` | 4031 |  |
+| `getUnmatchedForReconciliation` | 4148 | Get unmatched transactions for reconciliation matching UI Returns bank_import and manual transactions separate… |
+| `matchTransactions` | 4176 | Link a bank import transaction to a manually-entered transaction Sets matchStatus:'full' on the bank import an… |
+| `unmatchTransactions` | 4227 | Unmatch a previously matched pair — restores each side to the status it had before matching (tracked via prevS… |
+| `getBankAccountById` | 4270 | Get bank account by ID with dynamic balance |
+| `generateFinancialReport` | 4312 | Generate financial reports |
+| `exportFinancialReportAsCSV` | 4431 | Export financial report as CSV |
+| `exportTransactionsAsCSV` | 4495 | Export detailed transaction list as CSV |
+| `generateIncomeStatement` | 4537 | Generate comprehensive Income Statement (P&L Statement) |
+| `generateBalanceSheet` | 4639 | Generate comprehensive Balance Sheet |
+| `generateCashFlowStatement` | 4807 | Generate comprehensive Cash Flow Statement |
+| `generateIncomeDetailsStatement` | 4960 | Generate Income Details Statement (detailed breakdown of income sources) |
+| `getTransactionsPaginated` | 5040 | Cursor-based paginated transaction fetch (ordered by date desc). Pass `lastDoc` from the previous page's resul… |
+| `getFinanceAlerts` | 5083 | ── Finance Alerts ──────────────────────────────────────────────────────── |
+| `resolveFinanceAlert` | 5120 |  |
+| `voidTransaction` | 5143 | ── Void Transaction ────────────────────────────────────────────────────── |
+| `getReclassificationGroups` | 5211 | Returns distinct (loId, category, projectId, unmatchedProjectTitle) combos across all transactions, ordered by… |
+| `batchReclassifyTransactions` | 5246 | Batch-updates all transactions matching each rule's (loId, category, projectId, unmatchedProjectTitle) with th… |
+| `backfillMissingLoId` | 5298 | Backfills loId = DEFAULT_LO_ID on all transactions where loId is missing or null. |
 
-**其他 export：** `invalidateFinanceCache` (L114)
+**其他 export：** `invalidateFinanceCache` (L115)
 
 </details>
 
@@ -1122,7 +1122,7 @@
 | `aiPredictionService.ts` | 949 | 3 | AI Prediction Service - Advanced AI predictions for events, projects, and sponsors | — |
 | `cacheService.ts` | 314 | 33 | 缓存服务 - 提供内存缓存和本地存储缓存功能 Cache Service - Provides in-memory and localStorage caching capabilities | — |
 | `cloudinaryService.ts` | 337 | 14 | Cloudinary Upload Service | — |
-| `dataImportExportService.ts` | 892 | 3 | ⚠️ 無說明 | EVENTS, MEMBERS, MEMBER_EMAILS |
+| `dataImportExportService.ts` | 913 | 3 | ⚠️ 無說明 | EVENTS, MEMBERS, MEMBER_EMAILS |
 | `errorLoggingService.ts` | 354 | 67 | ⚠️ 無說明 | ERROR_LOGS |
 | `firestoreLogger.ts` | 197 | 3 | System Logger — Firestore ops + Performance monitoring Fire-and-forget buffered logger. Buffers events for 3 seconds then writes one batched… | SYSTEM_LOGS |
 | `inventoryService.ts` | 1,638 | 3 | Inventory Service - CRUD Operations | INVENTORY, INVENTORY_ALERTS, MAINTENANCE_SCHEDULES, STOCK_MOVEMENTS, TRANSACTIONS |
@@ -1160,14 +1160,14 @@
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `parseFile` | 66 | Parse uploaded file and extract data |
-| `parseCSVContent` | 133 | Parse CSV content string |
-| `validateData` | 155 | Validate imported data |
-| `importData` | 329 | Import data after validation |
-| `exportToCSV` | 586 | Export data to CSV format |
-| `exportToJSON` | 619 | Export data to JSON (Story 6.1 â€“ ä¸»æ¡£å¯¼å‡ºçº¦å®šæ ¼å¼) |
-| `exportToExcel` | 640 | Export data to Excel format |
-| `generateImportTemplate` | 682 | Generate import template |
+| `parseFile` | 67 | Parse uploaded file and extract data |
+| `parseCSVContent` | 134 | Parse CSV content string |
+| `validateData` | 156 | Validate imported data |
+| `importData` | 330 | Import data after validation |
+| `exportToCSV` | 607 | Export data to CSV format |
+| `exportToJSON` | 640 | Export data to JSON (Story 6.1 â€“ ä¸»æ¡£å¯¼å‡ºçº¦å®šæ ¼å¼) |
+| `exportToExcel` | 661 | Export data to Excel format |
+| `generateImportTemplate` | 703 | Generate import template |
 
 </details>
 

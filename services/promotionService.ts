@@ -14,6 +14,7 @@ import {
   MembershipType
 } from '../types';
 import { MembersService } from './membersService';
+import { MemberCardsService } from './memberCardsService';
 import {
   MembershipConfigService,
   computeMembershipTypeFromMember,
@@ -568,6 +569,9 @@ export class PromotionService {
     }
 
     await batch.commit();
+
+    // memberCards: member doc is committed; the promoted member now qualifies for a card (non-fatal)
+    await MemberCardsService.syncCards([{ memberId, before: member, after: { ...member, role: UserRole.MEMBER } }]);
 
     // Fix 4: invalidate members cache after promotion write
     MembersService.invalidateMembersCache();

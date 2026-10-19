@@ -64,6 +64,17 @@ describe('buildMemberCard', () => {
   });
 });
 
+describe('country (L5)', () => {
+  it("is 'Malaysia' only for KL (loId jcikl or missing)", () => {
+    expect(buildMemberCard({ role: 'MEMBER', loId: 'jcikl', general: { name: 'A' } }, NOW).country).toBe('Malaysia');
+    expect(buildMemberCard({ role: 'MEMBER', general: { name: 'A' } }, NOW).country).toBe('Malaysia');
+  });
+  it('is omitted for another chapter unless affiliation.country exists', () => {
+    expect('country' in buildMemberCard({ role: 'MEMBER', loId: 'jcicitysg', general: { name: 'A' } }, NOW)).toBe(false);
+    expect(buildMemberCard({ role: 'MEMBER', loId: 'jcicitysg', general: { name: 'A' }, affiliation: { country: 'Singapore' } }, NOW).country).toBe('Singapore');
+  });
+});
+
 describe('shouldHaveCard / planCardSync', () => {
   const ext = (status: string) => ({ role: 'AFFILIATE', loId: 'jcicitysg', general: { name: 'E' }, affiliation: { status, country: 'SG' } });
 

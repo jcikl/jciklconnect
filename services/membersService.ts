@@ -1278,7 +1278,21 @@ export class MembersService {
       );
       const roleMemberSnap = await getDoc(doc(db, COLLECTIONS.MEMBERS, memberId));
       const roleBatch = writeBatch(db);
+      // External roles are never board members: clear the board flags in the same write (they would
+      // otherwise keep isBoard()-style access flags from a previous KL board term).
+      const clearBoardFlags: Record<string, unknown> = (newRole === UserRole.AFFILIATE || newRole === UserRole.CHAPTER_ADMIN)
+        ? {
+            isCurrentBoardMember: false,
+            isCurrentCommissionDirector: false,
+            currentBoardYear: deleteField(),
+            currentBoardPosition: deleteField(),
+            'jciCareer.isCurrentBoardMember': false,
+            'jciCareer.currentBoardYear': deleteField(),
+            'jciCareer.currentBoardPosition': deleteField(),
+          }
+        : {};
       roleBatch.update(doc(db, COLLECTIONS.MEMBERS, memberId), {
+        ...clearBoardFlags,
         role: newRole,
         updatedAt: Timestamp.now(),
         roleChangedBy: auth?.currentUser?.uid ?? null,

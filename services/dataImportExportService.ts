@@ -1,9 +1,9 @@
 ﻿// Data Import/Export Service
 import Papa from 'papaparse';
-import { collection, doc, writeBatch, Timestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, writeBatch, Timestamp } from 'firebase/firestore';
 import { isDevMode } from '../utils/devMode';
 import { db, auth } from '../config/firebase';
-import { COLLECTIONS } from '../config/constants';
+import { COLLECTIONS, DEFAULT_LO_ID } from '../config/constants';
 // xlsx is dynamically imported inside importFromFile() and exportToExcel() to avoid eager loading
 import {
   DataImportResult,
@@ -21,6 +21,7 @@ import {
   Transaction
 } from '../types';
 import { MembersService } from './membersService';
+import { MemberCardsService, type CardSyncInput } from './memberCardsService';
 import { isMalaysianIC, getBirthPlaceFromIC, getDateOfBirthFromIC, getGenderFromIC } from '../utils/malaysianIdUtils';
 import { EventsService } from './eventsService';
 
@@ -488,9 +489,16 @@ export class DataImportExportService {
       return collectionName;
     };
 
+    // memberCards: card ops are queued per batch and applied only once that batch has committed.
+    const isMemberImport = entityType === 'members' || entityType === COLLECTIONS.MEMBERS;
+    let pendingCardOps: CardSyncInput[] = [];
+    const committedCardOps: CardSyncInput[] = [];
+
     const flushBatch = async () => {
       if (opsInCurrentBatch > 0) {
         await currentBatch.commit();
+        committedCardOps.push(...pendingCardOps);
+        pendingCardOps = [];
         committedBatches++;
         currentBatch = writeBatch(db);
         opsInCurrentBatch = 0;
@@ -511,14 +519,25 @@ export class DataImportExportService {
         if (existingId) {
           // Fix 14 (P1): stamp updatedAt on every imported update
           normalizedRow.updatedAt = Timestamp.now();
+          if (isMemberImport) {
+            // the import can change role / privacy / card fields: read the current doc to plan the card
+            const beforeSnap = await getDoc(doc(db, colName, existingId));
+            if (beforeSnap.exists()) {
+              const before = { ...beforeSnap.data(), id: existingId } as CardSyncInput['after'];
+              pendingCardOps.push({ memberId: existingId, before, after: MemberCardsService.applyUpdates(before, normalizedRow) });
+            }
+          }
           currentBatch.update(doc(db, colName, existingId), normalizedRow);
           summary.updated++;
         } else {
           // Fix 14 (P1): stamp createdAt + updatedAt on every new imported document
           normalizedRow.createdAt = Timestamp.now();
           normalizedRow.updatedAt = Timestamp.now();
+          // KL list queries filter loId == 'jcikl': a member without loId would be invisible.
+          if (isMemberImport && (normalizedRow.loId == null || normalizedRow.loId === '')) normalizedRow.loId = DEFAULT_LO_ID;
           const newDocRef = doc(collection(db, colName));
           currentBatch.set(newDocRef, normalizedRow);
+          if (isMemberImport) pendingCardOps.push({ memberId: newDocRef.id, before: null, after: { ...normalizedRow, id: newDocRef.id } as CardSyncInput['after'] });
           // P2 Fix: Write a memberEmails dedup slot atomically with each new member so that
           // bulk-imported members participate in the same email-uniqueness guarantee as
           // members created via MembersService.createMember().
@@ -557,6 +576,8 @@ export class DataImportExportService {
       // Previously the invalidation was skipped on batch failure, leaving stale cache behind.
       if (entityType === 'members' || entityType === COLLECTIONS.MEMBERS) {
         await MembersService.invalidateMembersCache();
+        // memberCards for rows whose batch committed (non-fatal; also runs after a partial import)
+        await MemberCardsService.syncCards(committedCardOps);
       }
     }
 
