@@ -133,6 +133,7 @@ const card = (memberId: string, international: boolean, extra: Doc = {}): Doc =>
 });
 
 const OTHER_DOCS: Array<[string, Doc]> = [
+  ['members/klLegacy', { role: 'MEMBER', general: { name: 'Legacy member without loId' } }],
   ['memberCards/klMember', card('klMember', false)],
   ['memberCards/klOptIn', card('klOptIn', true)],
   ['memberCards/aff2', card('aff2', false)],
@@ -295,9 +296,34 @@ describe.skipIf(!HOST)('firestore.rules — external members (emulator)', () => 
   });
 
   describe('KL members: behaviour unchanged', () => {
-    it('MEMBER can still read and list member docs', async () => {
+    it('MEMBER can still read KL member docs; lists need the loId == jcikl filter', async () => {
       expect(await getDoc('klMember', 'members/klBoard')).toBe(OK);
-      expect(await query('klMember', 'members')).toBe(OK);
+      expect(await getDoc('klMember', 'members/klLegacy')).toBe(OK); // no loId field → treated as KL
+      expect(await query('klMember', 'members', [['loId', 'EQUAL', KL]])).toBe(OK);
+      expect(await query('klMember', 'members', [['loId', 'EQUAL', KL], ['role', 'EQUAL', 'MEMBER']])).toBe(OK);
+      expect(await query('klMember', 'members')).toBe(DENIED);
+    });
+  });
+
+  describe('KL non-admins vs external members (decision 3)', () => {
+    it('MEMBER cannot get or list an affiliate doc', async () => {
+      expect(await getDoc('klMember', 'members/aff1')).toBe(DENIED);
+      expect(await getDoc('klMember', 'members/chAdmin')).toBe(DENIED);
+      expect(await query('klMember', 'members', [['loId', 'EQUAL', SG]])).toBe(DENIED);
+      expect(await query('klMember', 'members', [['role', 'EQUAL', 'AFFILIATE']])).toBe(DENIED);
+    });
+    it('BOARD cannot get an affiliate doc or list unfiltered', async () => {
+      expect(await getDoc('klBoard', 'members/aff1')).toBe(DENIED);
+      expect(await query('klBoard', 'members')).toBe(DENIED);
+      expect(await query('klBoard', 'members', [['loId', 'EQUAL', KL]])).toBe(OK);
+    });
+    it('a CHAPTER_ADMIN-role doc inside KL is hidden from non-admin get', async () => {
+      expect(await getDoc('klMember', 'members/chAdminKl')).toBe(DENIED);
+    });
+    it('ADMIN can read affiliate docs and list unfiltered', async () => {
+      expect(await getDoc('klAdmin', 'members/aff1')).toBe(OK);
+      expect(await query('klAdmin', 'members')).toBe(OK);
+      expect(await query('klAdmin', 'members', [['loId', 'EQUAL', SG]])).toBe(OK);
     });
     it('MEMBER can read all member cards and other modules', async () => {
       expect(await query('klMember', 'memberCards')).toBe(OK);

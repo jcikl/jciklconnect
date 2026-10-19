@@ -163,6 +163,12 @@ service cloud.firestore {
 
     // CHAPTER_ADMIN may read full member docs of their own chapter only. Written against
     // resource.data.loId (no .get) so list queries constrained with where('loId','==',myLoId) are provable.
+    // A KL member doc for non-admin KL readers (get only): loId 'jcikl' or missing, and not an external role.
+    function isKlMemberDoc(data) {
+      return data.get('loId', klLoId()) == klLoId() &&
+             !(data.get('role', '') in ['AFFILIATE', 'CHAPTER_ADMIN']);
+    }
+
     function chapterAdminCanRead() {
       return isActiveChapterAdmin() && resource.data.loId == getMyLoId();
     }
@@ -178,21 +184,27 @@ service cloud.firestore {
       // Public business profiles are served from the businessDirectory subcollection — not here.
       // External users (AFFILIATE / CHAPTER_ADMIN): own doc only (by uid, not by email match);
       // an active CHAPTER_ADMIN additionally reads docs of their own chapter (chapterAdminCanRead).
-      allow get, read: if isAuthenticated() && (
+      // Non-admin KL readers (isActiveMember / canReadOrgMembers): KL docs only — a doc without loId
+      // counts as KL; external members' full docs are admin-only (others use memberCards).
+      allow get: if isAuthenticated() && (
         request.auth.uid == memberId ||
         (!isExternal() && resource != null && resource.data.get('email', '') == request.auth.token.get('email', '')) ||
-        isActiveMember() ||
-        canReadOrgMembers() ||
+        isAdmin() ||
+        ((isActiveMember() || canReadOrgMembers()) && isKlMemberDoc(resource.data)) ||
         chapterAdminCanRead()
       );
 
       // Allow listing for email search during linking only (business directory uses businessDirectory subcollection)
       // SEC: exclude GUEST — isMember() includes GUEST, which would let any self-registered
       // GUEST dump the full member roster (NRIC, DOB, phone). Use isActiveMember() instead.
-      // TODO: loId filter — resource.data is null in list queries so per-doc loId check is not viable here; enforce at service layer
+      // Non-admin KL readers: the query itself must carry where('loId', '==', 'jcikl') (Firestore proves
+      // the condition from the query's filters). Docs without a loId field are then not returned
+      // to non-admins; admins list everything unfiltered.
       allow list: if isAuthenticated() && (
-        isActiveMember() ||
-        canReadOrgMembers() ||
+        isAdmin() ||
+        ((isActiveMember() || canReadOrgMembers()) && resource.data.loId == klLoId()) ||
+        // Own-email lookup (account linking), kept from the former `allow get, read` rule.
+        (!isExternal() && resource.data.email == request.auth.token.email) ||
         (request.query.filters.get('email', []) == [request.auth.token.get('email', '')]) ||
         (request.query.filters.email == [request.auth.token.get('email', '')]) ||
         // CHAPTER_ADMIN: the query itself must carry where('loId', '==', <own chapter id>).
