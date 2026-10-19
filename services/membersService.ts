@@ -45,6 +45,7 @@ import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 import { MOCK_MEMBERS } from './mockData';
 import { AuditLogService } from './auditLogService';
 import { LarkSyncService } from './larkSyncService';
+import { MemberCardsService } from './memberCardsService';
 
 const CACHE_KEY_ALL_MEMBERS = 'members:all';
 const CACHE_KEY_LO = (loId: string) => `members:lo:${loId}`;
@@ -615,6 +616,8 @@ export class MembersService {
         }
         txn.set(emailSlotRef, { email: memberData.contact?.email, memberId: memberRef.id, createdAt: Timestamp.now() });
         txn.set(memberRef, normalizedData);
+        // memberCards: card is created in the same transaction (rules validate it via getAfter on the member doc)
+        MemberCardsService.addToTransaction(txn, memberRef.id, { ...normalizedData, id: memberRef.id } as Member);
       });
       const docRef = memberRef;
       logWrite(CACHE_KEY_ALL_MEMBERS, 'membersService.createMember');
@@ -760,11 +763,15 @@ export class MembersService {
       // FIX: When email is changing, update memberEmails uniqueness slots atomically in the
       // same writeBatch as the member document update — no window where the old slot is freed
       // and the new slot is unclaimed (or vice-versa).
+      // memberCards: member doc after this update, so the card can be rebuilt/deleted in the same batch.
+      const afterMember = MemberCardsService.applyUpdates(currentData, normalizedUpdates) as Member;
+
       if (emailChanging && newEmail && currentEmail) {
         const sanitizedOld = currentEmail.toLowerCase().replace(/[^a-z0-9@.]/g, '_');
         const sanitizedNew = newEmail.toLowerCase().replace(/[^a-z0-9@.]/g, '_');
         const emailBatch = writeBatch(db);
         emailBatch.update(memberRef, normalizedUpdates);
+        MemberCardsService.addToBatch(emailBatch, memberId, currentData, afterMember);
         emailBatch.delete(doc(db, COLLECTIONS.MEMBER_EMAILS, sanitizedOld));
         emailBatch.set(doc(db, COLLECTIONS.MEMBER_EMAILS, sanitizedNew), {
           email: newEmail,
@@ -773,7 +780,10 @@ export class MembersService {
         });
         await emailBatch.commit();
       } else {
-        await updateDoc(memberRef, normalizedUpdates);
+        const updateBatch = writeBatch(db);
+        updateBatch.update(memberRef, normalizedUpdates);
+        MemberCardsService.addToBatch(updateBatch, memberId, currentData, afterMember);
+        await updateBatch.commit();
       }
       const _frames = (new Error().stack ?? '').split('\n').slice(2);
       const _named = _frames
@@ -1059,6 +1069,7 @@ export class MembersService {
       }
       boardSnap.docs.forEach(d => primaryBatch.delete(d.ref));
       bizSnap.docs.forEach(d => primaryBatch.delete(d.ref));
+      MemberCardsService.deleteInBatch(primaryBatch, memberId); // soft-deleted -> INACTIVE: no public card
       await this.commitWithRetry(primaryBatch);
 
       // Cascade batch: soft-cancel eventRegistrations + paymentRequests, delete notifications (P1 fix).
@@ -1264,7 +1275,14 @@ export class MembersService {
       const boardSnap = await getDocs(
         query(collection(db, COLLECTIONS.BOARD_MEMBERS), where('memberId', '==', memberId))
       );
+      const roleMemberRef = doc(db, COLLECTIONS.MEMBERS, memberId);
+      const roleMemberSnap = await getDoc(roleMemberRef);
       const roleBatch = writeBatch(db);
+      // memberCards: role decides whether the card exists (MEMBER+ yes; GUEST/INACTIVE no)
+      if (roleMemberSnap.exists()) {
+        const beforeRole = { ...roleMemberSnap.data(), id: memberId } as Member;
+        MemberCardsService.addToBatch(roleBatch, memberId, beforeRole, { ...beforeRole, role: newRole });
+      }
       roleBatch.update(doc(db, COLLECTIONS.MEMBERS, memberId), {
         role: newRole,
         updatedAt: Timestamp.now(),
@@ -1414,10 +1432,10 @@ export class MembersService {
         });
       }
 
-      // Firestore writeBatch limit is 500; flush every 400 to stay safe
-      for (let i = 0; i < memberIds.length; i += 400) {
+      // Firestore writeBatch limit is 500; each member may add a memberCards op, so flush every 200 members
+      for (let i = 0; i < memberIds.length; i += 200) {
         const batch = writeBatch(db);
-        memberIds.slice(i, i + 400).forEach(id => {
+        memberIds.slice(i, i + 200).forEach(id => {
           const existing = existingByIds.get(id) ?? null;
 
           // Senatorship lock guard: strip protected fields for board-validated members (mirrors updateMember)
@@ -1439,7 +1457,10 @@ export class MembersService {
           const typePatch = membershipTypePatchMap.get(id) ?? {};
           // Merge GUEST→MEMBER membership initialization patch (variant symmetry fix)
           const membershipInitPatch = membershipInitPatchMap.get(id) ?? {};
-          batch.update(doc(db, COLLECTIONS.MEMBERS, id), { ...perMemberNormalized, ...typePatch, ...membershipInitPatch, updatedAt: now });
+          const memberPatch = { ...perMemberNormalized, ...typePatch, ...membershipInitPatch, updatedAt: now };
+          batch.update(doc(db, COLLECTIONS.MEMBERS, id), memberPatch);
+          // memberCards: same batch, same rules as updateMember
+          if (existing) MemberCardsService.addToBatch(batch, id, existing, MemberCardsService.applyUpdates(existing, memberPatch) as Member);
         });
         await this.commitWithRetry(batch);
       }
@@ -1527,12 +1548,14 @@ export class MembersService {
       // Build all write ops (soft-deletes + menteeIds cleanup) into a single list so they
       // are committed in the same batch chunks — if any chunk fails the retry covers both
       // sides together, preventing members from being deleted while their mentors still list them.
-      type UpdateOp = { id: string; data: Record<string, unknown> };
+      // `deleteCard` ops remove memberCards/{id} (soft-deleted members are INACTIVE: no public card).
+      type UpdateOp = { id: string; data: Record<string, unknown>; deleteCard?: boolean };
       const allOps: UpdateOp[] = [
         ...memberIds.map(id => ({
           id,
           data: { role: 'INACTIVE', deletedAt: now, deletedBy: currentUid, updatedAt: now } as Record<string, unknown>,
         })),
+        ...memberIds.map(id => ({ id, data: {}, deleteCard: true })),
         ...[...mentorCleanup.entries()].map(([mentorId, ids]) => ({
           id: mentorId,
           data: { menteeIds: arrayRemove(...ids), updatedAt: now } as Record<string, unknown>,
@@ -1541,8 +1564,9 @@ export class MembersService {
 
       for (let i = 0; i < allOps.length; i += 400) {
         const batch = writeBatch(db);
-        allOps.slice(i, i + 400).forEach(({ id, data }) => {
-          batch.update(doc(db, COLLECTIONS.MEMBERS, id), data);
+        allOps.slice(i, i + 400).forEach(({ id, data, deleteCard }) => {
+          if (deleteCard) MemberCardsService.deleteInBatch(batch, id);
+          else batch.update(doc(db, COLLECTIONS.MEMBERS, id), data);
         });
         await this.commitWithRetry(batch);
       }
