@@ -6,6 +6,7 @@ import type { BusinessProfile, SpecialOffer } from '../../../types';
 import { getSpecialOfferSummary, hasSpecialOffer } from '../../../types/member';
 import { useSisterChapterMembers } from '../../../hooks/useSisterChapterMembers';
 import type { SisterChapterMember } from '../../../hooks/useSisterChapterMembers';
+import { ShareCardNotice } from './ShareCardNotice';
 // International Network Tab Component
 type IntlMemberView = {
   id: string;
@@ -51,7 +52,7 @@ interface InternationalNetworkTabProps {
 }
 
 export const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onContact }) => {
-  const { members: rawMembers, loading: membersLoading } = useSisterChapterMembers();
+  const { members: rawMembers, canView, optIn, optingIn } = useSisterChapterMembers();
   const views = useMemo(() => rawMembers.map(toIntlView), [rawMembers]);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -95,6 +96,9 @@ export const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = (
         (!showDealsOnly || hasSpecialOffer(member.specialOffer));
     });
   }, [views, searchTerm, selectedChapter, selectedCountry, selectedIndustry, showDealsOnly]);
+
+  // Reciprocity: no card list until the viewer shares their own card (all hooks are above this line).
+  if (!canView) return <ShareCardNotice onShare={optIn} sharing={optingIn} />;
 
   const getMappedBiz = (member: IntlMemberView): BusinessProfile => ({
     id: member.id, memberId: member.id,

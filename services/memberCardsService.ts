@@ -76,6 +76,12 @@ export class MemberCardsService {
     }, CACHE_TTL_3MIN);
   }
 
+  /** Drop cached card lists (call after the viewer opts in, so a stale result is not served). */
+  static invalidateCardsCache(): void {
+    apiCache.delete(CACHE_KEY_INTERNATIONAL);
+    apiCache.deleteByPrefix('memberCards:chapters:');
+  }
+
   static buildCard(member: Partial<Member>, nowIso?: string): MemberCard {
     return buildMemberCard(member, nowIso) as MemberCard;
   }

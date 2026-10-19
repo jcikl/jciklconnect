@@ -5,6 +5,7 @@ import { Button, Modal } from '../../ui/Common';
 import { LoadingState } from '../../ui/Loading';
 import { getInitialsSvg } from './businessDirectoryUtils';
 import { useSisterChapterMembers } from '../../../hooks/useSisterChapterMembers';
+import { ShareCardNotice } from './ShareCardNotice';
 import { hasSpecialOffer, getSpecialOfferSummary } from '../../../types/member';
 
 interface LocalBusinessTabProps {
@@ -65,7 +66,7 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
   const [quickFilter, setQuickFilter] = useState<'all' | 'bookmarked' | 'ideal' | 'international'>('all');
   const [intlDetail, setIntlDetail] = useState<{ name: string; chineseName?: string; avatarUrl: string; position: string; companyName: string; jciChapter: string; country: string; industry: string; businessCategory: string; email: string; website: string; description: string; specialOffer: string | undefined } | null>(null);
 
-  const { members: rawIntlMembers, loading: intlLoading } = useSisterChapterMembers();
+  const { members: rawIntlMembers, loading: intlLoading, canView: canViewIntl, optIn, optingIn } = useSisterChapterMembers();
   const intlViews = rawIntlMembers.map(m => ({
     id: m.id,
     name: m.displayName ?? '',
@@ -195,7 +196,9 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
                     <span className="text-xs font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{counts[quickFilter]}</span>
                   </div>
                 )}
-                {quickFilter === 'international' ? (
+                {quickFilter === 'international' && !canViewIntl ? (
+                  <ShareCardNotice onShare={optIn} sharing={optingIn} />
+                ) : quickFilter === 'international' ? (
                   <LoadingState loading={intlLoading} error={null} empty={intlViews.length === 0} emptyMessage="No international members found">
                     <div className="divide-y divide-slate-100 bg-white">
                       {intlViews.map(member => (
