@@ -23,7 +23,7 @@
 | UI 元件（通用） | 33 | `components/ui/` |
 | 共用業務元件 | 9 | `components/shared/` |
 | Context | 2 | `contexts/` |
-| Cloud Functions | 7 | `functions/src/` |
+| Cloud Functions | 0 | `functions/src/` |
 
 ## 1. ⚠️ 重複造輪子警示（先修正認知，不急著改碼）
 
@@ -76,7 +76,7 @@
 | `services/financeService.ts` | 5,320 |
 | `services/pointsService.ts` | 2,492 |
 | `services/membersService.ts` | 2,284 |
-| `hooks/useFinanceData.ts` | 2,029 |
+| `hooks/useFinanceData.ts` | 2,033 |
 | `services/inventoryService.ts` | 1,638 |
 
 ## 2. Service 層（按業務領域）
@@ -96,7 +96,7 @@
 | `membersService.ts` | 2,284 | 41 | Members Service - CRUD Operations | BOARD_MEMBERS, EVENT_REGISTRATIONS, MEMBERS, MEMBER_EMAILS, NOTIFICATIONS, PAYMENT_REQUESTS … |
 | `membershipConfigService.ts` | 373 | 17 | ⚠️ 無說明 | SYSTEM_SETTINGS |
 | `mentorshipService.ts` | 638 | 4 | Mentorship Matching Service | MEMBERS, MENTORSHIP_FEEDBACK, MENTOR_MATCHES |
-| `promotionService.ts` | 1,186 | 4 | ⚠️ 無說明 | MANUAL_PROMOTION_REQUESTS, MEMBERS, PROMOTION_HISTORY, SYSTEM |
+| `promotionService.ts` | 1,187 | 4 | ⚠️ 無說明 | MANUAL_PROMOTION_REQUESTS, MEMBERS, PROMOTION_HISTORY, SYSTEM |
 
 <details><summary><code>services/engagementAutoSuggestService.ts</code> — 0 個方法、1 個函數/常數</summary>
 
@@ -234,24 +234,24 @@
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `getPromotionProgress` | 338 | Get promotion progress for a Probation Member |
-| `getPromotionProgressForMember` | 344 |  |
-| `buildEngagementProgress` | 353 |  |
-| `saveEngagementRequirement` | 385 |  |
-| `checkAllRequirements` | 425 | Check all four promotion requirements for a member |
-| `checkRequirement` | 433 | Check a specific requirement for a member |
-| `processAutomaticPromotions` | 448 | Process automatic promotion for eligible members |
-| `promoteToOfficialMember` | 479 | Promote a Probation Member to Full Member |
-| `createManualPromotionRequest` | 606 | Create manual promotion request |
-| `updateMemberActivity` | 696 | Update member activity that might affect promotion requirements |
-| `getPromotionStatistics` | 723 | Get promotion statistics |
-| `getPromotionTrackingOverview` | 734 |  |
-| `getProbationMembersForDisplay` | 834 | Public API for UI: probation members with computed membership type |
-| `savePromotionProgressField` | 892 | Save a single promotion progress field for a member |
-| `getManualPromotionRequests` | 962 | List manual promotion requests, optionally filtered by status. |
-| `backfillOfficialMembershipType` | 981 | Backfill: sync jciCareer.membershipType for all members where root membershipType === 'Official' but jciCareer… |
-| `approveManualPromotionRequest` | 1010 | Approve a manual promotion request and trigger the actual promotion. |
-| `rejectManualPromotionRequest` | 1040 | Reject a manual promotion request with a reason. |
+| `getPromotionProgress` | 339 | Get promotion progress for a Probation Member |
+| `getPromotionProgressForMember` | 345 |  |
+| `buildEngagementProgress` | 354 |  |
+| `saveEngagementRequirement` | 386 |  |
+| `checkAllRequirements` | 426 | Check all four promotion requirements for a member |
+| `checkRequirement` | 434 | Check a specific requirement for a member |
+| `processAutomaticPromotions` | 449 | Process automatic promotion for eligible members |
+| `promoteToOfficialMember` | 480 | Promote a Probation Member to Full Member |
+| `createManualPromotionRequest` | 607 | Create manual promotion request |
+| `updateMemberActivity` | 697 | Update member activity that might affect promotion requirements |
+| `getPromotionStatistics` | 724 | Get promotion statistics |
+| `getPromotionTrackingOverview` | 735 |  |
+| `getProbationMembersForDisplay` | 835 | Public API for UI: probation members with computed membership type |
+| `savePromotionProgressField` | 893 | Save a single promotion progress field for a member |
+| `getManualPromotionRequests` | 963 | List manual promotion requests, optionally filtered by status. |
+| `backfillOfficialMembershipType` | 982 | Backfill: sync jciCareer.membershipType for all members where root membershipType === 'Official' but jciCareer… |
+| `approveManualPromotionRequest` | 1011 | Approve a manual promotion request and trigger the actual promotion. |
+| `rejectManualPromotionRequest` | 1041 | Reject a manual promotion request with a reason. |
 
 </details>
 
@@ -870,7 +870,7 @@
 | `emailService.ts` | 442 | 2 | Email Service - Email Integration Service | EMAIL_LOGS |
 | `guestAnalyticsService.ts` | 142 | 4 | ⚠️ 無說明 | GUEST_PAGE_STATS |
 | `inquiryService.ts` | 232 | 1 | ⚠️ 無說明 | INQUIRIES |
-| `knowledgeService.ts` | 372 | 1 | Knowledge & Learning Service - CRUD Operations Fixes applied: P1 – isDevMode() guard on every write path P1 – cacheService.getOrSet on every… | DOCUMENTS, LEARNING_PATHS, LEARNING_PROGRESS, TRAINING_MODULES |
+| `knowledgeService.ts` | 331 | 1 | Knowledge & Learning Service - CRUD Operations Fixes applied: P1 – isDevMode() guard on every write path P1 – cacheService.getOrSet on every… | DOCUMENTS, LEARNING_PATHS, LEARNING_PROGRESS, TRAINING_MODULES |
 | `larkSyncService.ts` | 51 | 1 | ⚠️ 無說明 | — |
 | `notificationService.ts` | 98 | 1 | ⚠️ 無說明 | MEMBERS |
 | `partnershipsService.ts` | 245 | 2 | ⚠️ 無說明 | ADVERTISEMENTS |
@@ -968,7 +968,7 @@
 
 </details>
 
-<details><summary><code>services/knowledgeService.ts</code> — 15 個方法</summary>
+<details><summary><code>services/knowledgeService.ts</code> — 12 個方法</summary>
 
 | 方法 | 行 | 說明 |
 |---|---|---|
@@ -983,10 +983,7 @@
 | `getAllDocuments` | 269 | Get all documents |
 | `createDocument` | 291 | Create document |
 | `deleteDocument` | 311 | Delete document |
-| `getDocumentsByCategory` | 322 | Get documents by category |
-| `searchDocuments` | 344 | Search documents |
-| `searchTrainingModules` | 355 | Search training modules |
-| `getAllCategories` | 365 | Get all unique document categories |
+| `searchTrainingModules` | 322 | Search training modules |
 
 </details>
 
@@ -1274,7 +1271,7 @@
 | `useBusinessDirectory.ts` | 48 | 4 | `useBusinessDirectory` | businessDirectoryService | ⚠️ 無說明 |
 | `useCommunication.ts` | 118 | 2 | `useCommunication` | communicationService | Communication Data Hook |
 | `useEvents.ts` | 191 | 8 | `useEvents` | errorLoggingService, eventsService, membersService | Events Data Hook |
-| `useFinanceData.ts` | 2,029 | 4 | `useFinanceData` | errorLoggingService, financeService, inventoryService, membersService, membershipConfigService, paymentRequestService, projectFinancialService, projectsService | TODO (PERF-A-004): This hook has ~90 useState declarations, causing full FinanceView re-renders on any state update. Planned refactor: split… |
+| `useFinanceData.ts` | 2,033 | 4 | `useFinanceData` | errorLoggingService, financeService, inventoryService, membersService, membershipConfigService, paymentRequestService, projectFinancialService, projectsService | TODO (PERF-A-004): This hook has ~90 useState declarations, causing full FinanceView re-renders on any state update. Planned refactor: split… |
 | `useFirestoreCollection.ts` | 171 | 18 | `useFirestoreCollection` | — | ⚠️ 無說明 |
 | `useGamification.ts` | 148 | 1 | `useGamification` | gamificationService | useGamification.ts - Unified Hook for Awards (Achievements + Badges) |
 | `useGuestAnalytics.ts` | 21 | 0 | `useGuestAnalytics` | guestAnalyticsService | ⚠️ 無說明 |
@@ -1531,13 +1528,6 @@
 |---|---|---|---|
 | `contexts/BatchModeContext.tsx` | 24 | `BatchModeContext`, `useBatchMode`, `BatchModeProvider` | ⚠️ 無說明 |
 | `contexts/HelpModalContext.tsx` | 28 | `useHelpModal` | HelpModalContext – allows child components to open the App Help modal |
-| `functions/src/automation.ts` | 420 | `executeWorkflow`, `evaluateAutomationRules`, `automationFunctions` | ⚠️ 無說明 |
-| `functions/src/financial.ts` | 263 | `validateTransactionSplits`, `generateFinancialReport`, `performBankReconciliation`, `financialFunctions` | ⚠️ 無說明 |
-| `functions/src/gamification.ts` | 566 | `checkBadgeAwards`, `updateAchievementProgress`, `calculatePointsFromRules`, `gamificationFunctions` | ⚠️ 無說明 |
-| `functions/src/gamificationLogic.ts` | 210 | `onSubmissionApproved`, `onEventRegistrationUpdate` | ⚠️ 無說明 |
-| `functions/src/index.ts` | 21 | `healthCheck` | ⚠️ 無說明 |
-| `functions/src/membership.ts` | 404 | `checkMemberPromotion`, `generateDuesRenewal`, `autoInitiateDuesRenewal`, `sendAnnualDuesReminders`, `membershipFunctions` | ⚠️ 無說明 |
-| `functions/src/notifications.ts` | 534 | `sendNotification`, `sendBulkNotifications`, `markNotificationRead`, `sendDuesRenewalReminders`, `sendEventReminders`, `sendBirthdayNotifications`, `notificationFunctions` | ⚠️ 無說明 |
 
 ## 8. 文件債：缺少檔頭說明的檔案
 

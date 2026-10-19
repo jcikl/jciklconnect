@@ -1,5 +1,5 @@
 import React, { lazy, Suspense } from 'react';
-import type { Transaction } from '../../../types';
+import type { MembershipRecord, MembershipType, Transaction } from '../../../types';
 import { formatCurrency } from '../../../utils/formatUtils';
 import { formatDate } from '../../../utils/dateUtils';
 
@@ -15,12 +15,12 @@ interface FinanceMembershipTabProps {
     phone?: string;
     dob?: string;
     general?: { dob?: string };
-    membershipType?: string;
+    membershipType?: MembershipType;
     introducer?: string;
     tshirtSize?: string;
     jacketSize?: string;
     joinDate?: string;
-    membership?: Record<string, unknown>;
+    membership?: Record<string, MembershipRecord>;
   }>;
   canOperateFinance: boolean;
   isAdminUser: boolean;

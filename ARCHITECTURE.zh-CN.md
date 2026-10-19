@@ -4,13 +4,13 @@
 
 ## 范围
 
-本文描述当前代码库的实际实现状态，而不只是早期 BMAD 规划文档。该项目是一个棕地系统：JCI Kuala Lumpur 管理应用，包含 React/Vite 前端、Firebase/Firestore 数据层、Netlify Functions、Firebase Cloud Functions、Capacitor 移动端壳，以及 BMAD 流程资料。
+本文描述当前代码库的实际实现状态，而不只是早期 BMAD 规划文档。该项目是一个棕地系统：JCI Kuala Lumpur 管理应用，包含 React/Vite 前端、Firebase/Firestore 数据层、Netlify Functions、Capacitor 移动端壳，以及 BMAD 流程资料。
 
 ## 技术栈
 
 - 前端：React 19、TypeScript、Vite 6、Tailwind CSS、lucide-react、React Router、React Query。
 - 数据与认证：Firebase Auth、Firestore、Firebase Storage、Firestore Security Rules。
-- 服务端执行：`netlify/functions/` 下的 Netlify Functions，以及 `functions/src/` 下的 Firebase Cloud Functions。
+- 服务端执行：只有 `netlify/functions/` 下的 Netlify Functions。Firebase 是 Spark 免费方案（不支持 Cloud Functions）；从未部署的 `functions/src/` 已于 2026-10-19 删除，保留在 git 历史中。
 - 移动端壳：`android/` 与 `capacitor.config.ts`。
 - 测试：Vitest，部分测试使用 fast-check 做属性测试。
 - 流程与文档：`_bmad/`、`_bmad-output/`、`docs/`。
@@ -26,12 +26,11 @@
 - `utils/`：权限、日期、财务、board membership、验证、dev mode 等通用工具。
 - `config/`：Firebase 配置、常量、国籍、集合名。
 - `netlify/functions/`：Zoom、ToyyibPay、Cloudinary、Auth 管理、Lark 同步、社媒 AI 改写、邮件、邀请、推送测试、审计日志、生日通知等 HTTP 函数。
-- `functions/src/`：会员、财务、自动化、游戏化、通知等 Firebase Cloud Functions。
 - `firestore.rules`、`firestore.indexes.json`、`storage.rules`：Firebase 安全和索引边界。
 - `scripts/`：迁移、Lark、Firebase 权限种子/审计脚本。
 - `tests/`：工具和属性测试。
 
-只读扫描估算文件量：`components` 194、`services` 69、`hooks` 39、`utils` 18、`types` 15、`netlify/functions` 23、`functions/src` 7、`tests` 8、`scripts` 15。
+只读扫描估算文件量：`components` 194、`services` 69、`hooks` 39、`utils` 18、`types` 15、`netlify/functions` 23、`tests` 8、`scripts` 15。
 
 ## 运行入口
 
@@ -64,10 +63,8 @@
 
 当前有两套服务端执行模型：
 
-- Netlify Functions：浏览器调用的特权 HTTP 操作和第三方集成。
-- Firebase Cloud Functions：Firebase 原生函数、触发器和后台流程。
-
-这点对维护很重要：以后新增功能前必须先决定该能力归属哪个运行时。
+- Netlify Functions：浏览器调用的特权 HTTP 操作、第三方集成，以及定时任务（生日通知、年度会费提醒）。
+- 没有 Firebase Cloud Functions（Spark 免费方案）。服务端或定时工作一律放在 Netlify Functions。
 
 ## 数据与领域模型
 
@@ -112,7 +109,7 @@
 
 ### 自动化与 Workflow
 
-当前至少存在两套重叠实现：`automationService.ts` 与 `workflowService.ts`，再加上 `functions/src/automation.ts`。它们都包含 workflow execution、idempotency、step execution、webhook-like action 等概念。
+当前至少存在两套重叠实现：`automationService.ts` 与 `workflowService.ts`。它们都包含 workflow execution、idempotency、step execution、webhook-like action 等概念。
 
 ### 外部集成
 

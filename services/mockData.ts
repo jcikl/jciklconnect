@@ -515,9 +515,9 @@ export const MOCK_TRAININGS: TrainingModule[] = [
 ];
 
 export const MOCK_DOCUMENTS: Document[] = [
-  { id: 'd1', name: 'LO_Constitution_2023.pdf', type: 'PDF', category: 'Policy', uploadedDate: '2023-01-15', size: '2.4 MB' },
-  { id: 'd2', name: 'Dec_Board_Minutes.pdf', type: 'PDF', category: 'Meeting Minutes', uploadedDate: '2023-12-05', size: '0.5 MB' },
-  { id: 'd3', name: 'Event_Budget_Template.xlsx', type: 'XLS', category: 'Template', uploadedDate: '2023-06-10', size: '0.1 MB' },
+  { id: 'd1', name: 'LO_Constitution_2023.pdf', purpose: 'Policy', uploadedDate: '2023-01-15' },
+  { id: 'd2', name: 'Dec_Board_Minutes.pdf', purpose: 'Meeting Minutes', uploadedDate: '2023-12-05' },
+  { id: 'd3', name: 'Event_Budget_Template.xlsx', purpose: 'Template', uploadedDate: '2023-06-10' },
 ];
 
 export const MOCK_POSTS: NewsPost[] = [
@@ -573,10 +573,10 @@ export const MOCK_PROJECT_FINANCIAL_ACCOUNTS: ProjectFinancialAccount[] = [
     totalIncome: 1000,
     totalExpenses: 2100,
     budgetCategories: [
-      { id: 'cat1', name: 'Venue', allocatedAmount: 1500, spentAmount: 1200, color: '#4F46E5' },
-      { id: 'cat2', name: 'Marketing', allocatedAmount: 1000, spentAmount: 500, color: '#10B981' },
-      { id: 'cat3', name: 'Catering', allocatedAmount: 2000, spentAmount: 400, color: '#F59E0B' },
-      { id: 'cat4', name: 'Admin', allocatedAmount: 500, spentAmount: 0, color: '#6B7280' }
+      { id: 'cat1', name: 'Venue', type: 'expense', allocatedAmount: 1500, spentAmount: 1200, color: '#4F46E5' },
+      { id: 'cat2', name: 'Marketing', type: 'expense', allocatedAmount: 1000, spentAmount: 500, color: '#10B981' },
+      { id: 'cat3', name: 'Catering', type: 'expense', allocatedAmount: 2000, spentAmount: 400, color: '#F59E0B' },
+      { id: 'cat4', name: 'Admin', type: 'expense', allocatedAmount: 500, spentAmount: 0, color: '#6B7280' }
     ],
     alertThresholds: [
       { id: 'at1', type: 'budget_warning', threshold: 80, enabled: true, notificationMethod: 'both' }
@@ -595,9 +595,9 @@ export const MOCK_PROJECT_FINANCIAL_ACCOUNTS: ProjectFinancialAccount[] = [
     totalIncome: 2000,
     totalExpenses: 500,
     budgetCategories: [
-      { id: 'cat5', name: 'Booth Construction', allocatedAmount: 8000, spentAmount: 0, color: '#3B82F6' },
-      { id: 'cat6', name: 'Guest Speakers', allocatedAmount: 4000, spentAmount: 500, color: '#8B5CF6' },
-      { id: 'cat7', name: 'Promotion', allocatedAmount: 3000, spentAmount: 0, color: '#EC4899' }
+      { id: 'cat5', name: 'Booth Construction', type: 'expense', allocatedAmount: 8000, spentAmount: 0, color: '#3B82F6' },
+      { id: 'cat6', name: 'Guest Speakers', type: 'expense', allocatedAmount: 4000, spentAmount: 500, color: '#8B5CF6' },
+      { id: 'cat7', name: 'Promotion', type: 'expense', allocatedAmount: 3000, spentAmount: 0, color: '#EC4899' }
     ],
     alertThresholds: [],
     createdAt: '2023-11-15T09:00:00Z',
@@ -614,8 +614,8 @@ export const MOCK_PROJECT_FINANCIAL_ACCOUNTS: ProjectFinancialAccount[] = [
     totalIncome: 0,
     totalExpenses: 1950,
     budgetCategories: [
-      { id: 'cat8', name: 'Hardware Parts', allocatedAmount: 1500, spentAmount: 1450, color: '#EF4444' },
-      { id: 'cat9', name: 'Logistics', allocatedAmount: 500, spentAmount: 500, color: '#F97316' }
+      { id: 'cat8', name: 'Hardware Parts', type: 'expense', allocatedAmount: 1500, spentAmount: 1450, color: '#EF4444' },
+      { id: 'cat9', name: 'Logistics', type: 'expense', allocatedAmount: 500, spentAmount: 500, color: '#F97316' }
     ],
     alertThresholds: [
       { id: 'at2', type: 'budget_exceeded', threshold: 100, enabled: true, notificationMethod: 'in_app' }

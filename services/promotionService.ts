@@ -212,7 +212,8 @@ export class PromotionService {
         senatorCertified: member.jciCareer?.senatorship?.certified,
         senatorshipId: member.jciCareer?.senatorship?.senatorNumber,
         role: member.role,
-        membershipType: (member.membershipType ?? member.jciCareer?.membershipType) as any,
+        // Root-level membershipType only exists on legacy (pre Phase-4) docs.
+        membershipType: ((member as Member & { membershipType?: string }).membershipType ?? member.jciCareer?.membershipType) as any,
       },
       rules
     );
@@ -844,7 +845,7 @@ export class PromotionService {
       role?: string;
       membershipType?: string;
       computedMembershipType: string;
-      promotionProgress?: import('../types').MemberPromotionProgress;
+      promotionProgress?: import('../types').MemberFoundationPathway | import('../types').MemberPromotionProgress;
     }[]
   > {
     const rules = await MembershipConfigService.getRules();
@@ -868,7 +869,7 @@ export class PromotionService {
     role?: string;
     membershipType?: string;
     computedMembershipType: string;
-    promotionProgress?: import('../types').MemberPromotionProgress;
+    promotionProgress?: import('../types').MemberFoundationPathway | import('../types').MemberPromotionProgress;
   }[] {
     return probation.map((m) => ({
       id: m.id,
@@ -985,7 +986,7 @@ export class PromotionService {
     }
     const all = await MembersService.getAllMembers();
     const toFix = all.filter(
-      (m: Member) => m.membershipType === 'Official' && m.jciCareer?.membershipType !== 'Official'
+      (m: Member) => (m as Member & { membershipType?: string }).membershipType === 'Official' && m.jciCareer?.membershipType !== 'Official'
     );
     if (toFix.length === 0) return { updated: 0, skipped: all.length };
 

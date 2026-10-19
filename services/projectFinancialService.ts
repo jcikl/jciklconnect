@@ -482,7 +482,7 @@ class ProjectFinancialService {
   async updateBudgetCategory(
     financialAccountId: string,
     categoryId: string,
-    updates: Partial<Pick<BudgetCategory, 'name' | 'allocatedAmount' | 'description' | 'color'>>
+    updates: Partial<Pick<BudgetCategory, 'name' | 'allocatedAmount' | 'description' | 'color' | 'type'>>
   ): Promise<BudgetCategory> {
     if (isDevMode()) {
       const account = this.accounts.get(financialAccountId);

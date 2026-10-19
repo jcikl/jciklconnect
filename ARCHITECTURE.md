@@ -4,13 +4,13 @@ Generated from a read-only scan on 2026-08-24.
 
 ## Scope
 
-This document describes the current repository shape as implemented, not only the earlier BMAD planning documents. The codebase is a brownfield JCI Kuala Lumpur management application with a React/Vite client, Firebase/Firestore data layer, Netlify Functions, Firebase Cloud Functions, Capacitor mobile shell, and BMAD process artifacts.
+This document describes the current repository shape as implemented, not only the earlier BMAD planning documents. The codebase is a brownfield JCI Kuala Lumpur management application with a React/Vite client, Firebase/Firestore data layer, Netlify Functions, Capacitor mobile shell, and BMAD process artifacts.
 
 ## Technology Stack
 
 - Frontend: React 19, TypeScript, Vite 6, Tailwind CSS, lucide-react, React Router, React Query.
 - Data/auth: Firebase Auth, Firestore, Firebase Storage, Firestore Security Rules.
-- Server-side execution: Netlify Functions under `netlify/functions/` and Firebase Cloud Functions under `functions/src/`.
+- Server-side execution: Netlify Functions under `netlify/functions/` only. Firebase is on the Spark plan (no Cloud Functions); the never-deployed `functions/src/` was removed on 2026-10-19 and remains in git history.
 - Mobile shell: Capacitor Android/iOS configuration under `android/` and `capacitor.config.ts`.
 - Testing: Vitest plus property-based tests using fast-check.
 - Process/documentation: BMAD artifacts under `_bmad/` and `_bmad-output/`, existing docs under `docs/`.
@@ -26,12 +26,11 @@ This document describes the current repository shape as implemented, not only th
 - `utils/`: shared permission, date, finance, board membership, validation, and dev-mode helpers.
 - `config/`: Firebase config, constants, nationalities, collection names.
 - `netlify/functions/`: server-side HTTP endpoints for Zoom, ToyyibPay, Cloudinary, auth admin actions, Lark sync, social AI rewrite, email, invites, push tests, audit logs, and scheduled birthday notifications.
-- `functions/src/`: Firebase Cloud Functions for membership, financial, automation, gamification, notifications, plus `index.ts`.
 - `firestore.rules`, `firestore.indexes.json`, `storage.rules`: Firebase security and indexing boundary.
 - `scripts/`: migration, Lark, Firebase permission seeding/audit scripts.
 - `tests/`: focused utility/property tests.
 
-Approximate file counts from the scan: `components` 194, `services` 69, `hooks` 39, `utils` 18, `types` 15, `netlify/functions` 23, `functions/src` 7, `tests` 8, `scripts` 15.
+Approximate file counts from the scan: `components` 194, `services` 69, `hooks` 39, `utils` 18, `types` 15, `netlify/functions` 23, `tests` 8, `scripts` 15.
 
 ## Runtime Entry Points
 
@@ -64,10 +63,8 @@ Guest routes are handled with `BrowserRouter` paths such as `/`, `/events`, `/pr
 
 The repository has two server execution models:
 
-- Netlify Functions are HTTP endpoints used for browser-to-server privileged operations and third-party integrations.
-- Firebase Cloud Functions are deployed through `functions/src/` and include event-driven/Cloud Functions workflows.
-
-This split is operationally important: future changes must decide which runtime owns a given capability before implementing it.
+- Netlify Functions are HTTP endpoints used for browser-to-server privileged operations and third-party integrations, plus scheduled jobs (birthday notifications, annual dues reminders).
+- There are no Firebase Cloud Functions (Spark plan). Server-side or scheduled work belongs in Netlify Functions.
 
 ## Data And Domain Model
 
@@ -112,7 +109,7 @@ Finance spans `financeService`, `paymentRequestService`, `toyyibService`, `recon
 
 ### Automation And Workflow
 
-There are at least two overlapping workflow/automation implementations: `automationService.ts` and `workflowService.ts`, plus Firebase Cloud Functions in `functions/src/automation.ts`. Both client-side services contain workflow execution concepts, idempotency guards, step execution, and webhook-like actions.
+There are at least two overlapping workflow/automation implementations: `automationService.ts` and `workflowService.ts`. Both client-side services contain workflow execution concepts, idempotency guards, step execution, and webhook-like actions.
 
 ### External Integrations
 

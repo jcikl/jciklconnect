@@ -204,7 +204,7 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
     budget: project.budget || 0,
     startingBalance: 0,
     budgetCategories: EXPENSE_CATEGORIES.map(cat => ({
-      name: cat.name, allocatedAmount: 0, color: cat.color,
+      name: cat.name, type: 'expense' as const, allocatedAmount: 0, color: cat.color,
       description: `Budget category for ${cat.name.toLowerCase()}`,
     })),
   });
@@ -482,7 +482,7 @@ export const ProjectFinancialAccountView: React.FC<ProjectFinancialAccountProps>
         color: newCatDraft.type === 'income' ? '#10B981' : '#6B7280',
       });
       setAccount(prev => prev ? { ...prev, budgetCategories: [...prev.budgetCategories, added] } : prev);
-      setNewCatDraft({ name: '', description: '', allocatedAmount: 0 });
+      setNewCatDraft({ name: '', description: '', allocatedAmount: 0, type: 'expense' });
       setShowNewCat(false);
       showToast('Category added', 'success');
     } catch {

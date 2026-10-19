@@ -2,7 +2,9 @@ import React from 'react';
 import { Gift, Globe } from 'lucide-react';
 import type { BusinessProfile } from '../../../types';
 import { FilterDrawer } from '../../ui/Common';
-import type { BusinessDirectoryTab } from './BusinessDirectoryHeader';
+
+/** Which listing the drawer filters ('local' = member businesses, otherwise sister chapters). */
+type BusinessDirectoryTab = 'local' | 'sister';
 import { BUSINESS_CATEGORIES } from './businessDirectoryUtils';
 
 interface SisterFilterMember {

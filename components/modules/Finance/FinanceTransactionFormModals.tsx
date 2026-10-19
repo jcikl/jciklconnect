@@ -1,5 +1,5 @@
 import React, { lazy, Suspense } from 'react';
-import type { BankAccount, InventoryItem, Member, Project, Transaction } from '../../../types';
+import type { BankAccount, InventoryItem, Project, Transaction } from '../../../types';
 import { Button, Modal } from '../../ui/Common';
 
 const TransactionForm = lazy(() => import('./TransactionForm'));
@@ -12,19 +12,19 @@ interface FinanceTransactionFormModalsProps {
   isUpdatingTransaction: boolean;
   accounts: BankAccount[];
   projects: Project[];
-  members: Member[];
+  members: Array<{ id: string; name: string }>; // slim list from useFinanceData (same as TransactionForm)
   inventoryItems: InventoryItem[];
   administrativeProjectIds: string[];
   adminPurposes: string[];
   projectYears: number[];
-  groupedProjectsForModal: Record<string, Project[]>;
+  groupedProjectsForModal: { label: string; options: string[] }[];
   filteredProjectsForModal: Project[];
   editingProjectPurposesByProject: Record<string, string[]>;
   recordFormCategory: string;
   recordFormMemberId: string;
   recordFormYear: number;
   recordFormProjectId: string;
-  editingModalYear: number;
+  editingModalYear: string; // 'All' or a year, as in useFinanceData
   editingTransaction: Transaction | null;
   editingMembershipYear: number;
   editingAdministrativeYear: number;
@@ -37,7 +37,7 @@ interface FinanceTransactionFormModalsProps {
   setRecordFormMemberId: (value: string) => void;
   setRecordFormYear: (value: number) => void;
   setRecordFormProjectId: (value: string) => void;
-  setEditingModalYear: (value: number) => void;
+  setEditingModalYear: (value: string) => void;
   setEditingTransaction: (transaction: Transaction | null) => void;
   setEditingMembershipYear: (value: number) => void;
   setEditingAdministrativeYear: (value: number) => void;

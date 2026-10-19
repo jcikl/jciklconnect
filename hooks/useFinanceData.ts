@@ -1816,7 +1816,11 @@ export function useFinanceData(searchQuery?: string) {
     try {
       if ((editingTransaction as any).isSplitChild) {
         // Split child records live in transactionSplits, not transactions
-        await FinanceService.updateTransactionSplit(editingTransaction.id, updatedTransaction);
+        // updatedTransaction carries only the shared editable fields (no status), so it fits a split.
+        await FinanceService.updateTransactionSplit(
+          editingTransaction.id,
+          updatedTransaction as Parameters<typeof FinanceService.updateTransactionSplit>[1],
+        );
       } else {
         await FinanceService.updateTransaction(editingTransaction.id, updatedTransaction);
       }

@@ -318,39 +318,6 @@ export class KnowledgeService {
     }
   }
 
-  // Get documents by category
-  static async getDocumentsByCategory(category: Document['category']): Promise<Document[]> {
-    if (isDevMode()) return MOCK_DOCUMENTS.filter(d => d.category === category);
-    try {
-      const snapshot = await getDocs(
-        query(
-          collection(db, COLLECTIONS.DOCUMENTS),
-          where('category', '==', category),
-          orderBy('uploadedDate', 'desc')
-        )
-      );
-      return snapshot.docs.map(d => ({
-        id: d.id,
-        ...d.data(),
-        uploadedDate: d.data().uploadedDate?.toDate?.()?.toISOString() || d.data().uploadedDate,
-      } as Document));
-    } catch (error) {
-      errorLoggingService.logError(error as Error, { action: 'KnowledgeService.getDocumentsByCategory', additionalData: { category } });
-      throw error;
-    }
-  }
-
-  // Search documents
-  static async searchDocuments(searchTerm: string): Promise<Document[]> {
-    const allDocs = await this.getAllDocuments();
-    const term = searchTerm.toLowerCase();
-    return allDocs.filter(d =>
-      d.name.toLowerCase().includes(term) ||
-      d.description?.toLowerCase().includes(term) ||
-      d.category?.toLowerCase().includes(term)
-    );
-  }
-
   // Search training modules
   static async searchTrainingModules(searchTerm: string): Promise<TrainingModule[]> {
     const allModules = await this.getAllTrainingModules();
@@ -359,13 +326,5 @@ export class KnowledgeService {
       m.title.toLowerCase().includes(term) ||
       m.type?.toLowerCase().includes(term)
     );
-  }
-
-  // Get all unique document categories
-  static async getAllCategories(): Promise<string[]> {
-    const allDocs = await this.getAllDocuments();
-    const categories = new Set<string>();
-    allDocs.forEach(d => { if (d.category) categories.add(d.category); });
-    return Array.from(categories).sort();
   }
 }

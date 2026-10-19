@@ -9,7 +9,7 @@ import { formatCurrency } from '../../../utils/formatUtils';
 import { formatDate } from '../../../utils/dateUtils';
 import { FinanceService } from '../../../services/financeService';
 import { projectFinancialService } from '../../../services/projectFinancialService';
-import type { Transaction, BankAccount, TransactionSplit, Project, Member } from '../../../types';
+import type { Transaction, BankAccount, TransactionSplit, Project } from '../../../types';
 
 interface GroupedGroup {
   key: string;
@@ -48,7 +48,7 @@ interface TransactionsTabProps {
   handleVoidTransaction: (tx: Transaction) => void;
   setSelectedTransaction: (tx: Transaction | null) => void;
   setIsSplitModalOpen: (open: boolean) => void;
-  members: Member[];
+  members: Array<{ id: string; name: string }>; // only the count is read (lazy-load trigger)
   loadMembers: () => void;
   projects: Project[];
   loadProjects: () => void;

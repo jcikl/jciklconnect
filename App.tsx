@@ -297,8 +297,8 @@ export const JCIKLApp: React.FC = () => {
     signOut();
   }, [user?.uid, signOut]);
 
-  // Birthday notifications are sent exclusively by the Cloud Function scheduler
-  // (functions/src/notifications.ts → sendBirthdayNotifications). No client-side generation.
+  // Birthday notifications are sent exclusively by the scheduled Netlify function
+  // (netlify/functions/birthday-notifications.mjs). No client-side generation.
   const allNotifications = notifications;
   const unreadNotifications = allNotifications.filter(n => !n.read);
 
