@@ -70,3 +70,18 @@ export const isDevModeStored = (): boolean => {
   }
 };
 
+
+/**
+ * Yes/no hint that the last session on this device was signed in (no account data). index.html
+ * reads it before first paint to show the member shell instead of the guest shell on reload.
+ */
+const SIGNED_IN_HINT_KEY = 'jci_signed_in';
+
+export const setSignedInHint = (signedIn: boolean): void => {
+  try {
+    if (signedIn) localStorage.setItem(SIGNED_IN_HINT_KEY, '1');
+    else localStorage.removeItem(SIGNED_IN_HINT_KEY);
+  } catch {
+    // Storage unavailable (private mode) — the shell falls back to the guest layout.
+  }
+};

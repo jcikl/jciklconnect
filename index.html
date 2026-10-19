@@ -63,12 +63,62 @@
       .sc{background:#e2e8f0;border-radius:1rem;animation:sh 1.6s ease-in-out infinite}
 
       @keyframes sh{0%,100%{opacity:1}50%{opacity:.45}}
+
+      /* Member shell — shown instead of the guest shell when the last session was signed in
+         (localStorage jci_signed_in, set by useAuth). Mirrors the app layout: white sidebar
+         (md+), gradient header h-14, the content Suspense skeleton, and the mobile bottom nav. */
+      #msh{display:none}
+      html.si #gsh{display:none}
+      html.si #msh{display:flex;height:100vh;overflow:hidden}
+      #msh .ms{display:none;width:256px;flex-shrink:0;background:#fff;border-right:1px solid #e2e8f0;flex-direction:column;padding:1rem .75rem;gap:.625rem}
+      @media(min-width:768px){#msh .ms{display:flex}}
+      #msh .ms img{height:36px;width:auto;object-fit:contain;align-self:flex-start;margin:0 .5rem 1rem}
+      #msh .mp{height:2.25rem;border-radius:.5rem;background:#f1f5f9;animation:sh 1.6s ease-in-out infinite}
+      #msh .mc{flex:1;display:flex;flex-direction:column;min-width:0}
+      #msh .mh{height:56px;flex-shrink:0;background:linear-gradient(to right,#1C3F94,#1a3a7a,#0097D7);display:flex;align-items:center;gap:.75rem;padding:0 1rem;box-shadow:0 4px 6px -1px rgba(0,0,0,.1)}
+      @media(min-width:640px){#msh .mh{padding:0 1.5rem}}
+      #msh .mw{background:rgba(255,255,255,.2);border-radius:.5rem;animation:sh 1.6s ease-in-out infinite}
+      #msh .mb{flex:1;overflow:hidden;padding:1rem 1.25rem 8rem;display:flex;flex-direction:column;gap:1rem}
+      @media(min-width:640px){#msh .mb{padding:1rem 2rem}}
+      #msh .mk{background:#e5e7eb;animation:sh 1.6s ease-in-out infinite}
+      #msh .mn{position:fixed;bottom:1.25rem;left:1rem;right:1rem;height:66px;border-radius:1.5rem;background:rgba(15,23,42,.95);display:flex;align-items:center;justify-content:space-around}
+      @media(min-width:768px){#msh .mn{display:none}}
+      #msh .mn i{width:1.5rem;height:1.5rem;border-radius:.375rem;background:rgba(255,255,255,.15)}
     </style>
+    <script>
+      // Pick the member or guest shell before first paint. Only a yes/no hint — no account data.
+      try { if (localStorage.getItem('jci_signed_in') === '1') document.documentElement.classList.add('si'); } catch (e) {}
+    </script>
   </head>
   <body class="bg-slate-50 text-slate-900 antialiased">
     <div id="root">
-      <!-- Static shell — paints instantly on first HTML byte, replaced seamlessly by React -->
-      <div>
+      <!-- Static shells — paint instantly on first HTML byte; React keeps showing them (via
+           window.__appShellHtml) until the sign-in check finishes. -->
+      <div id="msh" aria-hidden="true">
+        <div class="ms">
+          <img src="/JCI Kuala Lumpur-transparent.png" alt="" />
+          <div class="mp"></div><div class="mp"></div><div class="mp"></div><div class="mp"></div>
+          <div class="mp"></div><div class="mp"></div><div class="mp"></div><div class="mp"></div>
+        </div>
+        <div class="mc">
+          <div class="mh">
+            <div class="mw" style="width:2.25rem;height:2.25rem;border-radius:9999px"></div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:.375rem">
+              <div class="mw" style="width:5rem;height:.5rem"></div>
+              <div class="mw" style="width:7rem;height:.875rem"></div>
+            </div>
+            <div class="mw" style="width:2.25rem;height:2.25rem"></div>
+          </div>
+          <div class="mb">
+            <div class="mk" style="height:2rem;width:33%;border-radius:.5rem"></div>
+            <div class="mk" style="height:8rem;border-radius:.75rem"></div>
+            <div class="mk" style="height:8rem;border-radius:.75rem"></div>
+            <div class="mk" style="height:8rem;border-radius:.75rem"></div>
+          </div>
+        </div>
+        <div class="mn"><i></i><i></i><i></i><i></i></div>
+      </div>
+      <div id="gsh">
         <!-- Header matches GuestHeader: white, sticky, h-16 mobile / h-20 desktop -->
         <header id="sh">
           <img src="/JCI Kuala Lumpur-transparent.png" alt="JCI Kuala Lumpur" />
