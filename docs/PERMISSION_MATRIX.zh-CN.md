@@ -21,7 +21,7 @@
 - `SUPER_ADMIN`：超级管理员。
 - `INACTIVE`：停用用户，应被硬性限制。
 - `AFFILIATE`（外部会员）：其他 JCI 分会的会员，`members.loId` 为 `sisterChapters` 中的分会。不属于 `isMember()` / `isActiveMember()`；只能打开白名单视图（见下表），且 `affiliation.status` 为 `active` 时才能使用，其他状态只能看自己的资料与提示。
-- `CHAPTER_ADMIN`（分会管理人）：某个外部分会的管理人，由 KL 管理员创建。前端视图与 `AFFILIATE` 相同；规则层另允许读取本分会的完整会员文档，并修改本分会 AFFILIATE 的 `affiliation` 状态字段（不能设为 `active`）。
+- `CHAPTER_ADMIN`（分会管理人）：某个外部分会的管理人，由 KL 管理员创建。前端视图比 `AFFILIATE` 多一个 `MY_CHAPTER`（Phase 1）；规则层另允许读取本分会的完整会员文档，并修改本分会 AFFILIATE 的 `affiliation` 状态字段（不能设为 `active`）；应用里的审批、停用、邀请都经 `netlify/functions/external-accounts` 在服务端完成。
 - `isBoard()`：Firestore Rules 中包含 `BOARD`、`ADMIN`、`SUPER_ADMIN`，也包含 current board member。
 - `isAdmin()`：Firestore Rules 中包含 `ADMIN`、`SUPER_ADMIN`。
 - `canOperateFinance`：前端 `usePermissions.ts` 中的财务操作权限，主要给当前年度 treasurer/secretary/president。
@@ -40,12 +40,13 @@
 | Members 管理 | `isAdmin || isBoard || isDeveloper`，细节也用 `hasPermission('canEditMembers')` | Member 自己有个人资料视图。 |
 | Automation | `isBoard || isAdmin` | Developer 在部分配置页也可见。 |
 | System/Access Config | 多数为 `isAdmin || isBoard`，`AccessConfigView` 内部要求 `isAdmin` | UI 与页面内部有二次限制。 |
+| Config 页（`SYSTEM_CONFIG`） | `utils/configAccess.ts`：SUPER_ADMIN 全部标签；ADMIN 只有 Global Relations | Phase 1；编辑分会列表仍只有 SUPER_ADMIN（`canEditChapterList`）。 |
 | Developer Interface | `isDeveloper || isAdmin` | Dev mode 对本地调试放大权限。 |
 | Social Media | `hasPermission('canManageEvents')` 作为 BOD 判断，`isAdmin` 控制删除等高权限操作 | 与 Firestore `socialPosts` rules 需重点对齐。 |
 
-## 外部用户角色矩阵（Phase 0）
+## 外部用户角色矩阵（Phase 0 / Phase 1）
 
-来源：`utils/externalAccess.ts`（唯一白名单，导航与视图渲染都读取它）、`hooks/usePermissions.ts`（`externalAllowedViews`）。`AFFILIATE` 与 `CHAPTER_ADMIN` 的前端视图相同；差异只在 Firestore 规则层（见下方说明）。
+来源：`utils/externalAccess.ts`（唯一白名单，导航与视图渲染都读取它）、`hooks/usePermissions.ts`（`externalAllowedViews`）。`AFFILIATE` 与 `CHAPTER_ADMIN` 的前端视图只差一个 `MY_CHAPTER`；其余差异在 Firestore 规则层和 `external-accounts` function（见下方说明）。
 
 | 视图（ViewType） | 说明 | AFFILIATE（active） | CHAPTER_ADMIN（active） | 非 active（pending / suspended / expired） |
 |---|---|:---:|:---:|:---:|
@@ -56,11 +57,26 @@
 | `SURVEYS` | 问卷 | 是 | 是 | 否 |
 | `CLUBS` | 兴趣社群 | 是 | 是 | 否 |
 | `MEMBERS` | 仅本人资料（`MyProfileSelfView`） | 是 | 是 | 是 |
+| `MY_CHAPTER` | 本分会审批 / 成员 / 邀请（`ChapterAdminView`） | 否 | 是 | 否 |
 
 - 非 active 外部用户只能打开 `MEMBERS`，并看到 `ExternalAccessNotice` 状态提示（`getExternalStatusMessage`）。
 - 白名单之外的所有视图（财务、成员管理、项目、自动化、系统配置等）对两种外部角色都不可见，`isViewAllowedForRole` 返回 false。
-- `CHAPTER_ADMIN` 在规则层的额外权限：读取本分会完整会员文档（`members`）、修改本分会 AFFILIATE 的 `affiliation` 状态字段。前端目前没有对应的管理视图（Phase 1 规划）。
-- `DIRECTORY` 与生日列表的数据来源应为 `memberCards`，目前尚未接入（见 `RISK_REGISTER.md` R-058）。
+- `CHAPTER_ADMIN` 在规则层的额外权限：读取本分会完整会员文档（`members`）、修改本分会 AFFILIATE 的 `affiliation` 状态字段；前端对应 `MY_CHAPTER`（只对 active 的 `CHAPTER_ADMIN` 开放）。
+- 状态与邀请（Phase 1，`netlify/functions/external-accounts`，权限判断在 `netlify/lib/externalAccounts.mjs`）：
+  - 创建分会管理人（`createChapterAdmin`）：只有 KL 管理员（ADMIN / SUPER_ADMIN）。
+  - 邀请成员（`inviteMember`，账号创建即 `active`，角色 AFFILIATE）：active 的 `CHAPTER_ADMIN`（只能邀请自己的分会）或 KL 管理员（须指定分会）。
+  - 状态变更（`setStatus`）：分会管理人只能处理本分会的 AFFILIATE：`pending_chapter` → `pending_kl`（批准）、`pending_chapter` / `pending_kl` → `rejected`、`active` → `suspended`、`suspended` → `active`（仅限曾经 active，即 `affiliation.activatedAt` 已有）；`pending_kl` → `active` 只有 KL 管理员；KL 管理员可在任意两个不同状态间切换。
+  - 重发密码设置邮件（`resendInvite`）：KL 管理员，或 active 的 `CHAPTER_ADMIN`（只限本分会 AFFILIATE，不含自己）。
+- 配置页（`SYSTEM_CONFIG`，`utils/configAccess.ts`）：ADMIN 现在可以打开，但只能看到 Global Relations 标签（创建分会管理人、邀请成员、批准 `pending_kl`、停用）；增删改分会列表与启用开关仍只有 SUPER_ADMIN。
+- 外部用户在各视图的实际范围（Phase 1）：
+  - 生日：本分会（active 外部成员）的生日由 `chapter-birthdays` function 返回（只含 id、姓名、头像、月日，不含年份，跳过 `privacy.hideBirthday`）。
+  - 目录（`DIRECTORY`）：只显示 `memberCards` 名片，没有 Contact；范围是已开放名片的 KL 会员、本分会、以及其他分会 `international == true` 的名片；自己的名片未开放时查询不会执行（互惠规则，`useSisterChapterMembers` 的 `canView`）。
+  - 福利（`BENEFITS`）：不显示会员优惠与新增优惠入口；按 `targetCriteria.audiences` / `countries`（`utils/benefitEligibility.ts`）判断，不符合的福利灰显并说明原因、隐藏详情里的行动按钮。
+  - 问卷（`SURVEYS`）：只看到定向给自己的，或 B+ 已开放（`openToExternals`）且 Active 的问卷；只能作答，不能创建、分发，也看不到结果。
+  - 兴趣社群（`CLUBS`）：只看到已开放（`openToExternals`）的社群，不能创建；「Join」仍是打开社群群聊链接。
+  - 活动（`EVENTS`）：只看到 KL 主办或协办的活动（应用层查询过滤，规则对 `events` list 没有此限制，见 R-058）；价格数字以美元符号显示，不做换算；可以报名；付款方式为线下（说明文字见 `config/constants.ts` `EXTERNAL_OFFLINE_PAYMENT_NOTE`），由财务操作员 / 管理员标记已付款。
+  - 「向其他分会开放」勾选（问卷、兴趣社群）只有 BOARD / ADMIN 能操作；`firestore.rules` 同样限制。
+  - 活动「标记已付款」：只有 `canOperateFinance`（财务操作员 / 管理员）能完成（`EventDetailModal` 的 `handleMarkPaid` 校验），按钮本身仍对所有看得到报名列表的人显示（见 R-068）。
 - 前端白名单只是 UI 层限制；真正的数据边界是 `firestore.rules`，逐集合范围见 `SCHEMA-PERMISSIONS.md`「外部用户（AFFILIATE / CHAPTER_ADMIN）的规则范围」。
 
 ## Firestore 集合权限矩阵
@@ -197,7 +213,9 @@
 | `check-auth-email.mjs` | Firebase ID token | `BOARD`/`ADMIN`/`SUPER_ADMIN` | 检查 Auth email | PII/账号枚举风险已用角色限制。 |
 | `check-member-field.mjs` | Firebase ID token | `BOARD`/`ADMIN`/`SUPER_ADMIN` | 枚举/检查 member 字段 | PII 风险，需保留严格角色。 |
 | `cloudinary-delete.mjs` | Firebase ID token | `BOARD`/`ADMIN`/`SUPER_ADMIN` | Cloudinary signed delete | 有 publicId prefix allowlist。 |
+| `chapter-birthdays.mjs` | Firebase ID token | active 外部会员（`AFFILIATE` / `CHAPTER_ADMIN`，`affiliation.status == active`，非 KL 分会；角色与状态取自调用者的 Firestore 文档） | 只读 `members`（`loId` == 调用者分会），返回 id / 姓名 / 头像 / 月日 | 不返回年份与联系方式；跳过 `privacy.hideBirthday`；无 secret。 |
 | `delete-auth-user.mjs` | Firebase ID token | `ADMIN`/`SUPER_ADMIN` | 删除 Firebase Auth user | 高风险，不应给 board。 |
+| `external-accounts.mjs` | Firebase ID token | 按 action：`createChapterAdmin` 仅 `ADMIN`/`SUPER_ADMIN`（KL）；`inviteMember` active `CHAPTER_ADMIN`（强制自己的分会）或 KL 管理员；`setStatus` / `resendInvite` 见上方外部用户说明。角色、状态、分会取自调用者的 Firestore 文档，不取请求体 | 写 `members`、`memberEmails`、`memberCards`、`auditLog`；创建 / 删除 Firebase Auth 账号；发送密码设置邮件 | 需要 Firebase Admin 凭证，响应不含邮箱；每次调用写一条 `auditLog`（`external_accounts_*`）；每次最多 20 人、每个分会最多 100 个成员文档，没有限流；本地 `netlify dev` 跑不了（`firebase-admin/auth` 问题），需在预览版验证（见 R-071）。 |
 | `jci-proxy.mjs` | 无 | public | 代理 `jcimalaysia.cc` 公开 event HTML | eventid 限制为数字；返回 HTML。 |
 | `lark-sync.mjs` | Firebase ID token | 本人或 `BOARD`/`ADMIN`/`SUPER_ADMIN` | Lark API、Firestore member data | 同步范围和 PII 需审计。 |
 | `send-email.mjs` | Firebase ID token | `BOARD`/`ADMIN`/`SUPER_ADMIN` | Resend/SendGrid/SMTP 发送邮件 | 已限制 MEMBER，需继续限制 recipient flood。 |

@@ -10,6 +10,7 @@
 > **TS Interface:** `Member` | **Constants key:** `COLLECTIONS.MEMBERS`
 > `平铺冗余字段（等待替换）` 列记录 legacy/import flat aliases，主要来自 `MembersService.normalizeMemberData()` 的 flat-to-nested 映射。
 > `来` / `往` 记录字段的数据流：`来` 只写明角色填写、系统计算、服务同步或其他字段引用等写入来源；`往` 只写明页面展示、权限判断、统计计算、服务流程或其他集合字段等实际使用目标。它们不是 Firestore 自动触发器；空白代表当前未确认有代码级联动。
+> **外部会员文档（role `AFFILIATE` / `CHAPTER_ADMIN`）的创建来源（Phase 1）：** ① `netlify/functions/external-accounts`（Admin SDK，`createChapterAdmin` / `inviteMember`，账号创建即 `active`，同批写入 `memberEmails` 槽位与 `memberCards`）；② 外部自助注册：`hooks/useAuth` `signUpExternal`（`utils/signUpPayload.ts` `buildExternalSignUpMember`），role `AFFILIATE`、`affiliation.status` = `pending_chapter`，不写 `memberEmails`；③ `scripts/auditChapterMemberDocs.mjs --apply`：把旧 Global Relations「Add Member」建出的 role `MEMBER`、`loId` 不是 `jcikl` 的文档转为外部 `AFFILIATE`（`active`）。
 
 | 字段路径 | 类型 | 必填 | 枚举值 / 说明 | 平铺冗余字段（等待替换） | 来 | 往 |
 |--------|------|:----:|------------|--------------|----|----|
@@ -19,7 +20,7 @@
 | general.fullName | string | — | | fullName | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | `publicBusinessListings.ownerName`、`boardMembers.memberName` |
 | general.chineseName | string | — | |  | 角色: 自己(非锁定字段) 或 B+ | 会员资料详情、会员目录展示 |
 | general.idNumber | string | ✓ | | idNumber / nationalId | 角色: GUEST 自己 / B+；MEMBER+ 自己不可改 | 身份核验、唯一性检查 |
-| general.dob | string | ✓ | | dob / dateOfBirth | 角色: GUEST 自己 / B+；MEMBER+ 自己不可改；系统: 导入 normalize | 系统生成查询索引 `birthdayMMDD` |
+| general.dob | string | ✓ | | dob / dateOfBirth | 角色: GUEST 自己 / B+；MEMBER+ 自己不可改；外部会员自己仅在为空时可设置一次（`MyProfileSelfView`，同时写 `birthdayMMDD`；`firestore.rules` `externalSetsDobOnce`）；系统: 导入 normalize；`external-accounts` 创建账号（提供 dob 时，同时写 `birthdayMMDD`）；`signUpExternal`（只写 dob，不写 `birthdayMMDD`）；`RegisterModal` 经 `components/auth/signUpExtras.ts` 把 `general.fullName` / `gender` / `dob` / `nationality` 与 `contact.phone` 传给 `signUp` | 系统生成查询索引 `birthdayMMDD`；`netlify/functions/chapter-birthdays`（外部用户的本分会生日，读 `general.dob`，缺失时读 `birthdayMMDD`）；`DashboardHome` 生日列表 |
 | general.birthPlace | string | — | |  | 角色: 自己(非锁定字段) 或 B+ | 会员资料详情展示 |
 | general.gender | enum | ✓ | `Male` \| `Female` | gender | 角色: 自己(非锁定字段) 或 B+ | 会员资料详情、统计筛选 |
 | general.race | enum | ✓ | `Chinese` \| `Malay` \| `Indian` \| `Others` | race / ethnicity | 角色: 自己(非锁定字段) 或 B+ | 会员资料详情、统计筛选 |
@@ -152,40 +153,42 @@
 | tier | MemberTier \| string | — | |  | 系统: tier/gamification calculation；角色: B+ | member segmentation |
 | skills | string[] | — | |  | 角色: 自己(非锁定字段) 或 B+ | 会员资料展示、项目技能匹配 |
 | badges | Badge[] | — | |  | 系统: gamification service；角色: B+ | dashboard / member profile |
-| privacy | object | — | 顶层隐私设置（注意：不同于上方平铺别名为 `privacy` 的 `contact.privacy`） |  | 角色: 自己(非锁定字段) 或 B+ | 见 `privacy.shareCardInternationally` |
+| privacy | object | — | 顶层隐私设置（注意：不同于上方平铺别名为 `privacy` 的 `contact.privacy`） |  | 角色: 自己(非锁定字段) 或 B+ | 见 `privacy.shareCardInternationally`、`privacy.hideBirthday` |
 | privacy.shareCardInternationally | boolean | — | 默认 false（缺省 = false）；opt-in，允许其他分会外部会员看到公开名片 |  | 角色: 自己（`MyProfileSelfView` 开关，非锁定字段）；系统: 无 | `memberCards.international`：`MemberCardsService.syncCards` → `utils/memberCard.mjs` `buildMemberCard` 复制；firestore.rules `validMemberCard` 要求两者相等 |
-| affiliation | MemberAffiliation | — | 仅外部会员（role `AFFILIATE` / `CHAPTER_ADMIN`）存在；所属分会为顶层 `loId`（`sisterChapters` id）。`firestore.rules` 锁定自己不可写 |  | 角色: KL 管理员（`canEditMembers`，通用会员更新）；分会管理人（active `CHAPTER_ADMIN`，仅本分会 AFFILIATE 的状态字段，不能设 `active`）；系统: 无专用写入代码 | `utils/externalAccess.ts`、`hooks/usePermissions.ts`（外部可访问视图）；firestore.rules `isActiveExternal()`；`shouldHaveCard`（仅 active 外部有卡） |
-| affiliation.category | enum | 外部必填 | `sister` \| `apicc` \| `global` |  | 同 `affiliation`（无专用写入代码） | 外部会员来源分类展示 |
-| affiliation.country | string | 外部必填 | 分会所在国家（自由文本） |  | 同 `affiliation`（无专用写入代码） | `memberCards.country`（外部卡取此值；内部卡固定为 `'Malaysia'`） |
-| affiliation.status | enum | 外部必填 | `pending_chapter` \| `pending_kl` \| `active` \| `suspended` \| `expired` |  | 同 `affiliation`；分会管理人可改为 `pending_*` / `suspended` / `expired`，不能设 `active` | `isActiveExternal()` 访问判断；`memberCards` 生成/删除（`planCardSync`） |
-| affiliation.chapterApprovedAt / chapterApprovedBy | string | — | 分会管理人批准 `pending_chapter` → `pending_kl` 的时间与人（类型注释） |  | 角色: 分会管理人（rules 允许写入 `chapterApprovedAt` / `chapterApprovedBy`） | 审计展示 |
-| affiliation.klApprovedAt / klApprovedBy | string | — | KL 管理员批准 `pending_kl` → `active` 的时间与人（类型注释） |  | 角色: KL 管理员（类型注释；无专用写入代码） | 审计展示 |
-| affiliation.statusUpdatedAt / statusUpdatedBy | string | — | 最近一次状态变更的时间与人（任何操作者） |  | 同 `affiliation` | 审计展示 |
+| privacy.hideBirthday | boolean | — | 默认 false（缺省 = 显示生日）；设为 true 则不出现在生日列表 |  | 角色: 自己（`MyProfileSelfView` 开关，非锁定字段）；系统: 无 | `netlify/functions/chapter-birthdays`（`netlify/lib/chapterBirthdays.mjs` 跳过）；`DashboardHome` 生日列表（过滤）；`netlify/functions/birthday-notifications`（`netlify/lib/members.mjs` `showsBirthday` 跳过） |
+| affiliation | MemberAffiliation | — | 仅外部会员（role `AFFILIATE` / `CHAPTER_ADMIN`）存在；所属分会为顶层 `loId`（`sisterChapters` id）。`firestore.rules` 锁定自己不可写 |  | 角色: KL 管理员（`canEditMembers`，通用会员更新）；分会管理人（active `CHAPTER_ADMIN`，`firestore.rules` 仍保留仅限本分会 AFFILIATE 状态字段、不能设 `active` 的直接更新分支，应用现在改走 `external-accounts` function）；系统: `netlify/functions/external-accounts`（创建账号、`setStatus`）、`signUpExternal`（自助注册）、`scripts/auditChapterMemberDocs.mjs --apply`（见本节开头的来源说明） | `utils/externalAccess.ts`、`hooks/usePermissions.ts`（外部可访问视图）；firestore.rules `isActiveExternal()`；`shouldHaveCard`（仅 active 外部有卡）；`components/modules/Chapter/ChapterAdminView.tsx`、`SisterChaptersConfig`（成员列表与审批） |
+| affiliation.category | enum | 外部必填 | `sister` \| `apicc` \| `global` |  | 系统: `sisterChapters.type` 经 `utils/affiliation.mjs` `categoryForChapter` 计算（`external-accounts` 与 `signUpExternal` 共用）；KL 管理员（通用会员更新） | 外部会员来源分类展示；`utils/benefitEligibility.ts`（福利受众判断） |
+| affiliation.country | string | 外部必填 | 分会所在国家（自由文本） |  | 系统: `sisterChapters.country`（`external-accounts` 创建时、`signUpExternal` 自助注册时复制；`firestore.rules` `isExternalSelfRegistration` 要求自助注册值等于分会的 `country`）；KL 管理员（通用会员更新） | `memberCards.country`（外部卡取此值；内部卡固定为 `'Malaysia'`）；`utils/benefitEligibility.ts`（福利国家判断） |
+| affiliation.status | enum | 外部必填 | `pending_chapter` \| `pending_kl` \| `active` \| `suspended` \| `expired` \| `rejected`（`rejected`：待审批请求被拒，文档保留作记录） |  | 系统: `external-accounts` `setStatus`（转换表见 `netlify/lib/externalAccounts.mjs` `checkStatusTransition`：KL 管理员可在任意两个不同的已知状态间切换；active `CHAPTER_ADMIN` 仅限本分会 AFFILIATE：`pending_chapter` → `pending_kl`，`pending_chapter` / `pending_kl` → `rejected`，`active` → `suspended`，`suspended` → `active`（仅当 `affiliation.activatedAt` 已有）；`pending_kl` → `active` 只有 KL 管理员）；创建账号写 `active`；`signUpExternal` 写 `pending_chapter`；KL 管理员（通用会员更新） | `isActiveExternal()` 访问判断；`memberCards` 生成/删除（`setStatus` 内同批 `cardFor`；`planCardSync`）；`ExternalAccessNotice`（`getExternalStatusMessage`）；`ChapterAdminView` 与 `SisterChaptersConfig` 的待审批 / 成员列表 |
+| affiliation.chapterApprovedAt / chapterApprovedBy | string | — | `pending_chapter` → `pending_kl` 的时间与操作者 uid |  | 系统: `external-accounts` `setStatus`（`netlify/lib/externalAccounts.mjs` `statusUpdates`，状态由 `pending_chapter` 变为 `pending_kl` 时写入） | 审计展示 |
+| affiliation.klApprovedAt / klApprovedBy | string | — | KL 管理员把 `pending_kl` 或 `pending_chapter` 激活为 `active` 的时间与操作者 uid |  | 系统: `external-accounts` `setStatus`（`statusUpdates`：调用者是 KL 管理员、新状态 `active`、原状态为 `pending_kl` 或 `pending_chapter` 时写入） | 审计展示 |
+| affiliation.statusUpdatedAt / statusUpdatedBy | string | — | 最近一次状态变更的时间与人（任何操作者） |  | 系统: `external-accounts` 创建账号（初值）与每次 `setStatus`；`firestore.rules` 仍允许分会管理人直接写入 | 审计展示 |
+| affiliation.activatedAt | string | — | ISO；首次变为 `active` 的时间（服务器写入） |  | 系统: `external-accounts` 创建账号（`active`）与首次 `setStatus` → `active`（仅在尚无值时写入）；`scripts/auditChapterMemberDocs.mjs --apply` | `external-accounts` `setStatus`：分会管理人 `suspended` → `active` 须此字段已有；`ChapterAdminView` 重新激活按钮的显示条件 |
 
 ---
 
 ## `memberCards`
 > **TS Interface:** `MemberCard`（`types/member.ts`） | **Constants key:** `COLLECTIONS.MEMBER_CARDS`（`'memberCards'`） | **Doc ID:** 等于 `members` 文档 ID
 > 目录安全的公开名片，不含 PII。它是外部用户能读到的其他人资料的唯一来源（见 `SCHEMA-PERMISSIONS.md`）。
-> **来：** 只由 `MemberCardsService.syncCards`（`services/memberCardsService.ts`）写入，`membersService` 在成员写入成功之后调用（create / update / 软删除 / 角色变更 / 批量更新），卡片写入失败只记日志、不回滚成员写入；另有 `scripts/backfillMemberCards.mjs --apply` 回填。卡片构建逻辑在 `utils/memberCard.mjs`（`buildMemberCard`，`shouldHaveCard`，`planCardSync`）。
-> **往：** 应用代码目前没有读取 `memberCards` 的界面（Phase 1 的外部会员目录与生日列表尚未接入）；读取范围由 firestore.rules 决定（`externalCanReadCard`、`isActiveMember`、`canReadOrgMembers`）。
+> **来：** 由 `MemberCardsService.syncCards`（`services/memberCardsService.ts`）写入，`membersService` 在成员写入成功之后调用（create / update / 软删除 / 角色变更 / 批量更新），`hooks/useAuth` `updateMemberProfile` 在自己的资料保存后也调用（Phase 1）；卡片写入失败只记日志、不回滚成员写入。另有 `netlify/functions/external-accounts`（Admin SDK）：创建账号时随成员文档同批写入，`setStatus` 时同批写入或删除（`shouldHaveCard`）；`scripts/backfillMemberCards.mjs --apply` 回填。卡片构建逻辑在 `utils/memberCard.mjs`（`buildMemberCard`，`shouldHaveCard`，`planCardSync`）。
+> **往：** 国际目录经 `hooks/useSisterChapterMembers` 读取：外部用户在 `InternationalNetworkTab`、KL 用户在 `BusinessDirectoryView`（Phase 1）；外部用户读 `international == true` 的卡（含已开放的 KL 卡）加本分会的卡；卡片没有联系方式字段，外部目录不提供 Contact。读取范围由 firestore.rules 决定（`externalCanReadCard`、`isActiveMember`、`canReadOrgMembers`）。外部用户的生日列表不读 `memberCards`，走 `netlify/functions/chapter-birthdays`。
 > 卡片只在 `shouldHaveCard` 为真时存在：role `MEMBER` / `BOARD` / `ADMIN` / `SUPER_ADMIN`，或 active 外部会员；GUEST / INACTIVE 与软删除的成员没有卡。
 
 | 字段路径 | 类型 | 必填 | 枚举值 / 说明 | 平铺冗余字段（等待替换） | 来 | 往 |
 |--------|------|:----:|------------|--------------|----|----|
-| displayName | string | ✓ | 显示名 |  | 系统: `members.general.name`，回退 `members.name`，再回退空字符串（`buildMemberCard`） | 尚无应用读取者（规划：Phase 1 目录） |
-| avatarUrl | string | — | |  | 系统: `members.general.avatarUrl`，回退 `general.avatar` | 尚无应用读取者（规划：Phase 1 目录） |
-| loId | string | ✓ | 分会 ID；须等于 `members.loId`（缺省 `jcikl`） |  | 系统: `members.loId` | `firestore.rules` `externalCanReadCard`（本分会）；list 查询约束 |
-| country | string | — | 外部：`members.affiliation.country`；内部：固定 `'Malaysia'` |  | 系统: `members.affiliation.country`（外部）或代码常量（内部） | 尚无应用读取者（规划：Phase 1 目录） |
-| companyName | string | — | |  | 系统: `members.business.companyName`，回退 `members.companyName` | 尚无应用读取者（规划：Phase 1 目录） |
-| position | string | — | |  | 系统: `members.business.position` | 尚无应用读取者（规划：Phase 1 目录） |
-| department | string | — | |  | 系统: `members.business.departmentAndPosition` | 尚无应用读取者（规划：Phase 1 目录） |
-| industry | string | — | |  | 系统: `members.business.industry`，回退 `members.industry` | 尚无应用读取者（规划：Phase 1 目录） |
-| businessCategory | string[] | — | 仅保留非空字符串，空数组不写入 |  | 系统: `members.business.businessCategory` | 尚无应用读取者（规划：Phase 1 目录） |
-| companyDescription | string | — | |  | 系统: `members.business.companyDescription`，回退 `business.introduction` | 尚无应用读取者（规划：Phase 1 目录） |
-| website | string | — | |  | 系统: `members.business.companyWebsite` | 尚无应用读取者（规划：Phase 1 目录） |
-| acceptInternationalBusiness | enum | — | `Yes` \| `No` \| `Willing to Explore` |  | 系统: `members.business.acceptInternationalBusiness` | 尚无应用读取者（规划：Phase 1 目录） |
-| specialOfferSummary | string | — | 优惠摘要（字符串，或 `specialOffer.description`） |  | 系统: `members.business.specialOffer` | 尚无应用读取者（规划：Phase 1 目录） |
+| displayName | string | ✓ | 显示名 |  | 系统: `members.general.name`，回退 `members.name`，再回退空字符串（`buildMemberCard`） | `hooks/useSisterChapterMembers` → 国际目录展示（姓名） |
+| avatarUrl | string | — | |  | 系统: `members.general.avatarUrl`，回退 `general.avatar` | `hooks/useSisterChapterMembers` → 国际目录展示（头像） |
+| loId | string | ✓ | 分会 ID；须等于 `members.loId`（缺省 `jcikl`） |  | 系统: `members.loId` | `firestore.rules` `externalCanReadCard`（本分会）；list 查询约束；`utils/internationalCards.ts`（`attachSisterChapters` 解析卡所属分会，KL 用固定条目；外部用户另查本分会卡） |
+| country | string | — | 外部：`members.affiliation.country`；内部：固定 `'Malaysia'` |  | 系统: `members.affiliation.country`（外部）或代码常量（内部） | 尚无应用读取者（国际目录的国家取自 `sisterChapters.country`，不读此字段） |
+| companyName | string | — | |  | 系统: `members.business.companyName`，回退 `members.companyName` | `hooks/useSisterChapterMembers` → 国际目录展示与搜索 |
+| position | string | — | |  | 系统: `members.business.position` | `hooks/useSisterChapterMembers` → 国际目录展示 |
+| department | string | — | |  | 系统: `members.business.departmentAndPosition` | 尚无应用读取者 |
+| industry | string | — | |  | 系统: `members.business.industry`，回退 `members.industry` | `hooks/useSisterChapterMembers` → 国际目录展示与行业筛选 |
+| businessCategory | string[] | — | 仅保留非空字符串，空数组不写入 |  | 系统: `members.business.businessCategory` | `hooks/useSisterChapterMembers` → 国际目录展示与搜索 |
+| companyDescription | string | — | |  | 系统: `members.business.companyDescription`，回退 `business.introduction` | `hooks/useSisterChapterMembers` → 国际目录展示与搜索 |
+| website | string | — | |  | 系统: `members.business.companyWebsite` | `hooks/useSisterChapterMembers` → 国际目录展示 |
+| acceptInternationalBusiness | enum | — | `Yes` \| `No` \| `Willing to Explore` |  | 系统: `members.business.acceptInternationalBusiness` | 尚无应用读取者 |
+| specialOfferSummary | string | — | 优惠摘要（字符串，或 `specialOffer.description`） |  | 系统: `members.business.specialOffer` | `hooks/useSisterChapterMembers` → 国际目录优惠展示与「只看优惠」筛选 |
 | international | boolean | ✓ | 与 `members.privacy.shareCardInternationally` 相等（缺省 false） |  | 系统: `members.privacy.shareCardInternationally`（`buildMemberCard`） | `firestore.rules` `externalCanReadCard`：`international == true` 时外部用户可读 |
 | updatedAt | string | ✓ | 卡片写入时的 ISO 时间 |  | 系统: 同步时刻（`syncCards` / 回填脚本） | 尚无应用读取者 |
 
@@ -298,9 +301,11 @@
 
 | 字段路径 | 类型 | 必填 | 枚举值 / 说明 | 来 | 往 |
 |--------|------|:----:|------------|----|----|
-| email | string | ✓ | 原始邮箱地址 | 系统: 从 `members.contact.email` 规范化生成；导入时从导入记录生成 | 邮箱唯一性占位键；Auth 邮箱同步依据 |
-| memberId | string | ✓ | 对应 members doc ID | 系统: 创建会员时生成；导入时从会员文档关联 | 关联 `members/{memberId}`；查询邮箱对应会员 |
+| email | string | ✓ | 原始邮箱地址 | 系统: 从 `members.contact.email` 规范化生成；导入时从导入记录生成；`netlify/functions/external-accounts` 创建外部账号时（Admin SDK，`buildEmailSlot`） | 邮箱唯一性占位键；Auth 邮箱同步依据；`external-accounts` 创建前检查邮箱是否已占用 |
+| memberId | string | ✓ | 对应 members doc ID | 系统: 创建会员时生成；导入时从会员文档关联；`external-accounts` 创建外部账号时 | 关联 `members/{memberId}`；查询邮箱对应会员 |
 | createdAt | Timestamp | ✓ | | 系统: 创建邮箱去重槽位时生成 | 去重槽位审计记录 |
+
+> 外部自助注册（`signUpExternal`）不写入槽位：`memberEmails` 的创建规则只允许 B+，自助注册的外部会员没有槽位（见 `RISK_REGISTER.md` R-066）。
 
 ---
 
@@ -345,7 +350,7 @@
 | id | string | ✓ | Firestore doc ID，同时作为 members.loId 的值 | 角色: A+；系统: 创建时指定的 chapter ID | `members.loId` 关联；会员章节选择项 |
 | name | string | ✓ | 例："JCI Singapore" | 角色: A+；系统: 章节设置表单 | 会员章节名称、国际网络展示 |
 | country | string | ✓ | | 角色: A+；系统: 章节设置表单 | 国际网络筛选与展示 |
-| type | enum[] | ✓ | `sister_lo` \| `apicc` | 角色: A+；系统: 章节设置表单 | 国际伙伴类型筛选与展示 |
+| type | enum[] | ✓ | `sister_lo` \| `apicc` \| `global` | 角色: A+；系统: 章节设置表单 | 国际伙伴类型筛选与展示；`utils/affiliation.mjs` `categoryForChapter` → `members.affiliation.category`（`global` → `global`） |
 | flagEmoji | string | — | | 角色: A+；系统: 章节设置表单 | 章节名称和会员章节选择项展示 |
 | logoUrl | string | — | | 角色: A+；系统: 章节设置表单或图片上传 | 国际网络展示 |
 | partnerSince | string | — | | 角色: A+；系统: 章节设置表单 | 合作年份展示 |
@@ -418,6 +423,8 @@
 | billExternalReferenceNo | string | — | | 系统: ToyyibPay 账单创建 | 外部付款引用 |
 | financeTransactionId | string | — | | 系统: 财务交易创建/关联 | 财务交易记录 |
 | paymentMethod | enum | — | `toyyib` \| `bank_transfer` \| `cash` | 角色: 会员/财务；系统: 付款流程 | 付款处理分支 |
+| registrantLoId | string \| null | — | 报名人所属分会；`loId` 仍是主办 LO | 系统: `EventsService.registerForEvent` 从 `members.loId` 读取（读取失败时用 `jcikl`）；创建后自己不可改（`firestore.rules` 自更新锁定列表） | 仅作参考记录，尚无应用读取者 |
+| currency | enum \| null | — | `MYR` \| `USD` | 系统: `EventsService.registerForEvent`：报名人 role 为 `AFFILIATE` / `CHAPTER_ADMIN` 时写 `USD`，否则 `MYR`；创建后自己不可改（自更新锁定列表） | `EventPaymentService.markRegistrationPaid`（USD 时把活动价记为 `transactions.originalAmount`）；`EventMarkPaidModal`；USD 价格展示 |
 
 ---
 
@@ -607,6 +614,9 @@
 | reversalOf | string | — | 被冲销的原始交易 ID | 系统: 冲销交易复制原交易 ID | 关联原始 `transactions` |
 | reversalReason | string | — | | 角色: Finance；系统: 冲销表单 | 冲销审计说明 |
 | reversedBy | string | — | | 系统: 冲销操作人的 `auth.uid` | 冲销审计 |
+| currency | enum | — | `MYR` \| `USD`，缺省 = `MYR`；创建后不可改（不在 transactions 更新字段白名单内） | 目前没有写入代码（类型已声明；`EventPaymentService.markRegistrationPaid` 不写此字段） | 无 |
+| originalAmount | number | — | 仅参考：付款人看到的价格（USD 报名为美元价）；`amount` 仍是收到的马币金额 | 系统: `EventPaymentService.markRegistrationPaid`（`eventRegistrations.currency` 为 `USD` 时写入活动价） | 无（仅参考记录） |
+| originalCurrency | enum | — | `USD` | 系统: `EventPaymentService.markRegistrationPaid`（USD 报名时写入） | 无（仅参考记录） |
 
 ---
 
@@ -975,11 +985,13 @@
 | description | string | ✓ | | 角色: 广告主；系统: 广告表单 | 广告详情展示 |
 | type | enum | ✓ | `Banner` \| `Newsletter` \| `Event Sponsorship` \| `Social Media` \| `Website` | 角色: 广告主；系统: 广告表单 | 广告类型展示与投放配置 |
 | placement | enum[] | ✓ | `Homepage` \| `Events Page` \| `Newsletter Header` \| `Newsletter Footer` \| `Sidebar` \| `Popup` | 角色: 广告主；系统: 广告表单 | 广告位置筛选与投放 |
-| targetAudience | enum | — | `All Members` \| `Specific Tier` \| `Specific Role` \| `Custom` | 角色: 广告主；系统: 广告表单 | 受众筛选与投放 |
+| targetAudience | enum | — | `All Members` \| `Specific Tier` \| `Specific Role` \| `Custom` | 角色: 广告主；系统: 广告表单 | 仅用于 `AdvertisementsView` 列表搜索；未用于投放过滤（见 `RISK_REGISTER.md` R-067） |
 | targetCriteria | object | — | | 系统: 受众配置表单 | 受众匹配 |
 | targetCriteria.tiers | string[] | — | | 角色: 广告主；系统: 受众配置 | 会员等级筛选 |
 | targetCriteria.roles | string[] | — | | 角色: 广告主；系统: 受众配置 | 会员角色筛选 |
 | targetCriteria.memberIds | string[] | — | | 角色: 广告主；系统: 受众配置 | 指定会员投放 |
+| targetCriteria.audiences | enum[] | — | `kl` \| `sister` \| `apicc` \| `global`；缺省或空 = 仅 KL | 角色: B+/A+（`AdvertisementsView` 表单提交，`AdvertisementFormModal` 勾选，经 `advertisementService` 写入） | `utils/benefitEligibility.ts` `getBenefitEligibility`；`MemberBenefitsView`（不符合的项灰显并给出原因） |
+| targetCriteria.countries | string[] | — | 观看者国家（大小写不敏感）；缺省或空 = 任何国家 | 角色: B+/A+（同上） | `utils/benefitEligibility.ts`（KL 观看者固定为 `Malaysia`；外部观看者取 `members.affiliation.country`） |
 | businessProfileId | string | — | 链接到商业目录 | 系统: Business Directory 关联 | 广告主资料展示 |
 | imageUrl | string | ✓ | | 角色: 广告主；系统: 媒体上传 | 广告渲染 |
 | linkUrl | string | — | | 角色: 广告主；系统: 广告表单 | 点击跳转 |
@@ -1025,6 +1037,7 @@
 
 ## `guestRegistrations`
 > 无专属 TS 接口（字段从 `services/eventsService.ts` registerGuestForEvent 方法推断） | **Constants key:** `COLLECTIONS.GUEST_REGISTRATIONS`
+> 两种文档形状，由未登录访客经 `EventsService.registerGuestForEvent` 在同一个 `writeBatch` 里创建（确定性 doc id）：主文档 `{eventId}_{emailKey}`（`eventId`、`name`、`email`、`phone`、`registeredAt`、`status`，可选 `organization`、`notes`、取消后的 `cancelledAt`；创建时 `status` 必须是 `Pending`）；电话索引文档 `{eventId}_phone_{phoneKey}`（`eventId`、`email`、`phone`、`status`、`_indexFor` = `'phone'`）。已存在的 id 会让 `set` 变成更新，访客无权更新，整个批次被拒绝，所以访客取消后不能用同一邮箱 / 电话重新报名（设计如此，见 `RISK_REGISTER.md` R-072）。
 
 | 字段路径 | 类型 | 必填 | 枚举值 / 说明 | 来 | 往 |
 |--------|------|:----:|------------|----|----|
@@ -1037,6 +1050,7 @@
 | organization | string | — | | 访客报名表单 | 报名列表展示 |
 | notes | string | — | | 访客报名表单 | 活动人员备注 |
 | _indexFor | string | — | 电话索引哨兵文档专用字段，值为 `'phone'`；查询时需过滤掉此类文档 | 系统: 电话索引流程 | 电话重复报名查询 |
+| cancelledAt | Timestamp | — | 仅主文档 | 系统: `EventsService.cancelGuestRegistration`（同批把电话索引文档 `status` 改为 `Cancelled`）；目前应用内没有调用方 | 取消记录 |
 
 ---
 
@@ -1758,6 +1772,8 @@
 | timestamp | Date \| string | — | 写入时间（types/misc.ts 版本含此字段） | 系统: 审计操作时间 | 审计日志排序 |
 | loId | string | — | LO 归属（types/misc.ts 版本含此字段） | 系统: `members.loId` / 操作上下文 | 跨 LO 审计隔离 |
 
+> `action` 的已知取值（Phase 1）：`external_accounts_createChapterAdmin`、`external_accounts_inviteMember`、`external_accounts_setStatus`、`external_accounts_resendInvite`（均由 `netlify/functions/external-accounts` 写入，`_source` = `netlify-function`，`targetCollection` = `members`；`metadata` 不含邮箱）；`external_accounts_convert_chapter_members`（`scripts/auditChapterMemberDocs.mjs --apply` 写入）。
+
 ---
 
 ## `communication`
@@ -1805,7 +1821,8 @@
 | questions[].conditionalLogic.showIf.value | any | ✓ | 比对值 | 角色: 调查创建者；系统: 调查设计器 | 条件渲染判断 |
 | questions[].helpText | string | — | | 角色: 调查创建者；系统: 调查设计器 | 填写页辅助说明 |
 | targetAudience | enum | ✓ | `All Members` \| `Board` \| `Project Leads` \| `Specific Group` | 调查发布设置 | 调查分发目标筛选 |
-| specificMemberIds | string[] | — | 当 targetAudience = Specific Group 时使用 | 分组/成员选择器 | 指定成员调查入口 |
+| specificMemberIds | string[] | — | 当 targetAudience = Specific Group 时使用 | 分组/成员选择器 | 指定成员调查入口；外部用户读取权限（`firestore.rules`，列表须带 `array-contains` 条件）、`SurveysService.getSurveysForExternal` |
+| openToExternals | boolean | — | 缺省 = false；其他分会的外部会员在调查 `Active` 时可看到并作答 | 角色: B+ / A+（`SurveysView` 创建表单与列表行勾选；`firestore.rules` 只允许 B+ 写） | `firestore.rules`：外部用户读 `surveys`、创建 `surveyResponses`；`SurveysService.getSurveysForExternal` |
 | status | enum | ✓ | `Draft` \| `Active` \| `Closed` | 发布、关闭调查操作 | 列表状态、填写权限 |
 | startDate | string | ✓ | ISO date string | 调查发布设置 | 调查开放时间校验 |
 | endDate | string | ✓ | ISO date string | 调查发布设置 | 调查截止时间校验 |
@@ -1940,6 +1957,7 @@
 | whatsappUrl | string | — | 群组聊天邀请链接（WhatsApp / LINE / Discord 等，仅限 http/https） | 角色: 社团负责人；系统: `HobbyClubsView` 建立/编辑表单「Group Chat Link」 | 社团卡片「Join Group Chat」按钮（`utils/clubLink.getClubGroupLink`） |
 | capacity | number | — | 旧字段：原由已移除的 joinClub 检查 | — | 无 |
 | isDeleted | boolean | — | 软删除标记；getAllClubs 过滤掉此字段为 true 的记录 | 系统: 社团删除流程 | 社团列表过滤 |
+| openToExternals | boolean | — | 缺省 = false；其他分会的外部会员可看到该社团 | 角色: B+ / A+（`HobbyClubsView` 勾选；`firestore.rules`：MEMBER 创建时不能设 true，社团负责人更新不能改此字段） | `firestore.rules`：外部用户读 `hobbyClubs`（列表须带 `where('openToExternals','==',true)`）；`HobbyClubsService.getClubsForExternal` |
 
 ---
 
