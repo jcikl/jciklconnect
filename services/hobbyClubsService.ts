@@ -46,15 +46,13 @@ export class HobbyClubsService {
       async () => {
         try {
           // P1 fix: filter out soft-deleted clubs so they never appear in the UI.
-          const snapshot = await getDocs(
-            query(
-              collection(db, COLLECTIONS.HOBBY_CLUBS),
-              where('isDeleted', '!=', true),
-              orderBy('isDeleted'),
-              orderBy('name', 'asc')
-            )
-          );
-          return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as HobbyClub));
+          // Filtered in code: where('isDeleted','!=',true) would also drop clubs with no isDeleted field,
+          // which is every club createClub writes.
+          const snapshot = await getDocs(collection(db, COLLECTIONS.HOBBY_CLUBS));
+          return snapshot.docs
+            .map(d => ({ id: d.id, ...d.data() } as HobbyClub))
+            .filter(c => c.isDeleted !== true)
+            .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
         } catch (error) {
           errorLoggingService.logError(error as Error, {
             component: 'HobbyClubsService',
