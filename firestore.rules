@@ -42,8 +42,12 @@ service cloud.firestore {
 
     // Synced from boardMembers when assigned to the current calendar-year board.
     // Supports both legacy top-level fields and the canonical jciCareer.* fields.
+    // The flags only count for KL roles: an external (AFFILIATE / CHAPTER_ADMIN) or INACTIVE doc
+    // carrying isCurrentBoardMember never gets board / finance / member-editing access.
+    // (Feeds isBoard, canReadOrgMembers, canEditMembers, canAccessFinance, isFinanceOperator.)
     function isCurrentBoardMember() {
       return exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
+             !(getUserRole() in ['AFFILIATE', 'CHAPTER_ADMIN', 'INACTIVE']) &&
              (memberData().get('isCurrentBoardMember', false) == true ||
               memberJciCareer().get('isCurrentBoardMember', false) == true);
     }
@@ -169,6 +173,30 @@ service cloud.firestore {
              !(data.get('role', '') in ['AFFILIATE', 'CHAPTER_ADMIN']);
     }
 
+    // L2: a doc with an external role must sit in a non-KL chapter (checked on every create/update).
+    function externalRoleHasChapter() {
+      return !(request.resource.data.get('role', '') in ['AFFILIATE', 'CHAPTER_ADMIN']) ||
+             request.resource.data.get('loId', klLoId()) != klLoId();
+    }
+
+    // M2: an external user's own event registration / cancellation on an event doc: only
+    // registeredMembers gains or loses exactly their uid and attendees moves by exactly ±1
+    // (what eventRegistrationService / eventsService write via arrayUnion/arrayRemove + increment).
+    function isOwnRegistrationCounterChange() {
+      let before = resource.data.get('registeredMembers', []);
+      let after = request.resource.data.get('registeredMembers', []);
+      let delta = request.resource.data.get('attendees', 0) - resource.data.get('attendees', 0);
+      let uid = request.auth.uid;
+      return request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['attendees', 'registeredMembers', 'updatedAt']) &&
+             ((!(uid in before) && (uid in after) && after.size() == before.size() + 1 &&
+               after.toSet().difference(before.toSet()).hasOnly([uid]) &&
+               before.toSet().difference(after.toSet()).size() == 0 && delta == 1) ||
+              ((uid in before) && !(uid in after) && after.size() == before.size() - 1 &&
+               before.toSet().difference(after.toSet()).hasOnly([uid]) &&
+               after.toSet().difference(before.toSet()).size() == 0 && delta == -1));
+    }
+
     function chapterAdminCanRead() {
       return isActiveChapterAdmin() && resource.data.loId == getMyLoId();
     }
@@ -222,8 +250,14 @@ service cloud.firestore {
       // isBoard() bypasses field-shape checks; self-registration still validates both layouts.
       allow create: if isAuthenticated() &&
                        request.resource.data.role is string &&
-                       // Only KL admins create chapter admins (BOARD may not).
-                       (isAdmin() || request.resource.data.role != 'CHAPTER_ADMIN') &&
+                       externalRoleHasChapter() &&
+                       // Only KL admins create external members (AFFILIATE / CHAPTER_ADMIN). Non-admin
+                       // creators (BOARD, self sign-up) create KL docs only: loId 'jcikl' (or absent → KL)
+                       // and no affiliation.
+                       (isAdmin() ||
+                        (!(request.resource.data.role in ['AFFILIATE', 'CHAPTER_ADMIN']) &&
+                         request.resource.data.get('loId', klLoId()) == klLoId() &&
+                         !request.resource.data.keys().hasAny(['affiliation']))) &&
                        (isBoard() ||
                         (request.auth.uid == memberId &&
                          !exists(/databases/$(database)/documents/members/$(memberId)) &&
@@ -255,7 +289,7 @@ service cloud.firestore {
       // INACTIVE users are blocked from self-write at the rules layer (not just service layer).
       // GUEST may also set nationality/dob/idNumber; once promoted to MEMBER+ those three are locked.
       // BOARD+ edits: senatorshipId is immutable once board-validated; only Admin can override (E2 fix).
-      allow update: if isAuthenticated() && (
+      allow update: if isAuthenticated() && externalRoleHasChapter() && (
         (request.auth.uid == memberId &&
          resource.data.get('role', 'GUEST') != 'INACTIVE' &&
          // E8 fix: self-write cannot delete name/email. R-028: accept either the legacy top-level fields
@@ -286,8 +320,10 @@ service cloud.firestore {
         (canEditMembers() && (resource == null || isAdmin() || resourceInMyLo(resource.data)) &&
          // BOARD members cannot elevate anyone to ADMIN / SUPER_ADMIN (E13 fix)
          // ...nor to CHAPTER_ADMIN (chapter admins are created by KL admins only).
+         // ...nor to an external role, nor move a doc between chapters or touch affiliation (M3).
          (isAdmin() ||
-          !(request.resource.data.get('role', resource.data.get('role', '')) in ['ADMIN', 'SUPER_ADMIN', 'CHAPTER_ADMIN'])) &&
+          (!(request.resource.data.get('role', resource.data.get('role', '')) in ['ADMIN', 'SUPER_ADMIN', 'AFFILIATE', 'CHAPTER_ADMIN']) &&
+           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['loId', 'affiliation']))) &&
          (isAdmin() ||
           !resource.data.get('senatorshipBoardValidated', false) ||
           request.resource.data.get('senatorshipId', resource.data.get('senatorshipId', null))
@@ -303,7 +339,14 @@ service cloud.firestore {
          request.resource.data.get('affiliation', {}).diff(resource.data.get('affiliation', {})).affectedKeys()
            .hasOnly(['status', 'chapterApprovedAt', 'chapterApprovedBy', 'statusUpdatedAt', 'statusUpdatedBy']) &&
          (request.resource.data.get('affiliation', {}).get('status', '') == resource.data.get('affiliation', {}).get('status', '') ||
-          request.resource.data.get('affiliation', {}).get('status', '') in ['pending_chapter', 'pending_kl', 'suspended', 'expired']))
+          request.resource.data.get('affiliation', {}).get('status', '') in ['pending_chapter', 'pending_kl', 'suspended', 'expired']) &&
+         // L6: audit fields, when written, must name the caller.
+         (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['updatedBy']) ||
+          request.resource.data.updatedBy == request.auth.uid) &&
+         (!request.resource.data.get('affiliation', {}).diff(resource.data.get('affiliation', {})).affectedKeys().hasAny(['chapterApprovedBy']) ||
+          request.resource.data.affiliation.chapterApprovedBy == request.auth.uid) &&
+         (!request.resource.data.get('affiliation', {}).diff(resource.data.get('affiliation', {})).affectedKeys().hasAny(['statusUpdatedBy']) ||
+          request.resource.data.affiliation.statusUpdatedBy == request.auth.uid))
       );
 
       // Only admins may delete; self-delete removed to prevent orphan data (E07)
@@ -391,18 +434,20 @@ service cloud.firestore {
       // resource.data is null during list queries, so any resource.data condition on allow read
       // would silently block all list results. allow list: if true lets unauthenticated visitors
       // see the public events page; the service layer where() clause filters by status.
-      allow get: if isAuthenticated();
+      allow get: if isInternalUser() || isActiveExternal();
       allow list: if true;
       // FIX 1: restrict writes to Board+; members may update only their own attendance fields
       // P1 Fix: require critical fields on create to prevent partial/malformed event documents
       allow create: if (isBoard() || isAdmin()) &&
                        request.resource.data.keys().hasAll(['title', 'status', 'createdAt']);
       allow delete: if isBoard() || isAdmin();
-      // Active external users register for events too (eventRegistrationService updates the counter).
+      // KL members: pre-existing field-only check (unchanged). Active external users: only their own
+      // uid in/out of registeredMembers with attendees ±1 (M2).
       allow update: if isBoard() || isAdmin() ||
-                       ((isMember() || isActiveExternal()) &&
+                       (isMember() &&
                         request.resource.data.diff(resource.data).affectedKeys()
-                          .hasOnly(['attendees', 'registeredMembers', 'updatedAt']));
+                          .hasOnly(['attendees', 'registeredMembers', 'updatedAt'])) ||
+                       (isActiveExternal() && isOwnRegistrationCounterChange());
     }
 
     // Projects collection
@@ -410,17 +455,20 @@ service cloud.firestore {
       // Public events page uses getDocs(query(projects, where('status','==','Active'))).
       // Firestore list rules can't filter by query params, so allow list: if true lets the
       // unauthenticated guest events page work; service layer filters status in code.
-      allow get: if isAuthenticated() || resource.data.status == 'Active';
+      allow get: if isInternalUser() || isActiveExternal() || resource.data.status == 'Active';
       allow list: if true;
       // FIX 1: restrict writes to Board+; members may update only their own attendance/registration fields
       // P1 Fix: require critical fields on create to prevent partial/malformed project documents
       allow create: if (isBoard() || isAdmin()) &&
                        request.resource.data.keys().hasAll(['title', 'status', 'createdAt']);
       allow delete: if isBoard() || isAdmin();
+      // Events are stored here (eventRegistrationService / eventsService write doc(PROJECTS, eventId)),
+      // so active external users register through the same tight own-uid ±1 check as /events (M2).
       allow update: if isBoard() || isAdmin() ||
                        (isMember() &&
                         request.resource.data.diff(resource.data).affectedKeys()
-                          .hasOnly(['attendees', 'registeredMembers', 'updatedAt']));
+                          .hasOnly(['attendees', 'registeredMembers', 'updatedAt'])) ||
+                       (isActiveExternal() && isOwnRegistrationCounterChange());
     }
 
     // Flagship Projects collection
@@ -872,7 +920,7 @@ service cloud.firestore {
     // Hobby Clubs collection
     // FIX 12: any authenticated user (including GUEST) could create/update/delete any club
     match /hobbyClubs/{clubId} {
-      allow read: if isAuthenticated();  // external users included (whitelisted module: hobby clubs)
+      allow read: if isInternalUser() || isActiveExternal();  // whitelisted module: hobby clubs
       // P2 Fix: exclude GUEST role from creating clubs — only MEMBER and above.
       allow create: if (isMember() && getUserRole() != 'GUEST') || isBoard() || isAdmin();
       // Club lead can update descriptive fields only — leadId and memberIds are admin-managed
@@ -998,7 +1046,7 @@ service cloud.firestore {
     
     // Member Benefits collection
     match /memberBenefits/{benefitId} {
-      allow read: if isAuthenticated();  // external users included (whitelisted module: member benefits)
+      allow read: if isInternalUser() || isActiveExternal();  // whitelisted module: member benefits
       allow create, update, delete: if isBoard();
     }
     
@@ -1078,7 +1126,7 @@ service cloud.firestore {
       // resource.data valid on get; list is board-only to protect submitter identity
       allow get: if isBoard() || isAdmin() || (isAuthenticated() && resource.data.memberId == request.auth.uid);
       allow list: if isBoard() || isAdmin();
-      allow create: if isAuthenticated() &&
+      allow create: if (isInternalUser() || isActiveExternal()) &&
                       request.resource.data.memberId == request.auth.uid &&
                       request.resource.data.keys().hasAll(['memberId', 'eventId', 'rating', 'submittedAt']);
       allow update, delete: if isBoard() || isAdmin();
@@ -1472,7 +1520,7 @@ service cloud.firestore {
     // Board can read logs for debugging; authenticated users may create (client-side email log writes); Admin manages
     match /emailLogs/{docId} {
       allow read: if isAdmin() || isBoard();
-      allow create: if isAuthenticated();
+      allow create: if isInternalUser() || isActiveExternal();
       allow update, delete: if isAdmin();
     }
 
