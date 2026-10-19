@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { UserRole } from '../../types';
 import { ViewType } from '../../types/views';
+import { canOpenSystemConfig } from '../../utils/configAccess';
 
 export interface SidebarNavigationContext {
   memberRole?: UserRole;
@@ -236,7 +237,8 @@ export const sidebarNavigationSections: SidebarNavigationSection[] = [
         label: 'Config',
         view: 'SYSTEM_CONFIG',
         activeViews: ['SYSTEM_CONFIG', 'MEMBERSHIP_CONFIG', 'ACCESS_CONFIG', 'API_CONFIG', 'TOYYIB', 'WHAPI_CONFIG'],
-        visible: ({ memberRole }) => memberRole === UserRole.SUPER_ADMIN,
+        // ADMIN gets Config with the Global Relations tab only (utils/configAccess.ts).
+        visible: ({ memberRole }) => canOpenSystemConfig(memberRole),
       },
       {
         icon: <Workflow size={18} />,

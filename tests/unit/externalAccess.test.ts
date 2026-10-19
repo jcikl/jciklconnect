@@ -98,7 +98,8 @@ const KL_BASELINE: Record<string, string[]> = {
   INACTIVE: ['primary:DASHBOARD', 'primary:DIRECTORY', 'primary:KNOWLEDGE', 'primary:CLUBS', 'workspace:SURVEYS', 'workspace:ZOOM_BOOKING', 'workspace:SOCIAL_MEDIA'],
   PLAIN: ['primary:DASHBOARD', 'primary:DIRECTORY', 'primary:KNOWLEDGE', 'primary:BENEFITS', 'primary:CLUBS', 'workspace:PROJECTS', 'workspace:SURVEYS', 'workspace:ZOOM_BOOKING', 'workspace:SOCIAL_MEDIA'],
   BOARD: BOARD_ITEMS,
-  ADMIN: BOARD_ITEMS,
+  // Phase 1: ADMIN now sees Config (Global Relations tab only — utils/configAccess.ts, owner decision 2).
+  ADMIN: SUPER_ITEMS,
   SUPER: SUPER_ITEMS,
   DEV: [...SUPER_ITEMS, 'developer:AI_INSIGHTS', 'developer:DEVELOPER'],
 };

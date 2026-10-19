@@ -51,7 +51,11 @@ const Toggle: React.FC<{ checked: boolean; onChange: (v: boolean) => void }> = (
   </button>
 );
 
-export const SisterChaptersConfig: React.FC = () => {
+/**
+ * Global Relations (Config). canEditChapters (SUPER_ADMIN): add / edit / delete / activate chapters.
+ * Every KL admin (ADMIN + SUPER_ADMIN) may add chapter admins, invite members and handle approvals.
+ */
+export const SisterChaptersConfig: React.FC<{ canEditChapters?: boolean }> = ({ canEditChapters = false }) => {
   const { chapters, loading, reload } = useSisterChapters();
   const { showToast } = useToast();
 
@@ -286,7 +290,8 @@ export const SisterChaptersConfig: React.FC = () => {
       </div>
 
       <div className="space-y-2">
-        {/* Add chapter row */}
+        {/* Add chapter row (SUPER_ADMIN only) */}
+        {canEditChapters && (
         <button
           onClick={openNew}
           className="w-full flex items-center gap-3 p-3 rounded-xl border border-dashed border-slate-300 hover:border-jci-blue hover:bg-blue-50/50 text-slate-400 hover:text-jci-blue transition-colors"
@@ -296,6 +301,7 @@ export const SisterChaptersConfig: React.FC = () => {
           </div>
           <span className="text-sm font-medium">Add Chapter / Council</span>
         </button>
+        )}
 
         {/* Chapter cards grouped by type */}
         {TYPE_OPTIONS.map(({ value: typeKey, label: typeLabel }) => {
@@ -341,13 +347,17 @@ export const SisterChaptersConfig: React.FC = () => {
                   >
                     <ChevronDown size={14} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                   </button>
-                  <Toggle checked={ch.isActive} onChange={() => handleToggleActive(ch)} />
-                  <button onClick={() => openEdit(ch)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
-                    <Pencil size={14} />
-                  </button>
-                  <button onClick={() => handleDeleteChapter(ch)} className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors">
-                    <Trash2 size={14} />
-                  </button>
+                  {canEditChapters && (
+                    <>
+                      <Toggle checked={ch.isActive} onChange={() => handleToggleActive(ch)} />
+                      <button onClick={() => openEdit(ch)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
+                        <Pencil size={14} />
+                      </button>
+                      <button onClick={() => handleDeleteChapter(ch)} className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors">
+                        <Trash2 size={14} />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 
