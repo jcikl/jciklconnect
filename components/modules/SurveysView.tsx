@@ -5,7 +5,7 @@ import type { ConfirmState } from '../ui/Common';
 import { useSurveys } from '../../hooks/useSurveys';
 import { useAuth } from '../../hooks/useAuth';
 import { usePermissions } from '../../hooks/usePermissions';
-import { Input, Textarea, Select } from '../ui/Form';
+import { Input, Textarea, Select, Checkbox } from '../ui/Form';
 import { Survey, SurveyQuestion, SurveyResponse } from '../../services/surveysService';
 import { formatDate } from '../../utils/dateUtils';
 import { SurveyAnalyticsService, SurveyAnalytics, QuestionAnalytics } from '../../services/surveyAnalyticsService';
@@ -38,9 +38,16 @@ export const SurveysView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
     const [isSaving, setIsSaving] = useState(false);
     const { surveys, loading, error, createSurvey, submitResponse, updateSurvey, deleteSurvey, getSurveyResponses } = useSurveys();
     const { member } = useAuth();
-    const { isAdmin, isBoard } = usePermissions();
+    const { isAdmin, isBoard, isExternal } = usePermissions();
     const { showToast } = useToast();
-    const canManage = isAdmin || isBoard;
+    // Board / admin only; externals (other chapters) never create, distribute or set the audience.
+    const canManage = (isAdmin || isBoard) && !isExternal;
+    // Externals cannot read other people's responses, so the Results tab and buttons are hidden for them.
+    const surveyTabs = isExternal ? SURVEY_TABS.filter(t => t.id !== 'results') : SURVEY_TABS;
+
+    const toggleOpenToExternals = async (survey: Survey) => {
+        try { await updateSurvey(survey.id, { openToExternals: !survey.openToExternals }); } catch { /* handled in hook */ }
+    };
 
     const filteredSurveys = React.useMemo(() => {
         const term = (searchQuery || '').toLowerCase();
@@ -113,6 +120,7 @@ export const SurveysView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                 description: formData.get('description') as string,
                 questions,
                 targetAudience: (formData.get('targetAudience') as any) || 'All Members',
+                openToExternals: canManage && formData.get('openToExternals') === 'on',
                 status: 'Draft',
                 startDate: formData.get('startDate') as string,
                 endDate: formData.get('endDate') as string,
@@ -193,7 +201,7 @@ export const SurveysView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                 title="Feedback & Surveys"
                 description="Pulse checks, satisfaction surveys, and polls."
                 tabs={{
-                    items: SURVEY_TABS,
+                    items: surveyTabs,
                     activeTab,
                     onTabChange: (tab) => {
                         const nextTab = tab as typeof activeTab;
@@ -245,7 +253,13 @@ export const SurveysView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                                                     <p className="font-semibold text-slate-900 mt-1 group-hover:text-jci-blue transition-colors">{survey.title}</p>
                                                     {survey.description && <p className="text-xs text-slate-400 line-clamp-1 mt-0.5">{survey.description}</p>}
                                                 </td>
-                                                <td className="px-4 py-3 text-sm text-slate-600">{survey.targetAudience || '—'}</td>
+                                                <td className="px-4 py-3 text-sm text-slate-600">
+                                                    {survey.targetAudience || '—'}
+                                                    {canManage && (
+                                                        <Checkbox className="mt-1" label={<span className="text-xs">Open to other JCI chapters</span>}
+                                                            checked={!!survey.openToExternals} onChange={() => toggleOpenToExternals(survey)} />
+                                                    )}
+                                                </td>
                                                 <td className="px-4 py-3">
                                                     <span className="font-semibold text-slate-900">{survey.responsesCount || 0}</span>
                                                 </td>
@@ -258,7 +272,7 @@ export const SurveysView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                                                                 Take <ArrowRight size={12} />
                                                             </button>
                                                         )}
-                                                        {survey.status !== 'Active' && (
+                                                        {survey.status !== 'Active' && !isExternal && (
                                                             <button className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 border border-slate-200 hover:border-slate-300 px-2.5 py-1.5 rounded-lg transition-colors"
                                                                 onClick={() => { setAnalyticsSurveyId(survey.id); setActiveTab('results'); loadAnalytics(survey.id); }}>
                                                                 <BarChart2 size={12} /> Results
@@ -317,6 +331,10 @@ export const SurveysView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                                                     <span className="text-[11px] text-slate-400">Due {formatDate(survey.endDate)}</span>
                                                 </div>
                                                 <p className="font-semibold text-slate-900 text-sm mt-1">{survey.title}</p>
+                                                {canManage && (
+                                                    <Checkbox className="mt-1" label={<span className="text-xs">Open to other JCI chapters</span>}
+                                                        checked={!!survey.openToExternals} onChange={() => toggleOpenToExternals(survey)} />
+                                                )}
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -326,7 +344,7 @@ export const SurveysView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                                                     Take Survey <ArrowRight size={12} />
                                                 </button>
                                             )}
-                                            {survey.status !== 'Active' && (
+                                            {survey.status !== 'Active' && !isExternal && (
                                                 <button className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 border border-slate-200 px-2.5 py-1.5 rounded-lg"
                                                     onClick={() => { setAnalyticsSurveyId(survey.id); setActiveTab('results'); loadAnalytics(survey.id); }}>
                                                     <BarChart2 size={12} /> View Results
@@ -439,6 +457,9 @@ export const SurveysView: React.FC<{ searchQuery?: string }> = ({ searchQuery })
                                 { label: 'Project Leads', value: 'Project Leads' },
                                 { label: 'Specific Group', value: 'Specific Group' },
                             ]} defaultValue="All Members" required />
+                            {canManage && (
+                                <Checkbox name="openToExternals" label="Open to other JCI chapters (they can see and answer it while Active)" />
+                            )}
                             <button type="button" onClick={() => setCreateModalTab('questions')}
                                 className="w-full mt-2 flex items-center justify-center gap-2 text-sm font-semibold text-jci-blue border border-jci-blue/30 hover:border-jci-blue/60 hover:bg-sky-50 rounded-xl py-2.5 transition-colors">
                                 Next: Add Questions <ArrowRight size={14} />

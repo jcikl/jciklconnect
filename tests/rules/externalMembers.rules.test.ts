@@ -163,7 +163,8 @@ const OTHER_DOCS: Array<[string, Doc]> = [
   ['transactions/tx1', { amount: 100, type: 'Income', date: '2026-10-01', bankAccountId: 'b1', loId: KL }],
   // Events are stored in `projects` (eventRegistrationService writes doc(PROJECTS, eventId)).
   ['projects/p1', { title: 'KL event', status: 'Upcoming', attendees: 2, registeredMembers: ['klMember', 'klBoard'] }],
-  ['hobbyClubs/h1', { name: 'Runners', memberIds: ['klMember'] }],
+  // WP-5: externals only see clubs opened to them.
+  ['hobbyClubs/h1', { name: 'Runners', memberIds: ['klMember'], openToExternals: true }],
   ['memberBenefits/b1', { title: 'Discount' }],
 ];
 

@@ -3,14 +3,18 @@ import { useFirestoreCollection } from './useFirestoreCollection';
 import { SurveysService, Survey, SurveyResponse } from '../services/surveysService';
 import { useToast } from '../components/ui/Common';
 import { useAuth } from './useAuth';
+import { isExternalRole } from '../utils/externalAccess';
 
 export const useSurveys = () => {
   const { member } = useAuth();
   const { showToast } = useToast();
   const isSubmittingRef = useRef(false);
 
+  // Externals (other chapters) may only list surveys targeted to them or open to externals (firestore.rules).
+  const externalUid = member && isExternalRole(member.role) ? member.id : null;
   const { data: surveys, loading, error, reload: loadSurveys } = useFirestoreCollection<Survey>({
-    loader: () => SurveysService.getAllSurveys(),
+    loader: () => (externalUid ? SurveysService.getSurveysForExternal(externalUid) : SurveysService.getAllSurveys()),
+    deps: [externalUid],
   });
 
   const createSurvey = async (surveyData: Omit<Survey, 'id' | 'responsesCount' | 'createdAt'>) => {
