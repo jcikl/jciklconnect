@@ -5,6 +5,7 @@ import type { ConfirmState } from '../ui/Common';
 import { Input } from '../ui/Form';
 import { useSisterChapters } from '../../hooks/useSisterChapters';
 import { useExternalAccounts } from '../../hooks/useExternalAccounts';
+import { usePendingKlApprovals } from '../../hooks/useChapterMembers';
 import { SisterChaptersService } from '../../services/sisterChaptersService';
 import { MembersService } from '../../services/membersService';
 import type { ExternalCreateResponse } from '../../services/externalAccountsService';
@@ -69,6 +70,27 @@ export const SisterChaptersConfig: React.FC = () => {
   const [accountMode, setAccountMode] = useState<AccountMode>('invite');
   const [memberForm, setMemberForm] = useState(MEMBER_EMPTY);
   const { busy: savingMember, createChapterAdmins, inviteMembers } = useExternalAccounts();
+
+  // KL approval queue (affiliation.status == 'pending_kl', all chapters). Status changes go through the
+  // external-accounts function so the member card follows.
+  const approvals = usePendingKlApprovals(true);
+  const decide = async (m: Member, status: 'active' | 'rejected') => {
+    try {
+      await approvals.setStatus(m.id, status);
+      showToast(status === 'active' ? 'Approved — the member now has access' : 'Request rejected', 'success');
+      if (chapterMembers[m.loId ?? '']) loadMembers(m.loId as string);
+    } catch (err: any) {
+      showToast(err?.message ?? 'Could not update status', 'error');
+    }
+  };
+  const confirmReject = (m: Member) => setConfirmState({
+    open: true,
+    title: 'Reject request',
+    message: `Reject the request from ${m.general?.name ?? 'this person'}? The record is kept with status "rejected".`,
+    confirmLabel: 'Reject',
+    variant: 'danger',
+    onConfirm: async () => { setConfirmState(CONFIRM_CLOSED); await decide(m, 'rejected'); },
+  });
 
   // ── Chapter CRUD ──────────────────────────────────────────────
   const openNew = () => { setForm(EMPTY); setEditingId(null); setModalOpen(true); };
@@ -229,6 +251,38 @@ export const SisterChaptersConfig: React.FC = () => {
       <div>
         <h3 className="text-sm font-semibold text-slate-900">Global Relations</h3>
         <p className="text-xs text-slate-500 mt-0.5">Sister chapters and APICC city councils. Members from these organizations appear in the International Network tab.</p>
+      </div>
+
+      {/* ── Approvals: approved by their chapter, waiting for JCI KL ── */}
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Approvals{approvals.members.length > 0 ? ` (${approvals.members.length})` : ''}</p>
+          <button onClick={approvals.reload} className="text-xs text-jci-blue hover:underline">Refresh</button>
+        </div>
+        {approvals.loading ? (
+          <p className="text-xs text-slate-400 py-2 text-center">Loading…</p>
+        ) : approvals.error ? (
+          <p className="text-xs text-red-500 py-2 text-center">{approvals.error}</p>
+        ) : approvals.members.length === 0 ? (
+          <p className="text-xs text-slate-400 py-2 text-center">No requests waiting for JCI KL</p>
+        ) : (
+          approvals.members.map(m => {
+            const ch = chapters.find(c => c.id === m.loId);
+            const busy = approvals.busyId === m.id;
+            return (
+              <div key={m.id} className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-lg border border-slate-100 dark:border-slate-700 px-3 py-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">{m.general?.name ?? '—'}</p>
+                  <p className="text-[10px] text-slate-400 truncate">{[ch?.name ?? m.loId, m.contact?.email].filter(Boolean).join(' · ')}</p>
+                </div>
+                <div className="flex gap-1.5 shrink-0">
+                  <Button size="sm" variant="success" disabled={busy} onClick={() => decide(m, 'active')}>Approve</Button>
+                  <Button size="sm" variant="outline" disabled={busy} onClick={() => confirmReject(m)}>Reject</Button>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
 
       <div className="space-y-2">

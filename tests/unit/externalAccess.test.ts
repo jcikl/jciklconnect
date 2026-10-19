@@ -19,11 +19,14 @@ const ALL_VIEWS: ViewType[] = [
   'DIRECTORY', 'AUTOMATION', 'KNOWLEDGE', 'COMMUNICATION', 'CLUBS', 'SURVEYS', 'BENEFITS', 'DATA_IMPORT_EXPORT',
   'ADVERTISEMENTS', 'AI_INSIGHTS', 'TEMPLATES', 'ACTIVITY_PLANS', 'REPORTS', 'DEVELOPER', 'TOYYIB', 'WHAPI_CONFIG',
   'API_CONFIG', 'MEMBERSHIP_CONFIG', 'ACCESS_CONFIG', 'SYSTEM_CONFIG', 'PUBLICATIONS', 'RADAR_IMPORTER',
-  'FLAGSHIP_PROJECTS_MGT', 'SPONSORSHIPS', 'ZOOM_BOOKING', 'SOCIAL_MEDIA',
+  'FLAGSHIP_PROJECTS_MGT', 'SPONSORSHIPS', 'ZOOM_BOOKING', 'SOCIAL_MEDIA', 'MY_CHAPTER',
 ];
 const KL_ROLES = [UserRole.GUEST, UserRole.MEMBER, UserRole.BOARD, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.INACTIVE];
-const EXTERNAL_ACTIVE: ViewType[] = ['DASHBOARD', 'DIRECTORY', 'BENEFITS', 'EVENTS', 'SURVEYS', 'CLUBS', 'MEMBERS'];
-const FORBIDDEN: ViewType[] = ALL_VIEWS.filter(v => !EXTERNAL_ACTIVE.includes(v));
+const EXTERNAL_COMMON: ViewType[] = ['DASHBOARD', 'DIRECTORY', 'BENEFITS', 'EVENTS', 'SURVEYS', 'CLUBS', 'MEMBERS'];
+const EXTERNAL_ACTIVE_BY_ROLE: Record<string, ViewType[]> = {
+  [UserRole.AFFILIATE]: EXTERNAL_COMMON,
+  [UserRole.CHAPTER_ADMIN]: [...EXTERNAL_COMMON, 'MY_CHAPTER'],
+};
 const EXTERNAL_ROLES = [UserRole.AFFILIATE, UserRole.CHAPTER_ADMIN];
 
 describe('external access whitelist', () => {
@@ -35,9 +38,17 @@ describe('external access whitelist', () => {
   });
 
   it.each(EXTERNAL_ROLES)('%s: active may open exactly the whitelist', role => {
+    const expected = EXTERNAL_ACTIVE_BY_ROLE[role];
     const allowed = ALL_VIEWS.filter(v => isViewAllowedForRole(role, 'active', v));
-    expect([...allowed].sort()).toEqual([...EXTERNAL_ACTIVE].sort());
-    for (const v of FORBIDDEN) expect(isViewAllowedForRole(role, 'active', v)).toBe(false);
+    expect([...allowed].sort()).toEqual([...expected].sort());
+    for (const v of ALL_VIEWS.filter(x => !expected.includes(x))) expect(isViewAllowedForRole(role, 'active', v)).toBe(false);
+  });
+
+  it('MY_CHAPTER is for an active CHAPTER_ADMIN only', () => {
+    expect(isViewAllowedForRole(UserRole.CHAPTER_ADMIN, 'active', 'MY_CHAPTER')).toBe(true);
+    expect(isViewAllowedForRole(UserRole.CHAPTER_ADMIN, 'pending_kl', 'MY_CHAPTER')).toBe(false);
+    expect(isViewAllowedForRole(UserRole.CHAPTER_ADMIN, 'suspended', 'MY_CHAPTER')).toBe(false);
+    expect(isViewAllowedForRole(UserRole.AFFILIATE, 'active', 'MY_CHAPTER')).toBe(false);
   });
 
   it.each(['pending_chapter', 'pending_kl', 'suspended', 'expired', undefined] as const)(
@@ -114,8 +125,8 @@ describe('sidebar navigation', () => {
       externalAllowedViews: getExternalAllowedViews(role, 'active'),
     };
     const views = visibleItems(ctx).map(v => v.split(':')[1] as ViewType);
-    for (const v of views) expect(EXTERNAL_ACTIVE).toContain(v);
-    expect(views).toEqual(expect.arrayContaining(EXTERNAL_ACTIVE));
+    for (const v of views) expect(EXTERNAL_ACTIVE_BY_ROLE[role]).toContain(v);
+    expect(views).toEqual(expect.arrayContaining(EXTERNAL_ACTIVE_BY_ROLE[role]));
   });
 
   it('a pending external sees only My Profile', () => {

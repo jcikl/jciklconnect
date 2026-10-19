@@ -24,10 +24,10 @@ const EXTERNAL_COMMON_VIEWS: readonly ViewType[] = [
   'MEMBERS',
 ];
 
-/** Active externals, per role. CHAPTER_ADMIN gets its own entry (e.g. a chapter-management view in Phase 1). */
+/** Active externals, per role. CHAPTER_ADMIN also gets MY_CHAPTER (approvals / members / invite of own chapter). */
 export const EXTERNAL_ALLOWED_VIEWS: Record<ExternalRole, readonly ViewType[]> = {
   [UserRole.AFFILIATE]: EXTERNAL_COMMON_VIEWS,
-  [UserRole.CHAPTER_ADMIN]: EXTERNAL_COMMON_VIEWS,
+  [UserRole.CHAPTER_ADMIN]: [...EXTERNAL_COMMON_VIEWS, 'MY_CHAPTER'],
 };
 
 /** Externals whose affiliation is not `active` (pending / suspended / expired): own profile only. */

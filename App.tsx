@@ -905,6 +905,12 @@ export const JCIKLApp: React.FC = () => {
                           <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><CheckSquare size={22} /></div>
                           <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">Surveys</span>
                         </div>
+                        {canSeeView('MY_CHAPTER') && (
+                          <div className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transform transition-transform" onClick={() => { handleViewChange('MY_CHAPTER'); setShowMobileMenu(false); }}>
+                            <div className="w-12 h-12 rounded-full flex items-center justify-center border shadow-sm bg-slate-800/60 text-slate-300 border-slate-700/50"><Users size={22} /></div>
+                            <span className="text-[10px] sm:text-xs font-bold text-center mt-1 text-slate-300">My Chapter</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
