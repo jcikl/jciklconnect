@@ -535,3 +535,11 @@ Risk: no online payment (dues, event fee, manual bill) is ever recorded automati
 Resolution (branch `fix/toyyib-callback-refno`, awaiting merge): `netlify/lib/toyyibCallback.mjs` parses both shapes (`refno` / `transaction_id`) and picks the record by payment reference, then order_id; `netlify/lib/toyyibMode.mjs` holds mode / key / API-base selection shared by `toyyibpay-api` and `toyyibpay-callback`; the callback uses the bill's stored `isSandbox` (new field written at bill creation, with `billExternalReferenceNo`) or the site-wide mode; every rejection is now logged (bill code and reason only). 10 unit tests pass.
 
 Follow-up (2026-10-19, after R-046 was deployed): the new rejection log showed the real body — ToyyibPay posts the callback as `multipart/form-data`, which the handler parsed as URL-encoded, so every field was empty and sandbox bill `g6e28dl6` was still rejected. Branch `fix/toyyib-callback-multipart`: `readCallbackBody` in `netlify/lib/toyyibCallback.mjs` reads multipart, URL-encoded and JSON bodies; 2 tests added (they fail without the fix).
+
+### R-048 Members Signed Out on Page Reload (P1)
+
+Evidence (errorLogs, 2026-09 to 2026-10-19): 34 `useAuth-load-member-data` errors "Missing or insufficient permissions." — real members on 2026-09-23 (mobile, 8×) and 2026-10-05 (desktop), and the Claude test pane on 2026-10-18/19, each time followed by the member appearing signed out. The rule lets any signed-in user read `members/{own uid}`, so the read reached Firestore without the ID token: on reload Firebase Auth reports the restored user before Firestore has attached the token. `useAuth` treated the error as fatal and cleared the session.
+
+Risk: members are logged out at random after a reload and must sign in again.
+
+Resolution (branch `fix/auth-reload-signout`, awaiting merge): the own-profile read goes through `utils/retryOnPermissionDenied.ts` — on permission-denied it refreshes the ID token and retries (2×); the auth loading state stays on meanwhile. A genuinely forbidden read still fails after the retries. 3 unit tests; 10 consecutive reloads in the preview stayed signed in. Confirm after deploy that the error stops appearing in errorLogs.

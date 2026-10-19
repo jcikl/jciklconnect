@@ -535,3 +535,11 @@
 处理（分支 `fix/toyyib-callback-refno`，待合并）：`netlify/lib/toyyibCallback.mjs` 兼容两种字段（`refno` / `transaction_id`），按付款编号、再按 order_id 选对应记录；`netlify/lib/toyyibMode.mjs` 集中处理模式、密钥、API 地址，`toyyibpay-api` 与 `toyyibpay-callback` 共用；通知按账单建立时记下的 `isSandbox`（新字段，与 `billExternalReferenceNo` 一起在建账单时写入）选择环境，没有则用系统模式；所有拒收情况都写日志（只记账单编号和原因）。单元测试 10 项通过。
 
 后续（2026-10-19，R-046 上线后）：新加的拒收日志显示了真实的通知内容——ToyyibPay 以 `multipart/form-data`（表单上传格式）发送通知，处理程序却按普通表单解析，所有字段都读成空，沙盒账单 `g6e28dl6` 仍被拒收。分支 `fix/toyyib-callback-multipart`：`netlify/lib/toyyibCallback.mjs` 新增 `readCallbackBody`，可读取 multipart、普通表单、JSON 三种格式；新增 2 项测试（撤掉修复后失败）。
+
+### R-048 会员重新整理页面后被登出（P1）
+
+证据（errorLogs，2026-09 至 2026-10-19）：共 34 笔 `useAuth-load-member-data` 错误「Missing or insufficient permissions.」——真实会员 2026-09-23（手机，8 次）、2026-10-05（电脑）各有发生，2026-10-18/19 的测试面板也有，每次之后会员都显示为已登出。规则允许已登录用户读取 `members/{自己的 uid}`，说明读取请求送到 Firestore 时还没带上登录凭证：重新整理时 Firebase Auth 先报告已恢复的用户，Firestore 还没附上凭证。`useAuth` 把这个错误当成致命错误并清空登录状态。
+
+风险：会员重新整理后随机被登出，需要重新登录。
+
+处理（分支 `fix/auth-reload-signout`，待合并）：读取自己会员资料改经 `utils/retryOnPermissionDenied.ts`——遇到权限不足时先刷新登录凭证再重读（最多 2 次），期间保持「载入中」；真正没有权限的读取重试后仍会失败。单元测试 3 项；预览中连续重新整理 10 次均保持登录。上线后需确认 errorLogs 不再出现此错误。
