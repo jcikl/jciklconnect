@@ -6,6 +6,7 @@ import { LoadingState } from '../ui/Loading';
 import { useAdvertisements } from '../../hooks/useAdvertisements';
 import { usePermissions } from '../../hooks/usePermissions';
 import { Advertisement } from '../../services/advertisementService';
+import type { BenefitAudience } from '../../utils/benefitEligibility';
 import { formatNumber } from '../../utils/formatUtils';
 import { uploadToCloudinary } from '../../services/cloudinaryService';
 import imageCompression from 'browser-image-compression';
@@ -120,6 +121,11 @@ export const AdvertisementsView: React.FC<{ searchQuery?: string }> = ({ searchQ
         type: 'Banner',
         placement: ['Homepage'],
         targetAudience: formData.get('targetAudience') as any || 'All Members',
+        targetCriteria: {
+          ...selectedAd?.targetCriteria,
+          audiences: ((formData.get('audiences') as string) || '').split(',').filter(Boolean) as BenefitAudience[],
+          countries: ((formData.get('countries') as string) || '').split('|').filter(Boolean),
+        },
         imageUrl: imageUrl,
         logoUrl: logoUrl || undefined,
         linkUrl: formData.get('linkUrl') as string || undefined,

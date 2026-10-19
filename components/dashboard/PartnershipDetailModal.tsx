@@ -10,11 +10,13 @@ interface PartnershipDetailModalProps {
   ads?: Advertisement[];
   onClose: () => void;
   onNavigate?: (ad: Advertisement) => void;
+  /** When set, the viewer is not eligible: hide the CTA and show this reason instead. */
+  ineligibleReason?: string;
 }
 
 type SnapState = 'half' | 'full';
 
-export const PartnershipDetailModal: React.FC<PartnershipDetailModalProps> = ({ ad, ads = [], onClose, onNavigate }) => {
+export const PartnershipDetailModal: React.FC<PartnershipDetailModalProps> = ({ ad, ads = [], onClose, onNavigate, ineligibleReason }) => {
   const [visible, setVisible] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [snap, setSnap] = useState<SnapState>('half');
@@ -214,8 +216,15 @@ export const PartnershipDetailModal: React.FC<PartnershipDetailModalProps> = ({ 
           </div>
         </div>
 
+        {/* Not eligible: reason instead of CTA */}
+        {ineligibleReason && (
+          <div className="shrink-0 px-5 py-4 border-t border-slate-100 bg-white pb-safe">
+            <p className="text-sm font-bold text-slate-500 text-center">{ineligibleReason}</p>
+          </div>
+        )}
+
         {/* Footer CTA */}
-        {ad.linkUrl && (
+        {!ineligibleReason && ad.linkUrl && (
           <div className="shrink-0 px-5 py-4 border-t border-slate-100 bg-white pb-safe flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-black text-slate-900 leading-none">{ad.provider || 'JCI KL Partner'}</p>

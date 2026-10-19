@@ -33,6 +33,10 @@ export interface Advertisement {
     tiers?: string[];
     roles?: string[];
     memberIds?: string[];
+    /** Who may redeem. Missing/empty = KL-only (see utils/benefitEligibility.ts). */
+    audiences?: ('kl' | 'sister' | 'apicc' | 'global')[];
+    /** Viewer countries allowed (e.g. 'Singapore'); missing/empty = any country. */
+    countries?: string[];
   };
   businessProfileId?: string; // Link to business directory
   imageUrl: string;

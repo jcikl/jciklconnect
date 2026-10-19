@@ -8,6 +8,8 @@ import { useAuth } from '../../hooks/useAuth';
 import { useMembers } from '../../hooks/useMembers';
 import { Advertisement, BenefitUsage } from '../../services/advertisementService';
 import { formatDate, toDate } from '../../utils/dateUtils';
+import { getBenefitEligibility, KL_COUNTRY, type BenefitViewer } from '../../utils/benefitEligibility';
+import { isExternalRole } from '../../utils/externalAccess';
 import { PartnershipDetailModal } from '../dashboard/PartnershipDetailModal';
 import { hasSpecialOffer, getSpecialOfferSummary, SpecialOffer } from '../../types/member';
 import { uploadMemberOfferLogoToCloudinary, uploadMemberOfferBannerToCloudinary } from '../../services/cloudinaryService';
@@ -42,6 +44,14 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
   const { member } = useAuth();
   const { members, updateMember } = useMembers();
   const { showToast } = useToast();
+
+  // Externals (other chapters) cannot read other members' docs: no member offers, no offer editing.
+  const isExternal = isExternalRole(member?.role);
+  const viewer = useMemo((): BenefitViewer => isExternal
+    ? { isKl: false, role: member?.role, tier: member?.tier as string | undefined, category: member?.affiliation?.category, country: member?.affiliation?.country }
+    : { isKl: true, role: member?.role, tier: member?.tier as string | undefined, country: KL_COUNTRY },
+    [isExternal, member?.role, member?.tier, member?.affiliation?.category, member?.affiliation?.country]);
+  const eligibilityOf = (b: BenefitItem) => b._isMemberOffer ? { eligible: true as const } : getBenefitEligibility(b, viewer);
 
   // ── Special offer drawer (current user's own offer) ──
   const [offerDrawerOpen, setOfferDrawerOpen] = useState(false);
@@ -109,6 +119,7 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
   };
 
   const memberOffers = useMemo((): BenefitItem[] => {
+    if (isExternal) return [];
     return members
       .filter(m => {
         const offersList = m.business?.specialOffers;
@@ -145,7 +156,7 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
         } as BenefitItem;
         });
       });
-  }, [members, member?.id]);
+  }, [members, member?.id, isExternal]);
 
   useEffect(() => {
     if (member) loadClaimedBenefits();
@@ -184,13 +195,16 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
   }, [advertisements, memberOffers, searchQuery]);
 
   const featuredBenefits = useMemo(() =>
-    allActive.filter(b => !b._isMemberOffer && (b.priority || 0) >= 5).slice(0, 3),
-    [allActive]
+    allActive.filter(b => !b._isMemberOffer && (b.priority || 0) >= 5 && eligibilityOf(b).eligible).slice(0, 3),
+    [allActive, viewer] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const displayBenefits = useMemo(() => {
     // own offer first, then unclaimed before claimed
     return [...allActive].sort((a, b) => {
+      const aInel = eligibilityOf(a).eligible ? 0 : 1;
+      const bInel = eligibilityOf(b).eligible ? 0 : 1;
+      if (aInel !== bInel) return aInel - bInel;
       const aIsSelf = a._isMemberOffer && a._memberId === member?.id ? -1 : 0;
       const bIsSelf = b._isMemberOffer && b._memberId === member?.id ? -1 : 0;
       if (aIsSelf !== bIsSelf) return aIsSelf - bIsSelf;
@@ -198,7 +212,7 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
       const bClaimed = claimedBenefitIds.has(b.id!) ? 1 : 0;
       return aClaimed - bClaimed;
     });
-  }, [allActive, claimedBenefitIds, member?.id]);
+  }, [allActive, claimedBenefitIds, member?.id, viewer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isGuest = (member?.role || '') === 'GUEST';
 
@@ -277,7 +291,7 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
       <LoadingState loading={loading} error={error} empty={displayBenefits.length === 0 && isGuest} emptyMessage="No benefits match this filter">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
           {/* Add Special Offer card — visible to non-guests */}
-          {!isGuest && (
+          {!isGuest && !isExternal && (
             <div
               onClick={() => { setOfferEditingIndex(null); setOfferDrawerOpen(true); }}
               className="relative bg-white rounded-xl border-2 border-dashed border-slate-200 overflow-hidden cursor-pointer hover:border-jci-blue hover:shadow-md transition-all flex flex-col group"
@@ -301,11 +315,12 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
             const days = getDaysRemaining(b.endDate);
             const isExpiringSoon = days !== null && days <= 30 && days > 0;
             const isNew = isNewBenefit(b.startDate);
+            const elig = eligibilityOf(b);
 
             return (
               <div
                 key={b.id}
-                className="relative bg-white rounded-xl border border-slate-200 overflow-hidden cursor-pointer hover:shadow-md transition-shadow flex flex-col"
+                className={`relative bg-white rounded-xl border border-slate-200 overflow-hidden cursor-pointer hover:shadow-md transition-shadow flex flex-col${elig.eligible ? '' : ' opacity-60 grayscale'}`}
                 onClick={() => openDetail(b)}
               >
                 {/* Image */}
@@ -334,6 +349,9 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
 
                   {/* Badges on image */}
                   <div className="absolute top-2 left-2 flex flex-col gap-1">
+                    {"label" in elig && (
+                      <Badge variant="neutral">{elig.label}</Badge>
+                    )}
                     {b._isMemberOffer && (
                       <span className="flex items-center gap-0.5 text-[9px] font-bold bg-violet-600 text-white px-1.5 py-0.5 rounded-full shadow">
                         <Users size={8} /> {b._memberId === member?.id ? 'Your Offer' : 'Member Offer'}
@@ -391,6 +409,7 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
       {selectedBenefitForDetail && (
         <PartnershipDetailModal
           ad={selectedBenefitForDetail as Advertisement}
+          ineligibleReason={(() => { const e = eligibilityOf(selectedBenefitForDetail); return "label" in e ? e.label : undefined; })()}
           onClose={() => setSelectedBenefitForDetail(null)}
         />
       )}
