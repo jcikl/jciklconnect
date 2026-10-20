@@ -27,10 +27,13 @@ const CACHE_KEY_ALL = 'surveys:all';
 const cacheKeyById = (id: string) => `surveys:${id}`;
 const CACHE_KEY_RESPONSES_PREFIX = 'surveyResponses:';
 const cacheKeyResponses = (surveyId: string) => `${CACHE_KEY_RESPONSES_PREFIX}${surveyId}`;
+const CACHE_KEY_EXTERNAL_PREFIX = 'surveys:external:';
+const cacheKeyExternal = (uid: string) => `${CACHE_KEY_EXTERNAL_PREFIX}${uid}`;
 const CACHE_TTL_MS = CACHE_TTL_5MIN;
 
 function invalidateSurveysCache(surveyId?: string): void {
   apiCache.delete(CACHE_KEY_ALL);
+  apiCache.deleteByPrefix(CACHE_KEY_EXTERNAL_PREFIX);
   if (surveyId) {
     apiCache.delete(cacheKeyById(surveyId));
     apiCache.delete(cacheKeyResponses(surveyId));
@@ -44,6 +47,8 @@ export interface Survey {
   questions: SurveyQuestion[];
   targetAudience: 'All Members' | 'Board' | 'Project Leads' | 'Specific Group';
   specificMemberIds?: string[]; // For 'Specific Group' audience
+  /** Members of other JCI chapters (AFFILIATE / CHAPTER_ADMIN) may see and answer it while Active. Missing = false. Board/admin only. */
+  openToExternals?: boolean;
   status: 'Draft' | 'Active' | 'Closed';
   startDate: string;
   endDate: string;
@@ -112,6 +117,38 @@ export class SurveysService {
       },
       CACHE_TTL_MS,
       'SurveysService.getAllSurveys'
+    );
+  }
+
+  // Surveys an external (other-chapter) user may read: targeted to them, or open to externals and Active.
+  // Two queries because Firestore rules only allow lists whose filters prove access; merged and de-duplicated.
+  // Equality / array-contains filters only, no orderBy → no composite index needed; sorted in memory.
+  static async getSurveysForExternal(uid: string): Promise<Survey[]> {
+    if (isDevMode()) {
+      return (MOCK_SURVEYS as Survey[]).filter(
+        s => s.specificMemberIds?.includes(uid) || (s.openToExternals === true && s.status === 'Active')
+      );
+    }
+
+    return apiCache.getOrSet(
+      cacheKeyExternal(uid),
+      async () => {
+        try {
+          const col = collection(db, COLLECTIONS.SURVEYS);
+          const [targeted, open] = await Promise.all([
+            getDocs(query(col, where('specificMemberIds', 'array-contains', uid))),
+            getDocs(query(col, where('openToExternals', '==', true), where('status', '==', 'Active'))),
+          ]);
+          const byId = new Map<string, Survey>();
+          [...targeted.docs, ...open.docs].forEach(d => byId.set(d.id, mapSurveyDoc(d)));
+          return [...byId.values()].sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')));
+        } catch (error) {
+          errorLoggingService.logError(error as Error, { component: 'SurveysService', action: 'getSurveysForExternal' });
+          throw error;
+        }
+      },
+      CACHE_TTL_MS,
+      'SurveysService.getSurveysForExternal'
     );
   }
 

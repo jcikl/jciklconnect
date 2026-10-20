@@ -1,5 +1,5 @@
 import { db, messaging, hasAdminCredentials, getMemberFcmToken } from '../lib/firebaseAdmin.mjs';
-import { isActiveRecipient as isEligible } from '../lib/members.mjs';
+import { isActiveRecipient as isEligible, showsBirthday } from '../lib/members.mjs';
 
 async function sendFcmPush(memberId, title, body, type, extraData = {}) {
   await db.collection('notifications').add({
@@ -47,7 +47,7 @@ export default async (req, context) => {
       .get();
 
     const birthdayMembers = birthdaySnap.docs
-      .filter(doc => isEligible(doc.data()))
+      .filter(doc => isEligible(doc.data()) && showsBirthday(doc.data()))
       .map(doc => {
         const m = doc.data();
         const fullName = m.general?.name || m.name || '';

@@ -163,7 +163,8 @@ const OTHER_DOCS: Array<[string, Doc]> = [
   ['transactions/tx1', { amount: 100, type: 'Income', date: '2026-10-01', bankAccountId: 'b1', loId: KL }],
   // Events are stored in `projects` (eventRegistrationService writes doc(PROJECTS, eventId)).
   ['projects/p1', { title: 'KL event', status: 'Upcoming', attendees: 2, registeredMembers: ['klMember', 'klBoard'] }],
-  ['hobbyClubs/h1', { name: 'Runners', memberIds: ['klMember'] }],
+  // WP-5: externals only see clubs opened to them.
+  ['hobbyClubs/h1', { name: 'Runners', memberIds: ['klMember'], openToExternals: true }],
   ['memberBenefits/b1', { title: 'Discount' }],
 ];
 
@@ -286,12 +287,15 @@ describe.skipIf(!HOST)('firestore.rules — external members (emulator)', () => 
       expect(await query('chAdminKl', 'members', [['loId', 'EQUAL', KL]])).toBe(DENIED);
       expect(await getDoc('chAdminKl', 'members/klMember')).toBe(DENIED);
     });
-    it('can change affiliation.status of own-chapter affiliates, never to active', async () => {
+    // Review M1: chapter admins change statuses only through netlify/functions/external-accounts
+    // (transition table + card sync). The client status branch was removed from the rules.
+    it('cannot change affiliation.status from the client (any status)', async () => {
       const suspend = { ...MEMBERS.aff2, affiliation: affiliation('suspended'), updatedAt: '2026-10-19' };
-      expect(await set('chAdmin', 'members/aff2', suspend)).toBe(OK);
-      const reactivate = { ...suspend, affiliation: affiliation('active') };
-      expect(await set('chAdmin', 'members/aff2', reactivate)).toBe(DENIED);
-      expect(await set('owner', 'members/aff2', MEMBERS.aff2)).toBe(OK); // restore
+      expect(await set('chAdmin', 'members/aff2', suspend)).toBe(DENIED);
+      const approve = { ...MEMBERS.affPending, affiliation: affiliation('pending_kl') };
+      expect(await set('chAdmin', 'members/affPending', approve)).toBe(DENIED);
+      const reject = { ...MEMBERS.affPending, affiliation: affiliation('rejected') };
+      expect(await set('chAdmin', 'members/affPending', reject)).toBe(DENIED);
       const activatePending = { ...MEMBERS.affPending, affiliation: affiliation('active') };
       expect(await set('chAdmin', 'members/affPending', activatePending)).toBe(DENIED);
     });
@@ -491,7 +495,9 @@ describe.skipIf(!HOST)('firestore.rules — external members (emulator)', () => 
     });
   });
 
-  describe('L6: chapter-admin audit fields must name the caller', () => {
+  // L6 originally guarded the audit fields of the client chapter-admin status branch. That branch is gone
+  // (review M1): every chapter-admin write to an affiliate's affiliation is denied, audit fields or not.
+  describe('L6 (after M1): chapter-admin affiliation writes are denied whatever the audit fields', () => {
     beforeEach(async () => {
       expect(await set('owner', 'members/aff2', MEMBERS.aff2)).toBe(OK);
     });
@@ -505,10 +511,9 @@ describe.skipIf(!HOST)('firestore.rules — external members (emulator)', () => 
       expect(await set('chAdmin', 'members/aff2', withAff({ chapterApprovedBy: 'klAdmin' }))).toBe(DENIED);
       expect(await set('chAdmin', 'members/aff2', withAff({}, { updatedBy: 'klAdmin' }))).toBe(DENIED);
     });
-    it('accepts audit fields equal to the caller', async () => {
-      const ok = withAff({ statusUpdatedBy: 'chAdmin', chapterApprovedBy: 'chAdmin', statusUpdatedAt: 'now' }, { updatedBy: 'chAdmin' });
-      expect(await set('chAdmin', 'members/aff2', ok)).toBe(OK);
-      expect(await set('owner', 'members/aff2', MEMBERS.aff2)).toBe(OK); // restore
+    it('also denies audit fields equal to the caller', async () => {
+      const own = withAff({ statusUpdatedBy: 'chAdmin', chapterApprovedBy: 'chAdmin', statusUpdatedAt: 'now' }, { updatedBy: 'chAdmin' });
+      expect(await set('chAdmin', 'members/aff2', own)).toBe(DENIED);
     });
   });
 
@@ -534,6 +539,9 @@ describe.skipIf(!HOST)('firestore.rules — external members (emulator)', () => 
       expect(await set('aff2', 'members/aff2', optedIn)).toBe(OK);
       expect(await query('aff2', 'memberCards', [['loId', 'EQUAL', SG]])).toBe(OK);
       expect(await query('aff2', 'memberCards', [['international', 'EQUAL', true]])).toBe(OK);
+      // Phase 1 WP-7: useSisterChapterMembers lists own-chapter cards with where('loId','in',[ownLoId])
+      expect(await query('aff2', 'memberCards', [['loId', 'IN', [SG]]])).toBe(OK);
+      expect(await query('aff2', 'memberCards', [['loId', 'IN', [SG, KL]]])).toBe(DENIED);
       expect(await set('owner', 'members/aff2', MEMBERS.aff2)).toBe(OK); // restore
     });
     it('ADMIN not opted in: allowed', async () => {

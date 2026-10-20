@@ -8,6 +8,8 @@
 
 2026-10-18 更新：第一轮核实（权限与规则）新增 R-028 至 R-045，见文末。
 
+2026-10-20 更新：Phase 1（外部会员）新增 R-059 至 R-072，审查修复新增 R-073 至 R-086，见文末（`phase1/integration`，尚未合并、尚未部署）。R-049 至 R-058（Phase 0）的中文版尚未补写，以 `RISK_REGISTER.md` 为准。
+
 严重级别：P0 严重，P1 高，P2 中，P3 低。
 
 ## P0 风险
@@ -543,3 +545,233 @@
 风险：会员重新整理后随机被登出，需要重新登录。
 
 处理（分支 `fix/auth-reload-signout`，待合并）：读取自己会员资料改经 `utils/retryOnPermissionDenied.ts`——遇到权限不足时先刷新登录凭证再重读（最多 2 次），期间保持「载入中」；真正没有权限的读取重试后仍会失败。单元测试 3 项；预览中连续重新整理 10 次均保持登录。上线后需确认 errorLogs 不再出现此错误。
+
+## 2026-10-20 新增：Phase 1 外部会员
+
+### R-059 自助注册丢失了表单收集的个人资料（P2，已解决）
+
+证据：`components/auth/RegisterModal.tsx` 传的是平铺的 `fullName`、`phone`、`gender`、`dateOfBirth`、`nationality`，而 `hooks/useAuth.tsx` 的 `signUp` 只读 `additionalData.general.*` 和 `contact.phone`，这些值被无声丢弃。
+
+风险：所有自助注册的 GUEST 资料都缺全名、性别、出生日期、国籍和电话。
+
+处理（2026-10-20，`phase1/integration`）：新增 `components/auth/signUpExtras.ts` 的 `buildSignUpExtras`，把值放进 `general.fullName` / `gender` / `dob` / `nationality` 和 `contact.phone`，空值不写（Firestore 不接受嵌套的 undefined）；注册资料的构建函数移到 `utils/signUpPayload.ts`。测试：`tests/unit/signUpExtras.test.ts`、`tests/unit/signUpPayload.test.ts`。注册时仍不写 `birthdayMMDD`：`firestore.rules` 的 GUEST 创建白名单不允许。
+
+### R-060 访客活动报名一直失败（P1，已解决）
+
+证据：`EventsService.registerGuestForEvent` 的事务要先读 `guestRegistrations`，而未登录访客读不了（只有 board / admin 能读）；电话索引文档也不满足创建规则的必填字段检查。另外 `cancelGuestRegistration` 会写 `cancelledAt`，它不在更新白名单里，整个取消批次被拒绝。
+
+风险：访客无法报名活动，board 也无法取消访客报名。
+
+处理（2026-10-20，`phase1/integration`）：服务不再读取，用一个 `writeBatch` 按确定性 id 同时写主文档和电话索引文档；创建规则接受主文档形状（`status == 'Pending'`）或电话索引形状（`_indexFor == 'phone'`）；id 已存在时写入变成更新，访客无权更新，整个批次失败，表单提示「已报名」；更新白名单加入 `cancelledAt`，索引文档只能改 `status`。测试：`tests/rules/guestRegistrations.rules.test.ts`。`cancelGuestRegistration` 在应用里仍没有调用方。见 R-072。
+
+### R-061 问卷提交只有 board 和 admin 能成功（P1，已解决）
+
+证据：`SurveysService.submitResponse` 的事务要增加 `surveys.responsesCount`（`surveys` 更新规则原本只允许 board / admin），并先读自己尚不存在的回答 id（`surveyResponses` 的 get 规则读 `resource.data.memberId`，文档不存在时被拒绝）。
+
+风险：会员和外部用户无法提交问卷回答。
+
+处理（2026-10-20，`phase1/integration`）：`surveys` 更新规则允许任何能读该问卷的人只把 `responsesCount` 加 1 并更新 `updatedAt`；`surveyResponses` 的 get 在文档不存在时放行。规则测试复现了这两个失败。
+
+### R-062 兴趣社群列表漏掉没有 isDeleted 字段的社群（P1，已解决）
+
+证据：`HobbyClubsService.getAllClubs` 用 `where('isDeleted', '!=', true)`，这会同时丢掉没有 `isDeleted` 字段的文档；`createClub` 从不写这个字段，所以几乎看不到任何社群。
+
+风险：KL 会员几乎看不到兴趣社群。
+
+处理（2026-10-20，`phase1/integration`）：改为在代码里过滤软删除的社群并按名称排序，不改索引。单元测试用 Firestore 的 `!=` 语义复现了旧行为。
+
+### R-063 活动「标记已付款」缺少 bankAccountId 时报错（P1，已解决）
+
+证据：活动「Mark as paid」流程创建收入交易时没有 `bankAccountId`，而 `transactions` 创建规则要求有 `bankAccountId`。
+
+风险：活动页面无法记录付款。
+
+处理（2026-10-20，`phase1/integration`）：`services/eventPaymentService.ts` 的 `markRegistrationPaid` 自动选账户（项目的 `financialAccountId`，且它确实是本 LO 的银行账户；否则第一个 MYR 账户；再否则第一个账户；都没有则给出可读的错误），金额由财务确认（窗口预填 `price || priceMin`，见 R-080），报名状态更新失败时会把刚建的交易删掉。遗留问题见 R-070。
+
+### R-064 国际目录用的是假数据，外部用户看不到 KL 名片（P2，已解决）
+
+证据：`BusinessDirectoryView` 使用 `MOCK_SISTER_CHAPTER_MEMBERS`，姐妹会筛选没有作用在真实数据上；`MemberCardsService.getInternationalCards` 把 `loId == 'jcikl'` 的名片丢掉，外部用户看不到已开放名片的 KL 会员。
+
+风险：目录显示的是假人，外部用户看不到 KL 名片，也看不到本分会的名片。
+
+处理（2026-10-20，`phase1/integration`）：目录改经 `useSisterChapterMembers` 读取名片，删除假数据文件；外部用户得到 `international == true` 的名片（含 KL）加上本分会的名片，由 `mergeCards` 合并；`attachSisterChapters` 为 KL 提供固定的分会条目。测试：`tests/unit/internationalCards.test.ts`。
+
+### R-065 Global Relations 的「移除成员」一直失败（P2，已解决）
+
+证据：`MembersService.deleteMember` 里有一个客户端检查，管理员的 `loId` 与目标不同就拒绝，所以 KL 管理员无法移除姐妹会的文档，而 `members` 更新规则其实允许 `isAdmin()` 编辑任何 LO。
+
+风险：无法在 Global Relations 里移除姐妹会的人。
+
+处理（2026-10-20，`phase1/integration`）：`deleteMember` 增加一个很窄的例外（KL 管理员、`loId == 'jcikl'`、目标在其他分会）；这个检查只在客户端，规则没有改。Global Relations 现在对有登录账号的外部会员改为经 `external-accounts` 的 `setStatus` 停用（名片移除，登录和记录保留），只有没有登录的旧文档（role MEMBER、`loId` 不是 `jcikl`）才软删除。
+
+### R-066 注册表单的邮箱预检查无法工作；自助注册的外部会员没有 memberEmails 槽位（P2）
+
+证据：`RegisterModal` 的 `checkField` 调用 `netlify/functions/check-member-field.mjs` 时不带 `Authorization`，而该函数要求 BOARD / ADMIN / SUPER_ADMIN 令牌，并且查询的是 `members` 顶层的 `email` 字段（新文档的邮箱在 `contact.email`）；表单把没有 `exists` 的响应当成「可用」。`signUpExternal` 不写 `memberEmails`：该集合的创建规则只允许 B+。
+
+风险：访客永远看不到「邮箱已被使用」的提示；自助注册的外部会员没有槽位，依赖槽位的重复检查（`MembersService.createMember`）看不到他们。`external-accounts` 还会检查 Firebase Auth，所以用同一邮箱邀请仍会被拒绝。
+
+建议行动：把预检查换成不需要令牌的服务端检查，或者去掉；在批准时由服务端写入槽位。
+
+### R-067 advertisements.targetAudience 从未被执行（P2，既有问题）
+
+证据：`targetAudience` 由 `AdvertisementsView` 写入，只用于它自己的列表搜索，没有任何投放代码读取。Phase 1 新增的 `targetCriteria.audiences` 和 `targetCriteria.countries` 只有 `MemberBenefitsView` 经 `utils/benefitEligibility.ts` 读取；`roles`、`tiers`、`memberIds` 在那里同样没有被执行，其他广告展示位置未检查。`advertisements` 在 `firestore.rules` 里是公开可读。
+
+风险：管理员选了等级或角色受众，以为会过滤，其实不会；对外部用户来说，受众检查只存在于福利页面。
+
+建议行动：以 `audiences` / `countries` 作为唯一的投放条件，应用到所有广告位置；隐藏或删除不用的字段。
+
+### R-068 外部用户的活动付款依赖财务人员自觉（P2）
+
+证据：`EventDetailModal` 的 `handleMarkPaid` 会检查 `canOperateFinance`，但 `EventParticipantsTab`、`EventRegistrationsList`、`EventRoleParticipantsList` 里的「标记已付款 / 撤销付款」按钮没有按角色隐藏，`handleUndoPaid` 也没有角色检查；真正的门是规则（`transactions` 的创建和删除只有 Finance / admin）。外部用户看到的活动价格是同一个数字加美元符号，没有换算。「标记已付款」窗口现在把「实收金额（MYR）」预填为 `price || priceMin`，财务必须确认或修改（填 0 则不建交易），所以只有财务直接接受预填值时，美元报名才会被记成同样数字的马币。`transactions.currency` 已在类型里声明，但没有任何代码写它。
+
+风险：部分角色会看到不该有的按钮；财务不留意地确认，会把美元价当马币记账。
+
+建议行动：没有 `canOperateFinance` 的角色隐藏这些按钮；考虑为美元报名加入换算；写入或删除 `transactions.currency`。
+
+### R-069 useEventParticipations 直接读 Firestore，并且读错了访客的姓名字段（P3）
+
+证据：`components/modules/Events/useEventParticipations.ts` 引入了 `firebase/firestore` 并自己查询 `guestRegistrations`（分层违规，见 R-022），构建访客行时读 `data.general?.name`，而访客文档的姓名在顶层 `name`。规则里访客查询只有 board / admin 能做，并且和会员列表放在同一个 `Promise.all` 里。
+
+风险：参与者列表里的访客行没有姓名；如果非 board / admin 的人能打开这个页签，被拒绝的访客查询会让整个列表加载失败。
+
+建议行动：把查询移到 service 里，并读取 `name`。
+
+### R-070 projects.financialAccountId 从未被写入；线下付款说明文字是占位符（P3）
+
+证据：`services/`、`components/`、`hooks/` 里没有任何代码给项目文档写 `financialAccountId`（`EventPaymentService.resolveBankAccountId` 读取它，写入者只有假数据），所以标记已付款会退回到第一个 MYR 银行账户。`config/constants.ts` 的 `EXTERNAL_OFFLINE_PAYMENT_NOTE` 是一段全局占位文字，所有外部用户看到同一段。
+
+风险：活动收入可能进错账户；外部用户拿到的是通用的付款说明。
+
+建议行动：在项目层面加账户选择，并替换说明文字（或做成可配置）。
+
+### R-071 external-accounts 无法在本地测试，也没有限流（P2）
+
+证据：`netlify/functions/external-accounts.mjs` 用到 `firebase-admin/auth`，在本地 `netlify dev` 下会失败（见 R-040），所以第一次真正运行要在部署预览版上。它有每次调用 20 人、每个分会 100 个成员文档的上限，但没有限流；`chapter-birthdays.mjs` 也没有。现有的内存限流（`auto-invite`、`send-invite`）按函数实例计算，冷启动后清零。
+
+风险：没有验证过的函数会创建 Auth 账号并发邮件；分会管理人的令牌被盗，可在上限内批量建账号。
+
+建议行动：发布前在预览版上验证创建、邀请、状态变更、重发邮件；如担心滥用，加入持久化的限流。
+
+### R-072 访客取消报名后不能再次报名（P3，设计如此）
+
+证据：访客报名文档的 id 是 `{eventId}_{emailKey}`；再次报名是对已存在 id 的 `set`，也就是更新，访客无权更新（见 R-060）。取消后的文档会保留。
+
+风险：取消过的访客不能用同一邮箱或电话再报同一个活动。
+
+建议行动：接受现状，或由 board 删除已取消的文档（board 有删除权限）。
+
+## 2026-10-20 新增：Phase 1 审查修复
+
+以下修复都在 `phase1/integration`（尚未合并、尚未部署）。
+
+### R-073 KL 自助注册因嵌套的 undefined 一直失败（P0，已解决）
+
+证据：注册资料构建函数（`utils/signUpPayload.ts` 的 `buildSelfSignUpMember`）在表单没有填简介时留下 `others.bio: undefined`；旧的 `stripUndefined` 只去掉顶层的 undefined，而 Firestore 不接受嵌套的 undefined，所以写 `members` 失败。失败时，刚创建的 Firebase Auth 账号会留下，没有资料。
+
+风险：新的 KL 申请人无法注册，每次失败还会留下一个孤立的 Auth 账号。
+
+处理：`stripUndefined` 现在会清理各层的普通对象（Timestamp 和数组保持原样），`buildExternalSignUpMember` 也用它。`hooks/useAuth.tsx` 的 `signUp` 在资料写入失败时会删除刚建的 Auth 账号（和 `signUpExternal` 原有的回滚一致）。
+
+### R-074 分会管理人可以撤销 KL 的决定（P1，已解决）
+
+证据：重新激活已停用成员的条件是 `affiliation.activatedAt` 已有，这并不说明是谁停用的，所以分会管理人可以解除 JCI KL 做的停用。规则里分会管理人的客户端分支还允许 `expired` → `suspended` 等从浏览器直接改状态字段的写法。
+
+风险：分会管理人能推翻 KL 的停用，也能做 `external-accounts` 转换表不允许的状态变更。
+
+处理：`setStatus` 在每次变为 `suspended` 时写 `affiliation.suspendedByRole`（`KL` 或 `CHAPTER_ADMIN`），分会管理人只有在值为 `CHAPTER_ADMIN` 时才能重新激活；`ChapterAdminView` 的「重新激活」按钮用同一条件显示。`members` 更新规则里的客户端分支已移除，分会管理人不再从浏览器写会员文档。
+
+### R-075 任何人都可以通过自助注册占满分会名额（P1，已解决）
+
+证据：每个分会 100 个成员的上限统计了该分会所有成员文档，而任何人都能自助注册出一个 `pending_chapter` 文档。
+
+风险：大量自助注册会让真正的邀请无法进行。
+
+处理：function 只统计 `affiliation.status` 在 `CAP_COUNTED_STATUSES`（`active`、`suspended`）内的成员；待审批、已拒绝、已过期的文档不占名额。索引见 R-086。
+
+### R-076 问卷的 responsesCount 可以被刷高（P2，已解决）
+
+证据：`surveys` 更新规则允许任何能读问卷的人给 `responsesCount` 加 1，与是否真的有回答无关，也不看问卷状态。
+
+风险：用户不作答也能把回答计数刷上去。
+
+处理：非 board / admin 的更新必须针对 `Active` 的问卷，只改 `responsesCount`（+1）和 `updatedAt`，并且同一次写入要创建自己的 `surveyResponses/{surveyId}_{uid}`（规则检查该文档写入前不存在、写入后存在）。
+
+### R-077 自助注册的类别没有和分会绑定（P2，已解决）
+
+证据：外部自助注册规则接受 `sister`、`apicc`、`global` 中任意一个 `affiliation.category`。
+
+风险：自助注册的人可以选一个与自己分会不符的类别，从而改变他能看到的内容（福利受众）。
+
+处理：规则要求 `affiliation.category == categoryForChapterType(chapter.type)`。见 R-083。
+
+### R-078 可以按 id 试探报名和问卷回答（P2，已解决）
+
+证据：`eventRegistrations` 和 `surveyResponses` 的 get 规则允许读取任意 id 下不存在的文档，「找不到」与「无权限」的区别会告诉用户别人是否报过名或答过卷。
+
+风险：泄露谁报名了某个活动、谁回答了某份问卷。
+
+处理：不存在的 `eventRegistrations` 文档只有在 id 以 `_` 加调用者 uid 结尾时才允许读；不存在的 `surveyResponses` 文档只允许读 `{surveyId}_{uid}`。见 R-084、R-085。
+
+### R-079 不存在的活动也能接受访客报名（P2，已解决）
+
+证据：`guestRegistrations` 创建规则只检查数据形状，未登录访客可以对任意 `eventId` 创建报名。
+
+风险：为虚构或未列出的活动产生垃圾文档。
+
+处理：创建时还要求 `projects/{eventId}` 存在，且状态为 Active、Upcoming 或 Approved（访客活动页列出的状态）。见 R-082。
+
+### R-080 标记已付款时，分档价格记成了最低档（P2，已解决）
+
+证据：`markRegistrationPaid` 用 `price ?? priceMin`，分档价格的活动会记成最低档，与付款人实际付的无关。
+
+风险：财务收入金额不对。
+
+处理：「标记已付款」窗口要求财务确认实际收到的马币金额（预填 `price || priceMin`）；交易的 `amount` 就是确认的金额，`originalAmount`（只有美元报名才写）保留列出的价格。
+
+### R-081 问卷回答可以用任意 id 创建（P2，已解决）
+
+证据：`surveyResponses` 创建规则只要数据字段符合就接受任何文档 id，一个用户可以提交多份回答。
+
+风险：重复或多余的回答被计入问卷结果。
+
+处理：非 board / admin 必须使用 id `{surveyId}_{uid}`（`SurveysService.submitResponse` 本来就用这个 id），已存在的 id 仍然被拒绝。
+
+### R-082 已接受：未登录访客可以抢先占用访客的邮箱或电话（P3，已接受）
+
+证据：访客报名 id 是 `{eventId}_{emailKey}` 和 `{eventId}_phone_{phoneKey}`，创建不需要登录（R-060、R-072）。任何人都可以为某个已列出的活动登记一个邮箱或电话，真正的主人之后会被提示「已报名」。
+
+风险：访客可以挡住别人对该活动的访客报名。
+
+决定：暂时接受；board 可以删除被抢占的文档（board 有删除权限）。
+
+### R-083 规则里的 categoryForChapterType 与 categoryForChapter 重复（P3）
+
+证据：`firestore.rules` 的 `categoryForChapterType` 与 `utils/affiliation.mjs` 的 `categoryForChapter` 是同一个映射（先 `sister_lo`，再 `apicc`，再 `global`，默认 `sister`），规则不能引用代码。
+
+风险：只改其中一处，自助注册会被拒绝（或接受错误的类别）。
+
+建议行动：两处一起改；`tests/rules/wp3SelfRegister.rules.test.ts` 与单元测试应覆盖同样的情况。
+
+### R-084 问卷 id 不能包含下划线（P3）
+
+证据：`surveyResponses` 的 get 规则把第一个 `_` 之前的部分当作问卷 id（`responseId.split('_')[0]`），`surveys` 更新规则则拼出 `{surveyId}_{uid}`。问卷 id 是 Firestore 自动 id，不含 `_`。
+
+风险：手工指定的带 `_` 的问卷 id 会破坏不存在文档的读取和重复提交检查。
+
+建议行动：不要用自定义 id 创建问卷。
+
+### R-085 eventRegistrations 的「文档不存在」检查只看后缀（P3）
+
+证据：`eventRegistrations` 的 get 规则在 id 以 `_` 加调用者 uid 结尾时允许读取不存在的文档，不检查前面的部分。
+
+风险：只是理论上的：本身含 `_` 的 uid 可能匹配到别的 id 的后缀。Firebase 自动 uid 不含 `_`，且匹配只会暴露「文档不存在」。
+
+建议行动：暂不处理；若将来引入自定义 uid 再收紧。
+
+### R-086 部署注意：复合索引 members (loId, affiliation.status)（P2）
+
+证据：名额统计（R-075）用 `loId ==` 加 `affiliation.status in [...]` 查询 `members`；索引已写在 `firestore.indexes.json`。
+
+风险：如果规则和 function 上线时没有这个索引，创建或邀请外部账号会在统计查询处失败。
+
+建议行动：发布 function 前，把 `firestore.indexes.json` 与 `firestore.rules` 一起部署，并等索引建好。

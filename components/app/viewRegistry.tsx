@@ -4,6 +4,7 @@ import { ViewType } from '../../types/views';
 import type { AffiliationStatus } from '../../types/member';
 import { ExternalAccessNotice } from './ExternalAccessNotice';
 import { ExternalSelfProfile } from './ExternalSelfProfile';
+import { canOpenSystemConfig } from '../../utils/configAccess';
 
 const FinanceView = lazy(() => import('../modules/FinanceView').then(m => ({ default: m.FinanceView })));
 const PaymentRequestsView = lazy(() => import('../modules/PaymentRequestsView').then(m => ({ default: m.PaymentRequestsView })));
@@ -13,6 +14,7 @@ const MembersView = lazy(() => import('../modules/MembersView').then(m => ({ def
 const ProjectsView = lazy(() => import('../modules/ProjectsView').then(m => ({ default: m.ProjectsView })));
 const FlagshipProjectsManagementView = lazy(() => import('../modules/FlagshipProjectsManagementView').then(m => ({ default: m.FlagshipProjectsManagementView })));
 const InventoryView = lazy(() => import('../modules/InventoryView').then(m => ({ default: m.InventoryView })));
+const InternationalNetworkTab = lazy(() => import('../modules/BusinessDirectory/InternationalNetworkTab').then(m => ({ default: m.InternationalNetworkTab })));
 const BusinessDirectoryView = lazy(() => import('../modules/BusinessDirectoryView').then(m => ({ default: m.BusinessDirectoryView })));
 const AutomationStudio = lazy(() => import('../modules/AutomationStudio').then(m => ({ default: m.AutomationStudio })));
 const KnowledgeView = lazy(() => import('../modules/KnowledgeView').then(m => ({ default: m.KnowledgeView })));
@@ -36,6 +38,7 @@ const SystemConfigView = lazy(() => import('../modules/SystemConfigView').then(m
 const PublicationsView = lazy(() => import('../modules/PublicationsView').then(m => ({ default: m.PublicationsView })));
 const RadarDataImporter = lazy(() => import('../admin/RadarDataImporter').then(m => ({ default: m.RadarDataImporter })));
 const SponsorshipView = lazy(() => import('../modules/SponsorshipView').then(m => ({ default: m.SponsorshipView })));
+const ChapterAdminView = lazy(() => import('../modules/Chapter/ChapterAdminView').then(m => ({ default: m.ChapterAdminView })));
 
 export interface AppViewRenderContext {
   memberRole?: UserRole;
@@ -116,6 +119,10 @@ export const renderAppView = (view: ViewType, context: AppViewRenderContext): Re
     if (externalAllowedViews.includes(view)) {
       // The only whitelisted view that is a KL module is MEMBERS: externals get their OWN profile only,
       // rendered from the signed-in member (no members list query, no KL tabs).
+      // MY_CHAPTER is whitelisted only for an active CHAPTER_ADMIN (utils/externalAccess.ts).
+      if (view === 'MY_CHAPTER') {
+        return wrapErrorBoundary(<ChapterAdminView />, 'My Chapter');
+      }
       if (view === 'MEMBERS') {
         return wrapErrorBoundary(<ExternalSelfProfile />, '个人资料');
       }
@@ -155,6 +162,8 @@ export const renderAppView = (view: ViewType, context: AppViewRenderContext): Re
       return wrapErrorBoundary(<InventoryView searchQuery={searchQuery} />, '库存');
     case 'DIRECTORY':
       if (!hasMember) return dashboardFallback;
+      // Externals: card-only directory (businessProfiles / members are denied to them).
+      if (externalAllowedViews) return wrapErrorBoundary(<InternationalNetworkTab />, '商业目录');
       return wrapErrorBoundary(<BusinessDirectoryView searchQuery={searchQuery} initialSelectedBusinessId={initialSelectedBusinessId} onClearSelection={clearSelectedBusiness} />, '商业目录');
     case 'AUTOMATION':
       if (!isAdmin && !isBoard) return dashboardFallback;
@@ -220,7 +229,8 @@ export const renderAppView = (view: ViewType, context: AppViewRenderContext): Re
       if (memberRole !== UserRole.SUPER_ADMIN) return dashboardFallback;
       return wrapErrorBoundary(<SystemConfigView initialTab="access" />, '访问配置');
     case 'SYSTEM_CONFIG':
-      if (memberRole !== UserRole.SUPER_ADMIN) return dashboardFallback;
+      // ADMIN opens Config with the Global Relations tab only (SystemConfigView filters the tabs).
+      if (!canOpenSystemConfig(memberRole)) return dashboardFallback;
       return wrapErrorBoundary(<SystemConfigView />, '系统配置');
     case 'PUBLICATIONS':
       if (memberRole === UserRole.GUEST || isPlainMember) return dashboardFallback;

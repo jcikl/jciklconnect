@@ -201,6 +201,85 @@ service cloud.firestore {
       return isActiveChapterAdmin() && resource.data.loId == getMyLoId();
     }
 
+    // WP-8 (decision 8): an external member (AFFILIATE / CHAPTER_ADMIN) may set their own general.dob once,
+    // while it is still empty; birthdayMMDD, if written, must match it (or stay unset).
+    function externalSetsDobOnce() {
+      let before = resource.data;
+      let after = request.resource.data;
+      let dob = after.get('general', {}).get('dob', null);
+      return before.get('role', '') in ['AFFILIATE', 'CHAPTER_ADMIN'] &&
+             before.get('general', {}).get('dob', null) in [null, ''] &&
+             dob is string &&
+             dob.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+             (after.get('birthdayMMDD', null) == before.get('birthdayMMDD', null) ||
+              after.get('birthdayMMDD', null) == dob.split('-')[1] + dob.split('-')[2]);
+    }
+
+    // ── Self sign-up (members create) ─────────────────────────────────────────────────────────
+    // A brand-new user writing their own doc (uid == doc id, doc does not exist yet).
+    function isNewSelfSignUp(memberId) {
+      return request.auth.uid == memberId &&
+             !exists(/databases/$(database)/documents/members/$(memberId));
+    }
+
+    // Keys a self sign-up may write (GUEST: hooks/useAuth.tsx signUp, R-028).
+    function selfSignUpKeys() {
+      return ['email', 'name', 'displayName', 'photoURL', 'photoUrl',
+              'createdAt', 'role', 'status', 'loId',
+              'general', 'contact', 'membership',
+              'others', 'skills', 'surveyAnswers', 'personaType', 'tendencyTags',
+              'tier', 'points', 'churnRisk', 'attendanceRate', 'duesStatus', 'badges', 'jciCareer'];
+    }
+
+    // System-managed fields may only carry the sign-up defaults, and jciCareer may only hold joinDate,
+    // so a self-registered user cannot grant itself points, badges or a board position
+    // (isCurrentBoardMember / currentBoardPosition drive isBoard()). Name and email are required.
+    function selfSignUpDefaultsOk() {
+      let d = request.resource.data;
+      return d.get('tier', 'Bronze') == 'Bronze' &&
+             d.get('points', 0) == 0 &&
+             d.get('churnRisk', 'Low') == 'Low' &&
+             d.get('attendanceRate', 100) == 100 &&
+             d.get('duesStatus', 'Pending') == 'Pending' &&
+             d.get('badges', []).size() == 0 &&
+             d.get('jciCareer', {}).keys().hasOnly(['joinDate']) &&
+             (d.get('name', null) is string || d.get('general', {}).get('name', null) is string) &&
+             (d.get('email', null) is string || d.get('contact', {}).get('email', null) is string);
+    }
+
+    // Same mapping as utils/affiliation.mjs categoryForChapter (review M4): sisterChapters.type (list) →
+    // members.affiliation.category. sister_lo → 'sister', else apicc → 'apicc', else global → 'global',
+    // no type → 'sister'. Keep the two in sync.
+    function categoryForChapterType(types) {
+      return types.hasAny(['sister_lo']) ? 'sister'
+           : types.hasAny(['apicc']) ? 'apicc'
+           : types.hasAny(['global']) ? 'global'
+           : 'sister';
+    }
+
+    // Phase 1 WP-3: an external person registers themself for an ACTIVE sister chapter as an AFFILIATE
+    // waiting for their chapter admin (pending_chapter). Never CHAPTER_ADMIN, never KL, never active.
+    // affiliation holds exactly category / country / status; country must equal the chapter's country.
+    function isExternalSelfRegistration(memberId) {
+      let d = request.resource.data;
+      return isNewSelfSignUp(memberId) &&
+             d.role == 'AFFILIATE' &&
+             d.get('loId', null) is string &&
+             d.loId != '' &&
+             d.loId != klLoId() &&
+             exists(/databases/$(database)/documents/sisterChapters/$(d.loId)) &&
+             get(/databases/$(database)/documents/sisterChapters/$(d.loId)).data.get('isActive', false) == true &&
+             d.get('affiliation', null) is map &&
+             d.affiliation.keys().hasOnly(['category', 'country', 'status']) &&
+             d.affiliation.keys().hasAll(['category', 'country', 'status']) &&
+             d.affiliation.status == 'pending_chapter' &&
+             d.affiliation.category == categoryForChapterType(
+               get(/databases/$(database)/documents/sisterChapters/$(d.loId)).data.get('type', [])) &&
+             d.affiliation.country == get(/databases/$(database)/documents/sisterChapters/$(d.loId)).data.get('country', null) &&
+             d.keys().hasOnly(selfSignUpKeys().concat(['affiliation'])) &&
+             selfSignUpDefaultsOk();
+    }
+
     // Users collection (FCM tokens)
     match /users/{userId} {
       allow read, write: if isAuthenticated() && request.auth.uid == userId;
@@ -251,39 +330,22 @@ service cloud.firestore {
       allow create: if isAuthenticated() &&
                        request.resource.data.role is string &&
                        externalRoleHasChapter() &&
-                       // Only KL admins create external members (AFFILIATE / CHAPTER_ADMIN) or ADMIN /
-                       // SUPER_ADMIN docs (R-053, same guard as update). Non-admin creators (BOARD, self
-                       // sign-up) create KL docs only: loId 'jcikl' (or absent → KL) and no affiliation.
-                       (isAdmin() ||
-                        (!(request.resource.data.role in ['ADMIN', 'SUPER_ADMIN', 'AFFILIATE', 'CHAPTER_ADMIN']) &&
-                         request.resource.data.get('loId', klLoId()) == klLoId() &&
-                         !request.resource.data.keys().hasAny(['affiliation']))) &&
-                       (isBoard() ||
-                        (request.auth.uid == memberId &&
-                         !exists(/databases/$(database)/documents/members/$(memberId)) &&
-                         request.resource.data.get('role', 'GUEST') == 'GUEST' &&
-                         request.resource.data.keys().hasOnly([
-                           'email', 'name', 'displayName', 'photoURL', 'photoUrl',
-                           'createdAt', 'role', 'status', 'loId',
-                           'general', 'contact', 'membership',
-                           // R-028: fields the sign-up form writes (hooks/useAuth.tsx signUp)
-                           'others', 'skills', 'surveyAnswers', 'personaType', 'tendencyTags',
-                           'tier', 'points', 'churnRisk', 'attendanceRate', 'duesStatus', 'badges', 'jciCareer'
-                         ]) &&
-                         // System-managed fields may only carry the sign-up defaults, and jciCareer may only
-                         // hold joinDate, so a self-registered GUEST cannot grant itself points, badges or a
-                         // board position (isCurrentBoardMember / currentBoardPosition drive isBoard()).
-                         request.resource.data.get('tier', 'Bronze') == 'Bronze' &&
-                         request.resource.data.get('points', 0) == 0 &&
-                         request.resource.data.get('churnRisk', 'Low') == 'Low' &&
-                         request.resource.data.get('attendanceRate', 100) == 100 &&
-                         request.resource.data.get('duesStatus', 'Pending') == 'Pending' &&
-                         request.resource.data.get('badges', []).size() == 0 &&
-                         request.resource.data.get('jciCareer', {}).keys().hasOnly(['joinDate']) &&
-                         (request.resource.data.name is string ||
-                          request.resource.data.get('general', {}).get('name', null) is string) &&
-                         (request.resource.data.email is string ||
-                          request.resource.data.get('contact', {}).get('email', null) is string)));
+                       (
+                        // Only KL admins create external members (AFFILIATE / CHAPTER_ADMIN) or ADMIN /
+                        // SUPER_ADMIN docs (R-053, same guard as update). Non-admin creators (BOARD, self
+                        // sign-up) create KL docs only: loId 'jcikl' (or absent → KL) and no affiliation.
+                        ((isAdmin() ||
+                          (!(request.resource.data.role in ['ADMIN', 'SUPER_ADMIN', 'AFFILIATE', 'CHAPTER_ADMIN']) &&
+                           request.resource.data.get('loId', klLoId()) == klLoId() &&
+                           !request.resource.data.keys().hasAny(['affiliation']))) &&
+                         (isBoard() ||
+                          (isNewSelfSignUp(memberId) &&
+                           request.resource.data.get('role', 'GUEST') == 'GUEST' &&
+                           request.resource.data.keys().hasOnly(selfSignUpKeys()) &&
+                           selfSignUpDefaultsOk()))) ||
+                        // Phase 1 WP-3: external self-registration (hooks/useAuth.tsx signUpExternal).
+                        isExternalSelfRegistration(memberId)
+                       );
 
       // Self-write: members may update any profile field EXCEPT the locked list below.
       // INACTIVE users are blocked from self-write at the rules layer (not just service layer).
@@ -306,14 +368,18 @@ service cloud.firestore {
            'deletedAt', 'deletedBy', 'createdAt', 'createdBy',
            'attendanceCheckins', 'attendanceMonths', 'attendanceYear',
            'leaderboardScore', 'points',
-           'churnRisk', 'tier', 'birthdayMMDD', 'isDeveloper',
+           'churnRisk', 'tier', 'isDeveloper',
            'isCurrentBoardMember', 'currentBoardPosition',
            // External members cannot self-activate or change their category/country.
            'affiliation'
          ]) &&
+         // birthdayMMDD is locked, except when an external sets their dob once (WP-8).
+         (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['birthdayMMDD']) ||
+          externalSetsDobOnce()) &&
          (resource.data.get('role', 'GUEST') == 'GUEST' ||
           (request.resource.data.get('general', {}).get('nationality', null) == resource.data.get('general', {}).get('nationality', null) &&
-           request.resource.data.get('general', {}).get('dob', null)         == resource.data.get('general', {}).get('dob', null) &&
+           (request.resource.data.get('general', {}).get('dob', null)        == resource.data.get('general', {}).get('dob', null) ||
+            externalSetsDobOnce()) &&
            request.resource.data.get('general', {}).get('idNumber', null)    == resource.data.get('general', {}).get('idNumber', null) &&
            request.resource.data.get('general', {}).get('idType', null)      == resource.data.get('general', {}).get('idType', null)))
         ) ||
@@ -328,25 +394,10 @@ service cloud.firestore {
           !resource.data.get('senatorshipBoardValidated', false) ||
           request.resource.data.get('senatorshipId', resource.data.get('senatorshipId', null))
             == resource.data.get('senatorshipId', null))
-        ) ||
-        // Active CHAPTER_ADMIN → AFFILIATE docs of their own chapter: only affiliation.status and its
-        // audit fields. role / loId / everything else unchanged; may never set status 'active'
-        // (KL admins activate). Never touches KL members (own loId is never 'jcikl').
-        (isActiveChapterAdmin() &&
-         resource.data.loId == getMyLoId() &&
-         resource.data.get('role', '') == 'AFFILIATE' &&
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['affiliation', 'updatedAt', 'updatedBy']) &&
-         request.resource.data.get('affiliation', {}).diff(resource.data.get('affiliation', {})).affectedKeys()
-           .hasOnly(['status', 'chapterApprovedAt', 'chapterApprovedBy', 'statusUpdatedAt', 'statusUpdatedBy']) &&
-         (request.resource.data.get('affiliation', {}).get('status', '') == resource.data.get('affiliation', {}).get('status', '') ||
-          request.resource.data.get('affiliation', {}).get('status', '') in ['pending_chapter', 'pending_kl', 'suspended', 'expired']) &&
-         // L6: audit fields, when written, must name the caller.
-         (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['updatedBy']) ||
-          request.resource.data.updatedBy == request.auth.uid) &&
-         (!request.resource.data.get('affiliation', {}).diff(resource.data.get('affiliation', {})).affectedKeys().hasAny(['chapterApprovedBy']) ||
-          request.resource.data.affiliation.chapterApprovedBy == request.auth.uid) &&
-         (!request.resource.data.get('affiliation', {}).diff(resource.data.get('affiliation', {})).affectedKeys().hasAny(['statusUpdatedBy']) ||
-          request.resource.data.affiliation.statusUpdatedBy == request.auth.uid))
+        )
+        // Review M1: no client branch for CHAPTER_ADMIN status changes. Approve / reject / suspend /
+        // reactivate go through netlify/functions/external-accounts (Admin SDK: transition table,
+        // memberCards sync, suspendedByRole), so chapter admins write no member docs from the client.
       );
 
       // Only admins may delete; self-delete removed to prevent orphan data (E07)
@@ -735,13 +786,18 @@ service cloud.firestore {
         'matchedBankTxId', 'toyyibBillCode', 'toyyibPaymentUrl', 'toyyibPaymentStatus', 'billExternalReferenceNo',
         'cancelledAt', 'cancelledBy', 'cancelledByName', 'cancelledByRole',
         'registeredBy', 'registeredByName', 'memberName',
-        'eventId', 'memberId', 'loId', 'createdAt', 'updatedAt'];
+        'eventId', 'memberId', 'loId', 'registrantLoId', 'currency', 'createdAt', 'updatedAt'];
       return unchanged.toSet().difference(request.resource.data.diff(resource.data).affectedKeys()).size() == unchanged.size();
     }
     match /eventRegistrations/{regId} {
       // ER-R1: split get/list — resource.data is null in list queries; members can only self-read via get
+      // resource == null: registerForEvent's transaction reads the (not yet existing) {eventId}_{uid} doc first.
+      // Only for the caller's OWN id (exact "_" + uid suffix) so 404 vs 403 cannot be used to probe others.
       allow get: if isAuthenticated() &&
-        (isAdmin() || resource.data.get('memberId', null) == request.auth.uid || canReadOrgMembers());
+        (isAdmin() ||
+         (resource == null && regId.size() > request.auth.uid.size() &&
+          regId[regId.size() - request.auth.uid.size() - 1:] == '_' + request.auth.uid) ||
+         resource.data.get('memberId', null) == request.auth.uid || canReadOrgMembers());
       // Members may list their own registrations (service adds where('memberId','==',uid)); Board+ lists all.
       // Active external users: own registrations only — the query must carry where('memberId','==',uid).
       allow list: if isAuthenticated() && (isAdmin() || canReadOrgMembers() || isMember() ||
@@ -837,32 +893,63 @@ service cloud.firestore {
     
     // Surveys collection — SUPER_ADMIN included via isAdmin()
     match /surveys/{surveyId} {
-      // External users: only surveys targeted to them via the existing 'Specific Group' list
-      // (list query must carry where('specificMemberIds','array-contains',uid)).
+      // External users: surveys targeted to them via the 'Specific Group' list, or Active surveys that
+      // board/admin opened to other chapters (openToExternals; missing = false). List queries must carry
+      // where('specificMemberIds','array-contains',uid) OR where('openToExternals','==',true) + where('status','==','Active').
       allow read: if isInternalUser() ||
-                     (isActiveExternal() && request.auth.uid in resource.data.specificMemberIds);
-      allow create, update, delete: if isBoard() || isAdmin();
+                     (isActiveExternal() &&
+                      (request.auth.uid in resource.data.specificMemberIds ||
+                       (resource.data.openToExternals == true && resource.data.status == 'Active')));
+      allow create, delete: if isBoard() || isAdmin();
+      // Submitting a response (SurveysService.submitResponse) bumps responsesCount by exactly 1 in the same
+      // transaction: anyone who may read this survey may do that, and change nothing else but updatedAt —
+      // only while the survey is Active and only together with the caller's own new response
+      // (id {surveyId}_{uid}, created in this same write: absent before, present after).
+      allow update: if isBoard() || isAdmin() ||
+                      ((isInternalUser() ||
+                        (isActiveExternal() &&
+                         (request.auth.uid in resource.data.get('specificMemberIds', []) ||
+                          (resource.data.get('openToExternals', false) == true && resource.data.get('status', '') == 'Active')))) &&
+                       resource.data.get('status', '') == 'Active' &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['responsesCount', 'updatedAt']) &&
+                       request.resource.data.responsesCount == resource.data.get('responsesCount', 0) + 1 &&
+                       !exists(/databases/$(database)/documents/surveyResponses/$(surveyId + '_' + request.auth.uid)) &&
+                       existsAfter(/databases/$(database)/documents/surveyResponses/$(surveyId + '_' + request.auth.uid)));
     }
     
     // Survey Responses collection
     // FIX 5: allow read used resource.data.memberId which is null in list queries — members could never list their own responses
     match /surveyResponses/{responseId} {
+      // Survey being answered (get() results are cached per request, so repeated calls cost one read).
+      function surveyOfResponse() {
+        return get(/databases/$(database)/documents/surveys/$(request.resource.data.surveyId)).data;
+      }
       // resource.data valid for get; service-layer where(memberId == uid) handles list ownership
+      // resource == null: submitResponse's duplicate check reads its own not-yet-existing id ({surveyId}_{uid}).
+      // Only the caller's own id (exact: everything after the first '_' is the uid; survey ids are auto-ids
+      // without '_'), so nobody can probe whether another member answered (404 vs 403).
       allow get: if isAuthenticated() &&
-                    (resource.data.memberId == request.auth.uid || isBoard() || isAdmin());
+                    ((resource == null && responseId == responseId.split('_')[0] + '_' + request.auth.uid) ||
+                     (resource != null && resource.data.memberId == request.auth.uid) ||
+                     isBoard() || isAdmin());
       allow list: if isActiveMember() ||
                      (isActiveExternal() && resource.data.memberId == request.auth.uid);
       // FIX: added required field validation to prevent partial/malformed responses
-      // DEDUP: !exists() check prevents duplicate submissions when service uses memberId_surveyId as doc ID.
-      // Service MUST use a deterministic responseId = memberId + '_' + surveyId when calling setDoc.
+      // DEDUP: the id is deterministic, {surveyId}_{memberId} (SurveysService.submitResponse), and
+      // !exists() rejects a second submission. Non-board/admin users must use exactly that id, so they
+      // cannot add extra responses under other ids; board/admin keep their previous freedom.
       allow create: if isAuthenticated() &&
                       request.resource.data.memberId == request.auth.uid &&
+                      (isBoard() || isAdmin() ||
+                       responseId == request.resource.data.surveyId + '_' + request.auth.uid) &&
                       request.resource.data.keys().hasAll(['surveyId', 'memberId', 'responses', 'submittedAt']) &&
                       !exists(/databases/$(database)/documents/surveyResponses/$(responseId)) &&
-                      // External users may only answer surveys targeted to them.
+                      // External users may only answer surveys targeted to them, or Active surveys open to externals.
                       (!isExternal() ||
                        (isActiveExternal() &&
-                        request.auth.uid in get(/databases/$(database)/documents/surveys/$(request.resource.data.surveyId)).data.get('specificMemberIds', [])));
+                        (request.auth.uid in surveyOfResponse().get('specificMemberIds', []) ||
+                         (surveyOfResponse().get('openToExternals', false) == true &&
+                          surveyOfResponse().get('status', '') == 'Active'))));
       allow update, delete: if isBoard() || isAdmin();
     }
 
@@ -927,13 +1014,17 @@ service cloud.firestore {
     // Hobby Clubs collection
     // FIX 12: any authenticated user (including GUEST) could create/update/delete any club
     match /hobbyClubs/{clubId} {
-      allow read: if isInternalUser() || isActiveExternal();  // whitelisted module: hobby clubs
+      // Externals (other chapters) see only clubs board/admin opened to them (list query: where('openToExternals','==',true)).
+      allow read: if isInternalUser() || (isActiveExternal() && resource.data.openToExternals == true);
       // P2 Fix: exclude GUEST role from creating clubs — only MEMBER and above.
-      allow create: if (isMember() && getUserRole() != 'GUEST') || isBoard() || isAdmin();
-      // Club lead can update descriptive fields only — leadId and memberIds are admin-managed
+      // Only board/admin may open a club to other chapters.
+      allow create: if (isBoard() || isAdmin()) ||
+                      (isMember() && getUserRole() != 'GUEST' &&
+                       request.resource.data.get('openToExternals', false) != true);
+      // Club lead can update descriptive fields only — leadId, memberIds and openToExternals are admin-managed
       allow update: if isBoard() || isAdmin() ||
                       (isMember() && resource.data.leadId == request.auth.uid
-                        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['leadId', 'memberIds']));
+                        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['leadId', 'memberIds', 'openToExternals']));
       allow delete: if isAdmin();
     }
     
@@ -1150,14 +1241,32 @@ service cloud.firestore {
     // Guest Registrations collection
     // FIX 22: allow update had no hasOnly whitelist — Board could overwrite any field including immutable registration data
     match /guestRegistrations/{registrationId} {
+      // The guest events page lists `projects` docs with status Active / Upcoming / Approved
+      // (EventsService LISTED_EVENT_STATUSES); guests may only register for one of those.
+      function guestEventIsListed() {
+        let eventPath = /databases/$(database)/documents/projects/$(request.resource.data.eventId);
+        return exists(eventPath) && get(eventPath).data.get('status', '') in ['Active', 'Upcoming', 'Approved'];
+      }
       allow read: if isBoard() || isAdmin();
       // FIX 5: allow create: if true had no field validation — bots could write arbitrary content
-      // Fields from eventsService.ts: eventId, name, email, phone, registeredAt, status, organization, notes
-      allow create: if request.resource.data.keys().hasAll(['name', 'email', 'eventId', 'registeredAt'])
-                    && request.resource.data.keys().hasOnly(['name', 'email', 'phone', 'eventId', 'organization', 'notes', 'registeredAt', 'status', '_indexFor']);
+      // EventsService.registerGuestForEvent (signed-out guests) writes two docs in one batch with deterministic ids:
+      //   {eventId}_{emailKey}       main doc: eventId, name, email, phone, registeredAt, status, organization?, notes?
+      //   {eventId}_phone_{phoneKey} phone index doc: eventId, email, phone, status, _indexFor == 'phone'
+      // Dedup: an existing id makes the set an update, which only board/admin may do — the whole batch is denied.
+      allow create: if guestEventIsListed() && ((request.resource.data.keys().hasAll(['name', 'email', 'eventId', 'registeredAt', 'status'])
+                        && request.resource.data.keys().hasOnly(['name', 'email', 'phone', 'eventId', 'organization', 'notes', 'registeredAt', 'status'])
+                        && request.resource.data.status == 'Pending')
+                    || (request.resource.data.get('_indexFor', null) == 'phone'
+                        && request.resource.data.keys().hasAll(['eventId', 'email', 'phone', 'status', '_indexFor'])
+                        && request.resource.data.keys().hasOnly(['eventId', 'email', 'phone', 'status', '_indexFor'])
+                        && request.resource.data.status == 'Pending'));
+      // Main doc: check-in / notes / cancel (cancelGuestRegistration writes status + cancelledAt).
+      // Phone index doc: status only (cancelGuestRegistration marks it Cancelled).
       allow update: if (isBoard() || isAdmin()) &&
-                      request.resource.data.diff(resource.data).affectedKeys()
-                        .hasOnly(['status', 'checkedIn', 'checkedInAt', 'notes', 'updatedAt']);
+                      (resource.data.get('_indexFor', null) == 'phone'
+                        ? request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+                        : request.resource.data.diff(resource.data).affectedKeys()
+                            .hasOnly(['status', 'checkedIn', 'checkedInAt', 'notes', 'updatedAt', 'cancelledAt']));
       allow delete: if isBoard();
     }
     
@@ -1618,10 +1727,11 @@ service cloud.firestore {
       allow read: if isInternalUser();
       allow create, update, delete: if isAdmin();
     }
-    // Sister chapters — any authenticated member can read; only SUPER_ADMIN can write
+    // Sister chapters — public read; only SUPER_ADMIN can write
     match /sisterChapters/{chapterId} {
-      // Active external users read the chapter list too (names/countries/logos — no PII).
-      allow read: if isActiveMember() || isActiveExternal();
+      // Public (owner decision 5): the external self-registration form picks the chapter from this list
+      // before the user has an account. Chapter docs hold names / countries / logos only — no PII.
+      allow read: if true;
       allow create, update, delete: if getUserRole() == 'SUPER_ADMIN';
     }
 

@@ -13,6 +13,17 @@ export const formatCurrency = (
   }).format(safeAmount);
 };
 
+/**
+ * Event price range ("From" label). MYR keeps the existing "RM 50 – 80" look; any other currency
+ * (USD for external-chapter members: same number, display only) goes through formatCurrency.
+ */
+export const formatEventPrice = (min: number, max?: number | null, currency: string = 'MYR'): string => {
+  const hasRange = max != null && max !== min;
+  if (currency === 'MYR') return `RM ${min}${hasRange ? ` – ${max}` : ''}`;
+  const one = (n: number) => formatCurrency(n, currency, 'en-US');
+  return hasRange ? `${one(min)} – ${one(max as number)}` : one(min);
+};
+
 export const formatNumber = (num: number, decimals: number = 0): string => {
   return new Intl.NumberFormat('en-US', {
     minimumFractionDigits: decimals,

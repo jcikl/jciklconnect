@@ -11,6 +11,7 @@ import { MEMBER_SELF_EDITABLE_FIELDS } from '../../../config/constants';
 import { EventRegistrationService } from '../../../services/eventRegistrationService';
 import { EventsService } from '../../../services/eventsService';
 import { formatDateToDDMMMYYYY } from '../../../utils/dateUtils';
+import { isExternalRole } from '../../../utils/externalAccess';
 
 /** Dues status labels (Story 8.1) */
 const DUES_STATUS_LABEL: Record<string, string> = { Paid: 'Paid', Pending: 'Pending', Overdue: 'Overdue' };
@@ -30,7 +31,13 @@ export const MyProfileSelfView: React.FC<{ member: Member; onSave: (updates: Par
     showSocials: member.privacy?.showSocials ?? true,
     // Opt-in (default off): mirrored into memberCards.international by MembersService.updateMember
     shareCardInternationally: member.privacy?.shareCardInternationally ?? false,
+    // Default off = birthday (day / month, never the year) shown in birthday lists
+    hideBirthday: member.privacy?.hideBirthday ?? false,
   });
+  // External members (AFFILIATE / CHAPTER_ADMIN) may set their date of birth once, while it is empty
+  // (firestore.rules self-update allows exactly that; KL members' dob is managed by KL).
+  const canSetDobOnce = isExternalRole(member.role) && !member.general?.dob;
+  const [dobOnce, setDobOnce] = useState('');
 
   const [form, setForm] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {};
@@ -50,7 +57,8 @@ export const MyProfileSelfView: React.FC<{ member: Member; onSave: (updates: Par
       try {
         const [regs, allEvents] = await Promise.all([
           EventRegistrationService.listByMember(member.id),
-          EventsService.getAllEvents(),
+          // External-chapter members can only read events KL hosts or co-hosts.
+          isExternalRole(member.role) ? EventsService.getKlEvents() : EventsService.getAllEvents(),
         ]);
         if (cancelled) return;
         setParticipations(regs);
@@ -76,6 +84,11 @@ export const MyProfileSelfView: React.FC<{ member: Member; onSave: (updates: Par
       MEMBER_SELF_EDITABLE_FIELDS.forEach((key) => {
         (updates as Record<string, unknown>)[key] = form[key]?.trim() || null;
       });
+      if (canSetDobOnce && /^\d{4}-\d{2}-\d{2}$/.test(dobOnce)) {
+        // Whole general map (local state is shallow-merged); birthdayMMDD is the birthday index field.
+        (updates as Record<string, unknown>).general = { ...member.general, dob: dobOnce };
+        (updates as Record<string, unknown>).birthdayMMDD = dobOnce.slice(5, 7) + dobOnce.slice(8, 10);
+      }
       await onSave(updates);
       showToast('Profile updated', 'success');
     } catch (err) {
@@ -113,6 +126,13 @@ export const MyProfileSelfView: React.FC<{ member: Member; onSave: (updates: Par
               )}
             </div>
           ))}
+          {canSetDobOnce && (
+            <div>
+              <label className="block text-sm text-slate-600 mb-1">Date of birth</label>
+              <Input type="date" value={dobOnce} onChange={(e) => setDobOnce(e.target.value)} />
+              <p className="text-xs text-slate-400 mt-1">Can be set once. Only the day and month appear in your chapter's birthday list.</p>
+            </div>
+          )}
           <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
         </form>
       </Card>
@@ -127,6 +147,7 @@ export const MyProfileSelfView: React.FC<{ member: Member; onSave: (updates: Par
             { key: 'showAlternatePhone', label: 'Alternative Phone', desc: 'Show your alternative phone number to other members' },
             { key: 'showSocials', label: 'Social Media', desc: 'Show your LinkedIn, Facebook, Instagram and WeChat to other members' },
             { key: 'shareCardInternationally', label: 'Show my card to international JCI members', desc: 'Let JCI members of other chapters see your name, company and business card. Off by default.' },
+            { key: 'hideBirthday', label: 'Hide my birthday', desc: 'Leave me out of the birthday list. Only the day and month are ever shown, never the year.' },
           ] as { key: keyof typeof privacy; label: string; desc: string }[]).map(({ key, label, desc }) => (
             <div key={key} className="flex items-center justify-between gap-3">
               <div className="flex-1">

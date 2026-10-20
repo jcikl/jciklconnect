@@ -4,11 +4,23 @@ import type { BusinessProfile, Member } from '../../../types';
 import { Button, Modal } from '../../ui/Common';
 import { LoadingState } from '../../ui/Loading';
 import { getInitialsSvg } from './businessDirectoryUtils';
-import { useSisterChapterMembers } from '../../../hooks/useSisterChapterMembers';
 import { ShareCardNotice } from './ShareCardNotice';
 import { hasSpecialOffer, getSpecialOfferSummary } from '../../../types/member';
 
+/** International directory entry in the shape LocalBusinessTab renders (built from a public member card). */
+export interface IntlDirectoryMember {
+  id: string; name: string; chineseName?: string; avatarUrl: string; position: string; companyName: string;
+  jciChapter: string; country: string; industry: string; businessCategory: string; email: string;
+  website: string; description: string; specialOffer: string | undefined;
+}
+
 interface LocalBusinessTabProps {
+  /** Already filtered by the sister-chapter filters (chapter / country / industry). */
+  intlMembers: IntlDirectoryMember[];
+  intlLoading: boolean;
+  canViewIntl: boolean;
+  onIntlOptIn: () => void;
+  intlOptingIn: boolean;
   businesses: BusinessProfile[];
   filteredBusinesses: BusinessProfile[];
   members: Member[];
@@ -37,6 +49,11 @@ interface LocalBusinessTabProps {
 }
 
 export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
+  intlMembers: intlViews,
+  intlLoading,
+  canViewIntl,
+  onIntlOptIn: optIn,
+  intlOptingIn: optingIn,
   businesses,
   filteredBusinesses,
   members,
@@ -64,25 +81,7 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
   getBizScore,
 }) => {
   const [quickFilter, setQuickFilter] = useState<'all' | 'bookmarked' | 'ideal' | 'international'>('all');
-  const [intlDetail, setIntlDetail] = useState<{ name: string; chineseName?: string; avatarUrl: string; position: string; companyName: string; jciChapter: string; country: string; industry: string; businessCategory: string; email: string; website: string; description: string; specialOffer: string | undefined } | null>(null);
-
-  const { members: rawIntlMembers, loading: intlLoading, canView: canViewIntl, optIn, optingIn } = useSisterChapterMembers();
-  const intlViews = rawIntlMembers.map(m => ({
-    id: m.id,
-    name: m.displayName ?? '',
-    chineseName: undefined as string | undefined,
-    avatarUrl: m.avatarUrl ?? getInitialsSvg(m.displayName ?? ''),
-    position: m.position ?? '',
-    companyName: m.companyName ?? '',
-    jciChapter: m.sisterChapter?.name ?? '',
-    country: m.sisterChapter?.country ?? '',
-    industry: m.industry ?? '',
-    businessCategory: (m.businessCategory ?? []).join(', '),
-    email: '',
-    website: m.website ?? '',
-    description: m.companyDescription ?? '',
-    specialOffer: m.specialOfferSummary,
-  }));
+  const [intlDetail, setIntlDetail] = useState<IntlDirectoryMember | null>(null);
 
   const mobileDisplayBusinesses = isGuest ? filteredBusinesses : quickFilter === 'bookmarked'
     ? filteredBusinesses.filter(b => bookmarkedIds.has(b.id))

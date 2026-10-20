@@ -4,6 +4,7 @@ import { Mail, Lock, User, AlertCircle, Phone, CheckCircle, ChevronRight, Chevro
 import { Modal, Button, useToast, ProgressBar } from '../ui/Common';
 import { Input, Select, Textarea, Checkbox } from '../ui/Form';
 import { useAuth } from '../../hooks/useAuth';
+import { buildSignUpExtras } from './signUpExtras';
 import { JOIN_US_SURVEY_QUESTIONS, NATIONALITY_OPTIONS } from '../../config/constants';
 
 // Hobbies options from MembersView
@@ -255,18 +256,13 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
         formData.email,
         formData.password,
         formData.name,
-        {
-          fullName: formData.fullName,
-          phone: formData.phone,
-          gender: formData.gender,
-          dateOfBirth: formData.dateOfBirth,
-          nationality: formData.nationality,
+        buildSignUpExtras(formData, {
           selectedHobbies: formData.selectedHobbies,
           surveyAnswers: formData.surveyAnswers,
           personaType,
           tendencyTags,
           agreementSignatures,
-        }
+        })
       );
       showToast('Application submitted! 🎉 Our team will review your membership request within 3–5 business days.', 'success');
       onClose();

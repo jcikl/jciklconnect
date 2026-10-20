@@ -7,7 +7,7 @@ import { collection, doc, getDocs, query, where, writeBatch } from 'firebase/fir
 import { db } from '../config/firebase';
 import { COLLECTIONS } from '../config/constants';
 import type { Member, MemberCard } from '../types';
-import { KL_LO_ID, buildMemberCard, shouldHaveCard, planCardSync, applyMemberUpdates } from '../utils/memberCard.mjs';
+import { buildMemberCard, shouldHaveCard, planCardSync, applyMemberUpdates } from '../utils/memberCard.mjs';
 import { errorLoggingService } from './errorLoggingService';
 import { isDevMode } from '../utils/devMode';
 import { apiCache, CACHE_TTL_3MIN } from './cacheService';
@@ -32,7 +32,7 @@ export type MemberCardWithId = MemberCard & { id: string };
 
 export class MemberCardsService {
   /**
-   * Cards shared with other chapters (`international == true`), all chapters, KL's own excluded.
+   * Cards shared with other chapters (`international == true`), all chapters, including KL cards that opted in (externals see them).
    * Query shape: ONE `where('international','==',true)` query. firestore.rules allows it for both
    * active KL members (any card) and active externals (externalCanReadCard: international == true),
    * because Firestore can prove the filter from the query. Cached 3 min; read-only (cards are only
@@ -43,9 +43,7 @@ export class MemberCardsService {
     return apiCache.getOrSet(CACHE_KEY_INTERNATIONAL, async () => {
       try {
         const snap = await getDocs(query(collection(db, COLLECTIONS.MEMBER_CARDS), where('international', '==', true)));
-        return snap.docs
-          .map(d => ({ id: d.id, ...(d.data() as MemberCard) }))
-          .filter(c => c.loId !== KL_LO_ID);
+        return snap.docs.map(d => ({ id: d.id, ...(d.data() as MemberCard) }));
       } catch (error) {
         errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MemberCardsService.getInternationalCards' });
         throw error;

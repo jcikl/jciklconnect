@@ -1,6 +1,8 @@
 import React from 'react';
 import { Calendar, MapPin, Tag, Users } from 'lucide-react';
 import type { Event } from '../../../types';
+import { formatEventPrice } from '../../../utils/formatUtils';
+import { EXTERNAL_OFFLINE_PAYMENT_NOTE } from '../../../config/constants';
 
 interface EventDesktopInfoPanelProps {
   event: Event;
@@ -8,6 +10,9 @@ interface EventDesktopInfoPanelProps {
   registerButton: React.ReactNode;
   priceMin: number | undefined;
   priceMax: number | undefined;
+  priceCurrency?: 'MYR' | 'USD';
+  /** External-chapter viewer: show the offline payment instructions. */
+  offlinePayment?: boolean;
   date: Date | null;
   endDate: Date | null;
   isMultiDay: boolean | Date | null;
@@ -24,6 +29,8 @@ export const EventDesktopInfoPanel: React.FC<EventDesktopInfoPanelProps> = ({
   registerButton,
   priceMin,
   priceMax,
+  priceCurrency = 'MYR',
+  offlinePayment = false,
   date,
   endDate,
   isMultiDay,
@@ -39,7 +46,7 @@ export const EventDesktopInfoPanel: React.FC<EventDesktopInfoPanelProps> = ({
       <div className="flex items-baseline">
         {priceMin != null ? (
           <span className="text-2xl font-black text-slate-900">
-            RM {priceMin}{priceMax != null && priceMax !== priceMin ? ` – ${priceMax}` : ''}
+            {formatEventPrice(priceMin, priceMax, priceCurrency)}
           </span>
         ) : (
           <span className="text-2xl font-black text-green-600">FREE</span>
@@ -47,6 +54,9 @@ export const EventDesktopInfoPanel: React.FC<EventDesktopInfoPanelProps> = ({
       </div>
       <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">/ person</span>
       {registerButton}
+      {offlinePayment && priceMin != null && priceMin > 0 && (
+        <p className="text-xs text-slate-500 mt-2">{EXTERNAL_OFFLINE_PAYMENT_NOTE}</p>
+      )}
     </div>
 
     <div className="divide-y divide-slate-100">

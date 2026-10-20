@@ -10,6 +10,8 @@ Updated 2026-10-18: R-028 to R-045 added from verification round 1 (permissions 
 
 Updated 2026-10-19: R-049 to R-058 added from the Phase 0 external-members review (`feat/affiliate-p0`, WP5); see the end of this file.
 
+Updated 2026-10-20: R-059 to R-072 added from the Phase 1 external-members work (`phase1/integration`, not merged or deployed yet); R-073 to R-086 added from its review fixes; see the end of this file.
+
 Severity scale: P0 critical, P1 high, P2 medium, P3 low.
 
 ## P0 Risks
@@ -576,6 +578,8 @@ Risk: cards can be missing for members who became MEMBER+ through these paths, a
 
 Recommended action: confirm each function's `members` writes one by one; move card sync into the server writers (`utils/memberCard.mjs` is plain JS and can be imported from `netlify/`), or schedule the backfill; decide what the old-profile delete in `useAuth` should do with the card.
 
+Update (2026-10-20, Phase 1): `useAuth().updateMemberProfile` now syncs the card after the member write (`MemberCardsService.syncCards`, `applyMergeUpdates` in `utils/memberCard.mjs`), and the new `netlify/functions/external-accounts.mjs` writes and deletes cards in the same batch as the member doc. The sign-up `setDoc` / old-profile `deleteDoc` in `useAuth` and the other Netlify functions listed above are unchanged.
+
 ### R-052 Member Docs Without loId Disappear From KL List Queries (P1)
 
 Evidence: since Phase 0, non-admin `members` list queries carry `where('loId', '==', 'jcikl')` (`services/membersService.ts`: getAllMembers, role lookup, email lookup, churn-risk lookup). `firestore.rules` `members` list requires `resource.data.loId == 'jcikl'` for non-admins. Client-side `isKlMember` (`utils/memberScope.ts`) treats a missing `loId` as KL, but the server query does not return such docs.
@@ -640,3 +644,235 @@ Risk: until these are done, externals either see nothing in the directory and bi
 
 Recommended action: point the directory and birthday views at `memberCards` (with the rules' query constraints: `international == true` or own `loId`); reuse `MembersView` for the own-profile view or document why not; add a chapter filter for external users to the events list.
 
+
+Update (2026-10-20, Phase 1): the external directory now reads `memberCards` through `hooks/useSisterChapterMembers` (external users get `international == true` cards, including opted-in KL cards, plus their own chapter's cards; see R-064). External birthdays do not read `memberCards`: they come from the new `netlify/functions/chapter-birthdays.mjs`. `events` `allow list: if true` is unchanged; external users now get only events KL hosts or co-hosts because `EventsView`, `DashboardHome` and `MyProfileSelfView` use the KL events query and `isEventVisibleToExternal` in the app, so a direct query still returns every event. `MyProfileSelfView` still does not import `MembersView`; that reuse is still open.
+
+## Added 2026-10-20: Phase 1 External Members
+
+### R-059 Self Sign-Up Dropped the Profile Fields the Form Collected (P2, resolved)
+
+Evidence: `components/auth/RegisterModal.tsx` passed flat `fullName`, `phone`, `gender`, `dateOfBirth` and `nationality`, while `hooks/useAuth.tsx` `signUp` reads only `additionalData.general.*` and `contact.phone`, so the form values were dropped without an error.
+
+Risk: every self-registered GUEST doc lacked full name, gender, date of birth, nationality and phone.
+
+Resolution (2026-10-20, `phase1/integration`): `components/auth/signUpExtras.ts` `buildSignUpExtras` nests the values as `general.fullName` / `gender` / `dob` / `nationality` and `contact.phone` and leaves empty values out (Firestore rejects nested undefined). The sign-up payload builders moved to `utils/signUpPayload.ts`. Tests: `tests/unit/signUpExtras.test.ts`, `tests/unit/signUpPayload.test.ts`. `birthdayMMDD` is still not set at sign-up: the GUEST create whitelist in `firestore.rules` does not allow it.
+
+### R-060 Guest Event Registration Always Failed (P1, resolved)
+
+Evidence: `EventsService.registerGuestForEvent` ran a transaction that read `guestRegistrations`, and signed-out visitors cannot read it (board / admin only). The phone-index doc also failed the create rule's required-field check. Separately, `cancelGuestRegistration` writes `cancelledAt`, which was not in the update whitelist, so the whole cancel batch was denied for board / admin.
+
+Risk: no guest could register for an event, and a board member could not cancel a guest registration.
+
+Resolution (2026-10-20, `phase1/integration`): the service does no reads and writes the main doc and the phone-index doc in one `writeBatch` with deterministic ids. The create rule accepts the main shape (`status == 'Pending'`) or the phone-index shape (`_indexFor == 'phone'`); an existing id turns the write into an update, which guests may not do, so the batch fails and the form shows "already registered". The update whitelist gains `cancelledAt`, and the index doc may change `status` only. Tests: `tests/rules/guestRegistrations.rules.test.ts`. `cancelGuestRegistration` still has no caller in the app. See R-072.
+
+### R-061 Survey Submit Failed for Everyone but Board and Admin (P1, resolved)
+
+Evidence: `SurveysService.submitResponse` raises `surveys.responsesCount` in its transaction (the `surveys` update rule was board / admin only) and first reads its own not-yet-existing response id (the `surveyResponses` get rule read `resource.data.memberId`, which is denied for a missing doc).
+
+Risk: members and external users could not submit a survey response.
+
+Resolution (2026-10-20, `phase1/integration`): `surveys` update lets anyone who may read the survey change only `responsesCount` (exactly +1) and `updatedAt`; `surveyResponses` get is allowed when the doc does not exist. Rules tests reproduce both failures.
+
+### R-062 Hobby Club List Dropped Clubs Without an isDeleted Field (P1, resolved)
+
+Evidence: `HobbyClubsService.getAllClubs` used `where('isDeleted', '!=', true)`, which also drops documents that have no `isDeleted` field; `createClub` never writes it, so almost no club was listed.
+
+Risk: KL members saw (almost) no hobby clubs.
+
+Resolution (2026-10-20, `phase1/integration`): soft-deleted clubs are filtered and clubs sorted by name in code, no index change. A unit test reproduces the old behaviour with Firestore's `!=` semantics.
+
+### R-063 Event Mark-Paid Threw When No Bank Account Id Was Given (P1, resolved)
+
+Evidence: the event "Mark as paid" flow created the income transaction without a `bankAccountId`, and the `transactions` create rule requires `bankAccountId`.
+
+Risk: marking an event registration paid failed, so no payment could be recorded from the event screen.
+
+Resolution (2026-10-20, `phase1/integration`): `services/eventPaymentService.ts` `markRegistrationPaid` resolves the account (the project's `financialAccountId` when it is one of the LO's bank accounts, else the first MYR account, else the first account; a readable error when none exists), prefills the amount from `price || priceMin` for finance to confirm (see R-080), and removes the transaction again if the registration update fails. See R-070 for what is left.
+
+### R-064 International Directory Ran on Mock Data and Hid KL Cards From External Users (P2, resolved)
+
+Evidence: `BusinessDirectoryView` used `MOCK_SISTER_CHAPTER_MEMBERS` and its sister-chapter filters did not apply to real data; `MemberCardsService.getInternationalCards` dropped cards with `loId == 'jcikl'`, so external users could not see KL members who had opted in.
+
+Risk: the directory showed fake people, and external users could not see KL cards or their own chapter's cards.
+
+Resolution (2026-10-20, `phase1/integration`): the directory reads cards through `useSisterChapterMembers` and the mock file is removed; external users get `international == true` cards (KL included) plus their own chapter's cards, merged by `mergeCards`; KL gets a fixed chapter entry in `attachSisterChapters`. Test: `tests/unit/internationalCards.test.ts`.
+
+### R-065 Global Relations "Remove Member" Always Failed (P2, resolved)
+
+Evidence: `MembersService.deleteMember` has a client-side check that denies any admin whose `loId` differs from the target's, so a KL admin could not remove a sister-chapter doc, although the `members` update rule lets `isAdmin()` edit any LO.
+
+Risk: sister-chapter people could not be removed from Global Relations.
+
+Resolution (2026-10-20, `phase1/integration`): narrow exception in `deleteMember` (KL admin, `loId == 'jcikl'`, target in another chapter); the check is client-side only and the rules did not change. Global Relations now suspends login-backed external members through `external-accounts` `setStatus` (card removed, login and record kept) and soft-deletes only legacy docs without a login (role MEMBER, `loId` not `jcikl`).
+
+### R-066 Sign-Up Email Pre-Check Cannot Work; Self-Registered External Users Have No memberEmails Slot (P2)
+
+Evidence: `RegisterModal` `checkField` posts to `netlify/functions/check-member-field.mjs` with no `Authorization` header, but that function requires a BOARD / ADMIN / SUPER_ADMIN token, and it queries the top-level `email` field of `members` (new docs keep `contact.email`). The form treats a response without `exists` as "available". `signUpExternal` writes no `memberEmails` doc: the `memberEmails` create rule is B+ only.
+
+Risk: the "email taken" hint never shows for a visitor, and a self-registered external person holds no slot, so slot-based duplicate checks (`MembersService.createMember`) do not see them. `external-accounts` also checks Firebase Auth, so an invite to the same email is still refused.
+
+Recommended action: replace the pre-check with a token-free server check or remove it; write the slot on the server when the request is approved.
+
+### R-067 advertisements.targetAudience Is Never Enforced (P2, pre-existing)
+
+Evidence: `targetAudience` is written by `AdvertisementsView` and only used in its list search; no delivery code reads it. Phase 1 added `targetCriteria.audiences` and `targetCriteria.countries`, read only by `MemberBenefitsView` through `utils/benefitEligibility.ts`; `roles`, `tiers` and `memberIds` are not enforced there either, and other ad surfaces were not checked. `advertisements` is publicly readable in `firestore.rules`.
+
+Risk: an admin who picks a tier or role audience expects filtering that does not happen; for external users the audience check exists only in the Benefits view.
+
+Recommended action: use `audiences` / `countries` as the one targeting source on every ad surface, and hide or remove the unused fields.
+
+### R-068 External Event Payments Depend on Finance Discipline (P2)
+
+Evidence: `EventDetailModal` `handleMarkPaid` checks `canOperateFinance`, but the Mark Paid / Undo Payment buttons in `EventParticipantsTab`, `EventRegistrationsList` and `EventRoleParticipantsList` are not hidden by role, and `handleUndoPaid` has no role check; the real gate is the rules (`transactions` create and delete are Finance / admin). External events show the listed price number with a USD sign and no conversion. The mark-paid window now prefills "Amount received (MYR)" with `price || priceMin` and finance must confirm or edit it (0 records no transaction), so a USD registration is booked as that same number of ringgit only if finance accepts the prefill. `transactions.currency` is declared but nothing writes it.
+
+Risk: wrong buttons shown to some roles, and a careless confirmation books a USD price as ringgit.
+
+Recommended action: hide the buttons for roles without `canOperateFinance`; consider a conversion rate for USD registrations; write or drop `transactions.currency`.
+
+### R-069 useEventParticipations Reads Firestore Directly and Reads the Wrong Name Field for Guests (P3)
+
+Evidence: `components/modules/Events/useEventParticipations.ts` imports `firebase/firestore` and queries `guestRegistrations` itself (a layer breach, see R-022), and builds guest rows with `data.general?.name`, while guest docs hold a top-level `name`. The guest query is board / admin only in the rules and sits in the same `Promise.all` as the member list.
+
+Risk: guest rows in the participant list show no name; a viewer who is not board / admin would get a denied guest query that fails the whole list load (if that tab is reachable for them).
+
+Recommended action: move the query into a service and read `name`.
+
+### R-070 projects.financialAccountId Is Never Written; Offline Payment Note Is a Placeholder (P3)
+
+Evidence: nothing in `services/`, `components/` or `hooks/` writes `financialAccountId` on a project doc (`EventPaymentService.resolveBankAccountId` reads it; the only writers are mock data), so mark-paid falls back to the first MYR bank account. `EXTERNAL_OFFLINE_PAYMENT_NOTE` in `config/constants.ts` is one global placeholder text shown to every external user.
+
+Risk: event income may land in the wrong account; external users get generic payment instructions.
+
+Recommended action: add a project-level account selector, and replace the note text (or make it configurable).
+
+### R-071 external-accounts Cannot Be Tested Locally and Has No Rate Limit (P2)
+
+Evidence: `netlify/functions/external-accounts.mjs` uses `firebase-admin/auth`, which fails under local `netlify dev` (see R-040), so its first real run is on a deploy preview. It has per-call (20) and per-chapter (100) caps but no rate limit; `chapter-birthdays.mjs` has none either. The existing in-memory limits (`auto-invite`, `send-invite`) are per function instance and reset on a cold start.
+
+Risk: an unverified function creates Auth users and sends email; a compromised chapter admin token can create accounts up to the caps.
+
+Recommended action: verify create, invite, setStatus and resend on a deploy preview before release; add a persistent rate limit if abuse is a concern.
+
+### R-072 Guests Cannot Register Again After Cancelling (P3, by design)
+
+Evidence: the guest registration id is `{eventId}_{emailKey}`; registering again is a `set` on an existing id, which is an update and is denied for guests (R-060). A cancelled doc stays in place.
+
+Risk: a guest who cancelled cannot come back with the same email or phone for that event.
+
+Recommended action: accept it, or let board delete the cancelled docs (delete is allowed for board).
+
+## Added 2026-10-20: Phase 1 Review Fixes
+
+All fixes below are on `phase1/integration` (not merged or deployed yet).
+
+### R-073 KL Self Sign-Up Always Failed on a Nested undefined (P0, resolved)
+
+Evidence: the sign-up payload (`utils/signUpPayload.ts` `buildSelfSignUpMember`) left `others.bio: undefined` when the form gave no bio; the old `stripUndefined` only removed top-level undefined, and Firestore rejects nested undefined, so the `members` write failed. If it failed, the Firebase Auth user created a moment earlier stayed behind without a profile.
+
+Risk: new KL applicants could not register, and each failed attempt left an orphan Auth account.
+
+Resolution: `stripUndefined` now cleans plain objects at every depth (Timestamps and arrays are kept), and `buildExternalSignUpMember` uses it too. `hooks/useAuth.tsx` `signUp` now deletes the new Auth user when the profile write fails (the same rollback `signUpExternal` already had).
+
+### R-074 A Chapter Admin Could Undo KL Decisions (P1, resolved)
+
+Evidence: reactivation of a suspended member was allowed when `affiliation.activatedAt` was set, which says nothing about who suspended them, so a chapter admin could lift a suspension made by JCI KL. The client rules branch for CHAPTER_ADMIN also allowed `expired` → `suspended` and other writes of the status field from the browser.
+
+Risk: a chapter admin could override KL's suspension, and could change status in ways the `external-accounts` transition table does not allow.
+
+Resolution: `setStatus` stamps `affiliation.suspendedByRole` (`KL` or `CHAPTER_ADMIN`) on every change to suspended, and a chapter admin may reactivate only when it is `CHAPTER_ADMIN`; `ChapterAdminView` shows Reactivate on the same condition. The client branch in the `members` update rule was removed, so chapter admins write no member docs from the browser.
+
+### R-075 Anyone Could Fill a Chapter's Member Cap Through Self-Registration (P1, resolved)
+
+Evidence: the 100-member cap counted every member doc of the chapter, and anyone can self-register a `pending_chapter` doc.
+
+Risk: a flood of self-registrations could block real invites.
+
+Resolution: the function counts only members with `affiliation.status` in `CAP_COUNTED_STATUSES` (`active`, `suspended`); pending, rejected and expired docs do not use a place. See R-086 for the index.
+
+### R-076 Survey responsesCount Could Be Inflated (P2, resolved)
+
+Evidence: the `surveys` update rule let anyone who could read a survey add 1 to `responsesCount`, with no link to an actual response and regardless of the survey status.
+
+Risk: a user could push the response counter up without answering.
+
+Resolution: a non-board / non-admin update must be on an `Active` survey, change only `responsesCount` (+1) and `updatedAt`, and in the same write create the caller's own `surveyResponses/{surveyId}_{uid}` (the rule checks the doc is absent before and present after).
+
+### R-077 Self-Registration Category Was Not Tied to the Chapter (P2, resolved)
+
+Evidence: the external self-registration rule accepted any `affiliation.category` of `sister`, `apicc` or `global`.
+
+Risk: a self-registered person could pick a category that does not match their chapter and so change what they see (benefit audiences).
+
+Resolution: the rule requires `affiliation.category == categoryForChapterType(chapter.type)`. See R-083.
+
+### R-078 Registrations and Responses Could Be Probed by Id (P2, resolved)
+
+Evidence: `eventRegistrations` get and `surveyResponses` get allowed reading a missing doc under any id, so "not found" versus "permission denied" told a user whether another member had registered or answered.
+
+Risk: leaks who registered for an event or answered a survey.
+
+Resolution: a missing `eventRegistrations` doc may be read only when its id ends with `_` plus the caller's uid; a missing `surveyResponses` doc only under `{surveyId}_{uid}`. See R-084 and R-085.
+
+### R-079 Guest Registration Was Accepted for Events That Do Not Exist (P2, resolved)
+
+Evidence: the `guestRegistrations` create rule checked only the shape of the data, so a signed-out visitor could create registrations for any `eventId`.
+
+Risk: junk documents for made-up or unlisted events.
+
+Resolution: create also requires `projects/{eventId}` to exist with status Active, Upcoming or Approved (the statuses the guest events page lists). See R-082.
+
+### R-080 Mark-Paid Recorded the Lowest Tier of Tiered Prices (P2, resolved)
+
+Evidence: `markRegistrationPaid` used `price ?? priceMin`, and for an event with tiered prices that booked the lowest tier regardless of what the payer actually paid.
+
+Risk: wrong income amounts in finance.
+
+Resolution: the mark-paid window asks finance to confirm the MYR amount actually received, prefilled with `price || priceMin`; the transaction `amount` is that confirmed value, and `originalAmount` (USD registrations only) keeps the listed price.
+
+### R-081 Survey Responses Could Be Created Under Any Id (P2, resolved)
+
+Evidence: the `surveyResponses` create rule accepted any document id as long as the data fields matched, so one user could add several responses.
+
+Risk: duplicate or extra responses counted in survey results.
+
+Resolution: users other than board / admin must use the id `{surveyId}_{uid}` (the id `SurveysService.submitResponse` already used), and an existing id is still refused.
+
+### R-082 Accepted: A Signed-Out Visitor Can Pre-Claim a Guest's Email or Phone (P3, accepted)
+
+Evidence: guest registration ids are `{eventId}_{emailKey}` and `{eventId}_phone_{phoneKey}`, and creating them needs no login (R-060, R-072). Anyone can register an email or phone for a listed event, and the real owner is then refused as "already registered".
+
+Risk: a visitor can block someone else's guest registration for that event.
+
+Decision: accepted for now; board can delete the pre-claimed docs (delete is allowed for board).
+
+### R-083 Rules categoryForChapterType Duplicates categoryForChapter (P3)
+
+Evidence: `firestore.rules` `categoryForChapterType` and `utils/affiliation.mjs` `categoryForChapter` implement the same mapping (`sister_lo` then `apicc` then `global`, default `sister`), and rules cannot import code.
+
+Risk: if one changes alone, self-registration is refused (or accepts a wrong category).
+
+Recommended action: change both together; the rules tests in `tests/rules/wp3SelfRegister.rules.test.ts` and the unit tests should cover the same cases.
+
+### R-084 Survey Ids Must Not Contain an Underscore (P3)
+
+Evidence: the `surveyResponses` get rule takes everything before the first `_` as the survey id (`responseId.split('_')[0]`), and the `surveys` update rule builds `{surveyId}_{uid}`. Survey ids are Firestore auto-ids, which contain no `_`.
+
+Risk: a hand-made survey id with `_` would break the missing-doc read and the dedup check.
+
+Recommended action: never create surveys with custom ids.
+
+### R-085 The eventRegistrations Missing-Doc Check Is Suffix-Only (P3)
+
+Evidence: the `eventRegistrations` get rule allows a missing doc when its id ends with `_` plus the caller's uid; it does not check the part before it.
+
+Risk: theoretical only: a uid that itself contains `_` could match a suffix of another id. Firebase auto uids do not contain `_`, and a match only reveals that the doc is absent.
+
+Recommended action: none now; tighten if custom uids are ever introduced.
+
+### R-086 Deploy Note: Composite Index members (loId, affiliation.status) (P2)
+
+Evidence: the cap count (R-075) queries `members` with `loId ==` and `affiliation.status in [...]`; the index is in `firestore.indexes.json`.
+
+Risk: if the rules and function go live without the index, creating or inviting external accounts fails on the count query.
+
+Recommended action: deploy `firestore.indexes.json` together with `firestore.rules` (and wait for the index to build) before releasing the function.

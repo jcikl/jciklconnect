@@ -25,7 +25,7 @@ This document describes the current repository shape as implemented, not only th
 - `types/`: shared TypeScript domain types and view keys.
 - `utils/`: shared permission, date, finance, board membership, validation, and dev-mode helpers.
 - `config/`: Firebase config, constants, nationalities, collection names.
-- `netlify/functions/`: server-side HTTP endpoints for Zoom, ToyyibPay, Cloudinary, auth admin actions, Lark sync, social AI rewrite, email, invites, push tests, audit logs, and scheduled birthday notifications.
+- `netlify/functions/`: server-side HTTP endpoints for Zoom, ToyyibPay, Cloudinary, auth admin actions, Lark sync, social AI rewrite, email, invites, push tests, audit logs, scheduled birthday notifications, external (sister-chapter) accounts, and own-chapter birthdays for external members.
 - `firestore.rules`, `firestore.indexes.json`, `storage.rules`: Firebase security and indexing boundary.
 - `scripts/`: migration, Lark, Firebase permission seeding/audit scripts.
 - `tests/`: focused utility/property tests.
@@ -100,6 +100,15 @@ External users (`AFFILIATE`, `CHAPTER_ADMIN`: members of other chapters) are out
 - `utils/externalAccess.ts` is the single source of which views external users may open. Navigation and view rendering both read it; KL roles are not restricted by it. Access is client-side; `firestore.rules` (`isExternal()`, `isActiveExternal()`) is the real boundary.
 - Public member cards live in `memberCards/{memberId}`. `services/memberCardsService.ts` (`MemberCardsService.syncCards`) writes them from `members` after each member write, using `utils/memberCard.mjs`. Cards are the only member data external users may read about other people.
 - Scope and rule details: `SCHEMA.md` (`members.affiliation`, `memberCards`), `SCHEMA-PERMISSIONS.md`, `docs/PERMISSION_MATRIX.zh-CN.md`.
+
+### External Members (Phase 1)
+
+- Server side (Admin SDK, Netlify): `netlify/functions/external-accounts.mjs` creates chapter admins, invites members, changes `affiliation.status` and resends invites; it writes `members`, `memberEmails`, `memberCards` and `auditLog` and creates or deletes the Firebase Auth user. The permission and transition rules are pure functions in `netlify/lib/externalAccounts.mjs` (unit-tested). `netlify/functions/chapter-birthdays.mjs` returns own-chapter birthdays to active externals, who cannot list member docs (`netlify/lib/chapterBirthdays.mjs`). Callers: `services/externalAccountsService.ts`, `services/chapterBirthdaysService.ts`, wrapped by `hooks/useExternalAccounts.ts`, `hooks/useChapterMembers.ts`, `hooks/useChapterBirthdays.ts`.
+- New module `components/modules/Chapter/` (`ChapterAdminView`, view key `MY_CHAPTER`): approvals, members and invites for an active `CHAPTER_ADMIN`; whitelisted only for that role in `utils/externalAccess.ts`. The KL-side approvals queue and account creation live in `components/modules/SisterChaptersConfig.tsx` (Config, Global Relations tab).
+- `utils/configAccess.ts` decides who opens the Config view and which tabs they see: SUPER_ADMIN all tabs, ADMIN only Global Relations; only SUPER_ADMIN edits the chapter list.
+- External self-registration: `hooks/useAuth.tsx` `signUpExternal` with the payload built in `utils/signUpPayload.ts`; the matching rule is `isExternalSelfRegistration` in `firestore.rules`.
+- Shared pure helpers: `utils/affiliation.mjs` (chapter type to `affiliation.category`, used by the app and Netlify), `utils/benefitEligibility.ts` (benefit audience and country), `utils/loHosting.mjs` `isEventVisibleToExternal` (events KL hosts or co-hosts). Event payment for external registrations: `services/eventPaymentService.ts`.
+- One-off script: `scripts/auditChapterMemberDocs.mjs` converts old Global Relations "Add Member" docs (role MEMBER, `loId` not `jcikl`) to external members.
 
 ## Major Operation Flows
 

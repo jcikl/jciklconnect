@@ -28,6 +28,7 @@ import { errorLoggingService } from './errorLoggingService';
 import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 import { MOCK_EVENTS } from './mockData';
 import { getMYTTodayStr } from '../utils/dateUtils';
+import { isExternalRole } from '../utils/externalAccess';
 import { involvesLo, isKlRelevantEvent, KL_LO_NAME, KL_SHARED_LEVELS } from '../utils/loHosting.mjs';
 
 const CACHE_KEY_ALL_EVENTS = 'events:all';
@@ -440,6 +441,17 @@ export class EventsService {
           const deterministicRegId = `${eventId}_${memberId}`;
           const regRef = doc(db, COLLECTIONS.EVENT_REGISTRATIONS, deterministicRegId);
 
+          // Chapter + display currency of the registrant (external-chapter members see USD, everyone else MYR).
+          // Best effort: if the member doc cannot be read, treat as a KL member (loId stays the hosting LO either way).
+          let registrantLoId: string = DEFAULT_LO_ID;
+          let currency: 'MYR' | 'USD' = 'MYR';
+          try {
+            const memberSnap = await getDoc(doc(db, COLLECTIONS.MEMBERS, memberId));
+            const m = memberSnap.exists() ? (memberSnap.data() as { role?: string; loId?: string }) : null;
+            if (m?.loId) registrantLoId = m.loId;
+            if (isExternalRole(m?.role)) currency = 'USD';
+          } catch { /* keep defaults */ }
+
           await runTransaction(db, async (txn) => {
             const [existingSnap, eventSnap] = await Promise.all([
               txn.get(regRef),
@@ -479,6 +491,8 @@ export class EventsService {
                 createdAt: Timestamp.now(),
                 updatedAt: Timestamp.now(),
                 loId: DEFAULT_LO_ID,
+                registrantLoId,
+                currency,
               };
               if (extraFields?.dietary) payload.dietary = extraFields.dietary;
               if (extraFields?.isVegetarian != null) payload.isVegetarian = extraFields.isVegetarian;
@@ -999,11 +1013,11 @@ export class EventsService {
   }
 
   /**
-   * Register a guest for an event.
-   * Uses runTransaction to atomically prevent duplicate registrations — reads first to
-   * check for an existing active registration with the same email, then writes only if
-   * none exists. Without this, two simultaneous submissions from the same email could
-   * both pass the check and both write, creating duplicate records.
+   * Register a guest (signed out) for an event.
+   * Writes the registration and a phone-index doc in one writeBatch with deterministic ids.
+   * No reads: signed-out users may not read guestRegistrations. Duplicates are rejected by
+   * firestore.rules — an existing id turns the set into an update, which guests are denied,
+   * so the whole batch fails with permission-denied (shown as "already registered").
    */
   static async registerGuestForEvent(
     eventId: string,
@@ -1017,45 +1031,27 @@ export class EventsService {
   ): Promise<void> {
     if (isDevMode()) return;
     try {
-      // Use runTransaction to make the duplicate-check + write atomic.
-      // Note: Firestore transactions cannot run arbitrary queries, so we perform
-      // the duplicate checks as getDocs outside the transaction first, then
-      // write inside it. This is safe for the common case; extreme concurrent
-      // submissions are additionally protected by the Firestore rules' hasOnly guard.
-      // P0 FIX: use deterministic doc IDs + runTransaction to make dedup check atomic.
-      // The main record uses eventId_email as its ID. A lightweight phone-index doc lets
-      // us check phone uniqueness inside the same transaction without a collection query.
+      // Main record id = eventId_email; the phone-index doc makes the phone unique per event too.
       const emailKey = guestData.email.toLowerCase().replace(/[^a-z0-9]/g, '_');
       const phoneKey = guestData.phone.replace(/[^0-9]/g, '');
       const mainDocRef = doc(db, COLLECTIONS.GUEST_REGISTRATIONS, `${eventId}_${emailKey}`);
       const phoneIndexRef = doc(db, COLLECTIONS.GUEST_REGISTRATIONS, `${eventId}_phone_${phoneKey}`);
 
-      await runTransaction(db, async (txn) => {
-        const [mainSnap, phoneSnap] = await Promise.all([
-          txn.get(mainDocRef),
-          txn.get(phoneIndexRef),
-        ]);
-        if (mainSnap.exists() && mainSnap.data()['status'] !== 'Cancelled') {
-          throw new Error('This email has already been registered for this event.');
-        }
-        if (phoneSnap.exists() && phoneSnap.data()['status'] !== 'Cancelled') {
-          throw new Error('This phone number has already been registered for this event.');
-        }
+      const guestRegistration: Record<string, unknown> = {
+        eventId,
+        name: guestData.name,
+        email: guestData.email,
+        phone: guestData.phone,
+        registeredAt: Timestamp.now(),
+        status: 'Pending' as const,
+      };
+      if (guestData.organization != null) guestRegistration['organization'] = guestData.organization;
+      if (guestData.notes != null) guestRegistration['notes'] = guestData.notes;
 
-        const guestRegistration: Record<string, unknown> = {
-          eventId,
-          name: guestData.name,
-          email: guestData.email,
-          phone: guestData.phone,
-          registeredAt: Timestamp.now(),
-          status: 'Pending' as const,
-        };
-        if (guestData.organization != null) guestRegistration['organization'] = guestData.organization;
-        if (guestData.notes != null) guestRegistration['notes'] = guestData.notes;
-
-        txn.set(mainDocRef, guestRegistration);
-        txn.set(phoneIndexRef, { eventId, email: guestData.email, phone: guestData.phone, status: 'Pending', _indexFor: 'phone' });
-      });
+      const batch = writeBatch(db);
+      batch.set(mainDocRef, guestRegistration);
+      batch.set(phoneIndexRef, { eventId, email: guestData.email, phone: guestData.phone, status: 'Pending', _indexFor: 'phone' });
+      await batch.commit();
       apiCache.delete(`guestRegistrations:event:${eventId}`);
     } catch (error) {
       errorLoggingService.logError(error as Error, {
@@ -1063,6 +1059,10 @@ export class EventsService {
         action: 'registerGuestForEvent',
         additionalData: { eventId },
       });
+      // Duplicates surface as permission-denied (see above).
+      if ((error as { code?: string })?.code === 'permission-denied') {
+        throw new Error('This email or phone number has already been registered for this event.');
+      }
       throw error;
     }
   }

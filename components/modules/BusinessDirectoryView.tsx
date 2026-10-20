@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 
 import { useToast } from '../ui/Common';
 import { MembersOnlyOverlay } from '../ui/MembersOnlyOverlay';
@@ -10,11 +10,12 @@ import { BusinessDetailModal } from './BusinessDirectory/BusinessDetailModal';
 import { BusinessDirectoryFilterDrawer } from './BusinessDirectory/BusinessDirectoryFilterDrawer';
 import { BusinessDirectoryHeader } from './BusinessDirectory/BusinessDirectoryHeader';
 import { BusinessInquiryModal } from './BusinessDirectory/BusinessInquiryModal';
-import { MOCK_SISTER_CHAPTER_MEMBERS } from './BusinessDirectory/businessDirectoryMocks';
+import { useSisterChapterMembers } from '../../hooks/useSisterChapterMembers';
+import { getInitialsSvg } from './BusinessDirectory/businessDirectoryUtils';
 import { useBusinessBookmarks } from './BusinessDirectory/useBusinessBookmarks';
 import { useBusinessDirectoryFilters } from './BusinessDirectory/useBusinessDirectoryFilters';
 import { useBusinessInquiry } from './BusinessDirectory/useBusinessInquiry';
-import { LocalBusinessTab } from './BusinessDirectory/LocalBusinessTab';
+import { LocalBusinessTab, type IntlDirectoryMember } from './BusinessDirectory/LocalBusinessTab';
 import { useSisterChapterFilters } from './BusinessDirectory/useSisterChapterFilters';
 
 export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSelectedBusinessId?: string | null; onClearSelection?: () => void; isGuest?: boolean; onGuestCta?: () => void }> = ({ searchQuery, initialSelectedBusinessId, onClearSelection, isGuest = false, onGuestCta }) => {
@@ -27,6 +28,24 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
   const [showDealsOnly, setShowDealsOnly] = useState(false);
 
+  const { members: rawIntlMembers, loading: intlLoading, canView: canViewIntl, optIn, optingIn } = useSisterChapterMembers();
+  const intlMembers = useMemo<IntlDirectoryMember[]>(() => rawIntlMembers.map(m => ({
+    id: m.id,
+    name: m.displayName ?? '',
+    chineseName: undefined,
+    avatarUrl: m.avatarUrl ?? getInitialsSvg(m.displayName ?? ''),
+    position: m.position ?? '',
+    companyName: m.companyName ?? '',
+    jciChapter: m.sisterChapter?.name ?? '',
+    country: m.sisterChapter?.country ?? '',
+    industry: m.industry ?? '',
+    businessCategory: (m.businessCategory ?? []).join(', '),
+    email: '',
+    website: m.website ?? '',
+    description: m.companyDescription ?? '',
+    specialOffer: m.specialOfferSummary,
+  })), [rawIntlMembers]);
+
   const {
     selectedSisterChapter,
     selectedSisterCountry,
@@ -38,7 +57,13 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
     sisterCountries,
     sisterIndustries,
     sisterFiltersCount,
-  } = useSisterChapterFilters(MOCK_SISTER_CHAPTER_MEMBERS);
+  } = useSisterChapterFilters(intlMembers);
+
+  const filteredIntlMembers = useMemo(() => intlMembers.filter(m =>
+    (selectedSisterChapter === 'All' || m.jciChapter === selectedSisterChapter) &&
+    (selectedSisterCountry === 'All' || m.country === selectedSisterCountry) &&
+    (selectedSisterIndustry === 'All' || m.industry === selectedSisterIndustry)),
+  [intlMembers, selectedSisterChapter, selectedSisterCountry, selectedSisterIndustry]);
 
   const [detailBiz, setDetailBiz] = useState<BusinessProfile | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -110,6 +135,11 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
       <BusinessDirectoryHeader />
 
       <LocalBusinessTab
+        intlMembers={filteredIntlMembers}
+        intlLoading={intlLoading}
+        canViewIntl={canViewIntl}
+        onIntlOptIn={optIn}
+        intlOptingIn={optingIn}
         businesses={businesses}
         filteredBusinesses={filteredBusinesses}
         members={members}
@@ -179,7 +209,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
         uniqueIndustries={uniqueIndustries}
         uniqueInterestedIndustries={uniqueInterestedIndustries}
         uniqueIdealReferrals={uniqueIdealReferrals}
-        sisterMembers={MOCK_SISTER_CHAPTER_MEMBERS}
+        sisterMembers={intlMembers}
         sisterChapters={sisterChapters}
         sisterCountries={sisterCountries}
         sisterIndustries={sisterIndustries}

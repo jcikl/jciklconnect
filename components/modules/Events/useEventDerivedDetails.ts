@@ -5,7 +5,8 @@ const formatTime12 = (time: string) => {
   return `${hour % 12 || 12}:${String(minute).padStart(2, '0')} ${hour >= 12 ? 'PM' : 'AM'}`;
 };
 
-export const useEventDerivedDetails = (event: Event, localEvent: Event) => {
+/** @param isExternal external-chapter viewer: prices are displayed in USD (same number). */
+export const useEventDerivedDetails = (event: Event, localEvent: Event, isExternal = false) => {
   const date = event.date ? new Date(event.date) : null;
   const endDate = event.endDate ? new Date(event.endDate) : null;
   const isMultiDay = date && endDate && endDate.toDateString() !== date.toDateString();
@@ -20,6 +21,7 @@ export const useEventDerivedDetails = (event: Event, localEvent: Event) => {
   const formatDayShort = (value: Date) => value.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
   const priceMin = event.priceMin ?? event.price;
   const priceMax = event.priceMax;
+  const priceCurrency: 'MYR' | 'USD' = isExternal ? 'USD' : 'MYR';
   const attendancePercent = localEvent.maxAttendees
     ? Math.round(((localEvent.attendees || 0) / localEvent.maxAttendees) * 100)
     : 0;
@@ -35,6 +37,7 @@ export const useEventDerivedDetails = (event: Event, localEvent: Event) => {
     formatDayShort,
     priceMin,
     priceMax,
+    priceCurrency,
     attendancePercent,
     isFull,
   };

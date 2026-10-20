@@ -20,6 +20,7 @@ import {
   MessageSquare,
   Package,
   Share2,
+  ShieldCheck,
   User,
   SlidersHorizontal,
   Sparkles,
@@ -30,6 +31,7 @@ import {
 } from 'lucide-react';
 import { UserRole } from '../../types';
 import { ViewType } from '../../types/views';
+import { canOpenSystemConfig } from '../../utils/configAccess';
 
 export interface SidebarNavigationContext {
   memberRole?: UserRole;
@@ -96,6 +98,13 @@ export const sidebarNavigationSections: SidebarNavigationSection[] = [
         label: 'My Profile',
         view: 'MEMBERS',
         visible: ({ externalAllowedViews }) => !!externalAllowedViews,
+      },
+      {
+        icon: <ShieldCheck size={18} />,
+        label: 'My Chapter',
+        view: 'MY_CHAPTER',
+        // Only an external role can have MY_CHAPTER whitelisted (CHAPTER_ADMIN, active); never shown to KL roles.
+        visible: ({ externalAllowedViews }) => !!externalAllowedViews?.includes('MY_CHAPTER'),
       },
       {
         icon: <Building2 size={18} />,
@@ -228,7 +237,8 @@ export const sidebarNavigationSections: SidebarNavigationSection[] = [
         label: 'Config',
         view: 'SYSTEM_CONFIG',
         activeViews: ['SYSTEM_CONFIG', 'MEMBERSHIP_CONFIG', 'ACCESS_CONFIG', 'API_CONFIG', 'TOYYIB', 'WHAPI_CONFIG'],
-        visible: ({ memberRole }) => memberRole === UserRole.SUPER_ADMIN,
+        // ADMIN gets Config with the Global Relations tab only (utils/configAccess.ts).
+        visible: ({ memberRole }) => canOpenSystemConfig(memberRole),
       },
       {
         icon: <Workflow size={18} />,
