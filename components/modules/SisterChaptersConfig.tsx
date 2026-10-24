@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Plus, Pencil, Trash2, Globe, ChevronDown, UserPlus, User, ShieldCheck, PauseCircle } from 'lucide-react';
+import { Plus, Pencil, Trash2, Globe, ChevronDown, UserPlus, User, ShieldCheck, PauseCircle, Mail } from 'lucide-react';
 import { Button, Modal, useToast, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
 import type { ConfirmState } from '../ui/Common';
 import { Input } from '../ui/Form';
@@ -74,7 +74,7 @@ export const SisterChaptersConfig: React.FC<{ canEditChapters?: boolean }> = ({ 
   const [memberModalChapterId, setMemberModalChapterId] = useState<string | null>(null);
   const [accountMode, setAccountMode] = useState<AccountMode>('invite');
   const [memberForm, setMemberForm] = useState(MEMBER_EMPTY);
-  const { busy: savingMember, createChapterAdmins, inviteMembers, setStatus: setMemberStatus, removeLegacyMember } = useExternalAccounts();
+  const { busy: savingMember, createChapterAdmins, inviteMembers, setStatus: setMemberStatus, removeLegacyMember, resendInvite } = useExternalAccounts();
 
   // KL approval queue (affiliation.status == 'pending_kl', all chapters). Status changes go through the
   // external-accounts function so the member card follows.
@@ -250,6 +250,16 @@ export const SisterChaptersConfig: React.FC<{ canEditChapters?: boolean }> = ({ 
     });
   };
 
+  // KL admins can resend the password setup email (a chapter admin who never got it cannot reach My Chapter).
+  const handleResendInvite = async (member: Member) => {
+    try {
+      const sent = await resendInvite(member.id);
+      showToast(sent ? 'Password setup email sent' : 'The email could not be sent. Please try again later.', sent ? 'success' : 'error');
+    } catch (err: any) {
+      showToast(err?.message ?? 'Could not resend the invite', 'error');
+    }
+  };
+
   const handleDeleteMember = (member: Member, chapterId: string) => {
     const displayName = member.general?.name ?? member.id;
     setConfirmState({
@@ -414,6 +424,16 @@ export const SisterChaptersConfig: React.FC<{ canEditChapters?: boolean }> = ({ 
                           m.affiliation?.status === 'suspended' ? (
                             <span className="text-[10px] text-slate-400 shrink-0">Suspended</span>
                           ) : (
+                            <>
+                            <button
+                              onClick={() => handleResendInvite(m)}
+                              disabled={savingMember}
+                              className="p-1 rounded hover:bg-blue-50 text-slate-300 hover:text-jci-blue transition-colors shrink-0"
+                              aria-label="Resend invite"
+                              title="Resend invite"
+                            >
+                              <Mail size={12} />
+                            </button>
                             <button
                               onClick={() => handleSuspendMember(m, ch.id)}
                               disabled={savingMember}
@@ -423,6 +443,7 @@ export const SisterChaptersConfig: React.FC<{ canEditChapters?: boolean }> = ({ 
                             >
                               <PauseCircle size={12} />
                             </button>
+                            </>
                           )
                         ) : m.role !== UserRole.INACTIVE && (
                           <button
