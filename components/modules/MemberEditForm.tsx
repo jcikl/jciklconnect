@@ -6,6 +6,7 @@ import { Combobox } from '../ui/Combobox';
 import { Member, Project, UserRole, MemberTier, MembershipType, MembershipDues, MembershipRuleConfig } from '../../types';
 import { usePermissions } from '../../hooks/usePermissions';
 import { MEMBER_SELF_EDITABLE_FIELDS, INDUSTRY_OPTIONS, IDEAL_REFERRAL_OPTIONS, BUSINESS_CATEGORIES_OPTIONS, nationalityOptionsForValue } from '../../config/constants';
+import { normalizeIdealReferrals, joinIdealReferralIndustries } from '../../utils/idealReferrals.mjs';
 import {
   MembershipConfigService,
   computeMembershipTypeFromMember,
@@ -638,8 +639,8 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                 <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Ideal Referral Industry</label>
                 <MultiSelectDropdown
                   options={INDUSTRY_OPTIONS}
-                  selected={formValues.idealReferralIndustry ? formValues.idealReferralIndustry.split(', ').filter(Boolean) : []}
-                  onChange={selected => handleChange('idealReferralIndustry', selected.join(', '))}
+                  selected={normalizeIdealReferrals(formValues.idealReferralIndustry)}
+                  onChange={selected => handleChange('idealReferralIndustry', joinIdealReferralIndustries(selected))}
                   placeholder="Select industries..."
                 />
               </div>
@@ -648,8 +649,8 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                 <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Ideal Referral</label>
                 <MultiSelectDropdown
                   options={IDEAL_REFERRAL_OPTIONS.map(opt => opt.label)}
-                  selected={formValues.idealReferral ? (typeof formValues.idealReferral === 'string' ? formValues.idealReferral.split(', ') : formValues.idealReferral as string[]).filter(Boolean) : []}
-                  onChange={selected => handleChange('idealReferral', selected.join(', '))}
+                  selected={normalizeIdealReferrals(formValues.idealReferral)}
+                  onChange={selected => handleChange('idealReferral', selected)}
                   placeholder="Select referrals..."
                 />
               </div>

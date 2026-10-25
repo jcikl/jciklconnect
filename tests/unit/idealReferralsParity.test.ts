@@ -18,6 +18,9 @@ describe('idealReferrals parity with the local directory', () => {
     { business: { companyName: 'Co' }, idealReferrals: ['Doctors'] },
     { business: { companyName: 'Co', idealReferrals: [] }, idealReferral: 'Lawyers' },
     { business: { companyName: 'Co' }, idealReferralIndustry: 'IT' },
+    // Production shapes (PETER YU / JCI KL, 2026-10-26)
+    { business: { companyName: 'Co', idealReferrals: ['Event & Hospitality||Crypto||Blockchain||Finance & Insurance||Real Estate & Property Services||Travel & Tourism||Architecture', 'Engineering & Construction'] } },
+    { business: { companyName: 'Co', idealReferrals: ['Suppliers / Vendors', 'Marketing / Branding Partners'] } },
   ];
   it.each(cases.map((m, i) => [i, m] as const))('case %i', (_i, m) => {
     const card = buildMemberCard({ role: 'MEMBER', general: { name: 'A' }, ...m }, '') as { idealReferrals?: string[] };

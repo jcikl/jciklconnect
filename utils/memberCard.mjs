@@ -4,6 +4,8 @@
 //  - never emit undefined / null / empty values for the optional keys;
 //  - `loId` and `international` must equal the member doc's values after the write.
 
+import { normalizeIdealReferrals } from './idealReferrals.mjs';
+
 /** KL's own chapter id (same as DEFAULT_LO_ID in config/constants.ts). */
 export const KL_LO_ID = 'jcikl';
 
@@ -13,18 +15,6 @@ const EXTERNAL_ROLES = ['AFFILIATE', 'CHAPTER_ADMIN'];
 /** @param {unknown} v @returns {string | undefined} trimmed non-empty string, else undefined */
 function str(v) {
   return typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined;
-}
-
-/**
- * Same as toStringArray in services/businessDirectoryService.ts (keep them identical): array -> its
- * non-blank strings as stored; string -> split on ',' or '||', trimmed, blanks dropped.
- * @param {unknown} v
- * @returns {string[]}
- */
-function toStringArray(v) {
-  if (Array.isArray(v)) return v.filter(item => typeof item === 'string' && item.trim().length > 0);
-  if (typeof v === 'string') return v.split(/,|\|\|/).map(item => item.trim()).filter(Boolean);
-  return [];
 }
 
 /** @param {any} member @returns {boolean} */
@@ -61,10 +51,10 @@ export function buildMemberCard(member, nowIso = new Date().toISOString()) {
   const offer = b.specialOffer;
   // Ideal referral types, read exactly like the local directory's idealReferralTypes
   // (businessDirectoryService mapMemberToBusinessProfile) so one person shows the same values in both.
-  const referralTypes = toStringArray(b.idealReferralTypes);
+  const referralTypes = normalizeIdealReferrals(b.idealReferralTypes);
   const idealReferrals = referralTypes.length > 0
     ? referralTypes
-    : toStringArray(b.idealReferrals ?? member?.idealReferral ?? member?.idealReferrals);
+    : normalizeIdealReferrals(b.idealReferrals ?? member?.idealReferral ?? member?.idealReferrals);
   const offerSummary = str(typeof offer === 'string' ? offer : offer?.description);
 
   /** @type {Record<string, unknown>} */

@@ -19,6 +19,7 @@ import { DirectoryFilterPanel } from './BusinessDirectory/DirectoryFilterPanel';
 import { SisterMemberDetailModal } from './BusinessDirectory/SisterMemberDetailModal';
 import { useDirectoryFilters } from './BusinessDirectory/useDirectoryFilters';
 import { businessToDirectoryItem, cardToDirectoryItem, type DirectoryItem } from './BusinessDirectory/directoryFacets';
+import { normalizeIdealReferrals } from '../../utils/idealReferrals.mjs';
 
 export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSelectedBusinessId?: string | null; onClearSelection?: () => void; isGuest?: boolean; onGuestCta?: () => void }> = ({ searchQuery, initialSelectedBusinessId, onClearSelection, isGuest = false, onGuestCta }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -79,7 +80,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
 
   // Ideal match: the viewer's ideal referral industries vs the item's industry. Bookmarks are local only.
   const idealIndustries = useMemo(() => new Set(
-    (currentUser?.idealReferralIndustry ?? '').split(',').map(v => v.trim().toLowerCase()).filter(Boolean),
+    normalizeIdealReferrals(currentUser?.idealReferralIndustry).map(v => v.toLowerCase()),
   ), [currentUser?.idealReferralIndustry]);
   const getScore = useCallback((item: DirectoryItem): DirectoryScore => {
     if (item.source === 'local' && bookmarkedIds.has(item.id)) return 0;

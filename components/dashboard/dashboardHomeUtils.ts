@@ -1,4 +1,5 @@
 import { UserRole } from '../../types';
+import { normalizeIdealReferrals } from '../../utils/idealReferrals.mjs';
 
 export type DashboardMembershipKind = 'probation' | 'full' | 'guest';
 
@@ -106,12 +107,9 @@ export const getProfileCompleteness = (member: DashboardMemberLike | null): Prof
         { label: 'Company description', done: !!member.business?.companyDescription },
         {
           label: 'Ideal referral',
-          done: !!(
-            member.idealReferralIndustry ||
-            (Array.isArray(member.business?.idealReferrals)
-              ? member.business.idealReferrals.length > 0
-              : member.business?.idealReferrals)
-          ),
+          done:
+            normalizeIdealReferrals(member.idealReferralIndustry).length > 0 ||
+            normalizeIdealReferrals(member.business?.idealReferrals).length > 0,
         },
         { label: 'International business', done: !!member.business?.acceptInternationalBusiness },
         { label: 'Level of management', done: !!member.business?.levelOfManagement },
@@ -149,7 +147,7 @@ export const buildProfileUpdatePayload = (profileDraft: Record<string, string>):
   if ('companyName' in profileDraft) updates.companyName = profileDraft.companyName;
   if ('industry' in profileDraft) updates.industry = profileDraft.industry;
   if ('companyDescription' in profileDraft) updates['business.companyDescription'] = profileDraft.companyDescription;
-  if ('idealReferral' in profileDraft) updates['business.idealReferrals'] = profileDraft.idealReferral;
+  if ('idealReferral' in profileDraft) updates['business.idealReferrals'] = normalizeIdealReferrals(profileDraft.idealReferral);
   if ('address' in profileDraft) updates['contact.address'] = profileDraft.address;
   if ('emergencyContactName' in profileDraft) updates['contact.emergency.name'] = profileDraft.emergencyContactName;
   if ('emergencyContactRelationship' in profileDraft) updates['contact.emergency.relationship'] = profileDraft.emergencyContactRelationship;

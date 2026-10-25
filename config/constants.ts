@@ -273,28 +273,7 @@ export const ADMINISTRATIVE_PROJECT_IDS = ['National Due', 'Maintenance', 'Profe
 /** Administrative purpose options */
 export const ADMINISTRATIVE_PURPOSES = ['National Due', 'Utilities', 'Audit Fee', 'Water Fee', 'Electricity'] as const;
 
-export const INDUSTRY_OPTIONS = [
-  'Advertising, Marketing & Media',
-  'Agriculture & Animals',
-  'Architecture, Engineering & Construction',
-  'Art, Entertainment & Design',
-  'Automotive & Accessories',
-  'Food & Beverages',
-  'Telecom, AI, Computers & IT',
-  'Consulting & Professional Services',
-  'Education & Training',
-  'Event & Hospitality',
-  'Crypto, Blockchain, Finance & Insurance',
-  'Health & Wellness',
-  'Legal, HR, Accounting & Tax',
-  'Manufacturing & Supply Chain',
-  'Wholesale, Retail & E-Commerce',
-  'Personal, Beauty & Sports',
-  'Real Estate & Property Services',
-  'Transport & Logistics',
-  'Travel & Tourism',
-  'Other'
-] as const;
+export { INDUSTRY_OPTIONS } from './referralOptions.mjs';
 
 export const BUSINESS_CATEGORIES_OPTIONS = [
   'Distributor / Exporter / Importer',
@@ -305,25 +284,7 @@ export const BUSINESS_CATEGORIES_OPTIONS = [
 
 export { NATIONALITY_OPTIONS, nationalityOptionsForValue } from './nationalities';
 
-export const IDEAL_REFERRAL_OPTIONS = [
-  { label: 'Distributors', description: 'To help resell and distribute products in local or international markets' },
-  { label: 'Resellers', description: 'To purchase and resell products/services to end users' },
-  { label: 'Co-developers', description: 'For joint product or service development' },
-  { label: 'Strategic Alliances', description: 'Long-term partnerships for mutual growth' },
-  { label: 'Investors', description: 'For funding and scaling opportunities' },
-  { label: 'Suppliers / Vendors', description: 'To source materials, components, or services' },
-  { label: 'Technology Partners', description: 'For tech integration or digital transformation' },
-  { label: 'Marketing / Branding Partners', description: 'To co-promote or brand products' },
-  { label: 'Referral Partners / Affiliates', description: 'To refer potential customers or leads' },
-  { label: 'Joint Venture Partners', description: 'For shared ownership in a new entity or project' },
-  { label: 'Franchise Partners', description: 'To replicate business model in new regions' },
-  { label: 'Channel Partners', description: 'To sell or promote products through different sales channels' },
-  { label: 'Training / Content Partners', description: 'To create or deliver training programs or educational content' },
-  { label: 'Operational Partners', description: 'To support backend operations, logistics, or HR' },
-  { label: 'Government / NGO Collaborators', description: 'For public-private initiatives or CSR programs' },
-  { label: 'Community / Ecosystem Partners', description: 'To build networks, events, or shared platforms' },
-  { label: 'Other', description: '' }
-] as const;
+export { IDEAL_REFERRAL_OPTIONS } from './referralOptions.mjs';
 
 
 /** Join Us Survey Questions and Mappings */

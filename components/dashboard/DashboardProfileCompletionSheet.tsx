@@ -4,6 +4,7 @@ import { CheckCircle } from 'lucide-react';
 import { useToast } from '../ui/Common';
 import { Input, Select, Textarea } from '../ui/Form';
 import { MembersService } from '../../services/membersService';
+import { normalizeIdealReferrals } from '../../utils/idealReferrals.mjs';
 import {
   PROFILE_BASIC_LABELS,
   PROFILE_CONTACT_LABELS,
@@ -238,7 +239,7 @@ export const DashboardProfileCompletionSheet: React.FC<DashboardProfileCompletio
                 { label: 'Position / Title', value: member?.business?.departmentAndPosition },
                 { label: 'Business Categories', value: Array.isArray(member?.business?.businessCategory) && member.business.businessCategory.length > 0 ? member.business.businessCategory.join(', ') : undefined },
                 { label: 'Company Description', value: member?.business?.companyDescription },
-                { label: 'Ideal Referral', value: (Array.isArray(member?.business?.idealReferrals) && member.business.idealReferrals.length > 0) ? member.business.idealReferrals.join(', ') : (member?.idealReferralIndustry || undefined) },
+                { label: 'Ideal Referral', value: (normalizeIdealReferrals(member?.business?.idealReferrals).join(', ') || normalizeIdealReferrals(member?.idealReferralIndustry).join(', ')) || undefined },
                 { label: 'International Business', value: member?.business?.acceptInternationalBusiness },
                 { label: 'Level of Management', value: member?.business?.levelOfManagement },
               ].filter(row => row.value).map(row => (
