@@ -3,7 +3,7 @@ import { Bookmark, CheckSquare, Gift, Globe, Globe2, LayoutList, Lock, Search, S
 import type { BusinessProfile, Member } from '../../../types';
 import { Button, Modal } from '../../ui/Common';
 import { LoadingState } from '../../ui/Loading';
-import { getInitialsSvg } from './businessDirectoryUtils';
+import { getInitialsSvg, filterSisterMembersBySearch } from './businessDirectoryUtils';
 import { ShareCardNotice } from './ShareCardNotice';
 import { hasSpecialOffer, getSpecialOfferSummary } from '../../../types/member';
 
@@ -82,6 +82,10 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
 }) => {
   const [quickFilter, setQuickFilter] = useState<'all' | 'bookmarked' | 'ideal' | 'international'>('all');
   const [intlDetail, setIntlDetail] = useState<IntlDirectoryMember | null>(null);
+  // Desktop: show sister-chapter members in the right panel instead of local businesses.
+  const [showSister, setShowSister] = useState(false);
+  // Sister members matching the search box (used by both mobile International tab and desktop).
+  const desktopSisterViews = filterSisterMembersBySearch(intlViews, searchTerm);
 
   const mobileDisplayBusinesses = isGuest ? filteredBusinesses : quickFilter === 'bookmarked'
     ? filteredBusinesses.filter(b => bookmarkedIds.has(b.id))
@@ -157,7 +161,7 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
             all: filteredBusinesses.filter(b => !bookmarkedIds.has(b.id) && getBizScore(b) !== 1).length,
             bookmarked: filteredBusinesses.filter(b => bookmarkedIds.has(b.id)).length,
             ideal: filteredBusinesses.filter(b => getBizScore(b) === 1).length,
-            international: intlViews.length,
+            international: desktopSisterViews.length,
           };
           const activeLabel = TAB_CONFIG.find(t => t.id === quickFilter)?.label ?? 'All';
           const tabs = isGuest ? TAB_CONFIG.slice(0, 1) : TAB_CONFIG;
@@ -198,9 +202,9 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
                 {quickFilter === 'international' && !canViewIntl ? (
                   <ShareCardNotice onShare={optIn} sharing={optingIn} />
                 ) : quickFilter === 'international' ? (
-                  <LoadingState loading={intlLoading} error={null} empty={intlViews.length === 0} emptyMessage="No international members found">
+                  <LoadingState loading={intlLoading} error={null} empty={desktopSisterViews.length === 0} emptyMessage="No international members found">
                     <div className="divide-y divide-slate-100 bg-white">
-                      {intlViews.map(member => (
+                      {desktopSisterViews.map(member => (
                         <button key={member.id} type="button"
                           className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors"
                           onClick={() => setIntlDetail(member)}>
@@ -293,9 +297,11 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
       <div className="hidden md:flex gap-6 pt-2 items-start">
         <aside className="w-52 shrink-0 space-y-3 sticky top-4">
           <div className="bg-white rounded-xl border border-slate-200 p-4">
-            <p className="text-3xl font-black text-slate-900">{filteredBusinesses.length}</p>
+            <p className="text-3xl font-black text-slate-900">{showSister ? desktopSisterViews.length : filteredBusinesses.length}</p>
             <p className="text-xs text-slate-500 mt-0.5">
-              {filteredBusinesses.length === businesses.length ? 'local businesses' : `of ${businesses.length} businesses`}
+              {showSister
+                ? (desktopSisterViews.length === intlViews.length ? 'sister chapter members' : `of ${intlViews.length} sister members`)
+                : (filteredBusinesses.length === businesses.length ? 'local businesses' : `of ${businesses.length} businesses`)}
             </p>
             {activeFiltersCount > 0 && (
               <button
@@ -313,8 +319,16 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
               onClick={() => onSelectedIntlBizChange(selectedIntlBiz === 'Yes' ? 'All' : 'Yes')}
               className={`w-full text-left text-xs px-3 py-2 rounded-lg border flex items-center gap-2 font-semibold transition-colors ${selectedIntlBiz === 'Yes' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'}`}
             >
-              <Globe size={12} /> International
+              <Globe size={12} /> Accepts International Business
             </button>
+            {!isGuest && (
+              <button
+                onClick={() => setShowSister(v => !v)}
+                className={`w-full text-left text-xs px-3 py-2 rounded-lg border flex items-center gap-2 font-semibold transition-colors ${showSister ? 'bg-sky-50 text-sky-700 border-sky-200' : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'}`}
+              >
+                <Globe2 size={12} /> Sister Chapter Members
+              </button>
+            )}
             <button
               onClick={() => onShowDealsOnlyChange(v => !v)}
               className={`w-full text-left text-xs px-3 py-2 rounded-lg border flex items-center gap-2 font-semibold transition-colors ${showDealsOnly ? 'bg-amber-50 text-amber-700 border-amber-200' : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'}`}
@@ -351,7 +365,7 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
             <Search size={15} className="text-slate-400 shrink-0" />
             <input
               type="text"
-              placeholder="Search by name, company, industry…"
+              placeholder={showSister ? 'Search by name, company, chapter, industry…' : 'Search by name, company, industry…'}
               value={searchTerm}
               onChange={(e) => onSearchTermChange(e.target.value)}
               className="flex-1 text-sm bg-transparent outline-none text-slate-800 placeholder-slate-400"
@@ -361,6 +375,36 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
             )}
           </div>
 
+          {showSister && !isGuest ? (
+            !canViewIntl ? (
+              <ShareCardNotice onShare={optIn} sharing={optingIn} />
+            ) : (
+              <LoadingState loading={intlLoading} error={null} empty={desktopSisterViews.length === 0} emptyMessage="No sister chapter members found">
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                  {desktopSisterViews.map(member => (
+                    <button key={member.id} type="button"
+                      className="text-left bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col"
+                      onClick={() => setIntlDetail(member)}>
+                      <div className="p-4 flex gap-3 items-start">
+                        <img src={member.avatarUrl} alt={member.name} className="w-12 h-12 rounded-xl object-cover border border-slate-100 flex-shrink-0 shadow-sm" />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-sm text-slate-900 truncate leading-tight">{member.name}</p>
+                          {member.chineseName && member.chineseName !== member.name && <p className="text-[11px] text-slate-400 truncate">{member.chineseName}</p>}
+                          <p className="text-xs text-slate-500 truncate mt-0.5">{member.position}</p>
+                          <p className="text-xs font-semibold text-slate-700 truncate">{member.companyName}</p>
+                        </div>
+                      </div>
+                      <div className="px-4 pb-4 flex flex-wrap gap-1.5">
+                        <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-full">{member.jciChapter}{member.country ? ` · ${member.country}` : ''}</span>
+                        {member.businessCategory && <span className="text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-100 px-2 py-0.5 rounded-full">{member.businessCategory}</span>}
+                        {member.specialOffer && <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 px-2 py-0.5 rounded-full flex items-center gap-0.5"><Gift size={9} /> Deal</span>}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </LoadingState>
+            )
+          ) : (
           <LoadingState loading={loading} error={error} empty={filteredBusinesses.length === 0} emptyMessage="No businesses found matching this filter">
             {!isGuest && filteredBusinesses.length > 0 && (() => {
               const firstScore = getBizScore(filteredBusinesses[0]);
@@ -456,6 +500,7 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
               })}
             </div>
           </LoadingState>
+          )}
         </div>
       </div>
 
