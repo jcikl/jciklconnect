@@ -14,7 +14,6 @@ const MembersView = lazy(() => import('../modules/MembersView').then(m => ({ def
 const ProjectsView = lazy(() => import('../modules/ProjectsView').then(m => ({ default: m.ProjectsView })));
 const FlagshipProjectsManagementView = lazy(() => import('../modules/FlagshipProjectsManagementView').then(m => ({ default: m.FlagshipProjectsManagementView })));
 const InventoryView = lazy(() => import('../modules/InventoryView').then(m => ({ default: m.InventoryView })));
-const InternationalNetworkTab = lazy(() => import('../modules/BusinessDirectory/InternationalNetworkTab').then(m => ({ default: m.InternationalNetworkTab })));
 const BusinessDirectoryView = lazy(() => import('../modules/BusinessDirectoryView').then(m => ({ default: m.BusinessDirectoryView })));
 const AutomationStudio = lazy(() => import('../modules/AutomationStudio').then(m => ({ default: m.AutomationStudio })));
 const KnowledgeView = lazy(() => import('../modules/KnowledgeView').then(m => ({ default: m.KnowledgeView })));
@@ -162,8 +161,8 @@ export const renderAppView = (view: ViewType, context: AppViewRenderContext): Re
       return wrapErrorBoundary(<InventoryView searchQuery={searchQuery} />, '库存');
     case 'DIRECTORY':
       if (!hasMember) return dashboardFallback;
-      // Externals: card-only directory (businessProfiles / members are denied to them).
-      if (externalAllowedViews) return wrapErrorBoundary(<InternationalNetworkTab />, '商业目录');
+      // Externals: same directory layout, member cards only (businessProfiles / members are denied to them).
+      if (externalAllowedViews) return wrapErrorBoundary(<BusinessDirectoryView cardsOnly />, '商业目录');
       return wrapErrorBoundary(<BusinessDirectoryView searchQuery={searchQuery} initialSelectedBusinessId={initialSelectedBusinessId} onClearSelection={clearSelectedBusiness} />, '商业目录');
     case 'AUTOMATION':
       if (!isAdmin && !isBoard) return dashboardFallback;
