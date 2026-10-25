@@ -16,13 +16,15 @@ function str(v) {
 }
 
 /**
- * Non-empty, trimmed, de-duplicated strings from an array or a ',' / '||' separated string.
+ * Same as toStringArray in services/businessDirectoryService.ts (keep them identical): array -> its
+ * non-blank strings as stored; string -> split on ',' or '||', trimmed, blanks dropped.
  * @param {unknown} v
  * @returns {string[]}
  */
-function strList(v) {
-  const parts = Array.isArray(v) ? v : typeof v === 'string' ? v.split(/,|\|\|/) : [];
-  return [...new Set(parts.filter(p => typeof p === 'string').map(p => p.trim()).filter(Boolean))];
+function toStringArray(v) {
+  if (Array.isArray(v)) return v.filter(item => typeof item === 'string' && item.trim().length > 0);
+  if (typeof v === 'string') return v.split(/,|\|\|/).map(item => item.trim()).filter(Boolean);
+  return [];
 }
 
 /** @param {any} member @returns {boolean} */
@@ -57,9 +59,12 @@ export function buildMemberCard(member, nowIso = new Date().toISOString()) {
     ? b.businessCategory.filter(c => typeof c === 'string' && c.trim() !== '')
     : [];
   const offer = b.specialOffer;
-  // Ideal referral types: business.idealReferrals (array or string), else the legacy flat idealReferralIndustry.
-  const ownReferrals = strList(b.idealReferrals);
-  const idealReferrals = ownReferrals.length > 0 ? ownReferrals : strList(member?.idealReferralIndustry);
+  // Ideal referral types, read exactly like the local directory's idealReferralTypes
+  // (businessDirectoryService mapMemberToBusinessProfile) so one person shows the same values in both.
+  const referralTypes = toStringArray(b.idealReferralTypes);
+  const idealReferrals = referralTypes.length > 0
+    ? referralTypes
+    : toStringArray(b.idealReferrals ?? member?.idealReferral ?? member?.idealReferrals);
   const offerSummary = str(typeof offer === 'string' ? offer : offer?.description);
 
   /** @type {Record<string, unknown>} */

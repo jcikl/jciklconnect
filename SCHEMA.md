@@ -73,13 +73,13 @@
 | business.specialOffer | SpecialOffer \| string | — | | specialOffer / offerToMember | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | `publicBusinessListings.offer/offerTerms/offerExpiry` |
 | business.specialOffers | SpecialOffer[] | — | |  | 角色: 自己(非锁定字段) 或 B+ | Business Directory 优惠列表展示 |
 | business.acceptInternationalBusiness | enum | ✓ | `Yes` \| `No` \| `Willing to Explore` | acceptInternationalBusiness | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | `publicBusinessListings.acceptsInternationalBusiness` |
-| business.idealReferrals | string[] | — | | idealReferral / idealReferrals / idealReferralIndustry | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | `publicBusinessListings.idealReferralTypes` fallback；`memberCards.idealReferrals`（`buildMemberCard` 复制，`syncCards` 自动回写） |
+| business.idealReferrals | string[] | — | | idealReferral / idealReferrals / idealReferralIndustry | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | `publicBusinessListings.idealReferralTypes` fallback；`memberCards.idealReferrals` fallback（`buildMemberCard` 复制，`syncCards` 自动回写） |
 | business.connections | InternationalConnection[] | — | | connections / internationalConnections | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | business directory / international network 展示 |
 | business.levelOfManagement | string | — | | levelOfManagement | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | 商业资料展示 |
 | business.departmentAndPosition | string | — | | departmentAndPosition | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | 商业资料展示 |
 | business.companyDescription | string | — | | companyDescription | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | `publicBusinessListings.description` fallback |
 | business.interestedIndustries | string[] | — | | interestedIndustries | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | Business Directory 匹配与行业筛选 |
-| business.idealReferralTypes | string[] | — | | idealReferralTypes | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | `publicBusinessListings.idealReferralTypes` |
+| business.idealReferralTypes | string[] | — | | idealReferralTypes | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | `publicBusinessListings.idealReferralTypes`；`memberCards.idealReferrals`（优先来源，`buildMemberCard` 复制，`syncCards` 自动回写） |
 | business.bookmarkedBusinessIds | string[] | — | | bookmarkedBusinessIds | 角色: 自己(非锁定字段) 或 B+；系统: Business Directory 收藏操作 | Business Directory 书签状态 |
 | jciCareer | object | — | JCI 会员生涯 nested object |  | 会员、财务、董事会及晋升服务 | 权限判断、会员统计、晋升与会费流程 |
 | jciCareer.membershipType | enum | ✓ | `Guest` \| `Probation` \| `Official` \| `Honorary` \| `Senator` \| `Visiting` \| `Associate` | membershipType | 角色: B+；系统: 注册/审批/晋升/会费同步/导入 | `members.role` 推导；会费记录同步依据 |
@@ -190,7 +190,7 @@
 | website | string | — | |  | 系统: `members.business.companyWebsite` | `hooks/useSisterChapterMembers` → 国际目录展示 |
 | acceptInternationalBusiness | enum | — | `Yes` \| `No` \| `Willing to Explore` |  | 系统: `members.business.acceptInternationalBusiness` | 商业目录「Accepts International Business」快速筛选（`directoryFacets.ts` `cardToDirectoryItem`，仅 `Yes` 算接受） |
 | specialOfferSummary | string | — | 优惠摘要（字符串，或 `specialOffer.description`） |  | 系统: `members.business.specialOffer` | `hooks/useSisterChapterMembers` → 国际目录优惠展示与「只看优惠」筛选 |
-| idealReferrals | string[] | — | 去空白、去重；空则不写入 |  | 系统: `members.business.idealReferrals`（数组或以 `,` / `||` 分隔的字符串），为空时回退旧平铺字段 `members.idealReferralIndustry`（`buildMemberCard`；`syncCards` 自动回写） | `hooks/useSisterChapterMembers` → 商业目录「Ideal Referral Type」筛选（`components/modules/BusinessDirectory/directoryFacets.ts`） |
+| idealReferrals | string[] | — | 与本地商家目录 `idealReferralTypes` 同源同序同规范化（数组保留非空字符串；字符串按 `,` / `||` 拆分并去空白）；空则不写入 |  | 系统: `members.business.idealReferralTypes`，为空时回退 `business.idealReferrals ?? idealReferral ?? idealReferrals`（与 `businessDirectoryService` `mapMemberToBusinessProfile` 一致；不读 `idealReferralIndustry`）（`buildMemberCard`；`syncCards` 自动回写） | `hooks/useSisterChapterMembers` → 商业目录「Ideal Referral Type」筛选（`components/modules/BusinessDirectory/directoryFacets.ts`） |
 | international | boolean | ✓ | 与 `members.privacy.shareCardInternationally` 相等（缺省 false） |  | 系统: `members.privacy.shareCardInternationally`（`buildMemberCard`） | `firestore.rules` `externalCanReadCard`：`international == true` 时外部用户可读 |
 | updatedAt | string | ✓ | 卡片写入时的 ISO 时间 |  | 系统: 同步时刻（`syncCards` / 回填脚本） | 尚无应用读取者 |
 

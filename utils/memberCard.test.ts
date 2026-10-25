@@ -31,14 +31,19 @@ describe('buildMemberCard', () => {
     });
   });
 
-  it('idealReferrals: business.idealReferrals (array or string), else legacy idealReferralIndustry; omitted when empty', () => {
+  it('idealReferrals follows the local directory order: business.idealReferralTypes, then business.idealReferrals ?? idealReferral ?? idealReferrals', () => {
     const base = { role: 'MEMBER', general: { name: 'A' } };
-    expect(buildMemberCard({ ...base, business: { idealReferrals: [' Banks ', '', 'Banks', 'HR'] } }, NOW).idealReferrals).toEqual(['Banks', 'HR']);
-    expect(buildMemberCard({ ...base, business: { idealReferrals: 'Banks, HR' } }, NOW).idealReferrals).toEqual(['Banks', 'HR']);
-    expect(buildMemberCard({ ...base, idealReferralIndustry: 'IT||Retail, Food' }, NOW).idealReferrals).toEqual(['IT', 'Retail', 'Food']);
-    expect(buildMemberCard({ ...base, business: { idealReferrals: ['Banks'] }, idealReferralIndustry: 'IT' }, NOW).idealReferrals).toEqual(['Banks']);
-    expect(buildMemberCard({ ...base, business: { idealReferrals: [] }, idealReferralIndustry: 'IT' }, NOW).idealReferrals).toEqual(['IT']);
-    expect('idealReferrals' in buildMemberCard({ ...base, business: { idealReferrals: [' '] }, idealReferralIndustry: '' }, NOW)).toBe(false);
+    const ref = (m: Record<string, unknown>) => (buildMemberCard({ ...base, ...m }, NOW) as { idealReferrals?: string[] }).idealReferrals;
+    expect(ref({ business: { idealReferralTypes: ['Banks'], idealReferrals: ['HR'] } })).toEqual(['Banks']);
+    expect(ref({ business: { idealReferralTypes: [], idealReferrals: ['HR', ' ', 'IT'] } })).toEqual(['HR', 'IT']);
+    expect(ref({ business: { idealReferrals: 'Banks, HR||IT' } })).toEqual(['Banks', 'HR', 'IT']);
+    expect(ref({ idealReferral: 'Lawyers' })).toEqual(['Lawyers']);
+    expect(ref({ idealReferrals: ['Doctors'] })).toEqual(['Doctors']);
+    // `??`: an empty business.idealReferrals array stops the fallback, as in the service.
+    expect(ref({ business: { idealReferrals: [] }, idealReferral: 'Lawyers' })).toBeUndefined();
+    // The legacy idealReferralIndustry is not a source (the service does not read it).
+    expect(ref({ idealReferralIndustry: 'IT' })).toBeUndefined();
+    expect('idealReferrals' in buildMemberCard({ ...base, business: { idealReferrals: [' '] } }, NOW)).toBe(false);
   });
 
   it('uses fallbacks: general.avatar, flat companyName/industry, business.introduction, string specialOffer', () => {

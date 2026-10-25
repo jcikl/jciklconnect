@@ -392,7 +392,7 @@ export interface MemberCard {
   acceptInternationalBusiness?: 'Yes' | 'No' | 'Willing to Explore';
   /** Plain-text summary (see getSpecialOfferSummary). */
   specialOfferSummary?: string;
-  /** Ideal referral types (members.business.idealReferrals, else legacy idealReferralIndustry); omitted when empty. */
+  /** Same source, order and normalisation as the local directory's idealReferralTypes (business.idealReferralTypes, else business.idealReferrals ?? idealReferral ?? idealReferrals); omitted when empty. */
   idealReferrals?: string[];
   /** Visible to members of other chapters. Must equal members.privacy.shareCardInternationally (default false). */
   international: boolean;
