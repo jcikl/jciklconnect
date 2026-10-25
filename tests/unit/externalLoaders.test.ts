@@ -15,8 +15,8 @@ describe('canRunLoader', () => {
 });
 
 describe('external profile', () => {
-  it('externals only get the Basic tab', () => {
-    expect([...EXTERNAL_PROFILE_TABS]).toEqual(['basic']);
+  it('externals only get the Basic and Privacy & Security tabs', () => {
+    expect([...EXTERNAL_PROFILE_TABS]).toEqual(['basic', 'privacy']);
   });
 
   it('toExternalSelfUpdate drops KL-only and rule-locked keys, keeps the rest, does not mutate', () => {

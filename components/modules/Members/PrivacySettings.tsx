@@ -1,23 +1,25 @@
 import * as React from 'react';
 import { useState } from 'react';
-import { Globe } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 import { Button, Card, useToast } from '../../ui/Common';
 import { Input } from '../../ui/Form';
 import type { Member } from '../../../types';
+import { isExternalRole } from '../../../utils/externalAccess';
 
 /**
- * External member's own profile (Phase 1): share my card internationally, hide my birthday, and the
- * one-time date of birth. Saved through useAuth().updateMemberProfile (firestore.rules self-update allows
- * privacy, and general.dob + birthdayMMDD once while dob is empty; the memberCards doc is synced there).
+ * Privacy & Security tab of the member's own profile (KL and external members): share my card internationally,
+ * hide my birthday, and (externals only) the one-time date of birth. Saved through useAuth().updateMemberProfile
+ * (firestore.rules self-update allows privacy, and general.dob + birthdayMMDD once while dob is empty for externals;
+ * the memberCards doc is synced there).
  */
-export const ExternalSharingSettings: React.FC<{ member: Member; onSave: (updates: Partial<Member>) => Promise<void> }> = ({ member, onSave }) => {
+export const PrivacySettings: React.FC<{ member: Member; onSave: (updates: Partial<Member>) => Promise<void> }> = ({ member, onSave }) => {
   const { showToast } = useToast();
   const [saving, setSaving] = useState(false);
   const [privacy, setPrivacy] = useState({
     shareCardInternationally: member.privacy?.shareCardInternationally ?? false,
     hideBirthday: member.privacy?.hideBirthday ?? false,
   });
-  const canSetDobOnce = !member.general?.dob;
+  const canSetDobOnce = isExternalRole(member.role) && !member.general?.dob;
   const [dobOnce, setDobOnce] = useState('');
 
   const handleSave = async () => {
@@ -40,13 +42,13 @@ export const ExternalSharingSettings: React.FC<{ member: Member; onSave: (update
   };
 
   const switches: { key: keyof typeof privacy; label: string; desc: string }[] = [
-    { key: 'shareCardInternationally', label: 'Share my card internationally', desc: 'Let JCI members of other chapters see your name, company and business card. Off by default.' },
+    { key: 'shareCardInternationally', label: 'Share my card internationally', desc: 'Let JCI members of other chapters see your name, company and business card.' },
     { key: 'hideBirthday', label: 'Hide my birthday', desc: 'Leave me out of the birthday list. Only the day and month are ever shown, never the year.' },
   ];
 
   return (
     <Card className="p-4">
-      <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2"><Globe size={16} /> Sharing &amp; Birthday</h3>
+      <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2"><ShieldCheck size={16} /> Privacy &amp; Security</h3>
       <div className="space-y-3">
         {switches.map(({ key, label, desc }) => (
           <div key={key} className="flex items-center justify-between gap-3">

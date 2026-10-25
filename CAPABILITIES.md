@@ -34,7 +34,7 @@
 | `formatCurrency` | `utils/formatUtils.ts` | `components/modules/SponsorshipView.tsx:10`<br>`components/modules/ProjectManagement/ProjectReportGenerator.tsx:181` |
 | `formatDate` | `utils/dateUtils.ts` | `components/modules/Finance/BankMatchingModal.tsx:27`<br>`components/modules/MemberManagement/BoardTransitionTools.tsx:161` |
 | `formatDateTime` | `utils/dateUtils.ts` | `components/modules/ZoomBookingView.tsx:59` |
-| `getInitialsSvg` | `utils/avatarUtils.ts` | `components/layout/SearchDropdown.tsx:5`<br>`components/modules/CommunicationView.tsx:16`<br>`components/modules/HobbyClubsView.tsx:4`<br>`components/modules/BusinessDirectory/businessDirectoryUtils.ts:2`<br>`components/modules/Members/MemberCreateModal.tsx:4`<br>`components/modules/Members/MemberDetail.tsx:49`<br>`components/modules/Members/MemberDetailCareerTab.tsx:8`<br>`components/modules/Members/MemberTable.tsx:10`<br>`components/modules/Members/MentorMatchingModal.tsx:9` |
+| `getInitialsSvg` | `utils/avatarUtils.ts` | `components/layout/SearchDropdown.tsx:5`<br>`components/modules/CommunicationView.tsx:16`<br>`components/modules/HobbyClubsView.tsx:4`<br>`components/modules/BusinessDirectory/businessDirectoryUtils.ts:2`<br>`components/modules/Members/MemberCreateModal.tsx:4`<br>`components/modules/Members/MemberDetail.tsx:50`<br>`components/modules/Members/MemberDetailCareerTab.tsx:8`<br>`components/modules/Members/MemberTable.tsx:10`<br>`components/modules/Members/MentorMatchingModal.tsx:9` |
 | `isFuture` | `utils/dateUtils.ts` | `components/modules/ZoomBookingView.tsx:65` |
 
 ### 1.2 同一函數在多個元件各寫一份（應抽出到 utils）
@@ -64,6 +64,7 @@
 | `hooks/useMemberBenefits.ts` | 102 | Member Benefits Data Hook Wraps MemberBenefitsService with React state (loading / error / data). |
 | `hooks/useMemberMutations.ts` | 107 | ⚠️ 無說明 |
 | `hooks/useNotifications.ts` | 107 | ⚠️ 無說明 |
+| `hooks/usePushNotifications.ts` | 63 | ⚠️ 無說明 |
 | `services/pointsRuleService.ts` | 690 | Points Rule Service - Points Rule Configuration Management |
 | `services/projectAccountsService.ts` | 236 | Project Financial Accounts Service |
 | `services/reconciliationService.ts` | 861 | Reconciliation Service - Auto-matching & splitting bank transactions with project transactions |
@@ -481,8 +482,8 @@
 | `activityPlansService.ts` | 621 | 2 | Activity Plans Service - CRUD Operations P0 fix: all methods now query COLLECTIONS.ACTIVITY_PLANS (was COLLECTIONS.PROJECTS) P1 fixes: isDev… | ACTIVITY_PLANS, PROJECTS |
 | `eventFeedbackService.ts` | 226 | 3 | Event Feedback Service - Collects and manages event feedback | EVENT_FEEDBACK |
 | `eventPaymentService.ts` | 89 | 1 | Event payment (mark-paid) — creates the finance income record, then flips the registration to 'paid'. | PROJECTS |
-| `eventRegistrationService.ts` | 391 | 8 | Event Registration Service - 报名/缴费/签到统一名单（Story 8.1） | EVENT_REGISTRATIONS, PROJECTS |
-| `eventsService.ts` | 1,136 | 15 | Events Service - CRUD Operations | EVENT_BUDGETS, EVENT_FEEDBACK, EVENT_REGISTRATIONS, GUEST_REGISTRATIONS, MEMBERS, NOTIFICATIONS … |
+| `eventRegistrationService.ts` | 391 | 7 | Event Registration Service - 报名/缴费/签到统一名单（Story 8.1） | EVENT_REGISTRATIONS, PROJECTS |
+| `eventsService.ts` | 1,136 | 14 | Events Service - CRUD Operations | EVENT_BUDGETS, EVENT_FEEDBACK, EVENT_REGISTRATIONS, GUEST_REGISTRATIONS, MEMBERS, NOTIFICATIONS … |
 | `flagshipProjectsService.ts` | 156 | 3 | ⚠️ 無說明 | FLAGSHIP_PROJECTS |
 | `projectReportService.ts` | 775 | 3 | Project Report Service - Generates automated project reports | TEMPLATES |
 | `projectsService.ts` | 823 | 21 | Projects Service - CRUD Operations | ACTIVITY_PLANS, MEMBERS, POINTS, PROJECTS, PROJECT_REPORTS, PROJECT_TRANSACTIONS … |
@@ -1341,7 +1342,7 @@
 | `usePermissions.ts` | 212 | 30 | `usePermissions` | — | Permission Management Hook |
 | `usePoints.ts` | 61 | 2 | `usePoints` | pointsService | Points Data Hook |
 | `useProjects.ts` | 170 | 7 | `useProjects` | projectsService | Projects Data Hook |
-| `usePushNotifications.ts` | 63 | 1 | `usePushNotifications` | — | ⚠️ 無說明 |
+| `usePushNotifications.ts` | 63 | 0 | `usePushNotifications` | — | ⚠️ 無說明 |
 | `useSisterChapterMembers.ts` | 87 | 1 | `useSisterChapterMembers` | memberCardsService, membersService, sisterChaptersService | ⚠️ 無說明 |
 | `useSisterChapters.ts` | 26 | 6 | `useSisterChapters` | sisterChaptersService | ⚠️ 無說明 |
 | `useSocialPersonas.ts` | 46 | 2 | `useSocialPersonas` | socialPersonaService | ⚠️ 無說明 |
@@ -1432,7 +1433,7 @@
 |---|---|---|
 | `removeUndefined` | 6 | recursivley removes undefined values from an object. Firestore does not support 'undefined' values, so this he… |
 
-### `utils/dateUtils.ts` （176 行，46 處引用）
+### `utils/dateUtils.ts` （176 行，45 處引用）
 > Date Utility Functions
 
 | 函數 | 行 | 說明 |
@@ -1595,7 +1596,7 @@
 | `Card.tsx` | 77 | 1 | `Card`, `StatCardsContainer` |
 | `ColumnFilterHeader.tsx` | 118 | 2 | `ColumnFilterHeader` |
 | `Combobox.tsx` | 255 | 11 | `Combobox` |
-| `Common.tsx` | 26 | 234 | — |
+| `Common.tsx` | 26 | 233 | — |
 | `ConfirmDialog.tsx` | 100 | 2 | `ConfirmDialog`, `CONFIRM_CLOSED` |
 | `DataTable.tsx` | 172 | 0 | `DataTable` |
 | `Drawer.tsx` | 139 | 2 | `Drawer` |
@@ -1603,7 +1604,7 @@
 | `ErrorBoundary.tsx` | 261 | 3 | `ErrorFallback`, `SectionErrorFallback`, `ErrorBoundary`, `AsyncErrorBoundary`, `withErrorBoundary`, `useErrorHandler` |
 | `FilterDrawer.tsx` | 65 | 1 | `FilterDrawer` |
 | `FirstUseBanner.tsx` | 82 | 2 | `FirstUseBanner` |
-| `Form.tsx` | 502 | 98 | `Input`, `Select`, `Textarea`, `Checkbox`, `RadioGroup`, `ButtonGroup` |
+| `Form.tsx` | 502 | 97 | `Input`, `Select`, `Textarea`, `Checkbox`, `RadioGroup`, `ButtonGroup` |
 | `IntroducerSelector.tsx` | 338 | 6 | `IntroducerSelector` |
 | `LedgerTable.tsx` | 183 | 1 | `LedgerTable` |
 | `Loading.tsx` | 47 | 31 | `LoadingSpinner`, `LoadingOverlay` |

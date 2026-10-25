@@ -85,7 +85,6 @@ import { MemberStatisticsView } from './Members/MemberStatisticsView';
 import { AsyncErrorBoundary } from '../ui/AsyncErrorBoundary';
 import { BatchActionBar } from './Members/BatchActionBar';
 import { MemberTable } from './Members/MemberTable';
-import { MyProfileSelfView } from './Members/MyProfileSelfView';
 import { MemberDetail } from './Members/MemberDetail';
 import { MentorMatchingModal } from './Members/MentorMatchingModal';
 import { MemberCreateModal } from './Members/MemberCreateModal';

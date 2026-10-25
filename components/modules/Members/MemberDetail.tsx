@@ -43,6 +43,7 @@ import { MentorMatchingModal } from './MentorMatchingModal';
 import { MemberDetailBasicTab } from './MemberDetailBasicTab';
 import { MemberDetailCareerTab } from './MemberDetailCareerTab';
 import { MemberDetailActivitiesTab } from './MemberDetailActivitiesTab';
+import { PrivacySettings } from './PrivacySettings';
 import { AsyncErrorBoundary } from '../../ui/AsyncErrorBoundary';
 import { canRunLoader, EXTERNAL_PROFILE_TABS, toExternalSelfUpdate } from '../../../utils/externalAccess';
 // Generate an inline SVG data URI with initials — avoids external requests blocked by CSP
@@ -54,7 +55,7 @@ const getInitialsSvg = (name: string, size = 48): string => {
 
 export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelfView?: boolean }> = ({ member: memberProp, onBack, isSelfView = false }) => {
   const { members, updateMember, deleteMember } = useMembers();
-  const { resetPassword, member: currentAuthMember, simulatedRole, user } = useAuth();
+  const { resetPassword, member: currentAuthMember, simulatedRole, user, updateMemberProfile } = useAuth();
   // Always derive the latest member data from the live members array so the UI
   // updates automatically after every save (without a page reload).
   const member = useMemo(
@@ -105,7 +106,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
   const [activeInlineEditCard, setActiveInlineEditCard] = useState<'basic' | 'professional' | 'contact' | 'apparel' | 'career' | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [inlineValues, setInlineValues] = useState<any>(null);
-  const [activeDetailTab, setActiveDetailTab] = useState<'basic' | 'contact' | 'professional' | 'career' | 'activities'>('basic');
+  const [activeDetailTab, setActiveDetailTab] = useState<'basic' | 'contact' | 'professional' | 'career' | 'activities' | 'privacy'>('basic');
   const [activitiesLoading, setActivitiesLoading] = useState(false);
   const [projectRoles, setProjectRoles] = useState<any[]>([]);
   const [sponsorshipRecords, setSponsorshipRecords] = useState<any[]>([]);
@@ -1151,7 +1152,8 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
           tabs={[
             { id: 'basic', label: 'Basic Information' },
             { id: 'career', label: 'JCI Career' },
-            { id: 'activities', label: 'Activities Log' }
+            { id: 'activities', label: 'Activities Log' },
+            ...(isSelfView ? [{ id: 'privacy', label: 'Privacy & Security' }] : []),
           ].filter(t => !isExternal || (EXTERNAL_PROFILE_TABS as readonly string[]).includes(t.id))}
           activeTab={activeDetailTab}
           onTabChange={(tabId) => setActiveDetailTab(tabId as any)}
@@ -1222,6 +1224,12 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
             setRadarYear={setRadarYear}
             availableYears={availableYears}
           />
+        </AsyncErrorBoundary>
+      )}
+
+      {activeDetailTab === 'privacy' && isSelfView && (
+        <AsyncErrorBoundary>
+          <PrivacySettings key={member.id} member={member} onSave={updateMemberProfile} />
         </AsyncErrorBoundary>
       )}
 
