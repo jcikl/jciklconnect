@@ -82,8 +82,9 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
 }) => {
   const [quickFilter, setQuickFilter] = useState<'all' | 'bookmarked' | 'ideal' | 'international'>('all');
   const [intlDetail, setIntlDetail] = useState<IntlDirectoryMember | null>(null);
-  // Desktop-only: show sister-chapter members in the right panel instead of local businesses.
+  // Desktop: show sister-chapter members in the right panel instead of local businesses.
   const [showSister, setShowSister] = useState(false);
+  // Sister members matching the search box (used by both mobile International tab and desktop).
   const desktopSisterViews = filterSisterMembersBySearch(intlViews, searchTerm);
 
   const mobileDisplayBusinesses = isGuest ? filteredBusinesses : quickFilter === 'bookmarked'
@@ -160,7 +161,7 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
             all: filteredBusinesses.filter(b => !bookmarkedIds.has(b.id) && getBizScore(b) !== 1).length,
             bookmarked: filteredBusinesses.filter(b => bookmarkedIds.has(b.id)).length,
             ideal: filteredBusinesses.filter(b => getBizScore(b) === 1).length,
-            international: intlViews.length,
+            international: desktopSisterViews.length,
           };
           const activeLabel = TAB_CONFIG.find(t => t.id === quickFilter)?.label ?? 'All';
           const tabs = isGuest ? TAB_CONFIG.slice(0, 1) : TAB_CONFIG;
@@ -201,9 +202,9 @@ export const LocalBusinessTab: React.FC<LocalBusinessTabProps> = ({
                 {quickFilter === 'international' && !canViewIntl ? (
                   <ShareCardNotice onShare={optIn} sharing={optingIn} />
                 ) : quickFilter === 'international' ? (
-                  <LoadingState loading={intlLoading} error={null} empty={intlViews.length === 0} emptyMessage="No international members found">
+                  <LoadingState loading={intlLoading} error={null} empty={desktopSisterViews.length === 0} emptyMessage="No international members found">
                     <div className="divide-y divide-slate-100 bg-white">
-                      {intlViews.map(member => (
+                      {desktopSisterViews.map(member => (
                         <button key={member.id} type="button"
                           className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors"
                           onClick={() => setIntlDetail(member)}>
