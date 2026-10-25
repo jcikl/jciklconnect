@@ -43,12 +43,14 @@ export const EXTERNAL_DASHBOARD_WIDGETS = ['birthdays', 'partners', 'events', 'p
  * - memberBoardPositions: KL board / commission-director records (JCI Career tab)
  * - introducerProjects: projects list for the KL introducer picker
  * - memberActivities: projects / sponsorships / RegistrationHistory / members list (Activities tab)
+ * - businessDirectory: BusinessDirectoryService.getAllBusinesses (built from the KL members list; search dropdown)
  */
 export const KL_ONLY_LOADERS = [
   'allHobbyClubs',
   'memberBoardPositions',
   'introducerProjects',
   'memberActivities',
+  'businessDirectory',
 ] as const;
 export type KlOnlyLoader = typeof KL_ONLY_LOADERS[number];
 
