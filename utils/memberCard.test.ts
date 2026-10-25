@@ -5,7 +5,7 @@ const NOW = '2026-10-19T00:00:00.000Z';
 const RULE_KEYS = [
   'displayName', 'avatarUrl', 'loId', 'country', 'companyName', 'position', 'department', 'industry',
   'businessCategory', 'companyDescription', 'website', 'acceptInternationalBusiness', 'specialOfferSummary',
-  'international', 'updatedAt',
+  'idealReferrals', 'international', 'updatedAt',
 ];
 
 const full = {
@@ -15,6 +15,7 @@ const full = {
     companyName: 'Acme', position: 'Director', departmentAndPosition: 'Sales Dept', industry: 'IT',
     businessCategory: ['Software', 'AI'], companyDescription: 'We build', companyWebsite: 'https://acme.example',
     acceptInternationalBusiness: 'Yes', specialOffer: { description: '10% off' },
+    idealReferrals: ['Banks', 'Lawyers'],
   },
   privacy: { shareCardInternationally: true },
 };
@@ -25,8 +26,19 @@ describe('buildMemberCard', () => {
       displayName: 'Ali Tan', avatarUrl: 'https://img/a.png', loId: 'jcikl', country: 'Malaysia',
       companyName: 'Acme', position: 'Director', department: 'Sales Dept', industry: 'IT',
       businessCategory: ['Software', 'AI'], companyDescription: 'We build', website: 'https://acme.example',
-      acceptInternationalBusiness: 'Yes', specialOfferSummary: '10% off', international: true, updatedAt: NOW,
+      acceptInternationalBusiness: 'Yes', specialOfferSummary: '10% off', idealReferrals: ['Banks', 'Lawyers'],
+      international: true, updatedAt: NOW,
     });
+  });
+
+  it('idealReferrals: business.idealReferrals (array or string), else legacy idealReferralIndustry; omitted when empty', () => {
+    const base = { role: 'MEMBER', general: { name: 'A' } };
+    expect(buildMemberCard({ ...base, business: { idealReferrals: [' Banks ', '', 'Banks', 'HR'] } }, NOW).idealReferrals).toEqual(['Banks', 'HR']);
+    expect(buildMemberCard({ ...base, business: { idealReferrals: 'Banks, HR' } }, NOW).idealReferrals).toEqual(['Banks', 'HR']);
+    expect(buildMemberCard({ ...base, idealReferralIndustry: 'IT||Retail, Food' }, NOW).idealReferrals).toEqual(['IT', 'Retail', 'Food']);
+    expect(buildMemberCard({ ...base, business: { idealReferrals: ['Banks'] }, idealReferralIndustry: 'IT' }, NOW).idealReferrals).toEqual(['Banks']);
+    expect(buildMemberCard({ ...base, business: { idealReferrals: [] }, idealReferralIndustry: 'IT' }, NOW).idealReferrals).toEqual(['IT']);
+    expect('idealReferrals' in buildMemberCard({ ...base, business: { idealReferrals: [' '] }, idealReferralIndustry: '' }, NOW)).toBe(false);
   });
 
   it('uses fallbacks: general.avatar, flat companyName/industry, business.introduction, string specialOffer', () => {
@@ -108,6 +120,7 @@ describe('shouldHaveCard / planCardSync', () => {
     expect(planCardSync(full, { ...full, general: { name: 'New Name' } })).toBe('upsert');
     expect(planCardSync(full, { ...full, privacy: { shareCardInternationally: false } })).toBe('upsert');
     expect(planCardSync(full, { ...full, loId: 'other' })).toBe('upsert');
+    expect(planCardSync(full, { ...full, business: { ...full.business, idealReferrals: ['Banks'] } })).toBe('upsert');
   });
 
   it('forceDelete deletes even if the member never qualified', () => {

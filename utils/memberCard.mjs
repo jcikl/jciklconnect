@@ -15,6 +15,16 @@ function str(v) {
   return typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined;
 }
 
+/**
+ * Non-empty, trimmed, de-duplicated strings from an array or a ',' / '||' separated string.
+ * @param {unknown} v
+ * @returns {string[]}
+ */
+function strList(v) {
+  const parts = Array.isArray(v) ? v : typeof v === 'string' ? v.split(/,|\|\|/) : [];
+  return [...new Set(parts.filter(p => typeof p === 'string').map(p => p.trim()).filter(Boolean))];
+}
+
 /** @param {any} member @returns {boolean} */
 export function isExternalMember(member) {
   return EXTERNAL_ROLES.includes(member?.role);
@@ -47,6 +57,9 @@ export function buildMemberCard(member, nowIso = new Date().toISOString()) {
     ? b.businessCategory.filter(c => typeof c === 'string' && c.trim() !== '')
     : [];
   const offer = b.specialOffer;
+  // Ideal referral types: business.idealReferrals (array or string), else the legacy flat idealReferralIndustry.
+  const ownReferrals = strList(b.idealReferrals);
+  const idealReferrals = ownReferrals.length > 0 ? ownReferrals : strList(member?.idealReferralIndustry);
   const offerSummary = str(typeof offer === 'string' ? offer : offer?.description);
 
   /** @type {Record<string, unknown>} */
@@ -63,6 +76,7 @@ export function buildMemberCard(member, nowIso = new Date().toISOString()) {
     website: str(b.companyWebsite),
     acceptInternationalBusiness: str(b.acceptInternationalBusiness),
     specialOfferSummary: offerSummary,
+    idealReferrals: idealReferrals.length > 0 ? idealReferrals : undefined,
   };
   /** @type {Record<string, unknown>} */
   const card = {
