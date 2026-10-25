@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 
 import { useToast } from '../ui/Common';
 import { MembersOnlyOverlay } from '../ui/MembersOnlyOverlay';
@@ -13,61 +13,21 @@ import { BusinessInquiryModal } from './BusinessDirectory/BusinessInquiryModal';
 import { useSisterChapterMembers } from '../../hooks/useSisterChapterMembers';
 import { getInitialsSvg } from './BusinessDirectory/businessDirectoryUtils';
 import { useBusinessBookmarks } from './BusinessDirectory/useBusinessBookmarks';
-import { useBusinessDirectoryFilters } from './BusinessDirectory/useBusinessDirectoryFilters';
 import { useBusinessInquiry } from './BusinessDirectory/useBusinessInquiry';
-import { LocalBusinessTab, type IntlDirectoryMember } from './BusinessDirectory/LocalBusinessTab';
-import { useSisterChapterFilters } from './BusinessDirectory/useSisterChapterFilters';
+import { DirectoryList, type DirectoryScore } from './BusinessDirectory/DirectoryList';
+import { DirectoryFilterPanel } from './BusinessDirectory/DirectoryFilterPanel';
+import { SisterMemberDetailModal } from './BusinessDirectory/SisterMemberDetailModal';
+import { useDirectoryFilters } from './BusinessDirectory/useDirectoryFilters';
+import { businessToDirectoryItem, cardToDirectoryItem, type DirectoryItem } from './BusinessDirectory/directoryFacets';
 
 export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSelectedBusinessId?: string | null; onClearSelection?: () => void; isGuest?: boolean; onGuestCta?: () => void }> = ({ searchQuery, initialSelectedBusinessId, onClearSelection, isGuest = false, onGuestCta }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedIndustries, setSelectedIndustries] = useState<Set<string>>(new Set());
-  const [selectedInterestedIndustry, setSelectedInterestedIndustry] = useState<string>('All');
-  const [selectedIntlBiz, setSelectedIntlBiz] = useState<string>('All');
-  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
-  const [selectedIdealReferral, setSelectedIdealReferral] = useState<string>('All');
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
-  const [showDealsOnly, setShowDealsOnly] = useState(false);
-
-  const { members: rawIntlMembers, loading: intlLoading, canView: canViewIntl, optIn, optingIn } = useSisterChapterMembers();
-  const intlMembers = useMemo<IntlDirectoryMember[]>(() => rawIntlMembers.map(m => ({
-    id: m.id,
-    name: m.displayName ?? '',
-    chineseName: undefined,
-    avatarUrl: m.avatarUrl ?? getInitialsSvg(m.displayName ?? ''),
-    position: m.position ?? '',
-    companyName: m.companyName ?? '',
-    jciChapter: m.sisterChapter?.name ?? '',
-    country: m.sisterChapter?.country ?? '',
-    industry: m.industry ?? '',
-    businessCategory: (m.businessCategory ?? []).join(', '),
-    email: '',
-    website: m.website ?? '',
-    description: m.companyDescription ?? '',
-    specialOffer: m.specialOfferSummary,
-  })), [rawIntlMembers]);
-
-  const {
-    selectedSisterChapter,
-    selectedSisterCountry,
-    selectedSisterIndustry,
-    setSelectedSisterChapter,
-    setSelectedSisterCountry,
-    setSelectedSisterIndustry,
-    sisterChapters,
-    sisterCountries,
-    sisterIndustries,
-    sisterFiltersCount,
-  } = useSisterChapterFilters(intlMembers);
-
-  const filteredIntlMembers = useMemo(() => intlMembers.filter(m =>
-    (selectedSisterChapter === 'All' || m.jciChapter === selectedSisterChapter) &&
-    (selectedSisterCountry === 'All' || m.country === selectedSisterCountry) &&
-    (selectedSisterIndustry === 'All' || m.industry === selectedSisterIndustry)),
-  [intlMembers, selectedSisterChapter, selectedSisterCountry, selectedSisterIndustry]);
-
   const [detailBiz, setDetailBiz] = useState<BusinessProfile | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [sisterDetail, setSisterDetail] = useState<DirectoryItem | null>(null);
 
+  const { members: rawIntlMembers, canView: canViewIntl, optIn, optingIn } = useSisterChapterMembers();
   const { businesses, loading, error } = useBusinessDirectory();
   const { members } = useMembers();
   const { showToast } = useToast();
@@ -98,27 +58,46 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
     showToast,
   });
 
-  const {
-    uniqueIndustries,
-    uniqueInterestedIndustries,
-    uniqueIdealReferrals,
-    activeFiltersCount,
-    filteredBusinesses,
-    getBizScore,
-  } = useBusinessDirectoryFilters({
-    businesses,
-    searchTerm,
-    searchQuery,
-    selectedIndustries,
-    selectedInterestedIndustry,
-    selectedIntlBiz,
-    selectedCategories,
-    selectedIdealReferral,
-    showDealsOnly,
-    bookmarkedIds,
-    idealReferralIndustry: currentUser?.idealReferralIndustry,
-    currentUserId: currentUser?.id,
-  });
+  // One list: local businesses + (when the viewer may see cards) sister-chapter member cards.
+  const showSister = !isGuest && canViewIntl;
+  const businessById = useMemo(() => new Map(businesses.map(b => [b.id, b])), [businesses]);
+  const items = useMemo<DirectoryItem[]>(() => {
+    const membersById = new Map(members.map(m => [m.id, m]));
+    const local = businesses.map(biz => {
+      const owner = membersById.get(biz.memberId);
+      return businessToDirectoryItem(biz, {
+        avatarUrl: owner?.general?.avatarUrl || getInitialsSvg(biz.ownerName || ''),
+        chineseName: owner?.general?.chineseName,
+        position: owner?.business?.position || 'Representative',
+      });
+    });
+    const sister = showSister ? rawIntlMembers.map(card => cardToDirectoryItem(card, name => getInitialsSvg(name))) : [];
+    return [...local, ...sister];
+  }, [businesses, members, rawIntlMembers, showSister]);
+
+  const directory = useDirectoryFilters(items, searchQuery || searchTerm);
+
+  // Ideal match: the viewer's ideal referral industries vs the item's industry. Bookmarks are local only.
+  const idealIndustries = useMemo(() => new Set(
+    (currentUser?.idealReferralIndustry ?? '').split(',').map(v => v.trim().toLowerCase()).filter(Boolean),
+  ), [currentUser?.idealReferralIndustry]);
+  const getScore = useCallback((item: DirectoryItem): DirectoryScore => {
+    if (item.source === 'local' && bookmarkedIds.has(item.id)) return 0;
+    if (idealIndustries.size > 0 && item.industry && idealIndustries.has(item.industry.toLowerCase())) return 1;
+    return 2;
+  }, [bookmarkedIds, idealIndustries]);
+  const sortedItems = useMemo(
+    () => [...directory.filtered].sort((a, b) => (getScore(a) - getScore(b)) || a.name.localeCompare(b.name)),
+    [directory.filtered, getScore],
+  );
+
+  const openItem = (item: DirectoryItem) => {
+    if (item.source === 'sister') { setSisterDetail(item); return; }
+    const biz = businessById.get(item.id);
+    if (!biz) return;
+    setDetailBiz(biz);
+    setIsDetailOpen(true);
+  };
 
   // Logged-in GUEST role: mask the directory like the Benefits page (public guest landing page uses isGuest prop instead)
   const isGuestRole = !isGuest && (currentUser?.role || '') === 'GUEST';
@@ -134,43 +113,38 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
 
       <BusinessDirectoryHeader />
 
-      <LocalBusinessTab
-        intlMembers={filteredIntlMembers}
-        intlLoading={intlLoading}
-        canViewIntl={canViewIntl}
-        onIntlOptIn={optIn}
-        intlOptingIn={optingIn}
-        businesses={businesses}
-        filteredBusinesses={filteredBusinesses}
-        members={members}
+      <DirectoryList
+        items={sortedItems}
+        totalCount={items.length}
         loading={loading}
         error={error}
         isGuest={isGuest}
         searchTerm={searchTerm}
-        activeFiltersCount={activeFiltersCount}
-        selectedIndustries={selectedIndustries}
-        selectedIntlBiz={selectedIntlBiz}
-        showDealsOnly={showDealsOnly}
-        uniqueIndustries={uniqueIndustries}
-        bookmarkedIds={bookmarkedIds}
         onSearchTermChange={setSearchTerm}
+        activeFiltersCount={directory.activeCount}
+        onResetFilters={directory.reset}
         onFilterDrawerOpen={() => setIsFilterDrawerOpen(true)}
-        onBusinessOpen={(biz) => {
-          setDetailBiz(biz);
-          setIsDetailOpen(true);
-        }}
+        filterPanel={(
+          <DirectoryFilterPanel
+            variant="sidebar"
+            filters={directory.filters}
+            facets={directory.facets}
+            toggleValue={directory.toggleValue}
+            toggleFlag={directory.toggleFlag}
+            clearSection={directory.clearSection}
+          />
+        )}
+        showShareNotice={!isGuest && !canViewIntl}
+        onShare={optIn}
+        sharing={optingIn}
+        bookmarkedIds={bookmarkedIds}
+        getScore={getScore}
+        onItemOpen={openItem}
         onGuestCta={onGuestCta}
         onBookmarkToggle={toggleBookmark}
-        onSelectedIndustriesChange={setSelectedIndustries}
-        onSelectedInterestedIndustryChange={setSelectedInterestedIndustry}
-        onSelectedIntlBizChange={setSelectedIntlBiz}
-        onSelectedCategoriesChange={setSelectedCategories}
-        onSelectedIdealReferralChange={setSelectedIdealReferral}
-        onShowDealsOnlyChange={setShowDealsOnly}
-        getBizScore={getBizScore}
       />
 
-
+      <SisterMemberDetailModal item={sisterDetail} onClose={() => setSisterDetail(null)} />
 
       <BusinessDetailModal
         isOpen={isDetailOpen}
@@ -196,36 +170,9 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
       />
       <BusinessDirectoryFilterDrawer
         isOpen={isFilterDrawerOpen}
-        activeTab="local"
-        businesses={businesses}
-        filteredBusinessCount={filteredBusinesses.length}
-        activeFiltersCount={activeFiltersCount}
-        selectedIndustries={selectedIndustries}
-        selectedInterestedIndustry={selectedInterestedIndustry}
-        selectedIntlBiz={selectedIntlBiz}
-        selectedCategories={selectedCategories}
-        selectedIdealReferral={selectedIdealReferral}
-        showDealsOnly={showDealsOnly}
-        uniqueIndustries={uniqueIndustries}
-        uniqueInterestedIndustries={uniqueInterestedIndustries}
-        uniqueIdealReferrals={uniqueIdealReferrals}
-        sisterMembers={intlMembers}
-        sisterChapters={sisterChapters}
-        sisterCountries={sisterCountries}
-        sisterIndustries={sisterIndustries}
-        selectedSisterChapter={selectedSisterChapter}
-        selectedSisterCountry={selectedSisterCountry}
-        selectedSisterIndustry={selectedSisterIndustry}
         onClose={() => setIsFilterDrawerOpen(false)}
-        onSelectedIndustriesChange={setSelectedIndustries}
-        onSelectedInterestedIndustryChange={setSelectedInterestedIndustry}
-        onSelectedIntlBizChange={setSelectedIntlBiz}
-        onSelectedCategoriesChange={setSelectedCategories}
-        onSelectedIdealReferralChange={setSelectedIdealReferral}
-        onShowDealsOnlyChange={setShowDealsOnly}
-        onSelectedSisterChapterChange={setSelectedSisterChapter}
-        onSelectedSisterCountryChange={setSelectedSisterCountry}
-        onSelectedSisterIndustryChange={setSelectedSisterIndustry}
+        state={directory}
+        description="Narrow down local businesses and sister chapter members"
       />
     </div>
   );

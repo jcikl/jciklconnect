@@ -34,7 +34,7 @@
 | `formatCurrency` | `utils/formatUtils.ts` | `components/modules/SponsorshipView.tsx:10`<br>`components/modules/ProjectManagement/ProjectReportGenerator.tsx:181` |
 | `formatDate` | `utils/dateUtils.ts` | `components/modules/Finance/BankMatchingModal.tsx:27`<br>`components/modules/MemberManagement/BoardTransitionTools.tsx:161` |
 | `formatDateTime` | `utils/dateUtils.ts` | `components/modules/ZoomBookingView.tsx:59` |
-| `getInitialsSvg` | `utils/avatarUtils.ts` | `components/layout/SearchDropdown.tsx:5`<br>`components/modules/CommunicationView.tsx:16`<br>`components/modules/HobbyClubsView.tsx:4`<br>`components/modules/BusinessDirectory/businessDirectoryUtils.ts:9`<br>`components/modules/Members/MemberCreateModal.tsx:4`<br>`components/modules/Members/MemberDetail.tsx:49`<br>`components/modules/Members/MemberDetailCareerTab.tsx:8`<br>`components/modules/Members/MemberTable.tsx:10`<br>`components/modules/Members/MentorMatchingModal.tsx:9` |
+| `getInitialsSvg` | `utils/avatarUtils.ts` | `components/layout/SearchDropdown.tsx:5`<br>`components/modules/CommunicationView.tsx:16`<br>`components/modules/HobbyClubsView.tsx:4`<br>`components/modules/BusinessDirectory/businessDirectoryUtils.ts:2`<br>`components/modules/Members/MemberCreateModal.tsx:4`<br>`components/modules/Members/MemberDetail.tsx:49`<br>`components/modules/Members/MemberDetailCareerTab.tsx:8`<br>`components/modules/Members/MemberTable.tsx:10`<br>`components/modules/Members/MentorMatchingModal.tsx:9` |
 | `isFuture` | `utils/dateUtils.ts` | `components/modules/ZoomBookingView.tsx:65` |
 
 ### 1.2 同一函數在多個元件各寫一份（應抽出到 utils）
@@ -1509,7 +1509,7 @@
 |---|---|---|
 | `calculateAwardProgress` | 8 | Pure function: calculates progress percentage (0–100) toward an award. Milestone-based awards use segment logi… |
 
-### `utils/internationalCards.ts` （39 行，1 處引用）
+### `utils/internationalCards.ts` （39 行，2 處引用）
 
 | 函數 | 行 | 說明 |
 |---|---|---|
@@ -1595,7 +1595,7 @@
 | `Card.tsx` | 77 | 1 | `Card`, `StatCardsContainer` |
 | `ColumnFilterHeader.tsx` | 118 | 2 | `ColumnFilterHeader` |
 | `Combobox.tsx` | 255 | 11 | `Combobox` |
-| `Common.tsx` | 26 | 234 | — |
+| `Common.tsx` | 26 | 235 | — |
 | `ConfirmDialog.tsx` | 100 | 2 | `ConfirmDialog`, `CONFIRM_CLOSED` |
 | `DataTable.tsx` | 172 | 0 | `DataTable` |
 | `Drawer.tsx` | 139 | 2 | `Drawer` |

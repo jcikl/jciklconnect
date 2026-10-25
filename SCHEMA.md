@@ -172,7 +172,7 @@
 > **TS Interface:** `MemberCard`（`types/member.ts`） | **Constants key:** `COLLECTIONS.MEMBER_CARDS`（`'memberCards'`） | **Doc ID:** 等于 `members` 文档 ID
 > 目录安全的公开名片，不含 PII。它是外部用户能读到的其他人资料的唯一来源（见 `SCHEMA-PERMISSIONS.md`）。
 > **来：** 由 `MemberCardsService.syncCards`（`services/memberCardsService.ts`）写入，`membersService` 在成员写入成功之后调用（create / update / 软删除 / 角色变更 / 批量更新），`hooks/useAuth` `updateMemberProfile` 在自己的资料保存后也调用（Phase 1）；卡片写入失败只记日志、不回滚成员写入。另有 `netlify/functions/external-accounts`（Admin SDK）：创建账号时随成员文档同批写入，`setStatus` 时同批写入或删除（`shouldHaveCard`）；`scripts/backfillMemberCards.mjs --apply` 回填。卡片构建逻辑在 `utils/memberCard.mjs`（`buildMemberCard`，`shouldHaveCard`，`planCardSync`）。
-> **往：** 国际目录经 `hooks/useSisterChapterMembers` 读取：外部用户在 `InternationalNetworkTab`、KL 用户在 `BusinessDirectoryView`（Phase 1）；外部用户读 `international == true` 的卡（含已开放的 KL 卡）加本分会的卡；卡片没有联系方式字段，外部目录不提供 Contact。读取范围由 firestore.rules 决定（`externalCanReadCard`、`isActiveMember`、`canReadOrgMembers`）。外部用户的生日列表不读 `memberCards`，走 `netlify/functions/chapter-birthdays`。
+> **往：** 国际目录经 `hooks/useSisterChapterMembers` 读取：外部用户在 `InternationalNetworkTab`、KL 用户在 `BusinessDirectoryView`（与本地商家合并为同一列表、同一筛选面板，`components/modules/BusinessDirectory/directoryFacets.ts`）；外部用户读 `international == true` 的卡（含已开放的 KL 卡）加本分会的卡；卡片没有联系方式字段，外部目录不提供 Contact。读取范围由 firestore.rules 决定（`externalCanReadCard`、`isActiveMember`、`canReadOrgMembers`）。外部用户的生日列表不读 `memberCards`，走 `netlify/functions/chapter-birthdays`。
 > 卡片只在 `shouldHaveCard` 为真时存在：role `MEMBER` / `BOARD` / `ADMIN` / `SUPER_ADMIN`，或 active 外部会员；GUEST / INACTIVE 与软删除的成员没有卡。
 
 | 字段路径 | 类型 | 必填 | 枚举值 / 说明 | 平铺冗余字段（等待替换） | 来 | 往 |
@@ -180,7 +180,7 @@
 | displayName | string | ✓ | 显示名 |  | 系统: `members.general.name`，回退 `members.name`，再回退空字符串（`buildMemberCard`） | `hooks/useSisterChapterMembers` → 国际目录展示（姓名） |
 | avatarUrl | string | — | |  | 系统: `members.general.avatarUrl`，回退 `general.avatar` | `hooks/useSisterChapterMembers` → 国际目录展示（头像） |
 | loId | string | ✓ | 分会 ID；须等于 `members.loId`（缺省 `jcikl`） |  | 系统: `members.loId` | `firestore.rules` `externalCanReadCard`（本分会）；list 查询约束；`utils/internationalCards.ts`（`attachSisterChapters` 解析卡所属分会，KL 用固定条目；外部用户另查本分会卡） |
-| country | string | — | 外部：`members.affiliation.country`；内部：固定 `'Malaysia'` |  | 系统: `members.affiliation.country`（外部）或代码常量（内部） | 尚无应用读取者（国际目录的国家取自 `sisterChapters.country`，不读此字段） |
+| country | string | — | 外部：`members.affiliation.country`；内部：固定 `'Malaysia'` |  | 系统: `members.affiliation.country`（外部）或代码常量（内部） | 商业目录国家：优先取 `sisterChapters.country`，为空时才回退此字段（`directoryFacets.ts` `cardToDirectoryItem`） |
 | companyName | string | — | |  | 系统: `members.business.companyName`，回退 `members.companyName` | `hooks/useSisterChapterMembers` → 国际目录展示与搜索 |
 | position | string | — | |  | 系统: `members.business.position` | `hooks/useSisterChapterMembers` → 国际目录展示 |
 | department | string | — | |  | 系统: `members.business.departmentAndPosition` | 尚无应用读取者 |
@@ -188,7 +188,7 @@
 | businessCategory | string[] | — | 仅保留非空字符串，空数组不写入 |  | 系统: `members.business.businessCategory` | `hooks/useSisterChapterMembers` → 国际目录展示与搜索 |
 | companyDescription | string | — | |  | 系统: `members.business.companyDescription`，回退 `business.introduction` | `hooks/useSisterChapterMembers` → 国际目录展示与搜索 |
 | website | string | — | |  | 系统: `members.business.companyWebsite` | `hooks/useSisterChapterMembers` → 国际目录展示 |
-| acceptInternationalBusiness | enum | — | `Yes` \| `No` \| `Willing to Explore` |  | 系统: `members.business.acceptInternationalBusiness` | 尚无应用读取者 |
+| acceptInternationalBusiness | enum | — | `Yes` \| `No` \| `Willing to Explore` |  | 系统: `members.business.acceptInternationalBusiness` | 商业目录「Accepts International Business」快速筛选（`directoryFacets.ts` `cardToDirectoryItem`，仅 `Yes` 算接受） |
 | specialOfferSummary | string | — | 优惠摘要（字符串，或 `specialOffer.description`） |  | 系统: `members.business.specialOffer` | `hooks/useSisterChapterMembers` → 国际目录优惠展示与「只看优惠」筛选 |
 | idealReferrals | string[] | — | 去空白、去重；空则不写入 |  | 系统: `members.business.idealReferrals`（数组或以 `,` / `||` 分隔的字符串），为空时回退旧平铺字段 `members.idealReferralIndustry`（`buildMemberCard`；`syncCards` 自动回写） | `hooks/useSisterChapterMembers` → 商业目录「Ideal Referral Type」筛选（`components/modules/BusinessDirectory/directoryFacets.ts`） |
 | international | boolean | ✓ | 与 `members.privacy.shareCardInternationally` 相等（缺省 false） |  | 系统: `members.privacy.shareCardInternationally`（`buildMemberCard`） | `firestore.rules` `externalCanReadCard`：`international == true` 时外部用户可读 |
