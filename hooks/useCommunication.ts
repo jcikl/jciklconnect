@@ -11,7 +11,12 @@ import { useFirestoreCollection } from './useFirestoreCollection';
 // Firestore read of the same collection. When CommunicationView and App.tsx are refactored
 // to source notifications from useNotifications instead, remove the notifications fetch below.
 
-export const useCommunication = () => {
+/**
+ * @param options.loadPosts false = notifications only (the App-level bell): the communication posts
+ *   list is not loaded (its read rule is isInternalUser(), so it is denied for external members).
+ */
+export const useCommunication = (options?: { loadPosts?: boolean }) => {
+  const loadPosts = options?.loadPosts ?? true;
   const { member, loading: authLoading, isDevMode: isDevModeFromAuth } = useAuth();
   const { showToast } = useToast();
   const isSubmittingRef = useRef(false);
@@ -23,8 +28,8 @@ export const useCommunication = () => {
 
   const { data: posts, loading: loading1, error: error1, reload: reloadPosts } = useFirestoreCollection<NewsPost>({
     loader: () => CommunicationService.getAllPosts(),
-    enabled,
-    deps: [enabled],
+    enabled: enabled && loadPosts,
+    deps: [enabled, loadPosts],
   });
 
   const { data: notifications, loading: loading2, error: error2, reload: reloadNotifications } = useFirestoreCollection<Notification>({

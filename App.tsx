@@ -273,7 +273,8 @@ export const JCIKLApp: React.FC = () => {
 
   // useCommunication hook is safe to call even without authentication
   // It handles the case when member is null internally
-  const { notifications, markNotificationAsRead } = useCommunication();
+  // The bell only needs notifications: skip the posts list (denied for external members, unused here).
+  const { notifications, markNotificationAsRead } = useCommunication({ loadPosts: false });
   const { members } = useMembers();
 
   // FCM push notification registration
