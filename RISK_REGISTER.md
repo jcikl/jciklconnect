@@ -876,3 +876,37 @@ Evidence: the cap count (R-075) queries `members` with `loId ==` and `affiliatio
 Risk: if the rules and function go live without the index, creating or inviting external accounts fails on the count query.
 
 Recommended action: deploy `firestore.indexes.json` together with `firestore.rules` (and wait for the index to build) before releasing the function.
+
+### R-087 updateMember Used to Turn External Members into MEMBER (P1, resolved)
+
+Evidence: `MembersService.updateMember` ran `syncComputedMembershipType` for every member. For AFFILIATE / CHAPTER_ADMIN it wrote `jciCareer.membershipType` and `role: 'MEMBER'` (`roleForMembershipType` returns MEMBER for any non-KL role). Self-updates (e.g. "Share my card") were denied by the rules; admin edits would have silently converted the external into a KL MEMBER.
+
+Risk: externals could not opt in to card sharing; any admin edit of an external through updateMember changed their role.
+
+Resolution (2026-10-25): `updateMember` and `batchUpdateMembers` skip the membership-type recompute and the GUEST→MEMBER dues setup when the current doc is external. Rules test `tests/rules/externalSelfUpdate.rules.test.ts` replays the real payload. Production check the same day: all 6 non-KL member docs still have their external role and no `jciCareer.membershipType`.
+
+### R-088 Permission Errors for External Members on Every Page (P1, resolved)
+
+Evidence: production errorLogs for a test CHAPTER_ADMIN showed ~90 "Missing or insufficient permissions" entries: the App-level bell loaded all `communication` posts and listed notifications (list was B+ only); the Benefits page loaded `promotionPackages`; the search dropdown loaded `getAllBusinesses` → `getAllMembers`; sign-in ran the KL board-seat check; the profile page used the legacy `MyProfileSelfView`.
+
+Resolution (2026-10-25): the bell uses `useCommunication({ loadPosts: false })`; `notifications` list allows any signed-in user to list their own (query must carry `where('memberId','==',uid)`), which also fixes ordinary KL members never seeing their notifications; Benefits uses `useAdvertisements({ loadPackages: false })`; `useBusinessDirectory({ enabled })` is off for externals in the search dropdown; sign-in skips `ensureMemberBoardFieldsSynced` for externals. Externals' profile is `MemberDetail` (self view, Basic tab only) plus `ExternalSharingSettings`; KL-only loads are gated by `canRunLoader` / `KL_ONLY_LOADERS` in `utils/externalAccess.ts`.
+
+### R-089 errorLogs Entries Without a Label (P3)
+
+Evidence: `errorLoggingService.logError` keeps only `component`, `action` and `additionalData`; calls that pass `{ context: '...' }` are stored with no component or action.
+
+Risk: such errors are hard to trace from errorLogs.
+
+Recommended action: map `context` into `action` in `errorLoggingService`.
+
+### R-090 KL Member Self-Edit in MemberDetail May Be Rejected (P2, unverified)
+
+Evidence: the MemberDetail save payload includes introducer, senatorship and nationality defaults ('Malaysia' when empty), some of which the members self-update rule locks. Found while fixing R-088; not tested for KL members.
+
+Recommended action: replay a KL MEMBER self-edit payload against the rules in the emulator (as done for externals) and strip locked keys if needed.
+
+### R-091 Writes Silently Denied for Non-Privileged Users (P3)
+
+Evidence: `AdvertisementService.getActiveAdvertisements` marks expired ads with a Board-only write; `firestoreLogger` writes to admin-only `systemLogs`. Both fail for ordinary users (logged as warnings or silently).
+
+Recommended action: move these writes to an admin path or drop them for non-privileged users.

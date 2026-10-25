@@ -775,3 +775,33 @@
 风险：如果规则和 function 上线时没有这个索引，创建或邀请外部账号会在统计查询处失败。
 
 建议行动：发布 function 前，把 `firestore.indexes.json` 与 `firestore.rules` 一起部署，并等索引建好。
+
+### R-087 updateMember 曾把外部会员改成 MEMBER（P1，已解决）
+
+证据：`MembersService.updateMember` 对每个会员都会执行 `syncComputedMembershipType`；对 AFFILIATE / CHAPTER_ADMIN 会写入 `jciCareer.membershipType` 和 `role: 'MEMBER'`。本人更新（例如「Share my card」）因此被规则拒绝；管理员编辑则会悄悄把外部会员变成 KL 会员。
+
+解决（2026-10-25）：当前文档是外部角色时，`updateMember` 和 `batchUpdateMembers` 跳过会员类别重算和 GUEST→MEMBER 的会费初始化。规则测试 `tests/rules/externalSelfUpdate.rules.test.ts` 重放真实写入内容。同日检查正式数据库：6 个非 KL 会员文档仍是外部角色，没有 `jciCareer.membershipType`。
+
+### R-088 外部会员每个页面都出现权限错误（P1，已解决）
+
+证据：测试用分会管理人在正式环境产生约 90 条权限错误：顶部铃铛读取全部 communication 动态、列出通知（list 原本只限 B+）；福利页读取 promotionPackages；搜索框读取商家目录（getAllMembers）；登录时执行 KL 理事席位检查；个人资料页用的是旧版 MyProfileSelfView。
+
+解决（2026-10-25）：铃铛改为 `useCommunication({ loadPosts: false })`；notifications 的 list 规则允许已登录用户列出自己的通知（查询必须带 `where('memberId','==',uid)`），同时修好普通 KL 会员一直看不到通知的问题；福利页改为 `useAdvertisements({ loadPackages: false })`；搜索框对外部会员不加载商家目录；登录时对外部会员跳过理事席位检查。外部会员的个人资料改用 `MemberDetail`（只有基本资料分页）加 `ExternalSharingSettings`；KL 专用的加载由 `utils/externalAccess.ts` 的 `canRunLoader` / `KL_ONLY_LOADERS` 控制。
+
+### R-089 errorLogs 记录没有标签（P3）
+
+证据：`errorLoggingService.logError` 只保存 `component`、`action`、`additionalData`；只传 `{ context }` 的错误存进去时没有来源标签。
+
+建议行动：在 `errorLoggingService` 里把 `context` 映射到 `action`。
+
+### R-090 KL 会员在 MemberDetail 自行编辑可能被拒（P2，未验证）
+
+证据：MemberDetail 保存时会带上介绍人、参议员资格、国籍默认值（空时为 'Malaysia'），其中部分字段被本人更新规则锁定。修 R-088 时发现，尚未针对 KL 会员测试。
+
+建议行动：在模拟器里重放 KL 会员的自编辑写入（做法同外部会员），必要时剔除被锁定的字段。
+
+### R-091 非特权用户的部分写入被静默拒绝（P3）
+
+证据：`AdvertisementService.getActiveAdvertisements` 用只有理事能做的写入来标记过期广告；`firestoreLogger` 写入只限管理员的 `systemLogs`。普通用户这两处都会失败（只记为警告或无提示）。
+
+建议行动：把这些写入移到管理员路径，或对非特权用户不执行。
