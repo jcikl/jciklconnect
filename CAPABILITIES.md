@@ -34,7 +34,7 @@
 | `formatCurrency` | `utils/formatUtils.ts` | `components/modules/SponsorshipView.tsx:10`<br>`components/modules/ProjectManagement/ProjectReportGenerator.tsx:181` |
 | `formatDate` | `utils/dateUtils.ts` | `components/modules/Finance/BankMatchingModal.tsx:27`<br>`components/modules/MemberManagement/BoardTransitionTools.tsx:161` |
 | `formatDateTime` | `utils/dateUtils.ts` | `components/modules/ZoomBookingView.tsx:59` |
-| `getInitialsSvg` | `utils/avatarUtils.ts` | `components/layout/SearchDropdown.tsx:5`<br>`components/modules/CommunicationView.tsx:16`<br>`components/modules/HobbyClubsView.tsx:4`<br>`components/modules/BusinessDirectory/businessDirectoryUtils.ts:9`<br>`components/modules/Members/MemberCreateModal.tsx:4`<br>`components/modules/Members/MemberDetail.tsx:48`<br>`components/modules/Members/MemberDetailCareerTab.tsx:8`<br>`components/modules/Members/MemberTable.tsx:10`<br>`components/modules/Members/MentorMatchingModal.tsx:9` |
+| `getInitialsSvg` | `utils/avatarUtils.ts` | `components/layout/SearchDropdown.tsx:5`<br>`components/modules/CommunicationView.tsx:16`<br>`components/modules/HobbyClubsView.tsx:4`<br>`components/modules/BusinessDirectory/businessDirectoryUtils.ts:9`<br>`components/modules/Members/MemberCreateModal.tsx:4`<br>`components/modules/Members/MemberDetail.tsx:49`<br>`components/modules/Members/MemberDetailCareerTab.tsx:8`<br>`components/modules/Members/MemberTable.tsx:10`<br>`components/modules/Members/MentorMatchingModal.tsx:9` |
 | `isFuture` | `utils/dateUtils.ts` | `components/modules/ZoomBookingView.tsx:65` |
 
 ### 1.2 同一函數在多個元件各寫一份（應抽出到 utils）
@@ -75,7 +75,7 @@
 |---|---|
 | `services/financeService.ts` | 5,325 |
 | `services/pointsService.ts` | 2,492 |
-| `services/membersService.ts` | 2,329 |
+| `services/membersService.ts` | 2,338 |
 | `hooks/useFinanceData.ts` | 2,034 |
 | `services/inventoryService.ts` | 1,638 |
 
@@ -94,7 +94,7 @@
 | `memberCardsService.ts` | 136 | 9 | Member Cards Service — keeps `memberCards/{memberId}` (the public directory card, Phase 0 WP2) in sync with `members`. The card is written A… | MEMBER_CARDS |
 | `memberJourneyService.ts` | 155 | 2 | Leadership Journey + Trainer Pathway derivation (dashboard journey card for pre-2025 members) | — |
 | `memberStatsService.ts` | 319 | 2 | Member Statistics Service - Generates comprehensive member statistics and reports | — |
-| `membersService.ts` | 2,329 | 43 | Members Service - CRUD Operations | BOARD_MEMBERS, EVENT_REGISTRATIONS, MEMBERS, MEMBER_EMAILS, NOTIFICATIONS, PAYMENT_REQUESTS … |
+| `membersService.ts` | 2,338 | 43 | Members Service - CRUD Operations | BOARD_MEMBERS, EVENT_REGISTRATIONS, MEMBERS, MEMBER_EMAILS, NOTIFICATIONS, PAYMENT_REQUESTS … |
 | `membershipConfigService.ts` | 373 | 17 | ⚠️ 無說明 | SYSTEM_SETTINGS |
 | `mentorshipService.ts` | 638 | 4 | Mentorship Matching Service | MEMBERS, MENTORSHIP_FEEDBACK, MENTOR_MATCHES |
 | `promotionService.ts` | 1,191 | 4 | ⚠️ 無說明 | MANUAL_PROMOTION_REQUESTS, MEMBERS, PROMOTION_HISTORY, SYSTEM |
@@ -184,38 +184,38 @@
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `syncComputedMembershipType` | 99 | Recompute membershipType from profile + promotion (Full); always persisted on save. |
-| `invalidateMembersCache` | 126 | Invalidate all members cache (call after any write to members collection). |
-| `getAllMembers` | 134 | Get all members, optionally filtered by loId (for multi-LO). |
-| `getMemberById` | 179 | Get member by ID |
-| `recalculateIntroducerStats` | 201 | Helper to recalculate radar stats for an introducer (dynamic import to avoid circular dependency) |
-| `normalizeMemberData` | 248 | Helper to map flat properties to standard nested sub-objects (general, contact, etc.) for database consistency… |
-| `createMember` | 569 | Create new member. Caller should pass loId (or use DEFAULT_LO_ID for single-LO). |
-| `updateMember` | 650 | Update member. Sets updatedAt and optionally updatedBy (audit). |
-| `validateSenatorshipByBoard` | 870 | Board of Directors validates a member's senatorship number (locks future edits). |
-| `revokeSenatorshipValidation` | 896 | Revoke board validation (admin / board only). Clears certification. |
-| `deleteMember` | 990 | Delete member |
-| `searchMembers` | 1103 | Search members |
-| `getMembersByRole` | 1122 | Get members by role |
-| `getMemberByEmail` | 1153 | Get member by email (for account linking) |
-| `getMembersAtRisk` | 1194 | Get members at risk (churn prediction) |
-| `computeAttendanceMonths` | 1215 | 当年应计月份数：入会年份从入会月起算，否则从 1 月起算 |
-| `recalculateAttendance` | 1229 | 按当年 checked_in 记录重算出席对比（签到次数 vs 已过月份），写回会员档案 |
-| `updateMemberRole` | 1261 |  |
-| `assignMentor` | 1330 | Assign mentor |
-| `batchUpdateMembers` | 1353 | Batch update members — uses writeBatch for atomicity (E01) |
-| `batchDeleteMembers` | 1524 | Batch delete members — uses writeBatch for atomicity (E02) |
-| `getFirstMembershipYearKey` | 1692 | Earliest year key on member.jciCareer?.membershipDuesHistory (e.g. "2024"). |
-| `statusFromMembershipAmount` | 1705 |  |
-| `fixFirstMembershipDuesTo350` | 1723 | Set dues on each member's first membership year to RM350 and recalculate status from paid amount. SYNC-004 NOT… |
-| `getEffectiveJoinYear` | 1830 | Effective membership start year (calendar Oct rollover or first payment year). |
-| `inferMembershipType` | 1861 | Infer membershipType from role, senatorship, and membership[year].dues (Config rules). |
-| `batchSyncMembershipTypes` | 1884 | Batch-sync members.jciCareer?.membershipType from membership dues + role + Config. Does not modify members.jci… |
-| `batchSyncMembershipRecords` | 1996 | Batch-sync members.jciCareer?.membershipDuesHistory[year] from each member's membershipType + Membership Confi… |
-| `syncMembershipFromMembershipType` | 2212 |  |
-| `migrateMembershipTypeFullToOfficial` | 2219 | TEMP MIGRATION: membershipType 'Full' → 'Official' |
-| `migrateDobToGeneralDob` | 2254 | TEMP MIGRATION: copy root-level dateOfBirth/dob into general.dob for members missing it |
-| `getMembersPaginated` | 2296 | Cursor-based paginated member fetch (ordered by name). Pass `lastDoc` from the previous page's result to advan… |
+| `syncComputedMembershipType` | 100 | Recompute membershipType from profile + promotion (Full); always persisted on save. |
+| `invalidateMembersCache` | 127 | Invalidate all members cache (call after any write to members collection). |
+| `getAllMembers` | 135 | Get all members, optionally filtered by loId (for multi-LO). |
+| `getMemberById` | 180 | Get member by ID |
+| `recalculateIntroducerStats` | 202 | Helper to recalculate radar stats for an introducer (dynamic import to avoid circular dependency) |
+| `normalizeMemberData` | 249 | Helper to map flat properties to standard nested sub-objects (general, contact, etc.) for database consistency… |
+| `createMember` | 570 | Create new member. Caller should pass loId (or use DEFAULT_LO_ID for single-LO). |
+| `updateMember` | 651 | Update member. Sets updatedAt and optionally updatedBy (audit). |
+| `validateSenatorshipByBoard` | 877 | Board of Directors validates a member's senatorship number (locks future edits). |
+| `revokeSenatorshipValidation` | 903 | Revoke board validation (admin / board only). Clears certification. |
+| `deleteMember` | 997 | Delete member |
+| `searchMembers` | 1110 | Search members |
+| `getMembersByRole` | 1129 | Get members by role |
+| `getMemberByEmail` | 1160 | Get member by email (for account linking) |
+| `getMembersAtRisk` | 1201 | Get members at risk (churn prediction) |
+| `computeAttendanceMonths` | 1222 | 当年应计月份数：入会年份从入会月起算，否则从 1 月起算 |
+| `recalculateAttendance` | 1236 | 按当年 checked_in 记录重算出席对比（签到次数 vs 已过月份），写回会员档案 |
+| `updateMemberRole` | 1268 |  |
+| `assignMentor` | 1337 | Assign mentor |
+| `batchUpdateMembers` | 1360 | Batch update members — uses writeBatch for atomicity (E01) |
+| `batchDeleteMembers` | 1533 | Batch delete members — uses writeBatch for atomicity (E02) |
+| `getFirstMembershipYearKey` | 1701 | Earliest year key on member.jciCareer?.membershipDuesHistory (e.g. "2024"). |
+| `statusFromMembershipAmount` | 1714 |  |
+| `fixFirstMembershipDuesTo350` | 1732 | Set dues on each member's first membership year to RM350 and recalculate status from paid amount. SYNC-004 NOT… |
+| `getEffectiveJoinYear` | 1839 | Effective membership start year (calendar Oct rollover or first payment year). |
+| `inferMembershipType` | 1870 | Infer membershipType from role, senatorship, and membership[year].dues (Config rules). |
+| `batchSyncMembershipTypes` | 1893 | Batch-sync members.jciCareer?.membershipType from membership dues + role + Config. Does not modify members.jci… |
+| `batchSyncMembershipRecords` | 2005 | Batch-sync members.jciCareer?.membershipDuesHistory[year] from each member's membershipType + Membership Confi… |
+| `syncMembershipFromMembershipType` | 2221 |  |
+| `migrateMembershipTypeFullToOfficial` | 2228 | TEMP MIGRATION: membershipType 'Full' → 'Official' |
+| `migrateDobToGeneralDob` | 2263 | TEMP MIGRATION: copy root-level dateOfBirth/dob into general.dob for members missing it |
+| `getMembersPaginated` | 2305 | Cursor-based paginated member fetch (ordered by name). Pass `lastDoc` from the previous page's result to advan… |
 
 </details>
 
@@ -1313,14 +1313,14 @@
 | Hook 檔案 | 行數 | 引用 | Export | 依賴 Service | 說明 |
 |---|---|---|---|---|---|
 | `useActivityPlans.ts` | 130 | 1 | `useActivityPlans` | activityPlansService | ⚠️ 無說明 |
-| `useAdvertisements.ts` | 110 | 2 | `useAdvertisements` | advertisementService, errorLoggingService | Advertisements Data Hook |
+| `useAdvertisements.ts` | 111 | 2 | `useAdvertisements` | advertisementService, errorLoggingService | Advertisements Data Hook |
 | `useAppNavigation.ts` | 239 | 1 | `useAppNavigation` | — | ⚠️ 無說明 |
-| `useAuth.tsx` | 804 | 58 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, memberCardsService, membersService, mockData | Authentication Hook |
+| `useAuth.tsx` | 807 | 58 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, memberCardsService, membersService, mockData | Authentication Hook |
 | `useAutomation.ts` | 149 | 3 | `useAutomation` | automationService | useAutomation Hook - Manage automation workflows and rules |
-| `useBusinessDirectory.ts` | 48 | 4 | `useBusinessDirectory` | businessDirectoryService | ⚠️ 無說明 |
+| `useBusinessDirectory.ts` | 51 | 4 | `useBusinessDirectory` | businessDirectoryService | ⚠️ 無說明 |
 | `useChapterBirthdays.ts` | 23 | 1 | `useChapterBirthdays` | chapterBirthdaysService | Own-chapter birthdays for an active external user (dashboard birthday widget). `month` null → nothing loads. |
 | `useChapterMembers.ts` | 75 | 2 | `useChapterMembers`, `usePendingKlApprovals` | externalAccountsService | Chapter roster for an active CHAPTER_ADMIN (own chapter) and the KL approval queue (pending_kl, KL admins). Status changes / invites go thro… |
-| `useCommunication.ts` | 118 | 2 | `useCommunication` | communicationService | Communication Data Hook |
+| `useCommunication.ts` | 123 | 2 | `useCommunication` | communicationService | Communication Data Hook |
 | `useEvents.ts` | 191 | 8 | `useEvents` | errorLoggingService, eventsService, membersService | Events Data Hook |
 | `useExternalAccounts.ts` | 46 | 1 | `useExternalAccounts` | externalAccountsService, membersService | External (sister-chapter) account actions for components: create chapter admins, invite, status, resend. |
 | `useFinanceData.ts` | 2,034 | 4 | `useFinanceData` | errorLoggingService, financeService, inventoryService, membersService, membershipConfigService, paymentRequestService, projectFinancialService, projectsService | TODO (PERF-A-004): This hook has ~90 useState declarations, causing full FinanceView re-renders on any state update. Planned refactor: split… |
@@ -1463,15 +1463,16 @@
 | `isDevMode` | 12 |  |
 | `withDevMode` | 29 | Service helper: returns mock data in dev mode, calls the real async loader in production. Eliminates the repet… |
 
-### `utils/externalAccess.ts` （75 行，9 處引用）
+### `utils/externalAccess.ts` （122 行，13 處引用）
 
 | 函數 | 行 | 說明 |
 |---|---|---|
 | `isExternalRole` | 13 |  |
 | `EXTERNAL_ALLOWED_VIEWS` | 28 | Active externals, per role. CHAPTER_ADMIN also gets MY_CHAPTER (approvals / members / invite of own chapter). |
-| `getExternalAllowedViews` | 43 | Views an external may open, or null when the role is not external (= no whitelist applies). A missing affiliat… |
-| `isViewAllowedForRole` | 52 | True when `view` may be opened. Non-external roles are unrestricted here (their own rules still apply). |
-| `getExternalStatusMessage` | 61 |  |
+| `canRunLoader` | 60 | False when `loader` is KL-only and the viewer's role is external. KL roles run every loader. |
+| `getExternalAllowedViews` | 90 | Views an external may open, or null when the role is not external (= no whitelist applies). A missing affiliat… |
+| `isViewAllowedForRole` | 99 | True when `view` may be opened. Non-external roles are unrestricted here (their own rules still apply). |
+| `getExternalStatusMessage` | 108 |  |
 
 ### `utils/fetchWithTimeout.ts` （31 行，4 處引用）
 > ERR-R-005: fetch wrapper that aborts after `ms` milliseconds. Netlify functions on the free plan time out server-side after 10 s, but the br…
@@ -1594,7 +1595,7 @@
 | `Card.tsx` | 77 | 1 | `Card`, `StatCardsContainer` |
 | `ColumnFilterHeader.tsx` | 118 | 2 | `ColumnFilterHeader` |
 | `Combobox.tsx` | 255 | 11 | `Combobox` |
-| `Common.tsx` | 26 | 233 | — |
+| `Common.tsx` | 26 | 234 | — |
 | `ConfirmDialog.tsx` | 100 | 2 | `ConfirmDialog`, `CONFIRM_CLOSED` |
 | `DataTable.tsx` | 172 | 0 | `DataTable` |
 | `Drawer.tsx` | 139 | 2 | `Drawer` |
@@ -1602,7 +1603,7 @@
 | `ErrorBoundary.tsx` | 261 | 3 | `ErrorFallback`, `SectionErrorFallback`, `ErrorBoundary`, `AsyncErrorBoundary`, `withErrorBoundary`, `useErrorHandler` |
 | `FilterDrawer.tsx` | 65 | 1 | `FilterDrawer` |
 | `FirstUseBanner.tsx` | 82 | 2 | `FirstUseBanner` |
-| `Form.tsx` | 502 | 98 | `Input`, `Select`, `Textarea`, `Checkbox`, `RadioGroup`, `ButtonGroup` |
+| `Form.tsx` | 502 | 99 | `Input`, `Select`, `Textarea`, `Checkbox`, `RadioGroup`, `ButtonGroup` |
 | `IntroducerSelector.tsx` | 338 | 6 | `IntroducerSelector` |
 | `LedgerTable.tsx` | 183 | 1 | `LedgerTable` |
 | `Loading.tsx` | 47 | 31 | `LoadingSpinner`, `LoadingOverlay` |

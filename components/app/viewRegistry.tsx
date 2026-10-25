@@ -124,7 +124,7 @@ export const renderAppView = (view: ViewType, context: AppViewRenderContext): Re
         return wrapErrorBoundary(<ChapterAdminView />, 'My Chapter');
       }
       if (view === 'MEMBERS') {
-        return wrapErrorBoundary(<ExternalSelfProfile />, '个人资料');
+        return wrapErrorBoundary(<ExternalSelfProfile onBack={() => onNavigate('DASHBOARD')} />, '个人资料');
       }
     } else if (externalStatus !== 'active') {
       return <ExternalAccessNotice status={externalStatus} />;

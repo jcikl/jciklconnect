@@ -37,6 +37,53 @@ export const EXTERNAL_INACTIVE_VIEWS: readonly ViewType[] = ['MEMBERS'];
 export const EXTERNAL_DASHBOARD_WIDGETS = ['birthdays', 'partners', 'events', 'profile'] as const;
 
 /**
+ * Data loads that read KL-only collections (firestore.rules deny them to externals, or they only feed
+ * UI externals never see). For an external viewer they must not run.
+ * - allHobbyClubs: every club (externals may only list openToExternals clubs → getClubsForExternal)
+ * - memberBoardPositions: KL board / commission-director records (JCI Career tab)
+ * - introducerProjects: projects list for the KL introducer picker
+ * - memberActivities: projects / sponsorships / RegistrationHistory / members list (Activities tab)
+ * - businessDirectory: BusinessDirectoryService.getAllBusinesses (built from the KL members list; search dropdown)
+ * - boardSync: useAuth's KL board-seat self-heal at sign-in (boardMembers + a jciCareer write)
+ */
+export const KL_ONLY_LOADERS = [
+  'allHobbyClubs',
+  'memberBoardPositions',
+  'introducerProjects',
+  'memberActivities',
+  'businessDirectory',
+  'boardSync',
+] as const;
+export type KlOnlyLoader = typeof KL_ONLY_LOADERS[number];
+
+/** False when `loader` is KL-only and the viewer's role is external. KL roles run every loader. */
+export const canRunLoader = (role: UserRole | string | null | undefined, loader: KlOnlyLoader): boolean =>
+  !isExternalRole(role) || !KL_ONLY_LOADERS.includes(loader);
+
+/** MemberDetail tabs an external sees on their own profile (JCI Career and Activities are KL records). */
+export const EXTERNAL_PROFILE_TABS = ['basic'] as const;
+
+/**
+ * Keys of MemberDetail's profile save that an external must not send: KL-only fields (introducer, join date,
+ * membership type, senatorship) and fields their self-update rule locks (role, nationality, ID number,
+ * date of birth — the date of birth is set once through the profile's sharing card instead).
+ */
+const EXTERNAL_SELF_DROPPED_KEYS = [
+  'role', 'membershipType', 'introducer', 'joinDate', 'jciCareer.joinDate',
+  'senatorshipId', 'senatorCertified', 'senatorshipBoardValidated',
+  'senatorshipValidatedBy', 'senatorshipValidatedAt',
+  'jciCareer.senatorshipValidatedBy', 'jciCareer.senatorshipValidatedAt',
+  'idNumber', 'nationality', 'dateOfBirth', 'general.dob',
+];
+
+/** Copy of a MemberDetail profile save without the keys an external may not write (see above). */
+export const toExternalSelfUpdate = <T extends Record<string, unknown>>(updates: T): Partial<T> => {
+  const out: Record<string, unknown> = { ...updates };
+  for (const key of EXTERNAL_SELF_DROPPED_KEYS) delete out[key];
+  return out as Partial<T>;
+};
+
+/**
  * Views an external may open, or null when the role is not external (= no whitelist applies).
  * A missing affiliation status is treated as not active (fail closed).
  */

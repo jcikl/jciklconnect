@@ -67,6 +67,8 @@ interface MemberDetailBasicTabProps {
   handleInlineAvatarUpload: (event: React.ChangeEvent<HTMLInputElement>) => void;
   resolveIntroducerDisplay: (introVal?: string) => string;
   isSelfView?: boolean;
+  /** External member's own profile: hide KL-only / rule-locked fields (ID number, date of birth, nationality, introducer). */
+  hideKlOnlyFields?: boolean;
   activeInlineEditCard?: string | null;
 }
 
@@ -86,7 +88,7 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
     isAdmin, isDeveloper, canViewSensitiveFields,
     loadingClubs, memberClubs, members, allProjects,
     avatarUploading, avatarUploadProgress, handleInlineAvatarUpload,
-    resolveIntroducerDisplay, isSelfView = false, activeInlineEditCard,
+    resolveIntroducerDisplay, isSelfView = false, hideKlOnlyFields = false, activeInlineEditCard,
   } = props;
 
   const { showToast } = useToast();
@@ -214,6 +216,7 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                       <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Full Name (ID)</label>
                       <input type="text" value={inlineValues.fullName ?? ''} onChange={e => setInlineValues({ ...inlineValues, fullName: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
                     </div>
+                    {!hideKlOnlyFields && (<>
                     <div>
                       <label className="text-slate-500 block text-xs uppercase font-medium mb-1">ID Number</label>
                       {canViewSensitiveFields ? (
@@ -237,6 +240,7 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                       <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Nationality</label>
                       <Combobox options={nationalityOptionsForValue(inlineValues.nationality)} value={inlineValues.nationality ?? ''} onChange={val => setInlineValues({ ...inlineValues, nationality: val })} placeholder="Select nationality..." />
                     </div>
+                    </>)}
                     <div>
                       <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Birth Place</label>
                       <input type="text" value={inlineValues.birthPlace ?? ''} onChange={e => setInlineValues({ ...inlineValues, birthPlace: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20" />
@@ -270,10 +274,12 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                         ))}
                       </div>
                     </div>
+                    {!hideKlOnlyFields && (
                     <div className="col-span-2">
                       <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Introducer</label>
                       <IntroducerSelector value={inlineValues.introducer ?? ''} onChange={val => setInlineValues({ ...inlineValues, introducer: val })} members={members} projects={allProjects} />
                     </div>
+                    )}
                   </div>
                   <div className="border-t pt-3">
                     <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Personal Biography</label>
@@ -346,10 +352,12 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                       <p className="font-medium text-slate-900 capitalize">{member.general?.dietaryPreference || 'Not provided'}</p>
                     </div>
                   </div>
+                  {!hideKlOnlyFields && (
                   <div className="border-t pt-3">
                     <span className="text-slate-500 block text-xs uppercase font-medium mb-1">Introducer</span>
                     <p className="text-sm font-medium text-slate-900">{resolveIntroducerDisplay(member.jciCareer?.introducer)}</p>
                   </div>
+                  )}
                   <div className="border-t pt-3">
                     <span className="text-slate-500 block text-xs uppercase font-medium mb-1">Personal Biography</span>
                     <p className="text-sm text-slate-600 line-clamp-4 italic">{member.others?.bio || 'No biography provided.'}</p>

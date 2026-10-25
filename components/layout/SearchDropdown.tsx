@@ -12,6 +12,7 @@ import { useEvents } from '../../hooks/useEvents';
 import { useProjects } from '../../hooks/useProjects';
 import { useBusinessDirectory } from '../../hooks/useBusinessDirectory';
 import { usePermissions } from '../../hooks/usePermissions';
+import { canRunLoader } from '../../utils/externalAccess';
 import { ViewType } from '../../types';
 
 type SearchDropdownProps = {
@@ -28,12 +29,15 @@ export const SearchDropdown: React.FC<SearchDropdownProps> = (props) =>
 
 const SearchDropdownContent: React.FC<SearchDropdownProps> = ({ isOpen, onClose, searchQuery, onNavigate }) => {
   // External users may only search whitelisted modules (utils/externalAccess.ts): no members / projects.
-  const { externalAllowedViews } = usePermissions();
+  const { externalAllowedViews, effectiveRole } = usePermissions();
+  // The business directory list is built from the KL members list (denied to externals); their
+  // DIRECTORY is the card-only international network, which search does not cover.
+  const canLoadBusinesses = canRunLoader(effectiveRole, 'businessDirectory');
   const canSearch = (v: ViewType) => !externalAllowedViews || externalAllowedViews.includes(v);
   const { members } = useMembers();
   const { events } = useEvents();
   const { projects } = useProjects({ enabled: !externalAllowedViews });
-  const { businesses } = useBusinessDirectory();
+  const { businesses } = useBusinessDirectory({ enabled: canLoadBusinesses });
 
   const q = searchQuery.toLowerCase().trim();
   const filteredMembers = q && !externalAllowedViews ? members.filter(m =>
@@ -45,7 +49,7 @@ const SearchDropdownContent: React.FC<SearchDropdownProps> = ({ isOpen, onClose,
   const filteredProjects = q && !externalAllowedViews ? projects.filter(p =>
     (p.name || '').toLowerCase().includes(q)
   ).slice(0, 3) : [];
-  const filteredBusinesses = q && canSearch('DIRECTORY') ? businesses.filter(b =>
+  const filteredBusinesses = q && canSearch('DIRECTORY') && canLoadBusinesses ? businesses.filter(b =>
     (b.companyName || '').toLowerCase().includes(q) || (b.industry || '').toLowerCase().includes(q)
   ).slice(0, 3) : [];
 

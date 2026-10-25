@@ -30,6 +30,7 @@ import { retryOnPermissionDenied } from '../utils/retryOnPermissionDenied';
 import { buildSelfSignUpMember, buildExternalSignUpMember, type ExternalSignUpInput } from '../utils/signUpPayload';
 import { MemberCardsService } from '../services/memberCardsService';
 import { applyMergeUpdates } from '../utils/memberCard.mjs';
+import { canRunLoader } from '../utils/externalAccess';
 
 interface AuthContextType {
   user: User | null;
@@ -171,7 +172,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
 
             if (memberData && isMounted && !checkDevMode()) {
-              try {
+              // KL board self-heal: never for externals (no KL board seat; its fix-up write touches
+              // jciCareer, which their self-update rule locks).
+              if (canRunLoader(memberData.role, 'boardSync')) try {
                 const boardSync = await BoardManagementService.ensureMemberBoardFieldsSynced(memberData);
                 if (boardSync) {
                   memberData = { ...memberData, ...boardSync };

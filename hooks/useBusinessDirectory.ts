@@ -4,13 +4,16 @@ import { BusinessProfile } from '../types';
 import { useToast } from '../components/ui/Common';
 import { useAuth } from './useAuth';
 
-export const useBusinessDirectory = () => {
+/** @param options.enabled false skips the list load (e.g. external members: it reads the KL members list). */
+export const useBusinessDirectory = (options?: { enabled?: boolean }) => {
+  const enabled = options?.enabled ?? true;
   const { member, user } = useAuth();
   const { showToast } = useToast();
 
   const { data: businesses, loading, error, reload: loadBusinesses } = useFirestoreCollection<BusinessProfile>({
     loader: () => BusinessDirectoryService.getAllBusinesses(!user),
-    deps: [!!user],
+    enabled,
+    deps: [!!user, enabled],
   });
 
   const searchBusinesses = async (searchTerm: string) => {

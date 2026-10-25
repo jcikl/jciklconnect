@@ -40,7 +40,7 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
   const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
 
   const [recordedImpressions, setRecordedImpressions] = useState<Set<string>>(new Set());
-  const { advertisements, loading, error, recordClick, recordImpression, getBenefitUsageHistory } = useAdvertisements();
+  const { advertisements, loading, error, recordClick, recordImpression, getBenefitUsageHistory } = useAdvertisements({ loadPackages: false });
   const { member } = useAuth();
   const { members, updateMember } = useMembers();
   const { showToast } = useToast();
