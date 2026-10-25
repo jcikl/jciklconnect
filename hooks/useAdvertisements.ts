@@ -5,7 +5,8 @@ import { AdvertisementService, Advertisement, PromotionPackage } from '../servic
 import { useToast } from '../components/ui/Common';
 import { errorLoggingService } from '../services/errorLoggingService';
 
-export const useAdvertisements = () => {
+/** loadPackages: false skips promotion packages (not needed by the Benefits page; denied to external members). */
+export const useAdvertisements = ({ loadPackages = true }: { loadPackages?: boolean } = {}) => {
   const { showToast } = useToast();
   const isSubmittingRef = useRef(false);
 
@@ -13,7 +14,7 @@ export const useAdvertisements = () => {
     useFirestoreCollection<Advertisement>({ loader: () => AdvertisementService.getAllAdvertisements() });
 
   const { data: packages, loading: pkgsLoading, error: pkgsError, reload: reloadPackages } =
-    useFirestoreCollection<PromotionPackage>({ loader: () => AdvertisementService.getPromotionPackages() });
+    useFirestoreCollection<PromotionPackage>({ loader: () => AdvertisementService.getPromotionPackages(), enabled: loadPackages });
 
   const loading = adsLoading || pkgsLoading;
   const error = adsError || pkgsError;
