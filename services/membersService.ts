@@ -28,6 +28,7 @@ import { logError as logServiceError, errorLoggingService } from './errorLogging
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { COLLECTIONS, DEFAULT_LO_ID } from '../config/constants';
 import { isCrossLoDeleteBlocked } from '../utils/memberScope';
+import { isExternalRole } from '../utils/externalAccess';
 import {
   Member,
   MemberCreateInput,
@@ -701,13 +702,19 @@ export class MembersService {
         }
       }
 
-      updates = {
-        ...updates,
-        ...(await this.syncComputedMembershipType(updates, currentData)),
-      };
+      // External members (AFFILIATE / CHAPTER_ADMIN) have no KL membership type: never recompute it, never
+      // derive a KL role from it, never initialise KL dues. (Their self-update rule locks jciCareer and role,
+      // so the recompute made e.g. "Share my card" fail, and an admin edit would have turned them into MEMBER.)
+      const isExternalDoc = isExternalRole(currentData?.role);
+      if (!isExternalDoc) {
+        updates = {
+          ...updates,
+          ...(await this.syncComputedMembershipType(updates, currentData)),
+        };
+      }
 
       // Check for GUEST -> MEMBER transition to initialize membership record (if not already handled by caller)
-      if (updates.role === UserRole.MEMBER && !updates.jciCareer?.membershipDuesHistory) {
+      if (!isExternalDoc && updates.role === UserRole.MEMBER && !updates.jciCareer?.membershipDuesHistory) {
         if (currentData) {
           // If moving from GUEST (or no role) to MEMBER
           if (currentData.role === UserRole.GUEST || !currentData.role) {
@@ -1407,6 +1414,8 @@ export class MembersService {
         await Promise.all(
           memberIds.map(async id => {
             const existing = existingByIds.get(id) ?? null;
+            // Same as updateMember: external members get no KL membership type / role recompute.
+            if (isExternalRole(existing?.role)) return;
             const patch = await this.syncComputedMembershipType(updates, existing);
             membershipTypePatchMap.set(id, patch);
           })
