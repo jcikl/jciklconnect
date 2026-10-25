@@ -80,7 +80,7 @@
 | business.companyDescription | string | — | | companyDescription | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | `publicBusinessListings.description` fallback |
 | business.interestedIndustries | string[] | — | | interestedIndustries | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | Business Directory 匹配与行业筛选 |
 | business.idealReferralTypes | string[] | — | 旧版类型字段；应用内无表单写入，读取时同样经 `normalizeIdealReferrals` | idealReferralTypes | 系统: `normalizeMemberData` 仅透传 `data.business.idealReferralTypes`；`scripts/migrateMemberFields.mjs`（旧平铺迁移）；`scripts/normalizeIdealReferrals.mjs` 清理 | `publicBusinessListings.idealReferralTypes`；`memberCards.idealReferrals`（优先来源，`buildMemberCard` 复制，`syncCards` 自动回写） |
-| business.bookmarkedBusinessIds | string[] | — | | bookmarkedBusinessIds | 角色: 自己(非锁定字段) 或 B+；系统: Business Directory 收藏操作 | Business Directory 书签状态 |
+| business.bookmarkedBusinessIds | string[] | — | 收藏的成员 ID（本地商家 ID 与 `memberCards` ID 都等于成员 ID） | bookmarkedBusinessIds | 角色: 自己(非锁定字段，含外部会员) 或 B+；系统: Business Directory 收藏操作（`useBusinessBookmarks` → `useAuth.updateMemberProfile`） | Business Directory 书签状态与「Bookmarked」标签（本地商家与名片都可收藏） |
 | jciCareer | object | — | JCI 会员生涯 nested object |  | 会员、财务、董事会及晋升服务 | 权限判断、会员统计、晋升与会费流程 |
 | jciCareer.membershipType | enum | ✓ | `Guest` \| `Probation` \| `Official` \| `Honorary` \| `Senator` \| `Visiting` \| `Associate` | membershipType | 角色: B+；系统: 注册/审批/晋升/会费同步/导入 | `members.role` 推导；会费记录同步依据 |
 | jciCareer.membershipStatus | enum | ✓ | `paid_due` \| `unpaid_due` \| `terminated` \| `pending` \| `paid` \| `overdue` \| `partial` \| `over paid` |  | 角色: B+；系统: membership/finance sync | 会员状态过滤、权限判断、会费仪表盘 |
@@ -173,7 +173,7 @@
 > **TS Interface:** `MemberCard`（`types/member.ts`） | **Constants key:** `COLLECTIONS.MEMBER_CARDS`（`'memberCards'`） | **Doc ID:** 等于 `members` 文档 ID
 > 目录安全的公开名片，不含 PII。它是外部用户能读到的其他人资料的唯一来源（见 `SCHEMA-PERMISSIONS.md`）。
 > **来：** 由 `MemberCardsService.syncCards`（`services/memberCardsService.ts`）写入，`membersService` 在成员写入成功之后调用（create / update / 软删除 / 角色变更 / 批量更新），`hooks/useAuth` `updateMemberProfile` 在自己的资料保存后也调用（Phase 1）；卡片写入失败只记日志、不回滚成员写入。另有 `netlify/functions/external-accounts`（Admin SDK）：创建账号时随成员文档同批写入，`setStatus` 时同批写入或删除（`shouldHaveCard`）；`scripts/backfillMemberCards.mjs --apply` 回填。卡片构建逻辑在 `utils/memberCard.mjs`（`buildMemberCard`，`shouldHaveCard`，`planCardSync`）。
-> **往：** 国际目录经 `hooks/useSisterChapterMembers` 读取：外部用户在 `InternationalNetworkTab`、KL 用户在 `BusinessDirectoryView`（与本地商家合并为同一列表、同一筛选面板，`components/modules/BusinessDirectory/directoryFacets.ts`）；外部用户读 `international == true` 的卡（含已开放的 KL 卡）加本分会的卡；卡片没有联系方式字段，外部目录不提供 Contact。读取范围由 firestore.rules 决定（`externalCanReadCard`、`isActiveMember`、`canReadOrgMembers`）。外部用户的生日列表不读 `memberCards`，走 `netlify/functions/chapter-birthdays`。
+> **往：** 国际目录经 `hooks/useSisterChapterMembers` 读取：KL 用户与外部用户都在 `BusinessDirectoryView`（同一布局与筛选面板，`components/modules/BusinessDirectory/directoryFacets.ts`；KL 用户与本地商家合并为同一列表，外部用户为 `cardsOnly` 模式，只有卡片）；外部用户读 `international == true` 的卡（含已开放的 KL 卡）加本分会的卡；卡片没有联系方式字段，外部目录不提供 Contact。读取范围由 firestore.rules 决定（`externalCanReadCard`、`isActiveMember`、`canReadOrgMembers`）。外部用户的生日列表不读 `memberCards`，走 `netlify/functions/chapter-birthdays`。
 > 卡片只在 `shouldHaveCard` 为真时存在：role `MEMBER` / `BOARD` / `ADMIN` / `SUPER_ADMIN`，或 active 外部会员；GUEST / INACTIVE 与软删除的成员没有卡。
 
 | 字段路径 | 类型 | 必填 | 枚举值 / 说明 | 平铺冗余字段（等待替换） | 来 | 往 |

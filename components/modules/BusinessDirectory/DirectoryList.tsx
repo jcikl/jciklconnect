@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bookmark, Gift, Globe, LayoutList, Lock, Search, Send, SlidersHorizontal, Star } from 'lucide-react';
+import { Bookmark, Gift, Globe, Info, LayoutList, Lock, Search, Send, SlidersHorizontal, Star } from 'lucide-react';
 import { Button } from '../../ui/Common';
 import { LoadingState } from '../../ui/Loading';
 import { ShareCardNotice } from './ShareCardNotice';
@@ -16,6 +16,8 @@ interface DirectoryListProps {
   loading: boolean;
   error?: string | null;
   isGuest: boolean;
+  /** The viewer's own chapter name; items from any other chapter show a chapter chip. */
+  homeChapter?: string;
   searchTerm: string;
   onSearchTermChange: (value: string) => void;
   activeFiltersCount: number;
@@ -36,14 +38,14 @@ interface DirectoryListProps {
 
 const chip = 'text-[10px] font-semibold border rounded-full';
 
-/** Tags shared by the mobile row and the desktop card. */
-const ItemTags: React.FC<{ item: DirectoryItem; size: 'row' | 'card' }> = ({ item, size }) => {
+/** Tags shared by the mobile row and the desktop card; the same for every source. */
+const ItemTags: React.FC<{ item: DirectoryItem; size: 'row' | 'card'; homeChapter?: string }> = ({ item, size, homeChapter }) => {
   const pad = size === 'row' ? 'px-1.5 py-0.5' : 'px-2 py-0.5';
   return (
     <>
-      {item.source === 'sister' && <span className={`${chip} ${pad} bg-emerald-50 text-emerald-700 border-emerald-100`}>{item.chapter}{item.country ? ` · ${item.country}` : ''}</span>}
       {item.industry && <span className={`${chip} ${pad} bg-sky-50 text-sky-700 border-sky-100`}>{item.industry}</span>}
-      {item.source === 'local' && item.acceptsInternationalBusiness && <span className={`${chip} ${pad} bg-emerald-50 text-emerald-700 border-emerald-100 flex items-center gap-0.5`}><Globe size={9} /> Intl</span>}
+      {item.chapter && item.chapter !== homeChapter && <span className={`${chip} ${pad} bg-slate-50 text-slate-600 border-slate-200`}>{item.chapter}{item.country ? ` · ${item.country}` : ''}</span>}
+      {item.acceptsInternationalBusiness && <span className={`${chip} ${pad} bg-emerald-50 text-emerald-700 border-emerald-100 flex items-center gap-0.5`}><Globe size={9} /> Intl</span>}
       {item.hasDeal && <span className={`${chip} ${pad} bg-amber-50 text-amber-700 border-amber-100 flex items-center gap-0.5`}><Gift size={9} /> Deal</span>}
     </>
   );
@@ -55,6 +57,7 @@ export const DirectoryList: React.FC<DirectoryListProps> = ({
   loading,
   error,
   isGuest,
+  homeChapter,
   searchTerm,
   onSearchTermChange,
   activeFiltersCount,
@@ -78,7 +81,7 @@ export const DirectoryList: React.FC<DirectoryListProps> = ({
       ? items.filter(i => getScore(i) === 1)
       : items.filter(i => getScore(i) === 2);
 
-  const bookmarkButton = (item: DirectoryItem, size: number, extraCls: string) => item.source === 'local' && (
+  const bookmarkButton = (item: DirectoryItem, size: number, extraCls: string) => (
     <button
       type="button"
       className={`flex-shrink-0 rounded-lg transition-colors hover:bg-slate-100 ${extraCls}`}
@@ -195,14 +198,12 @@ export const DirectoryList: React.FC<DirectoryListProps> = ({
                               </div>
                               <p className="text-xs text-slate-500 truncate">{[item.position, item.company].filter(Boolean).join(' · ')}</p>
                               <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                                <ItemTags item={item} size="row" />
+                                <ItemTags item={item} size="row" homeChapter={homeChapter} />
                               </div>
                             </div>
                             {isGuest
                               ? <Lock size={13} className="text-slate-300 flex-shrink-0" />
-                              : item.source === 'local'
-                                ? bookmarkButton(item, 16, 'p-1.5')
-                                : <svg className="w-4 h-4 text-slate-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>}
+                              : bookmarkButton(item, 16, 'p-1.5')}
                           </div>
                         </React.Fragment>
                       );
@@ -288,7 +289,7 @@ export const DirectoryList: React.FC<DirectoryListProps> = ({
                       </div>
                       <div className="p-4 flex-1 flex flex-col gap-3">
                         <div className="flex flex-wrap gap-1.5">
-                          <ItemTags item={item} size="card" />
+                          <ItemTags item={item} size="card" homeChapter={homeChapter} />
                         </div>
                         {item.description ? (
                           <p className="text-xs text-slate-500 line-clamp-2 flex-1 leading-relaxed">{item.description}</p>
@@ -297,13 +298,12 @@ export const DirectoryList: React.FC<DirectoryListProps> = ({
                         )}
                         {item.hasDeal && (
                           <div className="bg-amber-50 rounded-lg px-3 py-2 border border-amber-100">
-                            <p className="text-[10px] font-black text-amber-700 uppercase tracking-wider mb-0.5 flex items-center gap-1"><Gift size={9} /> {item.source === 'local' ? 'Member Deal' : 'Sister Deal'}</p>
+                            <p className="text-[10px] font-black text-amber-700 uppercase tracking-wider mb-0.5 flex items-center gap-1"><Gift size={9} /> Member Deal</p>
                             <p className="text-[11px] text-amber-800 line-clamp-2 leading-snug">{item.dealSummary}</p>
                           </div>
                         )}
                       </div>
-                      {item.source === 'local' && (
-                        <div className="px-4 pb-4">
+                      <div className="px-4 pb-4">
                           {isGuest ? (
                             <button
                               className="w-full bg-slate-100 text-slate-400 text-xs font-bold py-2 rounded-lg flex items-center justify-center gap-1.5 relative overflow-hidden group/lock"
@@ -318,11 +318,10 @@ export const DirectoryList: React.FC<DirectoryListProps> = ({
                               className="w-full bg-jci-blue text-white text-xs font-bold py-2 rounded-lg hover:bg-jci-blue/90 transition-colors flex items-center justify-center gap-1.5"
                               onClick={(e) => { e.stopPropagation(); onItemOpen(item); }}
                             >
-                              <Send size={11} /> Contact
+                              {item.source === 'local' ? <><Send size={11} /> Contact</> : <><Info size={11} /> View Details</>}
                             </button>
                           )}
-                        </div>
-                      )}
+                      </div>
                     </div>
                   </React.Fragment>
                 );
