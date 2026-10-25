@@ -81,6 +81,7 @@ vi.mock('../../services/memberCardsService', () => ({
 }));
 
 import { MembersService } from '../../services/membersService';
+import { toExternalSelfUpdate } from '../../utils/externalAccess';
 
 function toValue(v: unknown): Record<string, unknown> {
   if (v instanceof FakeTimestamp) return { timestampValue: v.iso };
@@ -107,15 +108,34 @@ function authHeader(uid: string): Record<string, string> {
   };
   return { Authorization: `Bearer ${b64({ alg: 'none', typ: 'JWT' })}.${b64(payload)}.` };
 }
-/** Same semantics as updateDoc(ref, data): each top-level key of `data` replaces that field. */
+/**
+ * Same semantics as updateDoc(ref, data): each key replaces that field; a dotted key ('general.birthPlace')
+ * is a nested field path, overlaid on the map of the same name when both are sent (as the SDK does).
+ */
 async function patch(uid: string, path: string, data: Record<string, unknown>, fullReplace = false): Promise<number> {
+  const nested: Record<string, unknown> = {};
+  const paths: string[] = [];
+  for (const [key, value] of Object.entries(data)) {
+    const parts = key.split('.');
+    let node = nested;
+    for (const p of parts.slice(0, -1)) {
+      if (typeof node[p] !== 'object' || node[p] === null) node[p] = {};
+      node = node[p] as Record<string, unknown>;
+    }
+    const leaf = parts[parts.length - 1];
+    node[leaf] = (typeof value === 'object' && value !== null && !Array.isArray(value) && !(value instanceof FakeTimestamp)
+      && typeof node[leaf] === 'object' && node[leaf] !== null) ? { ...(node[leaf] as object), ...(value as object) } : value;
+    paths.push(key);
+  }
+  // Drop mask paths already covered by a parent path in the mask (the parent's value carries them).
+  const mask = paths.filter(p => !paths.some(q => q !== p && p.startsWith(`${q}.`)));
   const res = await fetch(`${BASE}:commit`, {
     method: 'POST',
     headers: { ...authHeader(uid), 'Content-Type': 'application/json' },
     body: JSON.stringify({
       writes: [{
-        update: { name: `${ROOT}/${path}`, fields: toFields(data) },
-        ...(fullReplace ? {} : { updateMask: { fieldPaths: Object.keys(data).map(k => `\`${k}\``) } }),
+        update: { name: `${ROOT}/${path}`, fields: toFields(nested) },
+        ...(fullReplace ? {} : { updateMask: { fieldPaths: mask } }),
       }],
     }),
   });
@@ -147,6 +167,36 @@ describe.skipIf(!HOST)('firestore.rules — external "Share my card" through Mem
     const payload = await updateMemberPayload('chOpt', { privacy: { shareCardInternationally: true } });
     expect(await patch('chOpt', 'members/chOpt', payload)).toBe(200);
     expect(payload).not.toHaveProperty('role');
+  });
+
+  // MemberDetail handleGlobalSave payload for an external editing their own profile (startInlineEdit
+  // defaults: nationality 'Malaysia' when empty, '' for id number / dob / introducer / senatorship).
+  const globalSave = (extra: Record<string, unknown> = {}) => ({
+    avatar: '', avatarUrl: '', name: 'Ann', fullName: 'Ann Tan', idNumber: '',
+    birthPlace: 'Singapore', 'general.birthPlace': 'Singapore',
+    dateOfBirth: '', gender: 'Female', ethnicity: 'Chinese', 'general.ethnicity': 'Chinese',
+    nationality: 'Malaysia', introducer: '', bio: 'Hi', hobbies: ['Golf'], skills: ['Sales'],
+    companyName: 'Acme', companyWebsite: 'acme.test', companyDescription: 'We build', departmentAndPosition: 'CEO',
+    'business.companyDescription': 'We build', 'business.departmentAndPosition': 'CEO',
+    acceptInternationalBusiness: 'Yes', businessCategory: [], industry: 'Tech', interestedIndustries: [],
+    'business.interestedIndustries': [], levelOfManagement: '', idealReferralIndustry: '', idealReferral: '',
+    specialOffers: [], privacy: { showPhone: true, showAlternatePhone: true, showSocials: true },
+    phone: '123', alternatePhone: '', email: 'ann@example.test', whatsappGroup: false, address: '',
+    emergencyContactName: '', emergencyContactRelationship: '', emergencyContactPhone: '',
+    linkedin: '', facebook: '', instagram: '', wechat: '',
+    cutStyle: '', tshirtSize: '', jacketSize: '', tshirtStatus: 'NA', embroideredName: '',
+    senatorshipId: '', senatorCertified: false, senatorshipBoardValidated: false,
+    senatorshipValidatedBy: '', 'jciCareer.senatorshipValidatedBy': '',
+    senatorshipValidatedAt: '', 'jciCareer.senatorshipValidatedAt': '',
+    role: 'AFFILIATE',
+    ...extra,
+  });
+
+  it('external profile save from MemberDetail: denied as-is, allowed after toExternalSelfUpdate', async () => {
+    const raw = await updateMemberPayload('affOpt', globalSave());
+    expect(await patch('affOpt', 'members/affOpt', raw)).toBe(403);
+    const clean = await updateMemberPayload('affOpt', toExternalSelfUpdate(globalSave()));
+    expect(await patch('affOpt', 'members/affOpt', clean)).toBe(200);
   });
 
   it('KL MEMBER keeps the membershipType recompute (unchanged behaviour)', async () => {

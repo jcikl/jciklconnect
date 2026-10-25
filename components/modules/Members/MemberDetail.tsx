@@ -44,6 +44,7 @@ import { MemberDetailBasicTab } from './MemberDetailBasicTab';
 import { MemberDetailCareerTab } from './MemberDetailCareerTab';
 import { MemberDetailActivitiesTab } from './MemberDetailActivitiesTab';
 import { AsyncErrorBoundary } from '../../ui/AsyncErrorBoundary';
+import { canRunLoader, EXTERNAL_PROFILE_TABS, toExternalSelfUpdate } from '../../../utils/externalAccess';
 // Generate an inline SVG data URI with initials — avoids external requests blocked by CSP
 const getInitialsSvg = (name: string, size = 48): string => {
   const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?';
@@ -60,7 +61,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
     () => members.find(m => m.id === memberProp.id) ?? memberProp,
     [members, memberProp]
   );
-  const { isAdmin, isDeveloper, hasPermission, effectiveRole, isOrganizationSecretary, isPresident } = usePermissions();
+  const { isAdmin, isDeveloper, hasPermission, effectiveRole, isOrganizationSecretary, isPresident, isExternal, externalStatus } = usePermissions();
   const isSuperAdmin = effectiveRole === UserRole.SUPER_ADMIN;
   const canViewSensitiveFields = isSelfView || isAdmin || isDeveloper || isOrganizationSecretary || isPresident;
   const canEditMembers = hasPermission('canEditMembers');
@@ -312,8 +313,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
     setIsSaving(true);
     const skillsArr = inlineValues.skills.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (updateMember as (id: string, updates: any) => Promise<void>)(member.id, {
+      const payload = {
         avatar: inlineValues.avatar || '', avatarUrl: inlineValues.avatar || '',
         name: inlineValues.name, fullName: inlineValues.fullName, idNumber: inlineValues.idNumber,
         birthPlace: inlineValues.birthPlace || undefined,
@@ -355,7 +355,10 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
         ...(inlineValues.role ? { role: inlineValues.role } : {}),
         ...(inlineValues.membershipType ? { membershipType: inlineValues.membershipType } : {}),
         ...(inlineValues.joinDate ? { joinDate: inlineValues.joinDate, 'jciCareer.joinDate': inlineValues.joinDate } : {}),
-      });
+      };
+      // External members (own profile only) may not write KL-only / rule-locked fields.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (updateMember as (id: string, updates: any) => Promise<void>)(member.id, isExternal ? toExternalSelfUpdate(payload) : payload);
       const finalAvatar = inlineValues.avatar;
       const originalAvatar = member.general?.avatarUrl || member.general?.avatarUrl || member.general?.avatarUrl || '';
       // Delete original saved avatar if replaced
@@ -484,7 +487,10 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
     const loadMemberClubs = async () => {
       setLoadingClubs(true);
       try {
-        const allClubs = await HobbyClubsService.getAllClubs();
+        // Externals may only list clubs opened to other chapters, and only while active (firestore.rules hobbyClubs read).
+        const allClubs = canRunLoader(effectiveRole, 'allHobbyClubs')
+          ? await HobbyClubsService.getAllClubs()
+          : externalStatus === 'active' ? await HobbyClubsService.getClubsForExternal() : [];
         const clubs = allClubs.filter(club =>
           club.memberIds?.includes(member.id)
         );
@@ -501,6 +507,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
 
   // Load board positions for this member directly from boardMembers collection
   useEffect(() => {
+    if (!canRunLoader(effectiveRole, 'memberBoardPositions')) return;
     const loadBoardPositions = async () => {
       try {
         const [positions, commissionPositions] = await Promise.all([
@@ -518,12 +525,13 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
 
   // Load projects for IntroducerSelector
   useEffect(() => {
+    if (!canRunLoader(effectiveRole, 'introducerProjects')) return;
     ProjectsService.getAllProjects().then(setAllProjects).catch(() => { });
   }, []);
 
   // Load activities log data
   useEffect(() => {
-    if (activeDetailTab !== 'activities') return;
+    if (activeDetailTab !== 'activities' || !canRunLoader(effectiveRole, 'memberActivities')) return;
 
     let cancelled = false;
     const fetchActivitiesData = async () => {
@@ -1144,7 +1152,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
             { id: 'basic', label: 'Basic Information' },
             { id: 'career', label: 'JCI Career' },
             { id: 'activities', label: 'Activities Log' }
-          ]}
+          ].filter(t => !isExternal || (EXTERNAL_PROFILE_TABS as readonly string[]).includes(t.id))}
           activeTab={activeDetailTab}
           onTabChange={(tabId) => setActiveDetailTab(tabId as any)}
          
@@ -1170,6 +1178,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
             handleInlineAvatarUpload={handleInlineAvatarUpload}
             resolveIntroducerDisplay={resolveIntroducerDisplay}
             isSelfView={isSelfView}
+            hideKlOnlyFields={isExternal}
             activeInlineEditCard={activeInlineEditCard}
           />
         </AsyncErrorBoundary>
