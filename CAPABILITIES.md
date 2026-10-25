@@ -1315,12 +1315,12 @@
 | `useActivityPlans.ts` | 130 | 1 | `useActivityPlans` | activityPlansService | ⚠️ 無說明 |
 | `useAdvertisements.ts` | 111 | 2 | `useAdvertisements` | advertisementService, errorLoggingService | Advertisements Data Hook |
 | `useAppNavigation.ts` | 239 | 1 | `useAppNavigation` | — | ⚠️ 無說明 |
-| `useAuth.tsx` | 804 | 58 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, memberCardsService, membersService, mockData | Authentication Hook |
+| `useAuth.tsx` | 807 | 58 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, memberCardsService, membersService, mockData | Authentication Hook |
 | `useAutomation.ts` | 149 | 3 | `useAutomation` | automationService | useAutomation Hook - Manage automation workflows and rules |
-| `useBusinessDirectory.ts` | 48 | 4 | `useBusinessDirectory` | businessDirectoryService | ⚠️ 無說明 |
+| `useBusinessDirectory.ts` | 51 | 4 | `useBusinessDirectory` | businessDirectoryService | ⚠️ 無說明 |
 | `useChapterBirthdays.ts` | 23 | 1 | `useChapterBirthdays` | chapterBirthdaysService | Own-chapter birthdays for an active external user (dashboard birthday widget). `month` null → nothing loads. |
 | `useChapterMembers.ts` | 75 | 2 | `useChapterMembers`, `usePendingKlApprovals` | externalAccountsService | Chapter roster for an active CHAPTER_ADMIN (own chapter) and the KL approval queue (pending_kl, KL admins). Status changes / invites go thro… |
-| `useCommunication.ts` | 118 | 2 | `useCommunication` | communicationService | Communication Data Hook |
+| `useCommunication.ts` | 123 | 2 | `useCommunication` | communicationService | Communication Data Hook |
 | `useEvents.ts` | 191 | 8 | `useEvents` | errorLoggingService, eventsService, membersService | Events Data Hook |
 | `useExternalAccounts.ts` | 46 | 1 | `useExternalAccounts` | externalAccountsService, membersService | External (sister-chapter) account actions for components: create chapter admins, invite, status, resend. |
 | `useFinanceData.ts` | 2,034 | 4 | `useFinanceData` | errorLoggingService, financeService, inventoryService, membersService, membershipConfigService, paymentRequestService, projectFinancialService, projectsService | TODO (PERF-A-004): This hook has ~90 useState declarations, causing full FinanceView re-renders on any state update. Planned refactor: split… |
@@ -1463,16 +1463,16 @@
 | `isDevMode` | 12 |  |
 | `withDevMode` | 29 | Service helper: returns mock data in dev mode, calls the real async loader in production. Eliminates the repet… |
 
-### `utils/externalAccess.ts` （118 行，11 處引用）
+### `utils/externalAccess.ts` （122 行，13 處引用）
 
 | 函數 | 行 | 說明 |
 |---|---|---|
 | `isExternalRole` | 13 |  |
 | `EXTERNAL_ALLOWED_VIEWS` | 28 | Active externals, per role. CHAPTER_ADMIN also gets MY_CHAPTER (approvals / members / invite of own chapter). |
-| `canRunLoader` | 56 | False when `loader` is KL-only and the viewer's role is external. KL roles run every loader. |
-| `getExternalAllowedViews` | 86 | Views an external may open, or null when the role is not external (= no whitelist applies). A missing affiliat… |
-| `isViewAllowedForRole` | 95 | True when `view` may be opened. Non-external roles are unrestricted here (their own rules still apply). |
-| `getExternalStatusMessage` | 104 |  |
+| `canRunLoader` | 60 | False when `loader` is KL-only and the viewer's role is external. KL roles run every loader. |
+| `getExternalAllowedViews` | 90 | Views an external may open, or null when the role is not external (= no whitelist applies). A missing affiliat… |
+| `isViewAllowedForRole` | 99 | True when `view` may be opened. Non-external roles are unrestricted here (their own rules still apply). |
+| `getExternalStatusMessage` | 108 |  |
 
 ### `utils/fetchWithTimeout.ts` （31 行，4 處引用）
 > ERR-R-005: fetch wrapper that aborts after `ms` milliseconds. Netlify functions on the free plan time out server-side after 10 s, but the br…
