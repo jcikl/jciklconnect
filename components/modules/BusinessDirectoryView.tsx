@@ -172,7 +172,6 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
         isOpen={isFilterDrawerOpen}
         onClose={() => setIsFilterDrawerOpen(false)}
         state={directory}
-        description="Narrow down local businesses and sister chapter members"
       />
     </div>
   );

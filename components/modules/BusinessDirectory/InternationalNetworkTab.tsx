@@ -186,7 +186,6 @@ export const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = (
         isOpen={isMobileFilterOpen}
         onClose={() => setIsMobileFilterOpen(false)}
         state={directory}
-        description="Narrow down member cards"
       />
 
       <SisterMemberDetailModal item={detailItem} onClose={() => setDetailItem(null)} onContact={contact} />
