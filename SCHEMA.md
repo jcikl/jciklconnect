@@ -73,13 +73,13 @@
 | business.specialOffer | SpecialOffer \| string | — | | specialOffer / offerToMember | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | `publicBusinessListings.offer/offerTerms/offerExpiry` |
 | business.specialOffers | SpecialOffer[] | — | |  | 角色: 自己(非锁定字段) 或 B+ | Business Directory 优惠列表展示 |
 | business.acceptInternationalBusiness | enum | ✓ | `Yes` \| `No` \| `Willing to Explore` | acceptInternationalBusiness | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | `publicBusinessListings.acceptsInternationalBusiness` |
-| business.idealReferrals | string[] | — | | idealReferral / idealReferrals / idealReferralIndustry | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | `publicBusinessListings.idealReferralTypes` fallback；`memberCards.idealReferrals` fallback（`buildMemberCard` 复制，`syncCards` 自动回写） |
+| business.idealReferrals | string[] | — | 理想转介**类型**（`IDEAL_REFERRAL_OPTIONS` label，仪表盘补填可为自由文字），一个值一个元素；写入前经 `utils/idealReferrals.mjs` `normalizeIdealReferrals`（按 `||` 拆分；`,` 只在拆出的全是已知选项时才拆；拼回被逗号拆散的选项名；去空白去重）。不放行业 | idealReferral / idealReferrals | 角色: 自己(非锁定字段) 或 B+（`MemberEditForm`、`MemberDetail` 专业资料、仪表盘 `buildProfileUpdatePayload`）；系统: `MembersService.normalizeMemberData`（含导入）；一次性 `scripts/normalizeIdealReferrals.mjs` | `publicBusinessListings.idealReferralTypes` fallback；`memberCards.idealReferrals` fallback（`buildMemberCard` 复制，`syncCards` 自动回写）；资料完整度「Ideal referral」（`dashboardHomeUtils.getProfileCompleteness`） |
 | business.connections | InternationalConnection[] | — | | connections / internationalConnections | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | business directory / international network 展示 |
 | business.levelOfManagement | string | — | | levelOfManagement | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | 商业资料展示 |
 | business.departmentAndPosition | string | — | | departmentAndPosition | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | 商业资料展示 |
 | business.companyDescription | string | — | | companyDescription | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | `publicBusinessListings.description` fallback |
 | business.interestedIndustries | string[] | — | | interestedIndustries | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | Business Directory 匹配与行业筛选 |
-| business.idealReferralTypes | string[] | — | | idealReferralTypes | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | `publicBusinessListings.idealReferralTypes`；`memberCards.idealReferrals`（优先来源，`buildMemberCard` 复制，`syncCards` 自动回写） |
+| business.idealReferralTypes | string[] | — | 旧版类型字段；应用内无表单写入，读取时同样经 `normalizeIdealReferrals` | idealReferralTypes | 系统: `normalizeMemberData` 仅透传 `data.business.idealReferralTypes`；`scripts/migrateMemberFields.mjs`（旧平铺迁移）；`scripts/normalizeIdealReferrals.mjs` 清理 | `publicBusinessListings.idealReferralTypes`；`memberCards.idealReferrals`（优先来源，`buildMemberCard` 复制，`syncCards` 自动回写） |
 | business.bookmarkedBusinessIds | string[] | — | | bookmarkedBusinessIds | 角色: 自己(非锁定字段) 或 B+；系统: Business Directory 收藏操作 | Business Directory 书签状态 |
 | jciCareer | object | — | JCI 会员生涯 nested object |  | 会员、财务、董事会及晋升服务 | 权限判断、会员统计、晋升与会费流程 |
 | jciCareer.membershipType | enum | ✓ | `Guest` \| `Probation` \| `Official` \| `Honorary` \| `Senator` \| `Visiting` \| `Associate` | membershipType | 角色: B+；系统: 注册/审批/晋升/会费同步/导入 | `members.role` 推导；会费记录同步依据 |
@@ -150,6 +150,7 @@
 | system.roleChangedAt | string \| Timestamp | — | ISO timestamp of last role change | roleChangedAt | 系统: updateMemberRole | audit trail |
 | system.role | enum | — | `GUEST` \| `MEMBER` \| `BOARD` \| `ADMIN` \| `SUPER_ADMIN` \| `INACTIVE` | role | 角色: B+ / A+；系统: registration / approval / membership sync / board sync | Firestore rules / UI permissions / `boardMembers.displayRole` |
 | churnRisk | string | — | |  | 系统: AI churn prediction；角色: B+ | analytics/dashboard |
+| idealReferralIndustry | string | — | 理想转介**行业**（`INDUSTRY_OPTIONS`），以 `||` 连接（`joinIdealReferralIndustries`）。保持字符串是因为已安装的旧版 app 会对它调用 `.split()`；`||` 不会出现在任何选项里，`,` 会（如 `Architecture, Engineering & Construction`）。读取一律用 `normalizeIdealReferrals`（兼容旧的 `, ` 分隔值） |  | 角色: 自己(非锁定字段) 或 B+（`MemberEditForm`、`MemberDetailProfessionalTab` / `MemberDetailBasicTab`）；系统: `MembersService.normalizeMemberData` 统一改写为 `||` 格式（含导入）；一次性 `scripts/normalizeIdealReferrals.mjs`（从类型字段移入行业值） | 商业目录「Ideal match」排序（`BusinessDirectoryView`，与条目 `industry` 比较）；资料完整度「Ideal referral」；会员资料展示。不进 `business.idealReferrals`、不进名片 |
 | tier | MemberTier \| string | — | |  | 系统: tier/gamification calculation；角色: B+ | member segmentation |
 | skills | string[] | — | |  | 角色: 自己(非锁定字段) 或 B+ | 会员资料展示、项目技能匹配 |
 | badges | Badge[] | — | |  | 系统: gamification service；角色: B+ | dashboard / member profile |
@@ -190,7 +191,7 @@
 | website | string | — | |  | 系统: `members.business.companyWebsite` | `hooks/useSisterChapterMembers` → 国际目录展示 |
 | acceptInternationalBusiness | enum | — | `Yes` \| `No` \| `Willing to Explore` |  | 系统: `members.business.acceptInternationalBusiness` | 商业目录「Accepts International Business」快速筛选（`directoryFacets.ts` `cardToDirectoryItem`，仅 `Yes` 算接受） |
 | specialOfferSummary | string | — | 优惠摘要（字符串，或 `specialOffer.description`） |  | 系统: `members.business.specialOffer` | `hooks/useSisterChapterMembers` → 国际目录优惠展示与「只看优惠」筛选 |
-| idealReferrals | string[] | — | 与本地商家目录 `idealReferralTypes` 同源同序同规范化（数组保留非空字符串；字符串按 `,` / `||` 拆分并去空白）；空则不写入 |  | 系统: `members.business.idealReferralTypes`，为空时回退 `business.idealReferrals ?? idealReferral ?? idealReferrals`（与 `businessDirectoryService` `mapMemberToBusinessProfile` 一致；不读 `idealReferralIndustry`）（`buildMemberCard`；`syncCards` 自动回写） | `hooks/useSisterChapterMembers` → 商业目录「Ideal Referral Type」筛选（`components/modules/BusinessDirectory/directoryFacets.ts`） |
+| idealReferrals | string[] | — | 与本地商家目录 `idealReferralTypes` 同源同序同规范化（`utils/idealReferrals.mjs` `normalizeIdealReferrals`）；空则不写入 |  | 系统: `members.business.idealReferralTypes`，为空时回退 `business.idealReferrals ?? idealReferral ?? idealReferrals`（与 `businessDirectoryService` `mapMemberToBusinessProfile` 一致；不读 `idealReferralIndustry`）（`buildMemberCard`；`syncCards` 自动回写） | `hooks/useSisterChapterMembers` → 商业目录「Ideal Referral Type」筛选（`components/modules/BusinessDirectory/directoryFacets.ts`） |
 | international | boolean | ✓ | 与 `members.privacy.shareCardInternationally` 相等（缺省 false） |  | 系统: `members.privacy.shareCardInternationally`（`buildMemberCard`） | `firestore.rules` `externalCanReadCard`：`international == true` 时外部用户可读 |
 | updatedAt | string | ✓ | 卡片写入时的 ISO 时间 |  | 系统: 同步时刻（`syncCards` / 回填脚本） | 尚无应用读取者 |
 
