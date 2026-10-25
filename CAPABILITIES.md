@@ -75,7 +75,7 @@
 |---|---|
 | `services/financeService.ts` | 5,325 |
 | `services/pointsService.ts` | 2,492 |
-| `services/membersService.ts` | 2,338 |
+| `services/membersService.ts` | 2,334 |
 | `hooks/useFinanceData.ts` | 2,034 |
 | `services/inventoryService.ts` | 1,638 |
 
@@ -94,7 +94,7 @@
 | `memberCardsService.ts` | 136 | 9 | Member Cards Service — keeps `memberCards/{memberId}` (the public directory card, Phase 0 WP2) in sync with `members`. The card is written A… | MEMBER_CARDS |
 | `memberJourneyService.ts` | 155 | 2 | Leadership Journey + Trainer Pathway derivation (dashboard journey card for pre-2025 members) | — |
 | `memberStatsService.ts` | 319 | 2 | Member Statistics Service - Generates comprehensive member statistics and reports | — |
-| `membersService.ts` | 2,338 | 43 | Members Service - CRUD Operations | BOARD_MEMBERS, EVENT_REGISTRATIONS, MEMBERS, MEMBER_EMAILS, NOTIFICATIONS, PAYMENT_REQUESTS … |
+| `membersService.ts` | 2,334 | 43 | Members Service - CRUD Operations | BOARD_MEMBERS, EVENT_REGISTRATIONS, MEMBERS, MEMBER_EMAILS, NOTIFICATIONS, PAYMENT_REQUESTS … |
 | `membershipConfigService.ts` | 373 | 17 | ⚠️ 無說明 | SYSTEM_SETTINGS |
 | `mentorshipService.ts` | 638 | 4 | Mentorship Matching Service | MEMBERS, MENTORSHIP_FEEDBACK, MENTOR_MATCHES |
 | `promotionService.ts` | 1,191 | 4 | ⚠️ 無說明 | MANUAL_PROMOTION_REQUESTS, MEMBERS, PROMOTION_HISTORY, SYSTEM |
@@ -184,38 +184,38 @@
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `syncComputedMembershipType` | 100 | Recompute membershipType from profile + promotion (Full); always persisted on save. |
-| `invalidateMembersCache` | 127 | Invalidate all members cache (call after any write to members collection). |
-| `getAllMembers` | 135 | Get all members, optionally filtered by loId (for multi-LO). |
-| `getMemberById` | 180 | Get member by ID |
-| `recalculateIntroducerStats` | 202 | Helper to recalculate radar stats for an introducer (dynamic import to avoid circular dependency) |
-| `normalizeMemberData` | 249 | Helper to map flat properties to standard nested sub-objects (general, contact, etc.) for database consistency… |
-| `createMember` | 570 | Create new member. Caller should pass loId (or use DEFAULT_LO_ID for single-LO). |
-| `updateMember` | 651 | Update member. Sets updatedAt and optionally updatedBy (audit). |
-| `validateSenatorshipByBoard` | 877 | Board of Directors validates a member's senatorship number (locks future edits). |
-| `revokeSenatorshipValidation` | 903 | Revoke board validation (admin / board only). Clears certification. |
-| `deleteMember` | 997 | Delete member |
-| `searchMembers` | 1110 | Search members |
-| `getMembersByRole` | 1129 | Get members by role |
-| `getMemberByEmail` | 1160 | Get member by email (for account linking) |
-| `getMembersAtRisk` | 1201 | Get members at risk (churn prediction) |
-| `computeAttendanceMonths` | 1222 | 当年应计月份数：入会年份从入会月起算，否则从 1 月起算 |
-| `recalculateAttendance` | 1236 | 按当年 checked_in 记录重算出席对比（签到次数 vs 已过月份），写回会员档案 |
-| `updateMemberRole` | 1268 |  |
-| `assignMentor` | 1337 | Assign mentor |
-| `batchUpdateMembers` | 1360 | Batch update members — uses writeBatch for atomicity (E01) |
-| `batchDeleteMembers` | 1533 | Batch delete members — uses writeBatch for atomicity (E02) |
-| `getFirstMembershipYearKey` | 1701 | Earliest year key on member.jciCareer?.membershipDuesHistory (e.g. "2024"). |
-| `statusFromMembershipAmount` | 1714 |  |
-| `fixFirstMembershipDuesTo350` | 1732 | Set dues on each member's first membership year to RM350 and recalculate status from paid amount. SYNC-004 NOT… |
-| `getEffectiveJoinYear` | 1839 | Effective membership start year (calendar Oct rollover or first payment year). |
-| `inferMembershipType` | 1870 | Infer membershipType from role, senatorship, and membership[year].dues (Config rules). |
-| `batchSyncMembershipTypes` | 1893 | Batch-sync members.jciCareer?.membershipType from membership dues + role + Config. Does not modify members.jci… |
-| `batchSyncMembershipRecords` | 2005 | Batch-sync members.jciCareer?.membershipDuesHistory[year] from each member's membershipType + Membership Confi… |
-| `syncMembershipFromMembershipType` | 2221 |  |
-| `migrateMembershipTypeFullToOfficial` | 2228 | TEMP MIGRATION: membershipType 'Full' → 'Official' |
-| `migrateDobToGeneralDob` | 2263 | TEMP MIGRATION: copy root-level dateOfBirth/dob into general.dob for members missing it |
-| `getMembersPaginated` | 2305 | Cursor-based paginated member fetch (ordered by name). Pass `lastDoc` from the previous page's result to advan… |
+| `syncComputedMembershipType` | 101 | Recompute membershipType from profile + promotion (Full); always persisted on save. |
+| `invalidateMembersCache` | 128 | Invalidate all members cache (call after any write to members collection). |
+| `getAllMembers` | 136 | Get all members, optionally filtered by loId (for multi-LO). |
+| `getMemberById` | 181 | Get member by ID |
+| `recalculateIntroducerStats` | 203 | Helper to recalculate radar stats for an introducer (dynamic import to avoid circular dependency) |
+| `normalizeMemberData` | 250 | Helper to map flat properties to standard nested sub-objects (general, contact, etc.) for database consistency… |
+| `createMember` | 566 | Create new member. Caller should pass loId (or use DEFAULT_LO_ID for single-LO). |
+| `updateMember` | 647 | Update member. Sets updatedAt and optionally updatedBy (audit). |
+| `validateSenatorshipByBoard` | 873 | Board of Directors validates a member's senatorship number (locks future edits). |
+| `revokeSenatorshipValidation` | 899 | Revoke board validation (admin / board only). Clears certification. |
+| `deleteMember` | 993 | Delete member |
+| `searchMembers` | 1106 | Search members |
+| `getMembersByRole` | 1125 | Get members by role |
+| `getMemberByEmail` | 1156 | Get member by email (for account linking) |
+| `getMembersAtRisk` | 1197 | Get members at risk (churn prediction) |
+| `computeAttendanceMonths` | 1218 | 当年应计月份数：入会年份从入会月起算，否则从 1 月起算 |
+| `recalculateAttendance` | 1232 | 按当年 checked_in 记录重算出席对比（签到次数 vs 已过月份），写回会员档案 |
+| `updateMemberRole` | 1264 |  |
+| `assignMentor` | 1333 | Assign mentor |
+| `batchUpdateMembers` | 1356 | Batch update members — uses writeBatch for atomicity (E01) |
+| `batchDeleteMembers` | 1529 | Batch delete members — uses writeBatch for atomicity (E02) |
+| `getFirstMembershipYearKey` | 1697 | Earliest year key on member.jciCareer?.membershipDuesHistory (e.g. "2024"). |
+| `statusFromMembershipAmount` | 1710 |  |
+| `fixFirstMembershipDuesTo350` | 1728 | Set dues on each member's first membership year to RM350 and recalculate status from paid amount. SYNC-004 NOT… |
+| `getEffectiveJoinYear` | 1835 | Effective membership start year (calendar Oct rollover or first payment year). |
+| `inferMembershipType` | 1866 | Infer membershipType from role, senatorship, and membership[year].dues (Config rules). |
+| `batchSyncMembershipTypes` | 1889 | Batch-sync members.jciCareer?.membershipType from membership dues + role + Config. Does not modify members.jci… |
+| `batchSyncMembershipRecords` | 2001 | Batch-sync members.jciCareer?.membershipDuesHistory[year] from each member's membershipType + Membership Confi… |
+| `syncMembershipFromMembershipType` | 2217 |  |
+| `migrateMembershipTypeFullToOfficial` | 2224 | TEMP MIGRATION: membershipType 'Full' → 'Official' |
+| `migrateDobToGeneralDob` | 2259 | TEMP MIGRATION: copy root-level dateOfBirth/dob into general.dob for members missing it |
+| `getMembersPaginated` | 2301 | Cursor-based paginated member fetch (ordered by name). Pass `lastDoc` from the previous page's result to advan… |
 
 </details>
 
@@ -889,7 +889,7 @@
 | Service | 行數 | 引用 | 用途 | 集合 |
 |---|---|---|---|---|
 | `advertisementService.ts` | 422 | 11 | Advertisement & Promotions Service | ADVERTISEMENTS, BENEFIT_USAGE, PROMOTION_PACKAGES |
-| `businessDirectoryService.ts` | 259 | 1 | Business Directory Service - CRUD Operations | MEMBERS, PUBLIC_BUSINESS_LISTINGS |
+| `businessDirectoryService.ts` | 255 | 1 | Business Directory Service - CRUD Operations | MEMBERS, PUBLIC_BUSINESS_LISTINGS |
 | `communicationService.ts` | 651 | 9 | Communication Service - CRUD Operations | COMMUNICATION, NOTIFICATIONS, SYSTEM_CONFIG |
 | `emailService.ts` | 442 | 2 | Email Service - Email Integration Service | EMAIL_LOGS |
 | `guestAnalyticsService.ts` | 142 | 4 | ⚠️ 無說明 | GUEST_PAGE_STATS |
@@ -927,13 +927,13 @@
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `syncPublicListing` | 125 |  |
-| `getAllBusinesses` | 158 |  |
-| `getBusinessById` | 204 |  |
-| `searchBusinesses` | 234 |  |
-| `getBusinessesByIndustry` | 244 |  |
+| `syncPublicListing` | 121 |  |
+| `getAllBusinesses` | 154 |  |
+| `getBusinessById` | 200 |  |
+| `searchBusinesses` | 230 |  |
+| `getBusinessesByIndustry` | 240 |  |
 
-**其他 export：** `mapMemberToBusinessProfile` (L42)
+**其他 export：** `mapMemberToBusinessProfile` (L37)
 
 </details>
 

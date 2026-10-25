@@ -36,7 +36,9 @@ describe('buildMemberCard', () => {
     const ref = (m: Record<string, unknown>) => (buildMemberCard({ ...base, ...m }, NOW) as { idealReferrals?: string[] }).idealReferrals;
     expect(ref({ business: { idealReferralTypes: ['Banks'], idealReferrals: ['HR'] } })).toEqual(['Banks']);
     expect(ref({ business: { idealReferralTypes: [], idealReferrals: ['HR', ' ', 'IT'] } })).toEqual(['HR', 'IT']);
-    expect(ref({ business: { idealReferrals: 'Banks, HR||IT' } })).toEqual(['Banks', 'HR', 'IT']);
+    // '||' always splits; ',' only when every part is a known option (utils/idealReferrals.mjs).
+    expect(ref({ business: { idealReferrals: 'Banks, HR||IT' } })).toEqual(['Banks, HR', 'IT']);
+    expect(ref({ business: { idealReferrals: 'Investors, Resellers||IT' } })).toEqual(['Investors', 'Resellers', 'IT']);
     expect(ref({ idealReferral: 'Lawyers' })).toEqual(['Lawyers']);
     expect(ref({ idealReferrals: ['Doctors'] })).toEqual(['Doctors']);
     // `??`: an empty business.idealReferrals array stops the fallback, as in the service.

@@ -5,6 +5,7 @@ import { MultiSelectDropdown } from '../../ui/MultiSelectDropdown';
 import type { Member, SpecialOffer } from '../../../types';
 import { getSpecialOfferSummary, hasSpecialOffer } from '../../../types/member';
 import { INDUSTRY_OPTIONS, IDEAL_REFERRAL_OPTIONS, BUSINESS_CATEGORIES_OPTIONS } from '../../../config/constants';
+import { normalizeIdealReferrals, joinIdealReferralIndustries } from '../../../utils/idealReferrals.mjs';
 import { uploadMemberOfferLogoToCloudinary, uploadMemberOfferBannerToCloudinary } from '../../../services/cloudinaryService';
 
 const EMPTY_OFFER: SpecialOffer = { description: '', terms: '', expiryDate: '', status: 'Active' };
@@ -207,8 +208,8 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Ideal Referral Industry</label>
                   <MultiSelectDropdown
                     options={INDUSTRY_OPTIONS}
-                    selected={inlineValues.idealReferralIndustry ? [...new Set<string>(inlineValues.idealReferralIndustry.split('||').flatMap((v: string) => v.split(', ')).filter(Boolean))] : []}
-                    onChange={selected => setInlineValues({ ...inlineValues, idealReferralIndustry: selected.join('||') })}
+                    selected={normalizeIdealReferrals(inlineValues.idealReferralIndustry)}
+                    onChange={selected => setInlineValues({ ...inlineValues, idealReferralIndustry: joinIdealReferralIndustries(selected) })}
                     placeholder="Select industries..."
                   />
                 </div>
@@ -216,8 +217,8 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Ideal Referral</label>
                   <MultiSelectDropdown
                     options={IDEAL_REFERRAL_OPTIONS.map(opt => opt.label)}
-                    selected={Array.isArray(inlineValues.idealReferral) ? inlineValues.idealReferral : (inlineValues.idealReferral ? String(inlineValues.idealReferral).split(', ').filter(Boolean) : [])}
-                    onChange={selected => setInlineValues({ ...inlineValues, idealReferral: selected.join(', ') })}
+                    selected={normalizeIdealReferrals(inlineValues.idealReferral)}
+                    onChange={selected => setInlineValues({ ...inlineValues, idealReferral: selected })}
                     placeholder="Select referrals..."
                   />
                 </div>
@@ -311,7 +312,7 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                     <span className="text-slate-500 text-xs uppercase font-medium">Ideal Referral Industry</span>
                     <div className="mt-1 text-slate-700 font-medium leading-snug">
                       {member.idealReferralIndustry
-                        ? <span className="text-xs leading-relaxed">{member.idealReferralIndustry}</span>
+                        ? <span className="text-xs leading-relaxed">{normalizeIdealReferrals(member.idealReferralIndustry).join(', ')}</span>
                         : <span className="text-slate-400 italic font-normal">None</span>}
                     </div>
                   </div>

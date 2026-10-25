@@ -42,6 +42,7 @@ import {
 } from '../types';
 import { isDevMode } from '../utils/devMode';
 import { getMYTYear } from '../utils/dateUtils';
+import { normalizeIdealReferrals, joinIdealReferralIndustries } from '../utils/idealReferrals.mjs';
 import { PostcodeService } from './postcodeService';
 import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 import { MOCK_MEMBERS } from './mockData';
@@ -396,22 +397,17 @@ export class MembersService {
     if (data.business?.acceptInternationalBusiness !== undefined) business.acceptInternationalBusiness = data.business?.acceptInternationalBusiness;
     else if (data.acceptInternationalBusiness !== undefined) business.acceptInternationalBusiness = data.acceptInternationalBusiness;
     
+    // Ideal referral TYPES → business.idealReferrals (string[]). Industries never go here: they stay in
+    // the flat idealReferralIndustry ('||'-joined, see utils/idealReferrals.mjs).
     if (data.business?.idealReferrals !== undefined) {
-      business.idealReferrals = Array.isArray(data.business?.idealReferrals)
-        ? data.business?.idealReferrals
-        : String(data.business?.idealReferrals).split(', ').filter(Boolean);
+      business.idealReferrals = normalizeIdealReferrals(data.business?.idealReferrals);
     } else if (data.idealReferral !== undefined) {
-      business.idealReferrals = Array.isArray(data.idealReferral)
-        ? data.idealReferral
-        : String(data.idealReferral).split(', ').filter(Boolean);
+      business.idealReferrals = normalizeIdealReferrals(data.idealReferral);
     } else if (data.idealReferrals !== undefined) {
-      business.idealReferrals = Array.isArray(data.idealReferrals)
-        ? data.idealReferrals
-        : String(data.idealReferrals).split(', ').filter(Boolean);
-    } else if (data.idealReferralIndustry !== undefined) {
-      business.idealReferrals = typeof data.idealReferralIndustry === 'string'
-        ? data.idealReferralIndustry.split(', ').filter(Boolean)
-        : data.idealReferralIndustry;
+      business.idealReferrals = normalizeIdealReferrals(data.idealReferrals);
+    }
+    if (data.idealReferralIndustry !== undefined) {
+      result.idealReferralIndustry = joinIdealReferralIndustries(data.idealReferralIndustry);
     }
     if (data.business?.connections !== undefined) business.connections = data.business?.connections;
     if (data.business?.levelOfManagement !== undefined) business.levelOfManagement = data.business?.levelOfManagement;

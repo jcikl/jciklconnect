@@ -19,6 +19,7 @@ import { DirectoryFilterPanel } from './BusinessDirectory/DirectoryFilterPanel';
 import { SisterMemberDetailModal } from './BusinessDirectory/SisterMemberDetailModal';
 import { useDirectoryFilters } from './BusinessDirectory/useDirectoryFilters';
 import { businessToDirectoryItem, cardToDirectoryItem, type DirectoryItem } from './BusinessDirectory/directoryFacets';
+import { normalizeIdealReferrals } from '../../utils/idealReferrals.mjs';
 import { ShareCardNotice } from './BusinessDirectory/ShareCardNotice';
 import { KL_CHAPTER } from '../../utils/internationalCards';
 
@@ -105,7 +106,7 @@ export const BusinessDirectoryView: React.FC<BusinessDirectoryViewProps> = ({ se
   // Ideal match: the viewer's ideal referral industries vs the item's industry. Bookmarks: any item
   // (stored on the viewer's own member doc, business.bookmarkedBusinessIds, as member / business ids).
   const idealIndustries = useMemo(() => new Set(
-    (currentUser?.idealReferralIndustry ?? '').split(',').map(v => v.trim().toLowerCase()).filter(Boolean),
+    normalizeIdealReferrals(currentUser?.idealReferralIndustry).map(v => v.toLowerCase()),
   ), [currentUser?.idealReferralIndustry]);
   const getScore = useCallback((item: DirectoryItem): DirectoryScore => {
     if (bookmarkedIds.has(item.id)) return 0;

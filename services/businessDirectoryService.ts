@@ -21,6 +21,7 @@ import { MembersService } from './membersService';
 import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 import { errorLoggingService } from './errorLoggingService';
 import { getSpecialOfferSummary } from '../types/member';
+import { normalizeIdealReferrals } from '../utils/idealReferrals.mjs';
 
 const CACHE_KEY_ALL_PUBLIC = 'businessDirectory:public:all';
 const CACHE_TTL_MS = CACHE_TTL_3MIN;
@@ -31,12 +32,6 @@ function invalidateBusinessDirectoryCache(): void {
 
 function cacheKeyById(id: string): string {
   return `businessDirectory:byId:${id}`;
-}
-
-function toStringArray(value: unknown): string[] {
-  if (Array.isArray(value)) return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
-  if (typeof value === 'string') return value.split(/,|\|\|/).map(item => item.trim()).filter(Boolean);
-  return [];
 }
 
 export function mapMemberToBusinessProfile(id: string, data: Record<string, unknown>): BusinessProfile | null {
@@ -51,10 +46,11 @@ export function mapMemberToBusinessProfile(id: string, data: Record<string, unkn
   }
 
   const businessCategory = data.businessCategory ?? business.businessCategory;
+  const referralTypes = normalizeIdealReferrals(business.idealReferralTypes);
   const idealReferralTypes =
-    toStringArray(business.idealReferralTypes).length > 0
-      ? toStringArray(business.idealReferralTypes)
-      : toStringArray(business.idealReferrals ?? data.idealReferral ?? data.idealReferrals);
+    referralTypes.length > 0
+      ? referralTypes
+      : normalizeIdealReferrals(business.idealReferrals ?? data.idealReferral ?? data.idealReferrals);
 
   return {
     id,
@@ -117,7 +113,7 @@ function mapListingDoc(id: string, data: Record<string, unknown>): BusinessProfi
     businessCategory: (data.businessCategory as string | undefined) || '',
     acceptsInternationalBusiness: (data.acceptsInternationalBusiness as boolean | undefined) || false,
     globalNetworkEnabled: (data.globalNetworkEnabled as boolean | undefined) || false,
-    idealReferralTypes: toStringArray(data.idealReferralTypes ?? data.idealReferrals ?? data.idealReferral),
+    idealReferralTypes: normalizeIdealReferrals(data.idealReferralTypes ?? data.idealReferrals ?? data.idealReferral),
   };
 }
 
