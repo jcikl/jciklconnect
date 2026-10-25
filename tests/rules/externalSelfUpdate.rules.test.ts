@@ -163,6 +163,13 @@ describe.skipIf(!HOST)('firestore.rules — external "Share my card" through Mem
     expect((payload.jciCareer as Record<string, unknown> | undefined)?.membershipType).toBeUndefined();
   });
 
+  // Directory bookmarks: useBusinessBookmarks -> useAuth.updateMemberProfile(setDoc merge) writes
+  // { business: { ...own business, bookmarkedBusinessIds }, updatedAt } on the external's own doc.
+  it('AFFILIATE can bookmark directory cards on their own member doc', async () => {
+    const payload = { business: { ...(SEED.affOpt.business as Doc), bookmarkedBusinessIds: ['klMember'] }, updatedAt: '2026-10-26T00:00:00.000Z' };
+    expect(await patch('affOpt', 'members/affOpt', payload)).toBe(200);
+  });
+
   it('CHAPTER_ADMIN (with jciCareer) opting in is allowed', async () => {
     const payload = await updateMemberPayload('chOpt', { privacy: { shareCardInternationally: true } });
     expect(await patch('chOpt', 'members/chOpt', payload)).toBe(200);

@@ -19,16 +19,36 @@ import { DirectoryFilterPanel } from './BusinessDirectory/DirectoryFilterPanel';
 import { SisterMemberDetailModal } from './BusinessDirectory/SisterMemberDetailModal';
 import { useDirectoryFilters } from './BusinessDirectory/useDirectoryFilters';
 import { businessToDirectoryItem, cardToDirectoryItem, type DirectoryItem } from './BusinessDirectory/directoryFacets';
+import { ShareCardNotice } from './BusinessDirectory/ShareCardNotice';
+import { KL_CHAPTER } from '../../utils/internationalCards';
 
-export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSelectedBusinessId?: string | null; onClearSelection?: () => void; isGuest?: boolean; onGuestCta?: () => void }> = ({ searchQuery, initialSelectedBusinessId, onClearSelection, isGuest = false, onGuestCta }) => {
+const NO_BUSINESSES: BusinessProfile[] = [];
+
+interface BusinessDirectoryViewProps {
+  searchQuery?: string;
+  initialSelectedBusinessId?: string | null;
+  onClearSelection?: () => void;
+  isGuest?: boolean;
+  onGuestCta?: () => void;
+  /**
+   * Externals (AFFILIATE / CHAPTER_ADMIN): member cards only. The local business list is not loaded
+   * (it reads the KL members list, which the rules deny them), and without card sharing the whole
+   * view is the ShareCardNotice (reciprocity gate).
+   */
+  cardsOnly?: boolean;
+}
+
+export const BusinessDirectoryView: React.FC<BusinessDirectoryViewProps> = ({ searchQuery, initialSelectedBusinessId, onClearSelection, isGuest = false, onGuestCta, cardsOnly = false }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
   const [detailBiz, setDetailBiz] = useState<BusinessProfile | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [sisterDetail, setSisterDetail] = useState<DirectoryItem | null>(null);
 
-  const { members: rawIntlMembers, canView: canViewIntl, optIn, optingIn } = useSisterChapterMembers();
-  const { businesses, loading, error } = useBusinessDirectory();
+  const { members: rawIntlMembers, chapters, loading: intlLoading, canView: canViewIntl, optIn, optingIn } = useSisterChapterMembers();
+  const { businesses: loadedBusinesses, loading: businessesLoading, error } = useBusinessDirectory({ enabled: !cardsOnly });
+  const businesses = cardsOnly ? NO_BUSINESSES : loadedBusinesses;
+  const loading = cardsOnly ? intlLoading : businessesLoading;
   const { members } = useMembers();
   const { showToast } = useToast();
   const { member: currentUser, updateMemberProfile } = useAuth();
@@ -77,12 +97,18 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
 
   const directory = useDirectoryFilters(items, searchQuery || searchTerm);
 
-  // Ideal match: the viewer's ideal referral industries vs the item's industry. Bookmarks are local only.
+  // The viewer's own chapter: items from it show no chapter chip (KL viewers: JCI Kuala Lumpur).
+  const homeChapter = currentUser?.loId && currentUser.loId !== KL_CHAPTER.id
+    ? chapters.find(c => c.id === currentUser.loId)?.name
+    : KL_CHAPTER.name;
+
+  // Ideal match: the viewer's ideal referral industries vs the item's industry. Bookmarks: any item
+  // (stored on the viewer's own member doc, business.bookmarkedBusinessIds, as member / business ids).
   const idealIndustries = useMemo(() => new Set(
     (currentUser?.idealReferralIndustry ?? '').split(',').map(v => v.trim().toLowerCase()).filter(Boolean),
   ), [currentUser?.idealReferralIndustry]);
   const getScore = useCallback((item: DirectoryItem): DirectoryScore => {
-    if (item.source === 'local' && bookmarkedIds.has(item.id)) return 0;
+    if (bookmarkedIds.has(item.id)) return 0;
     if (idealIndustries.size > 0 && item.industry && idealIndustries.has(item.industry.toLowerCase())) return 1;
     return 2;
   }, [bookmarkedIds, idealIndustries]);
@@ -102,6 +128,9 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
   // Logged-in GUEST role: mask the directory like the Benefits page (public guest landing page uses isGuest prop instead)
   const isGuestRole = !isGuest && (currentUser?.role || '') === 'GUEST';
 
+  // Externals: reciprocity gate as before, no list until they share their own card (all hooks are above).
+  if (cardsOnly && !canViewIntl) return <ShareCardNotice onShare={optIn} sharing={optingIn} />;
+
   return (
     <div className={`space-y-2 relative${isGuestRole ? ' pt-px' : ''}`}>
       {isGuestRole && (
@@ -119,6 +148,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
         loading={loading}
         error={error}
         isGuest={isGuest}
+        homeChapter={homeChapter}
         searchTerm={searchTerm}
         onSearchTermChange={setSearchTerm}
         activeFiltersCount={directory.activeCount}
@@ -134,7 +164,7 @@ export const BusinessDirectoryView: React.FC<{ searchQuery?: string; initialSele
             clearSection={directory.clearSection}
           />
         )}
-        showShareNotice={!isGuest && !canViewIntl}
+        showShareNotice={!isGuest && !canViewIntl && !cardsOnly}
         onShare={optIn}
         sharing={optingIn}
         bookmarkedIds={bookmarkedIds}

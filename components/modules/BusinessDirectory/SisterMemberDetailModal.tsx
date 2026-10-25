@@ -1,17 +1,15 @@
 import React from 'react';
-import { Gift, Globe, Send } from 'lucide-react';
+import { Gift, Globe } from 'lucide-react';
 import { Button, Modal } from '../../ui/Common';
 import type { DirectoryItem } from './directoryFacets';
 
 interface SisterMemberDetailModalProps {
   item: DirectoryItem | null;
   onClose: () => void;
-  /** Omit to hide Contact (cards carry no contact details; only shown where a caller wires it). */
-  onContact?: (item: DirectoryItem) => void;
 }
 
-/** Detail view of a member card (sister chapter, or any chapter for externals). */
-export const SisterMemberDetailModal: React.FC<SisterMemberDetailModalProps> = ({ item, onClose, onContact }) => {
+/** Detail view of a member card (sister chapter, or any chapter for externals). Cards carry no contact details, so no Contact. */
+export const SisterMemberDetailModal: React.FC<SisterMemberDetailModalProps> = ({ item, onClose }) => {
   if (!item) return null;
   return (
     <Modal isOpen={!!item} onClose={onClose} title={item.company || item.name} drawerOnMobile>
@@ -48,11 +46,6 @@ export const SisterMemberDetailModal: React.FC<SisterMemberDetailModalProps> = (
           onClick={() => window.open(item.website, '_blank', 'noopener')}>
           <Globe size={14} className="mr-2" /> Website
         </Button>
-        {onContact && (
-          <Button variant="primary" size="sm" className="flex-1" onClick={() => { onClose(); onContact(item); }}>
-            <Send size={14} className="mr-2" /> Contact
-          </Button>
-        )}
       </div>
     </Modal>
   );
