@@ -841,13 +841,12 @@ service cloud.firestore {
                     (resource.data.memberId == request.auth.uid ||
                      (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
                       get(/databases/$(database)/documents/members/$(request.auth.uid)).data.role in ['BOARD', 'ADMIN', 'SUPER_ADMIN']));
-      // INTENTIONAL DESIGN: resource.data is unavailable in list queries, so ownership cannot be
-      // enforced at the Firestore-rules layer for list. The service layer MUST always include
-      // where('memberId', '==', uid) in every list query — this prevents unfiltered reads from
-      // returning useful data even if rules pass. A compound index on (memberId ASC, timestamp DESC)
-      // must exist so Firestore rejects queries that omit the memberId equality filter.
-      // Tightened from isMember() to isAdmin()||isBoard() to prevent members from querying all notifications.
-      allow list: if isAuthenticated() && (isAdmin() || isBoard());
+      // Board / admin list any notifications. Everyone else (KL members, GUEST, external members)
+      // lists only their own: Firestore proves resource.data.memberId == uid from the query itself, so
+      // the query must carry where('memberId', '==', <own uid>) (CommunicationService.getNotifications,
+      // markAllAsRead, useNotifications). An unfiltered or another member's query is rejected.
+      allow list: if isAdmin() || isBoard() ||
+                     (isAuthenticated() && resource.data.memberId == request.auth.uid);
       
       // PR-C: MEMBER cancel/submit notifications need create rights; N-8: require all fields present
       // isBoard() for general notifications; isMember() for specific self-service action types only
