@@ -5,7 +5,7 @@ const NOW = '2026-10-19T00:00:00.000Z';
 const RULE_KEYS = [
   'displayName', 'avatarUrl', 'loId', 'country', 'companyName', 'position', 'department', 'industry',
   'businessCategory', 'companyDescription', 'website', 'acceptInternationalBusiness', 'specialOfferSummary',
-  'international', 'updatedAt',
+  'idealReferrals', 'international', 'updatedAt',
 ];
 
 const full = {
@@ -15,6 +15,7 @@ const full = {
     companyName: 'Acme', position: 'Director', departmentAndPosition: 'Sales Dept', industry: 'IT',
     businessCategory: ['Software', 'AI'], companyDescription: 'We build', companyWebsite: 'https://acme.example',
     acceptInternationalBusiness: 'Yes', specialOffer: { description: '10% off' },
+    idealReferrals: ['Banks', 'Lawyers'],
   },
   privacy: { shareCardInternationally: true },
 };
@@ -25,8 +26,24 @@ describe('buildMemberCard', () => {
       displayName: 'Ali Tan', avatarUrl: 'https://img/a.png', loId: 'jcikl', country: 'Malaysia',
       companyName: 'Acme', position: 'Director', department: 'Sales Dept', industry: 'IT',
       businessCategory: ['Software', 'AI'], companyDescription: 'We build', website: 'https://acme.example',
-      acceptInternationalBusiness: 'Yes', specialOfferSummary: '10% off', international: true, updatedAt: NOW,
+      acceptInternationalBusiness: 'Yes', specialOfferSummary: '10% off', idealReferrals: ['Banks', 'Lawyers'],
+      international: true, updatedAt: NOW,
     });
+  });
+
+  it('idealReferrals follows the local directory order: business.idealReferralTypes, then business.idealReferrals ?? idealReferral ?? idealReferrals', () => {
+    const base = { role: 'MEMBER', general: { name: 'A' } };
+    const ref = (m: Record<string, unknown>) => (buildMemberCard({ ...base, ...m }, NOW) as { idealReferrals?: string[] }).idealReferrals;
+    expect(ref({ business: { idealReferralTypes: ['Banks'], idealReferrals: ['HR'] } })).toEqual(['Banks']);
+    expect(ref({ business: { idealReferralTypes: [], idealReferrals: ['HR', ' ', 'IT'] } })).toEqual(['HR', 'IT']);
+    expect(ref({ business: { idealReferrals: 'Banks, HR||IT' } })).toEqual(['Banks', 'HR', 'IT']);
+    expect(ref({ idealReferral: 'Lawyers' })).toEqual(['Lawyers']);
+    expect(ref({ idealReferrals: ['Doctors'] })).toEqual(['Doctors']);
+    // `??`: an empty business.idealReferrals array stops the fallback, as in the service.
+    expect(ref({ business: { idealReferrals: [] }, idealReferral: 'Lawyers' })).toBeUndefined();
+    // The legacy idealReferralIndustry is not a source (the service does not read it).
+    expect(ref({ idealReferralIndustry: 'IT' })).toBeUndefined();
+    expect('idealReferrals' in buildMemberCard({ ...base, business: { idealReferrals: [' '] } }, NOW)).toBe(false);
   });
 
   it('uses fallbacks: general.avatar, flat companyName/industry, business.introduction, string specialOffer', () => {
@@ -108,6 +125,7 @@ describe('shouldHaveCard / planCardSync', () => {
     expect(planCardSync(full, { ...full, general: { name: 'New Name' } })).toBe('upsert');
     expect(planCardSync(full, { ...full, privacy: { shareCardInternationally: false } })).toBe('upsert');
     expect(planCardSync(full, { ...full, loId: 'other' })).toBe('upsert');
+    expect(planCardSync(full, { ...full, business: { ...full.business, idealReferrals: ['Banks'] } })).toBe('upsert');
   });
 
   it('forceDelete deletes even if the member never qualified', () => {

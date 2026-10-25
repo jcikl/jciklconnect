@@ -416,7 +416,7 @@ service cloud.firestore {
     function memberCardKeys() {
       return ['displayName', 'avatarUrl', 'loId', 'country', 'companyName', 'position', 'department',
               'industry', 'businessCategory', 'companyDescription', 'website',
-              'acceptInternationalBusiness', 'specialOfferSummary', 'international', 'updatedAt'];
+              'acceptInternationalBusiness', 'specialOfferSummary', 'idealReferrals', 'international', 'updatedAt'];
     }
 
     function validMemberCard(memberId) {

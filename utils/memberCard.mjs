@@ -15,6 +15,18 @@ function str(v) {
   return typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined;
 }
 
+/**
+ * Same as toStringArray in services/businessDirectoryService.ts (keep them identical): array -> its
+ * non-blank strings as stored; string -> split on ',' or '||', trimmed, blanks dropped.
+ * @param {unknown} v
+ * @returns {string[]}
+ */
+function toStringArray(v) {
+  if (Array.isArray(v)) return v.filter(item => typeof item === 'string' && item.trim().length > 0);
+  if (typeof v === 'string') return v.split(/,|\|\|/).map(item => item.trim()).filter(Boolean);
+  return [];
+}
+
 /** @param {any} member @returns {boolean} */
 export function isExternalMember(member) {
   return EXTERNAL_ROLES.includes(member?.role);
@@ -47,6 +59,12 @@ export function buildMemberCard(member, nowIso = new Date().toISOString()) {
     ? b.businessCategory.filter(c => typeof c === 'string' && c.trim() !== '')
     : [];
   const offer = b.specialOffer;
+  // Ideal referral types, read exactly like the local directory's idealReferralTypes
+  // (businessDirectoryService mapMemberToBusinessProfile) so one person shows the same values in both.
+  const referralTypes = toStringArray(b.idealReferralTypes);
+  const idealReferrals = referralTypes.length > 0
+    ? referralTypes
+    : toStringArray(b.idealReferrals ?? member?.idealReferral ?? member?.idealReferrals);
   const offerSummary = str(typeof offer === 'string' ? offer : offer?.description);
 
   /** @type {Record<string, unknown>} */
@@ -63,6 +81,7 @@ export function buildMemberCard(member, nowIso = new Date().toISOString()) {
     website: str(b.companyWebsite),
     acceptInternationalBusiness: str(b.acceptInternationalBusiness),
     specialOfferSummary: offerSummary,
+    idealReferrals: idealReferrals.length > 0 ? idealReferrals : undefined,
   };
   /** @type {Record<string, unknown>} */
   const card = {

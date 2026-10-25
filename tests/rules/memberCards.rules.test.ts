@@ -135,6 +135,18 @@ describe.skipIf(!HOST)('firestore.rules — buildMemberCard output (emulator)', 
     expect(await commit('klMember', [{ path: 'memberCards/klMember', data: buildMemberCard(klMember) as unknown as Doc }])).toBe(OK);
   });
 
+  it('card with idealReferrals (from business.idealReferrals) is accepted', async () => {
+    const withReferrals = { ...aff1, business: { ...aff1.business, idealReferrals: ['Banks', 'Lawyers'] } };
+    const card = buildMemberCard(withReferrals) as unknown as Doc;
+    expect(card.idealReferrals).toEqual(['Banks', 'Lawyers']);
+    expect(await commit('aff1', [{ path: 'memberCards/aff1', data: card }])).toBe(OK);
+  });
+
+  it('card with idealReferrals plus another extra key is still rejected', async () => {
+    const card = { ...(buildMemberCard(aff1) as unknown as Doc), idealReferrals: ['Banks'], email: 'x@example.test' };
+    expect(await commit('aff1', [{ path: 'memberCards/aff1', data: card }])).toBe(DENIED);
+  });
+
   it('card with an extra key is rejected', async () => {
     const card = { ...(buildMemberCard(aff1) as unknown as Doc), phone: '+65 1234' };
     expect(await commit('aff1', [{ path: 'memberCards/aff1', data: card }])).toBe(DENIED);

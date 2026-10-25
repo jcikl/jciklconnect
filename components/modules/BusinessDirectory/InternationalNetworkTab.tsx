@@ -1,124 +1,56 @@
 import React, { useMemo, useState } from 'react';
 import { Gift, Globe, Network, Search, Send, SlidersHorizontal } from 'lucide-react';
-import { Button, Modal } from '../../ui/Common';
+import { Button } from '../../ui/Common';
 import { Input } from '../../ui/Form';
-import type { BusinessProfile, SpecialOffer } from '../../../types';
-import { getSpecialOfferSummary, hasSpecialOffer } from '../../../types/member';
+import type { BusinessProfile } from '../../../types';
 import { useSisterChapterMembers } from '../../../hooks/useSisterChapterMembers';
-import type { SisterChapterMember } from '../../../hooks/useSisterChapterMembers';
 import { ShareCardNotice } from './ShareCardNotice';
-// International Network Tab Component
-type IntlMemberView = {
-  id: string;
-  name: string;
-  chineseName?: string;
-  avatarUrl: string;
-  jciChapter: string;
-  flagEmoji?: string;
-  country: string;
-  companyName: string;
-  industry: string;
-  businessCategory: string;
-  position: string;
-  email: string;
-  website: string;
-  description: string;
-  specialOffer: SpecialOffer | string | undefined;
-};
-
-function toIntlView(m: SisterChapterMember): IntlMemberView {
-  return {
-    // Built from the public member card: no chineseName / email / structured offer.
-    id: m.id,
-    name: m.displayName ?? '',
-    chineseName: undefined,
-    avatarUrl: m.avatarUrl ?? '',
-    jciChapter: m.sisterChapter.name,
-    flagEmoji: m.sisterChapter.flagEmoji,
-    country: m.sisterChapter.country,
-    companyName: m.companyName ?? '',
-    industry: m.industry ?? '',
-    businessCategory: (m.businessCategory ?? []).join(', '),
-    position: m.position ?? '',
-    email: '',
-    website: m.website ?? '',
-    description: m.companyDescription ?? '',
-    specialOffer: m.specialOfferSummary,
-  };
-}
+import { BusinessDirectoryFilterDrawer } from './BusinessDirectoryFilterDrawer';
+import { DirectoryFilterPanel } from './DirectoryFilterPanel';
+import { SisterMemberDetailModal } from './SisterMemberDetailModal';
+import { useDirectoryFilters } from './useDirectoryFilters';
+import { cardToDirectoryItem, type DirectoryItem } from './directoryFacets';
+import { getInitialsSvg } from './businessDirectoryUtils';
 
 interface InternationalNetworkTabProps {
   /** Omit to hide Contact (externals have no inquiry flow). */
   onContact?: (biz: BusinessProfile) => void;
 }
 
+/** Card-only directory for externals (and anyone rendering it): same filter panel as the KL directory. */
 export const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = ({ onContact }) => {
   const { members: rawMembers, canView, optIn, optingIn } = useSisterChapterMembers();
-  const views = useMemo(() => rawMembers.map(toIntlView), [rawMembers]);
+  const items = useMemo(() => rawMembers.map(card => cardToDirectoryItem(card, name => getInitialsSvg(name))), [rawMembers]);
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedChapter, setSelectedChapter] = useState('All');
-  const [selectedCountry, setSelectedCountry] = useState('All');
-  const [selectedIndustry, setSelectedIndustry] = useState('All');
-  const [showDealsOnly, setShowDealsOnly] = useState(false);
-  const [detailMember, setDetailMember] = useState<IntlMemberView | null>(null);
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [detailItem, setDetailItem] = useState<DirectoryItem | null>(null);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
-
-  const allChapters = useMemo(() => ['All', ...Array.from(new Set(views.map(m => m.jciChapter)))], [views]);
-  const allCountries = useMemo(() => ['All', ...Array.from(new Set(views.map(m => m.country)))], [views]);
-  const allIndustries = useMemo(() => ['All', ...Array.from(new Set(views.map(m => m.industry).filter(Boolean)))], [views]);
-
-  const activeFiltersCount = useMemo(() => {
-    let n = 0;
-    if (selectedChapter !== 'All') n++;
-    if (selectedCountry !== 'All') n++;
-    if (selectedIndustry !== 'All') n++;
-    if (showDealsOnly) n++;
-    return n;
-  }, [selectedChapter, selectedCountry, selectedIndustry, showDealsOnly]);
-
-  const clearFilters = () => { setSelectedChapter('All'); setSelectedCountry('All'); setSelectedIndustry('All'); setShowDealsOnly(false); };
-
-  const filteredMembers = useMemo(() => {
-    return views.filter(member => {
-      const term = searchTerm.toLowerCase();
-      const matchesSearch = !term ||
-        member.name.toLowerCase().includes(term) ||
-        (member.chineseName && member.chineseName.toLowerCase().includes(term)) ||
-        member.companyName.toLowerCase().includes(term) ||
-        member.jciChapter.toLowerCase().includes(term) ||
-        member.description.toLowerCase().includes(term) ||
-        member.businessCategory.toLowerCase().includes(term);
-      return matchesSearch &&
-        (selectedChapter === 'All' || member.jciChapter === selectedChapter) &&
-        (selectedCountry === 'All' || member.country === selectedCountry) &&
-        (selectedIndustry === 'All' || member.industry === selectedIndustry) &&
-        (!showDealsOnly || hasSpecialOffer(member.specialOffer));
-    });
-  }, [views, searchTerm, selectedChapter, selectedCountry, selectedIndustry, showDealsOnly]);
+  const directory = useDirectoryFilters(items, searchTerm);
+  const filteredMembers = directory.filtered;
+  const activeFiltersCount = directory.activeCount;
 
   // Reciprocity: no card list until the viewer shares their own card (all hooks are above this line).
   if (!canView) return <ShareCardNotice onShare={optIn} sharing={optingIn} />;
 
-  const getMappedBiz = (member: IntlMemberView): BusinessProfile => ({
+  const getMappedBiz = (member: DirectoryItem): BusinessProfile => ({
     id: member.id, memberId: member.id,
-    ownerName: member.chineseName ? `${member.name} (${member.chineseName})` : member.name,
-    companyName: member.companyName,
-    industry: `${member.jciChapter} (${member.country})`,
+    ownerName: member.name,
+    companyName: member.company,
+    industry: `${member.chapter} (${member.country})`,
     description: member.description, website: member.website,
-    offer: getSpecialOfferSummary(member.specialOffer), logo: member.avatarUrl,
+    offer: member.dealSummary, logo: member.avatarUrl,
     idealReferralTypes: [],
-    businessCategory: member.businessCategory, acceptsInternationalBusiness: 'Yes'
+    businessCategory: member.categories.join(', '), acceptsInternationalBusiness: 'Yes'
   });
+  const contact = onContact ? (item: DirectoryItem) => onContact(getMappedBiz(item)) : undefined;
 
   return (
     <div className="space-y-2">
-      {/* â”€â”€ Mobile layout â”€â”€ */}
+      {/* Mobile layout */}
       <div className="md:hidden space-y-2">
         <div className="flex gap-3 items-center bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
-          <div className="flex-1">
-            <Input icon={<Search size={14} />} placeholder="Search sister chapter members..."
+          <div className="flex-1 min-w-0">
+            <Input icon={<Search size={14} />} placeholder="Search name, company, chapter..."
               value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
           </div>
           <Button variant={activeFiltersCount > 0 ? "secondary" : "outline"} size="sm"
@@ -138,26 +70,17 @@ export const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = (
         ) : (
           <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white overflow-hidden">
             {filteredMembers.map(member => (
-              <button key={member.id} type="button"
+              <button key={member.key} type="button"
                 className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors"
-                onClick={() => { setDetailMember(member); setIsDetailOpen(true); }}>
-                {member.avatarUrl ? (
-                  <img src={member.avatarUrl} alt={member.name} className="w-11 h-11 rounded-full object-cover border border-slate-200 flex-shrink-0" />
-                ) : (
-                  <div className="w-11 h-11 rounded-full border border-slate-200 flex-shrink-0 bg-slate-100 flex items-center justify-center text-sm font-bold text-slate-400">
-                    {member.name.charAt(0).toUpperCase()}
-                  </div>
-                )}
+                onClick={() => setDetailItem(member)}>
+                <img src={member.avatarUrl} alt={member.name} className="w-11 h-11 rounded-full object-cover border border-slate-200 flex-shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-sm font-bold text-slate-900 truncate">{member.name}</span>
-                    {member.chineseName && member.chineseName !== member.name && <span className="text-xs text-slate-400 font-medium truncate hidden sm:inline">({member.chineseName})</span>}
-                  </div>
-                  <p className="text-xs text-slate-500 truncate">{member.position} · {member.companyName}</p>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <span className="text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-100 px-1.5 py-0.5 rounded-full">{member.businessCategory}</span>
-                    {hasSpecialOffer(member.specialOffer) && <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Gift size={9} /> Deal</span>}
-                    <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 px-1.5 py-0.5 rounded-full">{member.country}</span>
+                  <span className="block text-sm font-bold text-slate-900 truncate">{member.name}</span>
+                  <p className="text-xs text-slate-500 truncate">{[member.position, member.company].filter(Boolean).join(' · ')}</p>
+                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                    {member.categories.length > 0 && <span className="text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-100 px-1.5 py-0.5 rounded-full">{member.categories.join(', ')}</span>}
+                    {member.hasDeal && <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Gift size={9} /> Deal</span>}
+                    {member.country && <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 px-1.5 py-0.5 rounded-full">{member.country}</span>}
                   </div>
                 </div>
                 <svg className="w-4 h-4 text-slate-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
@@ -167,56 +90,29 @@ export const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = (
         )}
       </div>
 
-      {/* â”€â”€ Desktop: sidebar + card grid â”€â”€ */}
+      {/* Desktop: sidebar + card grid */}
       <div className="hidden md:flex gap-6 pt-2 items-start">
-        {/* Sidebar */}
-        <aside className="w-52 shrink-0 space-y-3 sticky top-4">
-          {/* Stats */}
-          <div className="bg-white rounded-xl border border-slate-200 p-4">
-            <p className="text-3xl font-black text-slate-900">{filteredMembers.length}</p>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {filteredMembers.length === views.length ? 'international partners' : `of ${views.length} partners`}
+        <aside className="w-60 shrink-0 space-y-3 sticky top-4">
+          <div className="bg-white rounded-xl border border-slate-200 p-4 dark:bg-slate-800 dark:border-slate-700">
+            <p className="text-3xl font-black text-slate-900 dark:text-white">{filteredMembers.length}</p>
+            <p className="text-xs text-slate-500 mt-0.5 dark:text-slate-400">
+              {filteredMembers.length === items.length ? 'international partners' : `of ${items.length} partners`}
             </p>
             {activeFiltersCount > 0 && (
-              <button onClick={clearFilters} className="mt-2 text-[10px] font-bold text-jci-blue hover:underline">
+              <button onClick={directory.reset} className="mt-2 text-[10px] font-bold text-jci-blue hover:underline">
                 Clear {activeFiltersCount} filter{activeFiltersCount > 1 ? 's' : ''}
               </button>
             )}
           </div>
-
-          {/* Quick filters */}
-          <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-2">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Quick Filters</p>
-            <button onClick={() => setShowDealsOnly(v => !v)}
-              className={`w-full text-left text-xs px-3 py-2 rounded-lg border flex items-center gap-2 font-semibold transition-colors ${showDealsOnly ? 'bg-amber-50 text-amber-700 border-amber-200' : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'}`}>
-              <Gift size={12} /> Has Sister Deal
-            </button>
-          </div>
-
-          {/* Country filter */}
-          <div className="bg-white rounded-xl border border-slate-200 p-4">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Country</p>
-            <div className="space-y-0.5">
-              {allCountries.map(c => (
-                <button key={c} onClick={() => setSelectedCountry(c)}
-                  className={`w-full text-left text-xs px-2.5 py-1.5 rounded-lg transition-colors ${selectedCountry === c ? 'bg-jci-blue text-white font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>
-                  {c}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Industry filter */}
-          <div className="bg-white rounded-xl border border-slate-200 p-4">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Industry</p>
-            <div className="space-y-0.5 max-h-48 overflow-y-auto">
-              {allIndustries.map(ind => (
-                <button key={ind} onClick={() => setSelectedIndustry(ind)}
-                  className={`w-full text-left text-xs px-2.5 py-1.5 rounded-lg transition-colors ${selectedIndustry === ind ? 'bg-jci-blue text-white font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>
-                  {ind}
-                </button>
-              ))}
-            </div>
+          <div className="bg-white rounded-xl border border-slate-200 p-4 dark:bg-slate-800 dark:border-slate-700">
+            <DirectoryFilterPanel
+              variant="sidebar"
+              filters={directory.filters}
+              facets={directory.facets}
+              toggleValue={directory.toggleValue}
+              toggleFlag={directory.toggleFlag}
+              clearSection={directory.clearSection}
+            />
           </div>
         </aside>
 
@@ -224,7 +120,7 @@ export const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = (
         <div className="flex-1 min-w-0 space-y-4">
           <div className="flex gap-3 items-center">
             <div className="flex-1">
-              <Input icon={<Search size={14} />} placeholder="Search by name, company, chapter, industry…"
+              <Input icon={<Search size={14} />} placeholder="Search by name, company, chapter, industry, category…"
                 value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             </div>
             {searchTerm && <button onClick={() => setSearchTerm('')} className="text-slate-400 hover:text-slate-600 text-lg leading-none shrink-0">×</button>}
@@ -239,37 +135,32 @@ export const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = (
           ) : (
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredMembers.map(member => (
-                <div key={member.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col group cursor-pointer"
-                  onClick={() => { setDetailMember(member); setIsDetailOpen(true); }}>
+                <div key={member.key} className="bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col group cursor-pointer"
+                  onClick={() => setDetailItem(member)}>
                   {/* Header */}
                   <div className="p-4 flex gap-3 items-start border-b border-slate-50">
-                    {member.avatarUrl ? (
                     <img src={member.avatarUrl} alt={member.name} className="w-12 h-12 rounded-xl object-cover border border-slate-100 flex-shrink-0 shadow-sm" />
-                  ) : (
-                    <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-100 flex-shrink-0 shadow-sm flex items-center justify-center text-lg font-bold text-slate-400">{member.flagEmoji || member.name.charAt(0)}</div>
-                  )}
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-1">
                         <p className="font-bold text-sm text-slate-900 truncate leading-tight">{member.name}</p>
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded shrink-0">{member.country}</span>
+                        {member.country && <span className="text-[9px] font-bold px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded shrink-0">{member.country}</span>}
                       </div>
-                      {member.chineseName && member.chineseName !== member.name && <p className="text-[11px] text-slate-400 truncate">{member.chineseName}</p>}
                       <p className="text-xs text-slate-500 truncate mt-0.5">{member.position}</p>
-                      <p className="text-xs font-semibold text-slate-700 truncate">{member.companyName}</p>
-                      <p className="text-[10px] text-jci-blue font-bold truncate mt-0.5">{member.jciChapter}</p>
+                      <p className="text-xs font-semibold text-slate-700 truncate">{member.company}</p>
+                      <p className="text-[10px] text-jci-blue font-bold truncate mt-0.5">{member.chapter}</p>
                     </div>
                   </div>
                   {/* Body */}
                   <div className="p-4 flex-1 flex flex-col gap-3">
                     <div className="flex flex-wrap gap-1.5">
-                      <span className="text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-100 px-2 py-0.5 rounded-full">{member.businessCategory}</span>
-                      {hasSpecialOffer(member.specialOffer) && <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 px-2 py-0.5 rounded-full flex items-center gap-0.5"><Gift size={9} /> Deal</span>}
+                      {member.categories.length > 0 && <span className="text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-100 px-2 py-0.5 rounded-full">{member.categories.join(', ')}</span>}
+                      {member.hasDeal && <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 px-2 py-0.5 rounded-full flex items-center gap-0.5"><Gift size={9} /> Deal</span>}
                     </div>
                     <p className="text-xs text-slate-500 line-clamp-2 flex-1 leading-relaxed">{member.description}</p>
-                    {hasSpecialOffer(member.specialOffer) && (
+                    {member.hasDeal && (
                       <div className="bg-amber-50 rounded-lg px-3 py-2 border border-amber-100">
                         <p className="text-[9px] font-black text-amber-700 uppercase tracking-wider mb-0.5 flex items-center gap-1"><Gift size={9} /> Sister Deal</p>
-                        <p className="text-[11px] text-amber-800 line-clamp-2 leading-snug">{getSpecialOfferSummary(member.specialOffer)}</p>
+                        <p className="text-[11px] text-amber-800 line-clamp-2 leading-snug">{member.dealSummary}</p>
                       </div>
                     )}
                   </div>
@@ -279,7 +170,7 @@ export const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = (
                       className="disabled:opacity-40 flex-1 border border-slate-200 text-slate-600 text-xs font-bold py-2 rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-1.5">
                       <Globe size={11} /> Website
                     </button>
-                    {onContact && <button onClick={(e) => { e.stopPropagation(); onContact(getMappedBiz(member)); }}
+                    {contact && <button onClick={(e) => { e.stopPropagation(); contact(member); }}
                       className="flex-1 bg-jci-blue text-white text-xs font-bold py-2 rounded-lg hover:bg-jci-blue/90 transition-colors flex items-center justify-center gap-1.5">
                       <Send size={11} /> Contact
                     </button>}
@@ -291,173 +182,14 @@ export const InternationalNetworkTab: React.FC<InternationalNetworkTabProps> = (
         </div>
       </div>
 
-      {/* Mobile filter drawer */}
-      {isMobileFilterOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60]" onClick={() => setIsMobileFilterOpen(false)} />
-      )}
-      <div className={`fixed top-0 right-0 h-full w-full max-w-sm bg-white shadow-2xl z-[60] flex flex-col transform transition-transform duration-300 ${isMobileFilterOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-          <div>
-            <h3 className="font-bold text-slate-800 text-lg">Filter Sister Chapters</h3>
-            <p className="text-xs text-slate-400 mt-0.5">Narrow down sister chapter members</p>
-          </div>
-          <button onClick={() => setIsMobileFilterOpen(false)} className="text-slate-400 hover:text-slate-600 p-1.5 hover:bg-slate-50 rounded-full text-xl font-bold">×</button>
-        </div>
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-5 space-y-6">
-            {/* Quick Filters */}
-            <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Quick Filters</p>
-              <button onClick={() => setShowDealsOnly(v => !v)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${showDealsOnly ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-slate-600 border-slate-200'}`}>
-                <Gift size={13} /> Has Sister Deal
-              </button>
-            </div>
+      <BusinessDirectoryFilterDrawer
+        isOpen={isMobileFilterOpen}
+        onClose={() => setIsMobileFilterOpen(false)}
+        state={directory}
+        description="Narrow down member cards"
+      />
 
-            {/* Country — pill group */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Country</p>
-                {selectedCountry !== 'All' && (
-                  <button onClick={() => setSelectedCountry('All')} className="text-[10px] font-bold text-jci-blue hover:underline">Clear</button>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {allCountries.filter(c => c !== 'All').map(c => {
-                  const count = views.filter(m => m.country === c).length;
-                  const active = selectedCountry === c;
-                  return (
-                    <button key={c} onClick={() => setSelectedCountry(active ? 'All' : c)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${active ? 'bg-jci-blue text-white border-jci-blue' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}>
-                      {c}
-                      <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{count}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Chapter — pill group */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">JCI Chapter</p>
-                {selectedChapter !== 'All' && (
-                  <button onClick={() => setSelectedChapter('All')} className="text-[10px] font-bold text-jci-blue hover:underline">Clear</button>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {allChapters.filter(c => c !== 'All').map(c => {
-                  const count = views.filter(m => m.jciChapter === c).length;
-                  const active = selectedChapter === c;
-                  return (
-                    <button key={c} onClick={() => setSelectedChapter(active ? 'All' : c)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${active ? 'bg-jci-blue text-white border-jci-blue' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}>
-                      {c}
-                      <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{count}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Industry — pill group */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Industry</p>
-                {selectedIndustry !== 'All' && (
-                  <button onClick={() => setSelectedIndustry('All')} className="text-[10px] font-bold text-jci-blue hover:underline">Clear</button>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {allIndustries.filter(i => i !== 'All').map(i => {
-                  const count = views.filter(m => m.industry === i).length;
-                  const active = selectedIndustry === i;
-                  return (
-                    <button key={i} onClick={() => setSelectedIndustry(active ? 'All' : i)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${active ? 'bg-jci-blue text-white border-jci-blue' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}>
-                      {i}
-                      <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{count}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="shrink-0 bg-white border-t border-slate-100">
-          <div className="px-5 pt-4 pb-10">
-            <button
-              onClick={() => setIsMobileFilterOpen(false)}
-              className="w-full bg-jci-blue text-white font-black py-4 rounded-2xl text-sm shadow-lg shadow-jci-blue/25 active:scale-[0.98] transition-transform"
-            >
-              Show {filteredMembers.length} {filteredMembers.length === 1 ? 'Member' : 'Members'}
-            </button>
-            {activeFiltersCount > 0 && (
-              <button
-                onClick={() => { clearFilters(); }}
-                className="w-full mt-3 text-slate-400 text-xs font-semibold hover:text-slate-600 transition-colors py-1"
-              >
-                Reset all {activeFiltersCount} filter{activeFiltersCount > 1 ? 's' : ''}
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* International member detail drawer (mobile) */}
-      {detailMember && (
-        <Modal
-          isOpen={isDetailOpen}
-          onClose={() => setIsDetailOpen(false)}
-          title={detailMember.companyName}
-          drawerOnMobile
-        >
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <img src={detailMember.avatarUrl} alt={detailMember.name} className="w-14 h-14 rounded-full object-cover border border-slate-200 flex-shrink-0" />
-              <div>
-                <div className="font-bold text-slate-900">{detailMember.name}{detailMember.chineseName && detailMember.chineseName !== detailMember.name && <span className="text-sm text-slate-500 font-normal ml-1">({detailMember.chineseName})</span>}</div>
-                <div className="text-sm text-slate-500">{detailMember.position} · {detailMember.companyName}</div>
-                <div className="text-xs text-jci-blue font-bold mt-0.5">{detailMember.jciChapter} · {detailMember.country}</div>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              <span className="text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-100 px-2 py-1 rounded-full">{detailMember.businessCategory}</span>
-              {hasSpecialOffer(detailMember.specialOffer) && <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100 px-2 py-1 rounded-full flex items-center gap-0.5"><Gift size={9} /> Deal</span>}
-            </div>
-            {detailMember.description && <p className="text-sm text-slate-600 leading-relaxed">{detailMember.description}</p>}
-            {hasSpecialOffer(detailMember.specialOffer) && (
-              <div className="bg-amber-50 p-3 rounded-xl border border-amber-100">
-                <span className="text-[10px] font-black text-amber-700 uppercase tracking-wider flex items-center gap-1 mb-1"><Gift size={11} /> Sister Chapter Deal</span>
-                <p className="text-sm font-semibold text-amber-900 leading-snug">{getSpecialOfferSummary(detailMember.specialOffer)}</p>
-              </div>
-            )}
-          </div>
-          <div className="flex gap-2 pt-4 border-t border-slate-100 mt-4">
-            <Button variant="outline" size="sm" className="flex-1" disabled={!detailMember.website}
-              onClick={() => window.open(detailMember.website, '_blank', 'noopener')}>
-              <Globe size={14} className="mr-2" /> Website
-            </Button>
-            {onContact && <Button variant="primary" size="sm" className="flex-1 bg-jci-blue text-white"
-              onClick={() => {
-                setIsDetailOpen(false);
-                const mappedBiz: BusinessProfile = {
-                  id: detailMember.id, memberId: detailMember.id,
-                  ownerName: detailMember.chineseName ? `${detailMember.name} (${detailMember.chineseName})` : detailMember.name,
-                  companyName: detailMember.companyName,
-                  industry: `${detailMember.jciChapter} (${detailMember.country})`,
-                  description: detailMember.description, website: detailMember.website,
-                  offer: getSpecialOfferSummary(detailMember.specialOffer), logo: detailMember.avatarUrl,
-                  idealReferralTypes: [],
-                  businessCategory: detailMember.businessCategory, acceptsInternationalBusiness: 'Yes'
-                };
-                onContact(mappedBiz);
-              }}>
-              <Send size={14} className="mr-2" /> Contact
-            </Button>}
-          </div>
-        </Modal>
-      )}
+      <SisterMemberDetailModal item={detailItem} onClose={() => setDetailItem(null)} onContact={contact} />
     </div>
   );
 };
