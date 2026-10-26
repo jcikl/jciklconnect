@@ -176,6 +176,38 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
   const getEventsForDate = (date: Date) =>
     events.filter(e => eventCoversDate(e, date));
 
+  // Multi-day events (up to the cap) draw as one continuous bar per week instead of a chip in every cell.
+  const isSpanning = (e: Event) => { const { days } = eventSpan(e); return days > 1 && days <= MAX_SPAN_DAYS; };
+  const spanningEvents = useMemo(() => events.filter(isSpanning), [events]);
+
+  /**
+   * Spanning-event bars that intersect one week, each as a single element spanning its columns
+   * (so it reads as one connected band), with a lane per overlapping bar to avoid stacking collisions.
+   * Grid columns: col 1 = week-number gutter; day i (0..6) spans grid lines (i+2)..(i+3).
+   */
+  const buildWeekBars = (week: Date[]) => {
+    const wStart = dayOnly(week[0]);
+    const wEnd   = dayOnly(week[6]);
+    const DAY = 86400000;
+    const laneLastCol: number[] = [];
+    return spanningEvents
+      .map(event => {
+        const { start, end } = eventSpan(event);
+        if (end < wStart || start > wEnd) return null;
+        const i = Math.max(0, Math.round((start.getTime() - wStart.getTime()) / DAY));
+        const j = Math.min(6, Math.round((end.getTime()   - wStart.getTime()) / DAY));
+        return { event, i, j, startsHere: start >= wStart, endsHere: end <= wEnd };
+      })
+      .filter((b): b is NonNullable<typeof b> => b !== null)
+      .sort((a, b) => a.i - b.i || b.j - a.j)
+      .map(b => {
+        let lane = 0;
+        while (lane < laneLastCol.length && laneLastCol[lane] >= b.i) lane++;
+        laneLastCol[lane] = b.j;
+        return { ...b, colStart: b.i + 2, colEnd: b.j + 3, lane };
+      });
+  };
+
   // ── Drag-and-drop ──────────────────────────────────────────────────────────
   const handleDragStart = (e: React.DragEvent, event: Event) => {
     if (readonly) { e.preventDefault(); return; }
@@ -303,7 +335,8 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
       {/* ── Calendar grid ── */}
       <div className="px-2 pt-1 pb-2">
         {calendarWeeks.map((week, wi) => (
-          <div key={wi} className="grid grid-cols-[24px_repeat(7,minmax(0,1fr))] mb-0.5">
+          <div key={wi} className="mb-0.5">
+          <div className="grid grid-cols-[24px_repeat(7,minmax(0,1fr))]">
 
             {/* ISO week number */}
             <div className="flex items-start justify-center pt-2.5">
@@ -314,7 +347,8 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
 
             {/* 7 day cells */}
             {week.map((date, di) => {
-              const dayEvents   = getEventsForDate(date);
+              // Single-day (and over-cap) events only — spanning events are drawn as week-level bars below.
+              const dayEvents   = getEventsForDate(date).filter(e => !isSpanning(e));
               const isToday_    = isSameDay(date, today);
               const isSelected  = !!selectedDate && isSameDay(date, selectedDate);
               const inMonth     = date.getMonth() === currentDate.getMonth();
@@ -366,21 +400,16 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
                     )}
                     {dayEvents.slice(0, 2).map(event => {
                       const c = getColors(event);
-                      const { days } = eventSpan(event);
-                      // A multi-day event shows its title on the start day and a plain colour band on the days it continues.
-                      const isContinuation = days > 1 && days <= MAX_SPAN_DAYS && !isSameDay(new Date(event.date), date);
                       return (
                         <div
                           key={event.id}
-                          draggable={!readonly && !isContinuation}
+                          draggable={!readonly}
                           onDragStart={(e) => handleDragStart(e, event)}
                           onClick={(e) => { e.stopPropagation(); onEventClick?.(event); }}
-                          className={isContinuation
-                            ? `w-full h-[11px] rounded-sm cursor-pointer ${c.bar} ${!inMonth ? 'opacity-40' : ''}`
-                            : ['w-full text-[8px] font-semibold truncate px-1 py-[1px] rounded-sm leading-tight cursor-pointer', c.chip, !inMonth ? 'opacity-40' : ''].join(' ')}
+                          className={['w-full text-[8px] font-semibold truncate px-1 py-[1px] rounded-sm leading-tight cursor-pointer', c.chip, !inMonth ? 'opacity-40' : ''].join(' ')}
                           title={event.title}
                         >
-                          {isContinuation ? '' : event.title}
+                          {event.title}
                         </div>
                       );
                     })}
@@ -393,6 +422,39 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
                 </div>
               );
             })}
+          </div>
+
+          {/* Multi-day events as continuous bars spanning their days (one element per week segment) */}
+          {(() => {
+            const bars = buildWeekBars(week);
+            if (!bars.length) return null;
+            return (
+              <div className="grid grid-cols-[24px_repeat(7,minmax(0,1fr))] gap-y-[2px] mt-[1px]">
+                {bars.map(b => {
+                  const c = getColors(b.event);
+                  const inMonth = b.event.date ? new Date(b.event.date).getMonth() === currentDate.getMonth() : true;
+                  return (
+                    <button
+                      key={`${b.event.id}-${b.lane}`}
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onEventClick?.(b.event); }}
+                      title={b.event.title}
+                      style={{ gridColumn: `${b.colStart} / ${b.colEnd}`, gridRow: b.lane + 1 }}
+                      className={[
+                        'h-[12px] flex items-center text-[8px] font-semibold text-white leading-none truncate px-1',
+                        c.bar,
+                        b.startsHere ? 'rounded-l-sm ml-0.5' : '',
+                        b.endsHere ? 'rounded-r-sm mr-0.5' : '',
+                        !inMonth ? 'opacity-40' : '',
+                      ].join(' ')}
+                    >
+                      {b.event.title}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
           </div>
         ))}
       </div>
