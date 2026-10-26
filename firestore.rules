@@ -1670,6 +1670,11 @@ service cloud.firestore {
     match /jciMalaysiaSyncRuns/{runId} {
       allow read, write: if false;
     }
+    // Cached Malaysia public holidays per year ({ year, locations, holidays, fetchedAt }); written by the
+    // malaysia-holidays function (Admin SDK) and read by it, not by the client. No client access.
+    match /malaysiaHolidays/{year} {
+      allow read, write: if false;
+    }
 
     // Member email dedup slots — one document per sanitised email address to enforce uniqueness
     // Members can read their own slot (to check status); only the service layer (Admin SDK) writes

@@ -1,7 +1,8 @@
 /**
- * Malaysia public holidays for the calendar. Fetched from the Netlify function `malaysia-holidays` (which proxies
- * Calendarific with a server-side key). Cached per year in memory and localStorage (holidays rarely change); any
- * failure resolves to an empty list so the calendar degrades gracefully (just no holiday markers).
+ * Malaysia public holidays for the calendar. Fetched from the Netlify function `malaysia-holidays`, which serves
+ * them from Firestore and only refreshes from Calendarific every few days (the key stays server-side). Cached per
+ * year in memory for this session; the function's response is also CDN-cached (~24h), so a new session fetches at
+ * most once per year. Any failure resolves to an empty list so the calendar degrades gracefully.
  */
 import { isDevMode } from '../utils/devMode';
 
@@ -12,7 +13,6 @@ export interface MalaysiaHoliday {
 }
 
 const ENDPOINT = '/.netlify/functions/malaysia-holidays';
-const LS_KEY = (year: number) => `my-holidays-${year}`;
 const memo = new Map<number, MalaysiaHoliday[]>();
 
 const MOCK: MalaysiaHoliday[] = [
@@ -28,17 +28,11 @@ export class MalaysiaHolidaysService {
     if (memo.has(year)) return memo.get(year)!;
 
     try {
-      const cached = localStorage.getItem(LS_KEY(year));
-      if (cached) { const parsed = JSON.parse(cached) as MalaysiaHoliday[]; memo.set(year, parsed); return parsed; }
-    } catch { /* ignore localStorage issues */ }
-
-    try {
       const res = await fetch(`${ENDPOINT}?year=${year}`);
       if (!res.ok) return [];
       const data = await res.json() as { holidays?: MalaysiaHoliday[] };
       const holidays = Array.isArray(data.holidays) ? data.holidays : [];
       memo.set(year, holidays);
-      try { localStorage.setItem(LS_KEY(year), JSON.stringify(holidays)); } catch { /* ignore */ }
       return holidays;
     } catch {
       return [];
