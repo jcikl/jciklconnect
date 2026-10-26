@@ -1,21 +1,22 @@
 /**
  * "Membership" tab of the unified JCI Malaysia sync modal — developer accounts only (the server checks again).
- * Syncs JCI Malaysia membership no. / join date / user id onto members. The preview reads a heavy snapshot, so it
- * runs ONLY when the user clicks "Load preview" (never automatically on open or tab switch). Preview (counts,
- * changes, conflicts with A/B picks, other chapter, not found) → Apply behind a confirm.
+ * Syncs selectable JCI Malaysia fields onto members. The three match keys (user id / membership no. / join date)
+ * are always written on a match; everything else is opt-in via checkboxes. Core profile fields (name / gender /
+ * dob / email / phone) only FILL A BLANK — they never overwrite a value we already hold. The preview reads a heavy
+ * snapshot, so it runs ONLY when the user clicks "Load preview". Preview (counts, per-field changes, conflicts with
+ * A/B picks, other chapter, not found) → pick which fields → Apply behind a confirm.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { Button, Badge, useToast } from '../../ui/Common';
 import { LoadingState } from '../../ui/Loading';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { useJciMalaysiaSync } from '../../../hooks/useJciMalaysiaSync';
-import type { JciMalaysiaCandidate, JciMalaysiaConflict, JciMalaysiaFields } from '../../../services/jciMalaysiaSyncService';
+import type { JciMalaysiaCandidate, JciMalaysiaConflict, JciMalaysiaSyncPreview } from '../../../services/jciMalaysiaSyncService';
 
 const BY_LABEL: Record<string, string> = {
   manual: 'manual pick', userId: 'user id', membershipNo: 'membership no.', email: 'email', phone: 'phone',
 };
-const FIELD_LABEL: Record<keyof JciMalaysiaFields, string> = { membershipNo: 'No.', joinDate: 'Joined', userId: 'User id' };
 const show = (v: string | null | undefined) => v || '∅';
 
 const card = 'rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800';
@@ -73,12 +74,39 @@ const ConflictRow: React.FC<{ conflict: JciMalaysiaConflict; busy: boolean; onSa
   );
 };
 
+/** One selectable-field checkbox with how many members it would change. `always` fields are locked on. */
+const FieldToggle: React.FC<{ label: string; count: number; checked: boolean; always?: boolean; onToggle?: () => void }> = ({ label, count, checked, always, onToggle }) => (
+  <label className={`flex items-center gap-2 rounded-md border px-2 py-1.5 min-w-0 ${always ? 'opacity-70 cursor-default' : 'cursor-pointer'} ${checked ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/30' : 'border-slate-200 dark:border-slate-700'}`}>
+    <input type="checkbox" checked={checked} disabled={always} onChange={onToggle} />
+    <span className="min-w-0 flex-1 text-sm text-slate-800 dark:text-slate-100 truncate">{label}{always && <span className={`ml-1 ${muted}`}>(always)</span>}</span>
+    <Badge variant={count ? 'info' : 'neutral'}>{count}</Badge>
+  </label>
+);
+
 export const MembershipSyncPanel: React.FC = () => {
   const { preview, result, loading, busy, error, loadPreview, pick, apply } = useJciMalaysiaSync();
   const { showToast } = useToast();
   const [confirming, setConfirming] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const initedFor = useRef<JciMalaysiaSyncPreview | null>(null);
 
-  const toWrite = preview?.writes.length ?? 0;
+  // When a fresh preview arrives, default-check the low-risk JCIM-only fields; leave core profile fields unchecked.
+  useEffect(() => {
+    if (preview && initedFor.current !== preview) {
+      initedFor.current = preview;
+      setSelected(new Set(preview.fieldCatalog.filter(f => !f.always && !f.core).map(f => f.key)));
+    }
+  }, [preview]);
+
+  const alwaysKeys = preview ? preview.fieldCatalog.filter(f => f.always).map(f => f.key) : [];
+  const active = new Set<string>([...alwaysKeys, ...selected]);
+  const countFor = (key: string) => (preview ? preview.writes.filter(w => w.fields.some(f => f.key === key)).length : 0);
+  const activeWrites = preview ? preview.writes.filter(w => w.fields.some(f => active.has(f.key))) : [];
+  const toWrite = activeWrites.length;
+
+  const selectableJcim = preview ? preview.fieldCatalog.filter(f => !f.always && !f.core) : [];
+  const selectableCore = preview ? preview.fieldCatalog.filter(f => !f.always && f.core) : [];
+  const toggle = (key: string) => setSelected(s => { const n = new Set(s); n.has(key) ? n.delete(key) : n.add(key); return n; });
 
   const savePick = async (memberId: string, sourceId: string) => {
     try {
@@ -92,7 +120,7 @@ export const MembershipSyncPanel: React.FC = () => {
   const runApply = async () => {
     setConfirming(false);
     try {
-      const res = await apply();
+      const res = await apply([...selected]);
       showToast(`JCI Malaysia sync: ${res.written} member(s) updated`, 'success');
     } catch {
       showToast('JCI Malaysia sync failed', 'error');
@@ -122,28 +150,56 @@ export const MembershipSyncPanel: React.FC = () => {
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <Stat label="KL members" value={preview.counts.members} />
-            <Stat label="To update" value={preview.counts.toWrite} />
-            <Stat label="Unchanged" value={preview.counts.unchanged} />
+            <Stat label="To update" value={toWrite} />
             <Stat label="Conflicts" value={preview.counts.conflict} />
+            <Stat label="Not found" value={preview.counts.none} />
           </div>
           <p className={muted}>
             Matched by manual pick {preview.counts.byManual} · user id {preview.counts.byUserId} · membership no. {preview.counts.byMembershipNo} · email {preview.counts.byEmail} · phone {preview.counts.byPhone}
           </p>
 
-          <Section title="Changes" count={preview.writes.length}>
-            {preview.writes.map(w => (
+          <div className={`${card} p-3 space-y-2`}>
+            <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Fields to load</p>
+            <p className={muted}>The three match keys are always written. Tick the extra fields you want. The count is how many members each would change.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+              {preview.fieldCatalog.filter(f => f.always).map(f => (
+                <FieldToggle key={f.key} label={f.label} count={countFor(f.key)} checked always />
+              ))}
+            </div>
+            {selectableJcim.length > 0 && (
+              <>
+                <p className={`${muted} pt-1`}>JCI Malaysia info (new fields — never touch our own data)</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                  {selectableJcim.map(f => (
+                    <FieldToggle key={f.key} label={f.label} count={countFor(f.key)} checked={selected.has(f.key)} onToggle={() => toggle(f.key)} />
+                  ))}
+                </div>
+              </>
+            )}
+            {selectableCore.length > 0 && (
+              <>
+                <p className={`${muted} pt-1`}>Core profile (fills a blank only — never overwrites a value we already have)</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                  {selectableCore.map(f => (
+                    <FieldToggle key={f.key} label={f.label} count={countFor(f.key)} checked={selected.has(f.key)} onToggle={() => toggle(f.key)} />
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          <Section title="Changes (selected fields)" count={toWrite} defaultOpen={toWrite > 0 && toWrite <= 30}>
+            {activeWrites.map(w => (
               <div key={w.memberId} className="py-1 border-b last:border-b-0 border-slate-100 dark:border-slate-700">
                 <p className="text-sm font-medium break-words">
                   {w.name} <span className={muted}>· by {BY_LABEL[w.by] ?? w.by}</span>
                 </p>
                 <ul className={`${muted} space-y-0.5`}>
-                  {(Object.keys(FIELD_LABEL) as (keyof JciMalaysiaFields)[])
-                    .filter(k => (w.before[k] ?? '') !== (w.after[k] ?? ''))
-                    .map(k => (
-                      <li key={k} className="break-words">
-                        {FIELD_LABEL[k]}: <span className="font-mono">{show(w.before[k])}</span> → <span className="font-mono text-slate-800 dark:text-slate-100">{show(w.after[k])}</span>
-                      </li>
-                    ))}
+                  {w.fields.filter(f => active.has(f.key)).map(f => (
+                    <li key={f.key} className="break-words">
+                      {f.label}: <span className="font-mono">{show(f.before)}</span> → <span className="font-mono text-slate-800 dark:text-slate-100">{show(f.after)}</span>
+                    </li>
+                  ))}
                 </ul>
               </div>
             ))}
@@ -187,7 +243,7 @@ export const MembershipSyncPanel: React.FC = () => {
         open={confirming}
         variant="warning"
         title={`Apply ${toWrite} change${toWrite === 1 ? '' : 's'}?`}
-        message="The server recomputes the changes, saves the old values as a backup run, then updates the members' JCI Malaysia fields."
+        message="The server recomputes the changes for the selected fields, saves the old values as a backup run, then updates the members. Core profile fields only fill a blank; they never overwrite a value you already have."
         confirmLabel="Apply"
         onConfirm={runApply}
         onCancel={() => setConfirming(false)}

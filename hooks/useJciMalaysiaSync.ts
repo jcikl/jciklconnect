@@ -41,11 +41,11 @@ export function useJciMalaysiaSync() {
     await loadPreview();
   }, [loadPreview]);
 
-  const apply = useCallback(async () => {
+  const apply = useCallback(async (selected: string[]) => {
     setBusy(true);
     setError(null);
     try {
-      const res = await JciMalaysiaSyncService.apply();
+      const res = await JciMalaysiaSyncService.apply(selected);
       setResult(res);
       return res;
     } catch (e) {

@@ -99,7 +99,7 @@
 | `membershipConfigService.ts` | 373 | 17 | ⚠️ 無說明 | SYSTEM_SETTINGS |
 | `mentorshipService.ts` | 638 | 4 | Mentorship Matching Service | MEMBERS, MENTORSHIP_FEEDBACK, MENTOR_MATCHES |
 | `promotionService.ts` | 1,191 | 4 | ⚠️ 無說明 | MANUAL_PROMOTION_REQUESTS, MEMBERS, PROMOTION_HISTORY, SYSTEM |
-| `senatorshipSyncService.ts` | 79 | 2 | Developer-only back-fill of JCI Malaysia senator numbers onto members. Runs in the Netlify function jci-malaysia-regcode (Admin SDK) so the … | — |
+| `senatorshipSyncService.ts` | 88 | 2 | Developer-only back-fill of JCI Malaysia senator numbers onto members. Runs in the Netlify function jci-malaysia-regcode (Admin SDK) so the … | — |
 
 <details><summary><code>services/engagementAutoSuggestService.ts</code> — 0 個方法、1 個函數/常數</summary>
 
@@ -277,8 +277,8 @@
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `preview` | 66 | Developer only: counts (matched, would-write, skipped-board-validated, skipped-no-value, conflicts, …). No PII… |
-| `apply` | 72 | Developer only: recompute, back up prior numbers, write (board-validated preserved), audit. |
+| `preview` | 75 | Developer only: counts + the per-member list of proposed writes (name · old → new) for verification. |
+| `apply` | 81 | Developer only: recompute, back up prior numbers, write (board-validated preserved), audit. |
 
 </details>
 
@@ -492,7 +492,7 @@
 | `activityPlansService.ts` | 621 | 2 | Activity Plans Service - CRUD Operations P0 fix: all methods now query COLLECTIONS.ACTIVITY_PLANS (was COLLECTIONS.PROJECTS) P1 fixes: isDev… | ACTIVITY_PLANS, PROJECTS |
 | `eventFeedbackService.ts` | 226 | 3 | Event Feedback Service - Collects and manages event feedback | EVENT_FEEDBACK |
 | `eventPaymentService.ts` | 89 | 1 | Event payment (mark-paid) — creates the finance income record, then flips the registration to 'paid'. | PROJECTS |
-| `eventRegcodeService.ts` | 96 | 3 | "My event QR": copy each member's JCI Malaysia regcode onto their own eventRegistration. Everything runs in the Netlify function jci-malaysi… | — |
+| `eventRegcodeService.ts` | 105 | 3 | "My event QR": copy each member's JCI Malaysia regcode onto their own eventRegistration. Everything runs in the Netlify function jci-malaysi… | — |
 | `eventRegistrationService.ts` | 393 | 7 | Event Registration Service - 报名/缴费/签到统一名单（Story 8.1） | EVENT_REGISTRATIONS, PROJECTS |
 | `eventsService.ts` | 1,142 | 14 | Events Service - CRUD Operations | EVENT_BUDGETS, EVENT_FEEDBACK, EVENT_REGISTRATIONS, GUEST_REGISTRATIONS, MEMBERS, NOTIFICATIONS … |
 | `flagshipProjectsService.ts` | 156 | 3 | ⚠️ 無說明 | FLAGSHIP_PROJECTS |
@@ -542,9 +542,9 @@
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `preview` | 69 | Developer only: counts (registrations, linkable, would-get-regcode, conflicts, …). No PII. |
-| `apply` | 75 | Developer only: the server recomputes the plan, backs up the ids, writes, audits. |
-| `attachMine` | 84 | Best-effort: attach the caller's OWN regcode for one event after registering. Never throws — a failure just le… |
+| `preview` | 78 | Developer only: counts + the per-registration list of proposed writes (member · event — regcode) for verificat… |
+| `apply` | 84 | Developer only: the server recomputes the plan, backs up the ids, writes, audits. |
+| `attachMine` | 93 | Best-effort: attach the caller's OWN regcode for one event after registering. Never throws — a failure just le… |
 
 </details>
 
@@ -1287,7 +1287,7 @@
 |---|---|---|---|---|
 | `chapterBirthdaysService.ts` | 46 | 1 | Own-chapter birthdays for external users: calls the Netlify function chapter-birthdays (read-only). | — |
 | `externalAccountsService.ts` | 162 | 3 | External (sister-chapter) accounts. Writes go through the Netlify function external-accounts (uid = member doc id); reads (chapter roster, K… | MEMBERS |
-| `jciMalaysiaSyncService.ts` | 145 | 2 | In-app JCI Malaysia sync (developer accounts only). Everything runs in the Netlify function jci-malaysia-sync: the source key, the overrides… | — |
+| `jciMalaysiaSyncService.ts` | 168 | 2 | In-app JCI Malaysia sync (developer accounts only). Everything runs in the Netlify function jci-malaysia-sync: the source key, the overrides… | — |
 | `reportService.ts` | 615 | 2 | ⚠️ 無說明 | — |
 
 <details><summary><code>services/chapterBirthdaysService.ts</code> — 1 個方法</summary>
@@ -1317,9 +1317,9 @@
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `preview` | 125 | The plan: counts, changes (before/after), conflicts with candidates A/B, other chapter, not found. |
-| `pick` | 131 | Save a manual pick for one conflict (server validates the source record). |
-| `apply` | 137 | Apply: the server recomputes the plan, backs up old values, writes, audits. No plan is sent. |
+| `preview` | 145 | The plan: counts, changes (before/after), conflicts with candidates A/B, other chapter, not found. |
+| `pick` | 151 | Save a manual pick for one conflict (server validates the source record). |
+| `apply` | 160 | Apply: the server recomputes the plan for the selected fields, backs up old values, writes, audits. No plan is… |
 
 </details>
 
@@ -1349,7 +1349,7 @@
 | `useActivityPlans.ts` | 130 | 1 | `useActivityPlans` | activityPlansService | ⚠️ 無說明 |
 | `useAdvertisements.ts` | 111 | 2 | `useAdvertisements` | advertisementService, errorLoggingService | Advertisements Data Hook |
 | `useAppNavigation.ts` | 239 | 1 | `useAppNavigation` | — | ⚠️ 無說明 |
-| `useAuth.tsx` | 880 | 62 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, memberCardsService, membersService, mockData | Authentication Hook |
+| `useAuth.tsx` | 880 | 63 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, memberCardsService, membersService, mockData | Authentication Hook |
 | `useAutomation.ts` | 149 | 3 | `useAutomation` | automationService | useAutomation Hook - Manage automation workflows and rules |
 | `useBusinessDirectory.ts` | 51 | 4 | `useBusinessDirectory` | businessDirectoryService | ⚠️ 無說明 |
 | `useChapterBirthdays.ts` | 23 | 1 | `useChapterBirthdays` | chapterBirthdaysService | Own-chapter birthdays for an active external user (dashboard birthday widget). `month` null → nothing loads. |
@@ -1374,7 +1374,7 @@
 | `useMemberSearch.ts` | 53 | 1 | `useMemberSearch` | — | ⚠️ 無說明 |
 | `useMembers.ts` | 195 | 20 | `useMembers`, `usePaginatedMembers` | membersService | Members Data Hook |
 | `useNotifications.ts` | 107 | 0 | `useNotifications` | communicationService, errorLoggingService, mockData | ⚠️ 無說明 |
-| `usePermissions.ts` | 212 | 33 | `usePermissions` | — | Permission Management Hook |
+| `usePermissions.ts` | 212 | 34 | `usePermissions` | — | Permission Management Hook |
 | `usePoints.ts` | 61 | 2 | `usePoints` | pointsService | Points Data Hook |
 | `useProjects.ts` | 170 | 7 | `useProjects` | projectsService | Projects Data Hook |
 | `usePushNotifications.ts` | 63 | 0 | `usePushNotifications` | — | ⚠️ 無說明 |
@@ -1642,7 +1642,7 @@
 | `Card.tsx` | 77 | 1 | `Card`, `StatCardsContainer` |
 | `ColumnFilterHeader.tsx` | 118 | 2 | `ColumnFilterHeader` |
 | `Combobox.tsx` | 255 | 11 | `Combobox` |
-| `Common.tsx` | 26 | 237 | — |
+| `Common.tsx` | 26 | 238 | — |
 | `ConfirmDialog.tsx` | 100 | 5 | `ConfirmDialog`, `CONFIRM_CLOSED` |
 | `DataTable.tsx` | 172 | 0 | `DataTable` |
 | `Drawer.tsx` | 139 | 2 | `Drawer` |

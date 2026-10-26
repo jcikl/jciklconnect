@@ -89,6 +89,14 @@
 | jciCareer.jciMalaysiaMembershipNo | string | — | JCI Malaysia（jcimalaysia.cc）会员编号，如 `JCIKL-025-0159`；对方为 "N/A" 时不写 | | 系统: `netlify/lib/jciMalaysiaSync.mjs`（按需执行，Admin SDK；入口为 CLI `scripts/syncJciMalaysia.mjs` 与应用内 `netlify/functions/jci-malaysia-sync`，仅开发者账号），来源 SheetScraper Pro 数据库 `member_directory.membership`（只取 JCI Kuala Lumpur 的记录；对应顺序：手动对应 `jciMalaysiaOverrides` → 已存用户编号 → 已存编号 → 电邮 → 电话） | 之后的同步按此编号对应；`MemberDetailCareerTab`（JCI Career 分页）只读显示 |
 | jciCareer.jciMalaysiaJoinDate | string | — | JCI Malaysia 入会日期（YYYY-MM-DD） | | 系统: `netlify/lib/jciMalaysiaSync.mjs`（CLI 与应用内同步），来源 `member_directory.joindate` | `MemberDetailCareerTab`（JCI Career 分页）只读显示 |
 | jciCareer.jciMalaysiaUserId | string | — | JCI Malaysia（jcimalaysia.cc）用户编号，对方每人固定不变 | | 系统: `netlify/lib/jciMalaysiaSync.mjs`（CLI 与应用内同步），来源 `member_directory.id` | 之后的同步优先按此编号对应（手动对应表之后）；应用内不显示 |
+| jciCareer.jciMalaysiaChapter | string | — | JCI Malaysia 所属分会（如 `JCI Kuala Lumpur`）；应用内同步可选字段 | | 系统: 同步时勾选，来源 `member_directory.chapter`（非空才写） | 参考 |
+| jciCareer.jciMalaysiaLevel | string | — | JCI Malaysia 会籍等级（如 `member`/`free`）；可选字段 | | 系统: 同步时勾选，来源 `member_directory.level` | 参考 |
+| jciCareer.jciMalaysiaArea | string | — | JCI Malaysia 区域（如 `Area Central`）；可选字段 | | 系统: 同步时勾选，来源 `member_directory.area` | 参考 |
+| jciCareer.jciMalaysiaRenewYear | number | — | JCI Malaysia 续费年份；可选字段 | | 系统: 同步时勾选，来源 `member_directory.renew_year` | 参考 |
+| jciCareer.jciMalaysiaRenewWindow | string | — | JCI Malaysia 续费窗口（如 `2026-11-01 to 2027-01-01`）；可选字段 | | 系统: 同步时勾选，来源 `member_directory.renew_window` | 参考 |
+| jciCareer.jciMalaysiaVerified | string | — | JCI Malaysia 验证标记（来源原值）；可选字段 | | 系统: 同步时勾选，来源 `member_directory.verify` | 参考 |
+
+> **同步也可选填核心个人资料**（`general.name` / `general.gender` / `general.dob` / `contact.email` / `contact.phone`，来源 `member_directory.fullname/gender/dob/email/contact`）：仅当我方该栏位**为空时才填**，绝不覆盖已有值；email/phone/dob 在预览里打码（真实值只在服务端写入/备份，不进预览响应）。固定同步的 3 项（UserId/MembershipNo/JoinDate）始终写入；其余均需在应用内「Fields to load」勾选。
 | jciCareer.introducer | string | — | | introducer | 角色: B+；系统: 导入 normalize | introducer stats recalculation |
 | jciCareer.senatorship | object | ✓ | |  | B+ 操作 / senatorship validation | Senator 资格、编号及董事会验证 |
 | jciCareer.senatorship.certified | boolean | ✓ | | senatorCertified | 角色: B+；系统: senatorship validation | Senator 资格展示、换届董事会验证 |
@@ -372,7 +380,7 @@
 | by | string | ✓ | 执行者 uid | 系统: `jci-malaysia-sync` `apply`（`applySync`） | 审计 |
 | at | Timestamp | ✓ | | 系统: 同上 | 审计 |
 | counts | map | ✓ | 与预览相同的计数（members、byManual … toWrite、unchanged） | 系统: 同上（服务端重新计算的计划） | 审计；`auditLog.metadata.counts` 同值 |
-| before | array | ✓ | `[{ memberId, before: { jciMalaysiaMembershipNo, jciMalaysiaJoinDate, jciMalaysiaUserId } }]`（原值，缺失为 null） | 系统: 同上，在写 `members` 之前写入 | 人工恢复：用 Admin SDK 把这些值写回 `members.jciCareer.*`（R-097） |
+| before | array | ✓ | `[{ memberId, before: { "<字段点路径>": 原值 } }]`，仅含本次改动的字段（点路径键如 `jciCareer.jciMalaysiaMembershipNo`、`general.gender`；缺失为 null） | 系统: 同上，在写 `members` 之前写入 | 人工恢复：用 Admin SDK 把这些点路径值写回 `members`（R-097） |
 | status | string | ✓ | `started` → `done`；停在 `started` 表示批次中途失败（部分会员已写入） | 系统: 同上 | 恢复判断 |
 | written | number | ✓ | 已写入的会员数 | 系统: 同上 | 审计 |
 

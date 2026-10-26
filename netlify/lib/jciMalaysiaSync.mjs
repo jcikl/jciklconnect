@@ -7,6 +7,7 @@
 // Inputs are Admin SDK Firestore instances, so the core is testable with a fake db. No emails or phones leave it.
 import {
   buildSourceIndex, matchMember, planUpdate, membershipNo, toIsoDate, KL_SOURCE_CHAPTER,
+  FIELD_CATALOG, SELECTABLE_KEYS,
 } from '../../utils/jciMalaysiaMatch.mjs';
 import { KL_LO_ID } from '../../utils/memberCard.mjs';
 
@@ -18,24 +19,25 @@ export const RUNS_COLLECTION = 'jciMalaysiaSyncRuns';
 export const SECRET_COLLECTION = 'systemSecrets';
 export const SECRET_DOC_ID = 'jciMalaysiaSource';
 export const BATCH_SIZE = 400;
-// Only what the matcher and the plan read, so the members read stays small.
+// Only what the matcher and the plan read, so the members read stays small. Covers every catalog target so the
+// "fill only if empty" check and the before/after detail can see the member's current value.
 const MEMBER_FIELDS = [
-  'loId', 'name', 'general.name', 'email', 'phone', 'contact.email', 'contact.phone',
-  'jciCareer.jciMalaysiaMembershipNo', 'jciCareer.jciMalaysiaJoinDate', 'jciCareer.jciMalaysiaUserId',
+  'loId', 'name', 'phone', 'email',
+  ...new Set(FIELD_CATALOG.map(f => f.target)),
 ];
 const BY_COUNT = { manual: 'byManual', userId: 'byUserId', membershipNo: 'byMembershipNo', email: 'byEmail', phone: 'byPhone' };
-const FIELD = { membershipNo: 'jciMalaysiaMembershipNo', joinDate: 'jciMalaysiaJoinDate', userId: 'jciMalaysiaUserId' };
+// target dot-path -> catalog field, for turning an update map into labelled before/after detail.
+const FIELD_BY_TARGET = new Map(FIELD_CATALOG.map(f => [f.target, f]));
+const getPath = (obj, path) => path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
+const asStr = v => (v == null ? '' : String(v));
+/** The field catalog, as the UI needs it (no internal getters). `always` fields are written on every match. */
+export const publicFieldCatalog = () => FIELD_CATALOG.map(({ key, label, core, fillIfEmpty, always }) => ({ key, label, core: !!core, fillIfEmpty: !!fillIfEmpty, always: !!always }));
 
 /** Only a member doc with isDeveloper === true (set by an admin; members cannot set it, see firestore.rules). */
 export const isSyncDeveloper = member => !!member && member.isDeveloper === true && member.role !== 'INACTIVE';
 
 const isKlMember = m => (m.loId ?? KL_LO_ID) === KL_LO_ID;
 const memberName = m => m.general?.name ?? m.name ?? m.id;
-const threeFields = m => ({
-  membershipNo: m.jciCareer?.jciMalaysiaMembershipNo ?? null,
-  joinDate: m.jciCareer?.jciMalaysiaJoinDate ?? null,
-  userId: m.jciCareer?.jciMalaysiaUserId ?? null,
-});
 
 /** A source record as the UI may see it: no email, no phone. */
 export const rowSummary = row => row ? {
@@ -64,8 +66,14 @@ export async function loadOverrides(db) {
   return out;
 }
 
-/** Pure: the plan for these rows, members and manual picks. */
-export function buildPlan({ rows, members, overrides = {} }) {
+/**
+ * Pure: the plan for these rows, members and manual picks.
+ * `selected`: which selectable field keys to include (besides the always-on three). The preview passes every
+ * selectable key so the UI can show per-field counts; apply passes only the keys the user ticked.
+ * Each write carries `fields` (labelled before/after per changed field) for the UI and `prior` (target->old value)
+ * for the rollback backup.
+ */
+export function buildPlan({ rows, members, overrides = {}, selected = [] }) {
   const index = buildSourceIndex(rows);
   const counts = { members: members.length, byManual: 0, byUserId: 0, byMembershipNo: 0, byEmail: 0, byPhone: 0, conflict: 0, otherChapter: 0, none: 0, toWrite: 0, unchanged: 0 };
   const writes = [], conflicts = [], otherChapter = [], notFound = [];
@@ -83,12 +91,23 @@ export function buildPlan({ rows, members, overrides = {} }) {
       continue;
     }
     counts[BY_COUNT[res.by]]++;
-    const updates = planUpdate(m, res.row);
-    if (!Object.keys(updates).length) { counts.unchanged++; continue; }
+    const updates = planUpdate(m, res.row, selected);
+    const targets = Object.keys(updates);
+    if (!targets.length) { counts.unchanged++; continue; }
     counts.toWrite++;
-    const before = threeFields(m);
-    const after = Object.fromEntries(Object.entries(FIELD).map(([k, f]) => [k, updates[`jciCareer.${f}`] ?? before[k]]));
-    writes.push({ memberId: m.id, name: memberName(m), by: res.by, chapter: res.row.chapter ?? '', updates, before, after });
+    const prior = Object.fromEntries(targets.map(t => [t, getPath(m, t) ?? null]));
+    const fields = targets.map(t => {
+      const f = FIELD_BY_TARGET.get(t);
+      // Sensitive values (email / phone / dob) are masked in the preview detail; the real value stays in
+      // `updates`/`prior` (server-side only — publicPlan strips them before the response leaves the function).
+      const sensitive = !!f?.sensitive;
+      return {
+        key: f?.key ?? t, label: f?.label ?? t, core: !!f?.core,
+        before: sensitive ? (asStr(prior[t]) ? '•••' : '') : asStr(prior[t]),
+        after: sensitive ? '•••' : asStr(updates[t]),
+      };
+    });
+    writes.push({ memberId: m.id, name: memberName(m), by: res.by, chapter: res.row.chapter ?? '', updates, prior, fields });
   }
   return { sourceRows: rows.length, counts, writes, conflicts, otherChapter, notFound };
 }
@@ -97,22 +116,18 @@ export function buildPlan({ rows, members, overrides = {} }) {
  * Read source, members and (unless given) the Firestore overrides in parallel, then plan.
  * @param {{ sourceDb: any, db: any, overrides?: Record<string, string> }} args
  */
-export async function computePlan({ sourceDb, db, overrides }) {
+export async function computePlan({ sourceDb, db, overrides, selected = [] }) {
   const [rows, members, picks] = await Promise.all([
     loadSourceRows(sourceDb), loadKlMembers(db), overrides ? Promise.resolve(overrides) : loadOverrides(db),
   ]);
-  return buildPlan({ rows, members, overrides: picks });
+  return buildPlan({ rows, members, overrides: picks, selected });
 }
 
-/** Old values of every planned write, in the shape both backups use (CLI file, jciMalaysiaSyncRuns doc). */
-export const backupOf = plan => plan.writes.map(w => ({
-  memberId: w.memberId,
-  before: {
-    jciMalaysiaMembershipNo: w.before.membershipNo,
-    jciMalaysiaJoinDate: w.before.joinDate,
-    jciMalaysiaUserId: w.before.userId,
-  },
-}));
+/** Keep only valid selectable keys (drops anything a client made up; the always-on three are added by planUpdate). */
+export const sanitizeSelected = sel => (Array.isArray(sel) ? sel.filter(k => SELECTABLE_KEYS.includes(k)) : []);
+
+/** Old values of every field each planned write will change (target dot-path -> prior value), for rollback. */
+export const backupOf = plan => plan.writes.map(w => ({ memberId: w.memberId, before: w.prior }));
 
 /** Write the planned updates in batches of at most BATCH_SIZE. Returns the number of members written. */
 export async function applyPlan(db, plan, onProgress) {
@@ -128,11 +143,12 @@ export async function applyPlan(db, plan, onProgress) {
   return done;
 }
 
-/** What the UI gets for a preview: no internal update maps. */
+/** What the UI gets for a preview: the selectable field catalog + per-member labelled field changes, no internal maps. */
 export const publicPlan = plan => ({
   sourceRows: plan.sourceRows,
+  fieldCatalog: publicFieldCatalog(),
   counts: plan.counts,
-  writes: plan.writes.map(({ updates, ...w }) => w),
+  writes: plan.writes.map(({ updates, prior, ...w }) => w),
   conflicts: plan.conflicts,
   otherChapter: plan.otherChapter,
   notFound: plan.notFound,
@@ -180,8 +196,8 @@ export async function savePick({ sourceDb, db, memberId, sourceId, by, now }) {
  * Apply: the plan is ALWAYS recomputed here from the databases; nothing the client sends is used.
  * Order: backup doc -> member batches -> run doc marked done -> one auditLog entry (counts only).
  */
-export async function applySync({ sourceDb, db, by, now }) {
-  const plan = await computePlan({ sourceDb, db });
+export async function applySync({ sourceDb, db, by, now, selected = [] }) {
+  const plan = await computePlan({ sourceDb, db, selected });
   if (!plan.writes.length) return { status: 200, body: { runId: null, written: 0, counts: plan.counts } };
   const runRef = db.collection(RUNS_COLLECTION).doc();
   await runRef.set({ by, at: now, counts: plan.counts, before: backupOf(plan), status: 'started', written: 0 });
@@ -201,10 +217,11 @@ export async function applySync({ sourceDb, db, by, now }) {
   return { status: 200, body: { runId: runRef.id, written, counts: plan.counts } };
 }
 
-/** Dispatch one function call. `body` is only read for 'pick' (memberId, sourceId). */
+/** Dispatch one function call. `body` is read for 'pick' (memberId, sourceId) and 'apply' (selected field keys). */
 export async function runAction({ action, body = {}, sourceDb, db, callerUid, now }) {
-  if (action === 'preview') return { status: 200, body: publicPlan(await computePlan({ sourceDb, db })) };
+  // preview computes every selectable field so the UI can show per-field counts; the user then ticks a subset.
+  if (action === 'preview') return { status: 200, body: publicPlan(await computePlan({ sourceDb, db, selected: SELECTABLE_KEYS })) };
   if (action === 'pick') return savePick({ sourceDb, db, memberId: body.memberId, sourceId: body.sourceId, by: callerUid, now });
-  if (action === 'apply') return applySync({ sourceDb, db, by: callerUid, now });
+  if (action === 'apply') return applySync({ sourceDb, db, by: callerUid, now, selected: sanitizeSelected(body.selected) });
   return fail(400, "action must be 'preview', 'pick' or 'apply'");
 }

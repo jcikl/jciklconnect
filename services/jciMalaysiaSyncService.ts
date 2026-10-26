@@ -10,10 +10,22 @@ import { MembersService } from './membersService';
 
 export type JciMalaysiaMatchBy = 'manual' | 'userId' | 'membershipNo' | 'email' | 'phone';
 
-export interface JciMalaysiaFields {
-  membershipNo: string | null;
-  joinDate: string | null;
-  userId: string | null;
+/** One field that would change for a member: our current value -> the JCI Malaysia value. */
+export interface JciMalaysiaFieldChange {
+  key: string;
+  label: string;
+  core: boolean;
+  before: string;
+  after: string;
+}
+
+/** A selectable field the user can tick. `always` fields (the 3 match keys) are written on every match. */
+export interface JciMalaysiaFieldCatalogItem {
+  key: string;
+  label: string;
+  core: boolean;
+  fillIfEmpty: boolean;
+  always: boolean;
 }
 
 export interface JciMalaysiaSyncWrite {
@@ -21,8 +33,7 @@ export interface JciMalaysiaSyncWrite {
   name: string;
   by: JciMalaysiaMatchBy;
   chapter: string;
-  before: JciMalaysiaFields;
-  after: JciMalaysiaFields;
+  fields: JciMalaysiaFieldChange[];
 }
 
 /** A source record as the server returns it (never an email or phone). */
@@ -57,6 +68,7 @@ export interface JciMalaysiaSyncCounts {
 
 export interface JciMalaysiaSyncPreview {
   sourceRows: number;
+  fieldCatalog: JciMalaysiaFieldCatalogItem[];
   counts: JciMalaysiaSyncCounts;
   writes: JciMalaysiaSyncWrite[];
   conflicts: JciMalaysiaConflict[];
@@ -78,13 +90,21 @@ const MOCK_COUNTS: JciMalaysiaSyncCounts = {
   members: 3, byManual: 0, byUserId: 1, byMembershipNo: 0, byEmail: 1, byPhone: 0,
   conflict: 1, otherChapter: 0, none: 0, toWrite: 1, unchanged: 1,
 };
+const MOCK_CATALOG: JciMalaysiaFieldCatalogItem[] = [
+  { key: 'chapter', label: 'Chapter', core: false, fillIfEmpty: false, always: false },
+  { key: 'level', label: 'Level', core: false, fillIfEmpty: false, always: false },
+  { key: 'name', label: 'Full name', core: true, fillIfEmpty: true, always: false },
+];
 const MOCK_PREVIEW: JciMalaysiaSyncPreview = {
   sourceRows: 3,
+  fieldCatalog: MOCK_CATALOG,
   counts: MOCK_COUNTS,
   writes: [{
     memberId: 'mock-1', name: 'Mock Member', by: 'email', chapter: 'JCI Kuala Lumpur',
-    before: { membershipNo: null, joinDate: null, userId: null },
-    after: { membershipNo: 'JCIKL-000-0001', joinDate: '2024-01-15', userId: '10001' },
+    fields: [
+      { key: 'membershipNo', label: 'Membership no.', core: false, before: '', after: 'JCIKL-000-0001' },
+      { key: 'chapter', label: 'Chapter', core: false, before: '', after: 'JCI Kuala Lumpur' },
+    ],
   }],
   conflicts: [{
     memberId: 'mock-2', name: 'Mock Conflict',
@@ -133,10 +153,13 @@ export class JciMalaysiaSyncService {
     await this.call('pick', { action: 'pick', memberId, sourceId });
   }
 
-  /** Apply: the server recomputes the plan, backs up old values, writes, audits. No plan is sent. */
-  static async apply(): Promise<JciMalaysiaSyncApplyResult> {
+  /**
+   * Apply: the server recomputes the plan for the selected fields, backs up old values, writes, audits.
+   * No plan is sent — only which field keys to write (besides the always-on three).
+   */
+  static async apply(selected: string[]): Promise<JciMalaysiaSyncApplyResult> {
     if (isDevMode()) return { runId: 'mock-run', written: MOCK_COUNTS.toWrite, counts: MOCK_COUNTS };
-    const res = await this.call<JciMalaysiaSyncApplyResult>('apply', { action: 'apply' });
+    const res = await this.call<JciMalaysiaSyncApplyResult>('apply', { action: 'apply', selected });
     // The server wrote member docs: drop cached member lists (all + per-LO keys).
     if (res.written > 0) MembersService.invalidateMembersCache();
     return res;

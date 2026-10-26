@@ -95,14 +95,67 @@ export function matchMember(member, index, overrides = {}) {
   return { status: 'matched', ...hit };
 }
 
-/** The fields to write (only those that change). Empty source values never overwrite ours. */
-export function planUpdate(member, row) {
+// ---------------------------------------------------------------------------
+// Field catalog: which JCI Malaysia source fields can be written, and where.
+//  - always: the three match-key fields, always written when matched (never deselectable).
+//  - core:   our own profile fields (name/gender/dob/email/phone); fillIfEmpty so a scraped value
+//            NEVER overwrites one we already hold — it only fills a blank.
+//  - the rest: JCI-Malaysia-only fields stored under jciCareer.jciMalaysia*, written when the source
+//            value is non-empty and differs.
+// `get` transforms the raw source value to what we store ('' means "treat as empty / skip").
+// ---------------------------------------------------------------------------
+export const FIELD_CATALOG = [
+  { key: 'userId',       label: 'JCIM user id',   source: 'id',           target: 'jciCareer.jciMalaysiaUserId',       always: true, get: v => (v != null ? String(v).trim() : '') },
+  { key: 'membershipNo', label: 'Membership no.', source: 'membership',   target: 'jciCareer.jciMalaysiaMembershipNo', always: true, get: membershipNo },
+  { key: 'joinDate',     label: 'Join date',      source: 'joindate',     target: 'jciCareer.jciMalaysiaJoinDate',     always: true, get: toIsoDate },
+  { key: 'chapter',      label: 'Chapter',        source: 'chapter',      target: 'jciCareer.jciMalaysiaChapter' },
+  { key: 'level',        label: 'Level',          source: 'level',        target: 'jciCareer.jciMalaysiaLevel' },
+  { key: 'area',         label: 'Area',           source: 'area',         target: 'jciCareer.jciMalaysiaArea' },
+  { key: 'renewYear',    label: 'Renew year',     source: 'renew_year',   target: 'jciCareer.jciMalaysiaRenewYear',    number: true },
+  { key: 'renewWindow',  label: 'Renew window',   source: 'renew_window', target: 'jciCareer.jciMalaysiaRenewWindow' },
+  { key: 'verify',       label: 'Verified',       source: 'verify',       target: 'jciCareer.jciMalaysiaVerified' },
+  { key: 'name',         label: 'Full name',      source: 'fullname',     target: 'general.name',   core: true, fillIfEmpty: true },
+  { key: 'gender',       label: 'Gender',         source: 'gender',       target: 'general.gender', core: true, fillIfEmpty: true },
+  // sensitive: the preview must never carry the raw value (email / phone / date of birth) — it is masked there
+  // and the real value lives only in the server-side update/backup, which the public preview strips.
+  { key: 'dob',          label: 'Date of birth',  source: 'dob',          target: 'general.dob',    core: true, fillIfEmpty: true, sensitive: true },
+  { key: 'email',        label: 'Email',          source: 'email',        target: 'contact.email',  core: true, fillIfEmpty: true, sensitive: true },
+  { key: 'phone',        label: 'Phone',          source: 'contact',      target: 'contact.phone',  core: true, fillIfEmpty: true, sensitive: true },
+];
+
+/** Field keys always written on a match (the three match keys). */
+export const ALWAYS_KEYS = FIELD_CATALOG.filter(f => f.always).map(f => f.key);
+/** Field keys the user may choose to also write (everything except the always-on three). */
+export const SELECTABLE_KEYS = FIELD_CATALOG.filter(f => !f.always).map(f => f.key);
+const CATALOG_BY_KEY = new Map(FIELD_CATALOG.map(f => [f.key, f]));
+
+const getPath = (obj, path) => path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
+
+/** The source value for one catalog field, normalised; '' when empty/unusable. */
+export function sourceFieldValue(f, row) {
+  const raw = row[f.source];
+  if (f.get) return f.get(raw);
+  if (f.number) { const n = Number(raw); return Number.isFinite(n) ? n : ''; }
+  return String(raw ?? '').trim();
+}
+
+/**
+ * The fields to write for `member` from source `row`, limited to the always-on keys plus `selected`.
+ * Empty source values never overwrite ours; `fillIfEmpty` (core profile) fields only write when our value is
+ * blank; the rest write when the value differs. Returns a dot-path update map.
+ */
+export function planUpdate(member, row, selected = []) {
+  const keys = new Set([...ALWAYS_KEYS, ...selected]);
   const updates = {};
-  const no = membershipNo(row.membership);
-  const join = toIsoDate(row.joindate);
-  const userId = row.id != null ? String(row.id).trim() : '';
-  if (userId && userId !== String(member.jciCareer?.jciMalaysiaUserId ?? '')) updates['jciCareer.jciMalaysiaUserId'] = userId;
-  if (no && no !== (member.jciCareer?.jciMalaysiaMembershipNo ?? '')) updates['jciCareer.jciMalaysiaMembershipNo'] = no;
-  if (join && join !== (member.jciCareer?.jciMalaysiaJoinDate ?? '')) updates['jciCareer.jciMalaysiaJoinDate'] = join;
+  for (const key of keys) {
+    const f = CATALOG_BY_KEY.get(key);
+    if (!f) continue;
+    const val = sourceFieldValue(f, row);
+    if (val === '' || val == null) continue;                // empty source never overwrites
+    const current = getPath(member, f.target);
+    const curStr = current == null ? '' : String(current);
+    if (f.fillIfEmpty) { if (curStr === '') updates[f.target] = val; }
+    else if (String(val) !== curStr) updates[f.target] = val;
+  }
   return updates;
 }
