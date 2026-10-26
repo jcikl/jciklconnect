@@ -1,13 +1,15 @@
 /**
  * On-demand: copy the JCI Malaysia membership no. and JCI Malaysia join date from the SheetScraper Pro
  * database (Firestore project gen-lang-client-0772255734, collection member_directory) into our KL
- * members as jciCareer.jciMalaysiaMembershipNo / jciCareer.jciMalaysiaJoinDate.
+ * members as jciCareer.jciMalaysiaMembershipNo / jciMalaysiaJoinDate / jciMalaysiaUserId (the source record id).
  *
- * Match (owner decision 2026-10-26): stored membership no. → email → phone. Rows of the same person in
+ * Match (owner decision 2026-10-26): manual picks → stored user id → stored membership no. → email → phone. Rows of the same person in
  * several chapters: the JCI Kuala Lumpur row wins, then the latest join date. Only JCI Kuala Lumpur rows are
  * written (a person found only in another chapter is skipped and listed). Email and phone pointing to
- * different membership numbers = conflict, skipped and listed; the owner's picks for those live in
- * scripts/data/jciMalaysiaOverrides.json (our member id -> source record id) and win. "N/A" is not a membership no.
+ * different membership numbers = conflict, skipped and listed; the owner's picks for those live in Firestore
+ * jciMalaysiaOverrides/{our member id} = { sourceId } (falls back to scripts/data/jciMalaysiaOverrides.json while
+ * that collection is empty) and win. "N/A" is not a membership no.
+ * Planning and writing are shared with the in-app sync (netlify/lib/jciMalaysiaSync.mjs).
  *
  *   node scripts/syncJciMalaysia.mjs                 # dry run (default): counts, per-member changes, lists
  *   node scripts/syncJciMalaysia.mjs --apply         # writes; saves the old values to secrets/backups/ first
@@ -19,15 +21,13 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { buildSourceIndex, matchMember, planUpdate } from '../utils/jciMalaysiaMatch.mjs';
+import { SOURCE_DATABASE_ID, computePlan, loadOverrides, backupOf, applyPlan } from '../netlify/lib/jciMalaysiaSync.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(path.join(root, 'package.json'));
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 
-const SOURCE_DATABASE_ID = 'ai-studio-cba40058-0493-450b-8680-948d1cb07c7d';
-const BATCH_SIZE = 400;
 const APPLY = process.argv.includes('--apply');
 const argAfter = flag => { const i = process.argv.indexOf(flag); return i > 0 ? process.argv[i + 1] : undefined; };
 const sourceKeyPath = path.resolve(argAfter('--source-key') ?? path.join(root, 'secrets', 'source-firebase.json'));
@@ -51,62 +51,35 @@ const db = getFirestore(initializeApp({ credential: cert({
 console.log(`target: PROJECT ${env.FIREBASE_ADMIN_PROJECT_ID} | source: member_directory (read-only)`);
 console.log(APPLY ? 'mode: APPLY (writes)' : 'mode: DRY RUN (no writes)');
 
-const rows = (await source.collection('member_directory').get()).docs.map(d => d.data());
-const index = buildSourceIndex(rows);
-// Owner's manual picks for people whose email and phone matched different records (our member id -> source record id).
-const overridesFile = path.join(root, 'scripts', 'data', 'jciMalaysiaOverrides.json');
-const overrides = existsSync(overridesFile) ? JSON.parse(readFileSync(overridesFile, 'utf8')) : {};
-const members = (await db.collection('members').get()).docs
-  .map(d => ({ ...d.data(), id: d.id }))
-  .filter(m => (m.loId ?? 'jcikl') === 'jcikl');
-
-const name = m => m.general?.name ?? m.name ?? m.id;
-const counts = { members: members.length, byManual: 0, byMembershipNo: 0, byEmail: 0, byPhone: 0, conflict: 0, otherChapter: 0, none: 0, toWrite: 0, unchanged: 0 };
-const writes = [], conflicts = [], unmatched = [], otherChapter = [];
-for (const m of members) {
-  const res = matchMember(m, index, overrides);
-  if (res.status === 'conflict') { counts.conflict++; conflicts.push(name(m)); continue; }
-  if (res.status === 'none') { counts.none++; unmatched.push(name(m)); continue; }
-  if (res.status === 'otherChapter') { counts.otherChapter++; otherChapter.push(`${name(m)} (${res.row.chapter}, by ${res.by})`); continue; }
-  counts[{ manual: 'byManual', membershipNo: 'byMembershipNo', email: 'byEmail', phone: 'byPhone' }[res.by]]++;
-  const updates = planUpdate(m, res.row);
-  if (!Object.keys(updates).length) { counts.unchanged++; continue; }
-  counts.toWrite++;
-  writes.push({ m, updates, by: res.by, chapter: res.row.chapter });
+// Owner's manual picks (our member id -> source record id): Firestore first, the JSON file while that is empty.
+let overrides = await loadOverrides(db);
+if (!Object.keys(overrides).length) {
+  const overridesFile = path.join(root, 'scripts', 'data', 'jciMalaysiaOverrides.json');
+  overrides = existsSync(overridesFile) ? JSON.parse(readFileSync(overridesFile, 'utf8')) : {};
 }
+const plan = await computePlan({ sourceDb: source, db, overrides });
 
-console.log(`source rows: ${rows.length}`);
-console.log(JSON.stringify(counts));
-for (const w of writes) {
-  const before = { no: w.m.jciCareer?.jciMalaysiaMembershipNo ?? '', join: w.m.jciCareer?.jciMalaysiaJoinDate ?? '' };
-  const after = { no: w.updates['jciCareer.jciMalaysiaMembershipNo'] ?? before.no, join: w.updates['jciCareer.jciMalaysiaJoinDate'] ?? before.join };
-  console.log(`  ${name(w.m)}: no ${before.no || '∅'} -> ${after.no || '∅'} | join ${before.join || '∅'} -> ${after.join || '∅'} | by ${w.by}`);
+console.log(`source rows: ${plan.sourceRows}`);
+console.log(JSON.stringify(plan.counts));
+for (const w of plan.writes) {
+  const { before: b, after: a } = w;
+  console.log(`  ${w.name}: no ${b.membershipNo || '∅'} -> ${a.membershipNo || '∅'} | join ${b.joinDate || '∅'} -> ${a.joinDate || '∅'} | user id ${b.userId || '∅'} -> ${a.userId || '∅'} | by ${w.by}`);
 }
-console.log(`\nconflicts (email and phone point to different people) — check manually: ${conflicts.length}`);
-conflicts.forEach(n => console.log(`  ${n}`));
-console.log(`only found in another chapter — skipped, check manually: ${otherChapter.length}`);
-otherChapter.forEach(n => console.log(`  ${n}`));
-console.log(`not found in JCI Malaysia data: ${unmatched.length}`);
-unmatched.forEach(n => console.log(`  ${n}`));
+console.log(`\nconflicts (email and phone point to different people) — check manually: ${plan.conflicts.length}`);
+plan.conflicts.forEach(c => console.log(`  ${c.name}`));
+console.log(`only found in another chapter — skipped, check manually: ${plan.otherChapter.length}`);
+plan.otherChapter.forEach(o => console.log(`  ${o.name} (${o.chapter}, by ${o.by})`));
+console.log(`not found in JCI Malaysia data: ${plan.notFound.length}`);
+plan.notFound.forEach(n => console.log(`  ${n.name}`));
 
 if (!APPLY) { console.log('\nDry run — nothing written. Re-run with --apply to write.'); process.exit(0); }
 
 const backupDir = path.join(root, 'secrets', 'backups');
 mkdirSync(backupDir, { recursive: true });
 const backupFile = path.join(backupDir, `jci-malaysia-sync-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
-writeFileSync(backupFile, JSON.stringify(writes.map(w => ({
-  memberId: w.m.id,
-  before: { jciMalaysiaMembershipNo: w.m.jciCareer?.jciMalaysiaMembershipNo ?? null, jciMalaysiaJoinDate: w.m.jciCareer?.jciMalaysiaJoinDate ?? null },
-})), null, 2));
+writeFileSync(backupFile, JSON.stringify(backupOf(plan), null, 2));
 console.log(`backup of old values: ${backupFile}`);
 
-let done = 0;
-for (let i = 0; i < writes.length; i += BATCH_SIZE) {
-  const batch = db.batch();
-  for (const w of writes.slice(i, i + BATCH_SIZE)) batch.update(db.collection('members').doc(w.m.id), w.updates);
-  await batch.commit();
-  done += Math.min(BATCH_SIZE, writes.length - i);
-  console.log(`written ${done}/${writes.length}`);
-}
+await applyPlan(db, plan, (done, total) => console.log(`written ${done}/${total}`));
 console.log('done');
 process.exit(0);

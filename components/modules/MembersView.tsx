@@ -88,6 +88,7 @@ import { MemberTable } from './Members/MemberTable';
 import { MemberDetail } from './Members/MemberDetail';
 import { MentorMatchingModal } from './Members/MentorMatchingModal';
 import { MemberCreateModal } from './Members/MemberCreateModal';
+import { JciMalaysiaSyncButton } from './Members/JciMalaysiaSyncButton';
 import { useSisterChapters } from '../../hooks/useSisterChapters';
 import { DEFAULT_LO_ID } from '../../config/constants';
 import { BatchFieldUpdateModal } from './Members/BatchFieldUpdateModal';
@@ -462,18 +463,24 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
         <PageScaffold
           title="Member Directory"
           description="Manage membership, tiers, and engagement."
-          actions={canManageMembers ? (
-            <div className="hidden sm:flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setIsExportModalOpen(true)}>
-                <Download size={14} className="mr-1.5" /> Export
-              </Button>
-              {isAdmin && (
-                <Button variant="outline" size="sm" onClick={() => setIsImportModalOpen(true)}>
-                  <Upload size={14} className="mr-1.5" /> Import
-                </Button>
+          actions={
+            <div className="flex items-center gap-2">
+              {canManageMembers && (
+                <div className="hidden sm:flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setIsExportModalOpen(true)}>
+                    <Download size={14} className="mr-1.5" /> Export
+                  </Button>
+                  {isAdmin && (
+                    <Button variant="outline" size="sm" onClick={() => setIsImportModalOpen(true)}>
+                      <Upload size={14} className="mr-1.5" /> Import
+                    </Button>
+                  )}
+                </div>
               )}
+              {/* Developer accounts only (renders nothing otherwise); visible on mobile too */}
+              <JciMalaysiaSyncButton />
             </div>
-          ) : undefined}
+          }
         >
 
           {/* Desktop-only horizontal tab bar */}

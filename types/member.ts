@@ -287,6 +287,8 @@ export interface Member {
     jciMalaysiaMembershipNo?: string;
     /** JCI Malaysia join date (YYYY-MM-DD). Written by scripts/syncJciMalaysia.mjs. */
     jciMalaysiaJoinDate?: string;
+    /** JCI Malaysia user id (the jcimalaysia.cc member record id). Internal match key, not shown. Written by scripts/syncJciMalaysia.mjs. */
+    jciMalaysiaUserId?: string;
   };
   createdAt?: string | Timestamp | Date;
   updatedAt?: string | Timestamp | Date;
@@ -298,6 +300,8 @@ export interface Member {
   role?: UserRole | string;
   idealReferralIndustry?: string;
   loId?: string;
+  /** Developer account (set by an admin / Admin SDK; members cannot set it). Gates the JCI Malaysia sync. */
+  isDeveloper?: boolean;
   churnRisk?: string;
   companyName?: string;
   industry?: string;

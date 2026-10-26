@@ -42,6 +42,7 @@
 | System/Access Config | 多数为 `isAdmin || isBoard`，`AccessConfigView` 内部要求 `isAdmin` | UI 与页面内部有二次限制。 |
 | Config 页（`SYSTEM_CONFIG`） | `utils/configAccess.ts`：SUPER_ADMIN 全部标签；ADMIN 只有 Global Relations | Phase 1；编辑分会列表仍只有 SUPER_ADMIN（`canEditChapterList`）。 |
 | Developer Interface | `isDeveloper || isAdmin` | Dev mode 对本地调试放大权限。 |
+| Sync JCI Malaysia（Member Directory 标题栏按钮） | `hooks/useJciMalaysiaSync.ts` `canSync`：`members.isDeveloper === true`（或本地 dev mode） | 仅开发者账号；SUPER_ADMIN / ADMIN 没有 `isDeveloper` 也看不到。服务端 `jci-malaysia-sync` 再查调用者的 Firestore 文档，非开发者 403。 |
 | Social Media | `hasPermission('canManageEvents')` 作为 BOD 判断，`isAdmin` 控制删除等高权限操作 | 与 Firestore `socialPosts` rules 需重点对齐。 |
 
 ## 外部用户角色矩阵（Phase 0 / Phase 1）
@@ -220,6 +221,7 @@
 | `chapter-birthdays.mjs` | Firebase ID token | active 外部会员（`AFFILIATE` / `CHAPTER_ADMIN`，`affiliation.status == active`，非 KL 分会；角色与状态取自调用者的 Firestore 文档） | 只读 `members`（`loId` == 调用者分会），返回 id / 姓名 / 头像 / 月日 | 不返回年份与联系方式；跳过 `privacy.hideBirthday`；无 secret。 |
 | `delete-auth-user.mjs` | Firebase ID token | `ADMIN`/`SUPER_ADMIN` | 删除 Firebase Auth user | 高风险，不应给 board。 |
 | `external-accounts.mjs` | Firebase ID token | 按 action：`createChapterAdmin` 仅 `ADMIN`/`SUPER_ADMIN`（KL）；`inviteMember` active `CHAPTER_ADMIN`（强制自己的分会）或 KL 管理员；`setStatus` / `resendInvite` / `deleteAccount` 见上方外部用户说明。角色、状态、分会取自调用者的 Firestore 文档，不取请求体 | 写 `members`、`memberEmails`、`memberCards`、`auditLog`；`deleteAccount` 另删除 `emailChangeRequests`、`publicBusinessListings` 的同 id 文档；创建 / 删除 Firebase Auth 账号；发送密码设置邮件 | 需要 Firebase Admin 凭证，响应不含邮箱；每次调用写一条 `auditLog`（`external_accounts_*`）；每次最多 20 人、每个分会最多 100 个成员文档，没有限流；本地 `netlify dev` 跑不了（`firebase-admin/auth` 问题），需在预览版验证（见 R-071）。 |
+| `jci-malaysia-sync.mjs` | Firebase ID token | 仅开发者：调用者 `members/{uid}.isDeveloper === true` 且角色不是 `INACTIVE`（取自 Firestore，不取请求体；`netlify/lib/jciMalaysiaSync.mjs` `isSyncDeveloper`），否则 403 | 读 `systemSecrets/jciMalaysiaSource`、来源项目 `member_directory`（只读、字段遮罩）、`members`、`jciMalaysiaOverrides`；`pick` 写 `jciMalaysiaOverrides`；`apply` 写 `jciMalaysiaSyncRuns`、`members.jciCareer.jciMalaysia*`；都写 `auditLog` | `apply` 一律在服务端重算计划，不用客户端送来的计划；响应不含电邮与电话；同步函数默认约 10 秒超时（R-097）。 |
 | `jci-proxy.mjs` | 无 | public | 代理 `jcimalaysia.cc` 公开 event HTML | eventid 限制为数字；返回 HTML。 |
 | `lark-sync.mjs` | Firebase ID token | 本人或 `BOARD`/`ADMIN`/`SUPER_ADMIN` | Lark API、Firestore member data | 同步范围和 PII 需审计。 |
 | `send-email.mjs` | Firebase ID token | `BOARD`/`ADMIN`/`SUPER_ADMIN` | Resend/SendGrid/SMTP 发送邮件 | 已限制 MEMBER，需继续限制 recipient flood。 |

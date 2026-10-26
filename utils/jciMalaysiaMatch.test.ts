@@ -38,7 +38,9 @@ describe('jciMalaysiaMatch', () => {
       row({ membership: 'JCIK-1', email: 'a@x.com' }),
       row({ membership: 'JCIK-2', contact: '0122222222' }),
     ]);
-    expect(matchMember({ contact: { email: 'a@x.com', phone: '0122222222' } }, index)).toEqual({ status: 'conflict' });
+    expect(matchMember({ contact: { email: 'a@x.com', phone: '0122222222' } }, index)).toMatchObject({
+      status: 'conflict', candidates: { email: { membership: 'JCIK-1' }, phone: { membership: 'JCIK-2' } },
+    });
   });
 
   it('two different people both without a membership no. are still a conflict', () => {
@@ -46,7 +48,7 @@ describe('jciMalaysiaMatch', () => {
       row({ id: '1', membership: 'N/A', email: 'a@x.com' }),
       row({ id: '2', membership: 'N/A', contact: '0122222222' }),
     ]);
-    expect(matchMember({ contact: { email: 'a@x.com', phone: '0122222222' } }, index)).toEqual({ status: 'conflict' });
+    expect(matchMember({ contact: { email: 'a@x.com', phone: '0122222222' } }, index)).toMatchObject({ status: 'conflict' });
     const same = buildSourceIndex([row({ id: '1', membership: 'N/A', email: 'a@x.com', contact: '0122222222' })]);
     expect(matchMember({ contact: { email: 'a@x.com', phone: '0122222222' } }, same)).toMatchObject({ status: 'matched', by: 'email' });
   });
@@ -57,7 +59,7 @@ describe('jciMalaysiaMatch', () => {
       row({ id: '2', membership: 'JCIK-2', contact: '0122222222' }),
     ]);
     const m = { id: 'm1', contact: { email: 'a@x.com', phone: '0122222222' } };
-    expect(matchMember(m, index)).toEqual({ status: 'conflict' });
+    expect(matchMember(m, index)).toMatchObject({ status: 'conflict' });
     expect(matchMember(m, index, { m1: '2' })).toMatchObject({ status: 'matched', by: 'manual', row: { membership: 'JCIK-2' } });
   });
 
@@ -69,7 +71,14 @@ describe('jciMalaysiaMatch', () => {
     const m = { jciCareer: { jciMalaysiaMembershipNo: 'JCIKL-1', jciMalaysiaJoinDate: '2023-03-04' }, contact: { email: 'own@x.com' } };
     const res = matchMember(m, index);
     expect(res).toMatchObject({ by: 'membershipNo', row: { id: '1' } });
-    expect(planUpdate(m, res.row)).toEqual({});
+    // Membership no. and join date unchanged; only the user id of that same record is added.
+    expect(planUpdate(m, res.row)).toEqual({ 'jciCareer.jciMalaysiaUserId': '1' });
+  });
+
+  it('a stored JCI Malaysia user id matches first, even when email and phone changed', () => {
+    const index = buildSourceIndex([row({ id: '77', membership: 'N/A', email: 'new@x.com' })]);
+    const m = { jciCareer: { jciMalaysiaUserId: '77' }, contact: { email: 'old@x.com' } };
+    expect(matchMember(m, index)).toMatchObject({ status: 'matched', by: 'userId', row: { id: '77' } });
   });
 
   it('skips people whose only record is in another chapter', () => {
@@ -84,8 +93,9 @@ describe('jciMalaysiaMatch', () => {
 
   it('plans only changed, non-empty fields', () => {
     const r = row({ membership: 'JCIK-1', joindate: '2021-05-06 09:00:00' });
-    expect(planUpdate({}, r)).toEqual({ 'jciCareer.jciMalaysiaMembershipNo': 'JCIK-1', 'jciCareer.jciMalaysiaJoinDate': '2021-05-06' });
+    expect(planUpdate({}, { ...r, id: '9' })).toEqual({ 'jciCareer.jciMalaysiaMembershipNo': 'JCIK-1', 'jciCareer.jciMalaysiaJoinDate': '2021-05-06', 'jciCareer.jciMalaysiaUserId': '9' });
     expect(planUpdate({ jciCareer: { jciMalaysiaMembershipNo: 'JCIK-1', jciMalaysiaJoinDate: '2021-05-06' } }, r)).toEqual({});
+    expect(planUpdate({ jciCareer: { jciMalaysiaMembershipNo: 'JCIK-1', jciMalaysiaJoinDate: '2021-05-06', jciMalaysiaUserId: '9' } }, { ...r, id: '9' })).toEqual({});
     expect(planUpdate({ jciCareer: { jciMalaysiaMembershipNo: 'OLD' } }, row({ membership: '', joindate: '' }))).toEqual({});
   });
 });

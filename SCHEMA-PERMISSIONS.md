@@ -115,6 +115,9 @@ econciliations | B+/A+ | B+/A+ | B+/A+(必填字段) | A+ 或 B+(仅notes字段)
 | emailLogs | B+/A+ | B+/A+ | 登 | A+ | A+ | ⚠️ P0：无写入者，集合永远为空 |
 | memberEmails | B+/A+ | B+/A+ | B+/A+ | A+ | A+ | |
 | emailChangeRequests | × | × | × | × | × | 仅 Admin SDK（`netlify/functions/self-email`）读写；规则 `if false` |
+| systemSecrets | × | × | × | × | × | 仅 Admin SDK；规则 `if false`（SUPER_ADMIN、ADMIN、开发者都不行）；`jciMalaysiaSource` 由 `scripts/uploadJciMalaysiaSourceKey.mjs` 写入，`netlify/functions/jci-malaysia-sync` 读取 |
+| jciMalaysiaOverrides | × | × | × | × | × | 仅 Admin SDK（`netlify/functions/jci-malaysia-sync` `pick`、上传脚本 `--seed-overrides`）；规则 `if false` |
+| jciMalaysiaSyncRuns | × | × | × | × | × | 仅 Admin SDK（`netlify/functions/jci-malaysia-sync` `apply` 的备份）；规则 `if false` |
 | pointsRules | 登 | 登 | B+/A+ | B+/A+ | B+/A+ | |
 | pointsRuleExecutions | B+/A+ | B+/A+ | 登(字段白名单) | A+ | A+ | ⚠️ P0：竞态→双倍积分 |
 | irthdayNotificationsSent | × | × | × | × | × | ⚠️ 全禁止，仅Cloud Function |
