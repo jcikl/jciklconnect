@@ -1651,6 +1651,20 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // JCI Malaysia sync (netlify/functions/jci-malaysia-sync, developer accounts only) — Admin SDK only, no client access
+    // for anyone, admins and developers included. systemSecrets holds the source project's service account key.
+    match /systemSecrets/{id} {
+      allow read, write: if false;
+    }
+    // Manual picks for conflicts: { sourceId, pickedBy, pickedAt }, id = our member id.
+    match /jciMalaysiaOverrides/{memberId} {
+      allow read, write: if false;
+    }
+    // Apply backups: { by, at, counts, before: [{ memberId, before }], status, written }.
+    match /jciMalaysiaSyncRuns/{runId} {
+      allow read, write: if false;
+    }
+
     // Member email dedup slots — one document per sanitised email address to enforce uniqueness
     // Members can read their own slot (to check status); only the service layer (Admin SDK) writes
     match /memberEmails/{email} {

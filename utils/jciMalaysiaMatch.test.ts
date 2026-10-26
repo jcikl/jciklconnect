@@ -38,7 +38,9 @@ describe('jciMalaysiaMatch', () => {
       row({ membership: 'JCIK-1', email: 'a@x.com' }),
       row({ membership: 'JCIK-2', contact: '0122222222' }),
     ]);
-    expect(matchMember({ contact: { email: 'a@x.com', phone: '0122222222' } }, index)).toEqual({ status: 'conflict' });
+    expect(matchMember({ contact: { email: 'a@x.com', phone: '0122222222' } }, index)).toMatchObject({
+      status: 'conflict', candidates: { email: { membership: 'JCIK-1' }, phone: { membership: 'JCIK-2' } },
+    });
   });
 
   it('two different people both without a membership no. are still a conflict', () => {
@@ -46,7 +48,7 @@ describe('jciMalaysiaMatch', () => {
       row({ id: '1', membership: 'N/A', email: 'a@x.com' }),
       row({ id: '2', membership: 'N/A', contact: '0122222222' }),
     ]);
-    expect(matchMember({ contact: { email: 'a@x.com', phone: '0122222222' } }, index)).toEqual({ status: 'conflict' });
+    expect(matchMember({ contact: { email: 'a@x.com', phone: '0122222222' } }, index)).toMatchObject({ status: 'conflict' });
     const same = buildSourceIndex([row({ id: '1', membership: 'N/A', email: 'a@x.com', contact: '0122222222' })]);
     expect(matchMember({ contact: { email: 'a@x.com', phone: '0122222222' } }, same)).toMatchObject({ status: 'matched', by: 'email' });
   });
@@ -57,7 +59,7 @@ describe('jciMalaysiaMatch', () => {
       row({ id: '2', membership: 'JCIK-2', contact: '0122222222' }),
     ]);
     const m = { id: 'm1', contact: { email: 'a@x.com', phone: '0122222222' } };
-    expect(matchMember(m, index)).toEqual({ status: 'conflict' });
+    expect(matchMember(m, index)).toMatchObject({ status: 'conflict' });
     expect(matchMember(m, index, { m1: '2' })).toMatchObject({ status: 'matched', by: 'manual', row: { membership: 'JCIK-2' } });
   });
 

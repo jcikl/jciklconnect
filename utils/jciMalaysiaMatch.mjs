@@ -53,7 +53,8 @@ export function pickRow(rows) {
 /**
  * Match one of our members. Returns { status, by?, row? }:
  *  - 'matched'  by 'manual' | 'userId' | 'membershipNo' | 'email' | 'phone'
- *  - 'conflict'     email and phone lead to different JCI Malaysia membership numbers
+ *  - 'conflict'     email and phone lead to different JCI Malaysia membership numbers;
+ *                   candidates = { email: row, phone: row } (the two records, for a manual pick)
  *  - 'otherChapter' the person's only record is in another chapter (owner decision: skip, list for a manual check)
  *  - 'none'
  */
@@ -86,7 +87,7 @@ export function matchMember(member, index, overrides = {}) {
     const a = membershipKey(byEmail.membership), b = membershipKey(byPhone.membership);
     // Without a real membership no. on both sides, compare the source record ids instead.
     const samePerson = a && b ? a === b : String(byEmail.id ?? '') === String(byPhone.id ?? '');
-    if (!samePerson) return { status: 'conflict' };
+    if (!samePerson) return { status: 'conflict', candidates: { email: byEmail, phone: byPhone } };
   }
   const hit = byEmail ? { by: 'email', row: byEmail } : byPhone ? { by: 'phone', row: byPhone } : null;
   if (!hit) return { status: 'none' };
