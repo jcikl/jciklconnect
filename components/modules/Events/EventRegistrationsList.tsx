@@ -2,6 +2,7 @@ import React from 'react';
 import { CheckCircle, ChevronDown, DollarSign, Leaf, Plus, RefreshCw, Trash2, Users } from 'lucide-react';
 import type { Event, EventRegistration, Member } from '../../../types';
 import { Button, Badge } from '../../ui/Common';
+import { RegcodeQr } from '../../ui/RegcodeQr';
 import { EventsService } from '../../../services/eventsService';
 import { EventAddParticipantForm, type EventAddParticipantFormData } from './EventAddParticipantForm';
 import type { EventParticipantSubTab } from './EventParticipantsSubTabs';
@@ -160,7 +161,7 @@ export const EventRegistrationsList: React.FC<EventRegistrationsListProps> = ({
             : `Cancelled by ${registration.cancelledByRole ?? 'admin'}: ${registration.cancelledByName ?? ''}`
           : null;
         const isRowExpanded = expandedRows.has(registration.id);
-        const hasDetails = registration.dietary != null || registration.isVegetarian != null || registration.emergencyContactName || registration.emergencyContactPhone || registration.tshirtSize;
+        const hasDetails = registration.dietary != null || registration.isVegetarian != null || registration.emergencyContactName || registration.emergencyContactPhone || registration.tshirtSize || !!registration.jciMalaysiaRegcode;
 
         return (
           <div key={registration.id} className={`transition-colors ${isCancelled ? 'bg-red-50/40 opacity-70' : 'bg-white'}`}>
@@ -270,6 +271,11 @@ export const EventRegistrationsList: React.FC<EventRegistrationsListProps> = ({
                     <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Emergency Contact</p>
                     {registration.emergencyContactName && <p className="text-xs font-medium text-slate-700 truncate">{registration.emergencyContactName}</p>}
                     {registration.emergencyContactPhone && <p className="text-xs text-slate-500">{registration.emergencyContactPhone}</p>}
+                  </div>
+                )}
+                {registration.jciMalaysiaRegcode && (
+                  <div className="col-span-2 pt-1">
+                    <RegcodeQr regcode={registration.jciMalaysiaRegcode} label="JCI Malaysia check-in code" size={108} />
                   </div>
                 )}
               </div>

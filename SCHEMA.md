@@ -92,7 +92,7 @@
 | jciCareer.introducer | string | — | | introducer | 角色: B+；系统: 导入 normalize | introducer stats recalculation |
 | jciCareer.senatorship | object | ✓ | |  | B+ 操作 / senatorship validation | Senator 资格、编号及董事会验证 |
 | jciCareer.senatorship.certified | boolean | ✓ | | senatorCertified | 角色: B+；系统: senatorship validation | Senator 资格展示、换届董事会验证 |
-| jciCareer.senatorship.senatorNumber | string | — | | senatorshipId | 角色: B+；锁定后仅 A+ 可改 | Senator 编号展示 |
+| jciCareer.senatorship.senatorNumber | string | — | | senatorshipId；系统: developer-only `netlify/functions/jci-malaysia-regcode` `applySenatorship` 从 JCI Malaysia `event_participants` 快照按 IC(`general.idNumber`)→email→phone 匹配人员记录的 `senatorship` 写入——仅当 `boardValidated !== true` 时覆盖（已验证的编号保留），空值不写；只改 `senatorNumber`，`certified`/`boardValidated`/`validated*` 不动；写前备份到 `jciMalaysiaSyncRuns`（`kind:'senatorship'`） | 角色: B+；锁定后仅 A+ 可改 | Senator 编号展示 |
 | jciCareer.senatorship.boardValidated | boolean | — | | senatorshipBoardValidated | 角色: B+；系统: senatorship validation | Senator 资格验证状态展示 |
 | jciCareer.currentBoardYear | number | — | | currentBoardYear | 系统: `boardMembers.term` 当前届 active 记录 | 权限判断/board 展示 |
 | jciCareer.currentBoardPosition | string | — | | currentBoardPosition | 系统: `boardMembers.position` 当前届 active 记录 | 权限判断/board 展示 |
@@ -496,6 +496,7 @@
 | paymentMethod | enum | — | `toyyib` \| `bank_transfer` \| `cash` | 角色: 会员/财务；系统: 付款流程 | 付款处理分支 |
 | registrantLoId | string \| null | — | 报名人所属分会；`loId` 仍是主办 LO | 系统: `EventsService.registerForEvent` 从 `members.loId` 读取（读取失败时用 `jcikl`）；创建后自己不可改（`firestore.rules` 自更新锁定列表） | 仅作参考记录，尚无应用读取者 |
 | currency | enum \| null | — | `MYR` \| `USD` | 系统: `EventsService.registerForEvent`：报名人 role 为 `AFFILIATE` / `CHAPTER_ADMIN` 时写 `USD`，否则 `MYR`；创建后自己不可改（自更新锁定列表） | `EventPaymentService.markRegistrationPaid`（USD 时把活动价记为 `transactions.originalAmount`）；`EventMarkPaidModal`；USD 价格展示 |
+| jciMalaysiaRegcode | string \| null | — | JCI Malaysia 签到码（6 位）；会员自更新锁定列表，仅服务端可写 | 系统: 仅 `netlify/functions/jci-malaysia-regcode`（Admin SDK）：经 `projects.roadmapId` 关联到 JCI Malaysia `event_participants` 快照，按 IC(`general.idNumber`)→email→phone 匹配该活动人员记录的 `regcode`；email 与 phone 指向不同 regcode 则跳过。批量回填（developer-only `applyRegcodes`）或报名后 best-effort（`attachMyRegcode`，仅限本人 `{eventId}_{uid}`）写入 | `components/ui/RegcodeQr`：在活动详情（本人）与报名名单展开行（B+/委员会）用它重新生成 QR 并显示号码；不使用来源的 `qrcode` 图片 |
 
 ---
 

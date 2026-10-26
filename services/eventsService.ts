@@ -23,6 +23,7 @@ import { auth, db } from '../config/firebase';
 import { COLLECTIONS, DEFAULT_LO_ID } from '../config/constants';
 import { Event, ProjectCommitteeMember } from '../types';
 import { EventRegistrationService } from './eventRegistrationService';
+import { EventRegcodeService } from './eventRegcodeService';
 import { isDevMode, withDevMode } from '../utils/devMode';
 import { errorLoggingService } from './errorLoggingService';
 import { apiCache, CACHE_TTL_3MIN } from './cacheService';
@@ -512,6 +513,11 @@ export class EventsService {
           });
 
           this.invalidateEventsCache(); // P1-C: invalidate after attendee count changes
+
+          // Best-effort "my event QR": attach the member's own JCI Malaysia regcode after the registration
+          // is written. Only runs for self-registration; the server reads the source key + event_participants
+          // (never the client) and only ever touches the caller's own {eventId}_{uid} doc. Never throws.
+          void EventRegcodeService.attachMine(eventId, memberId);
         } catch (error) {
           errorLoggingService.logError(error as Error, { component: 'EventsService', action: 'registerForEvent', additionalData: { eventId, memberId } });
           throw error;

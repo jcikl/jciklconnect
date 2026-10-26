@@ -103,7 +103,7 @@
 | 集合 | 读权限 | 写权限 | 风险/备注 | 测试优先级 |
 |---|---|---|---|---|
 | `events` | get authenticated；list public | create/delete board/admin；update board/admin 或 committee/organizer 条件 | list 公开，需确认列表字段不含敏感资料。 | P1 |
-| `eventRegistrations` | authenticated，list active/member/org | create authenticated；update authenticated 条件；delete org reader | 报名、付款、签到状态要重点防止代写。 | P1 |
+| `eventRegistrations` | authenticated，list active/member/org | create authenticated；update authenticated 条件；delete org reader | 报名、付款、签到状态要重点防止代写。`jciMalaysiaRegcode`（JCI Malaysia 签到码）仅服务端可写，会员自更新锁定列表禁止伪造；本人可见自己的 QR，B+/委员会在名单中可见。 | P1 |
 | `eventBudgets` | board/admin 或 createdBy；list board/admin | create/delete board/admin；update admin 或条件 | 财务相关。 | P1 |
 | `eventFeedback` | board/admin 或本人 | create 本人；update/delete board/admin | 已修公开读风险，需回归测试。 | P2 |
 | `projects` | get authenticated 或 active public；list public | create/delete board/admin；update board/admin 或负责人/committee 条件 | list 公开，需确认公开字段。 | P1 |

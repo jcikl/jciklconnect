@@ -60,6 +60,12 @@ export interface EventRegistration {
   registrantLoId?: string | null;
   /** Currency the registrant saw the price in: 'USD' for external-chapter members, 'MYR' otherwise. */
   currency?: 'MYR' | 'USD' | null;
+  /**
+   * JCI Malaysia check-in code (regcode) for this member at this event. Copied server-side from the
+   * JCI Malaysia event_participants snapshot (matched via projects.roadmapId + IC/email/phone); never
+   * written by the client. The app renders a QR from this string. Missing = not linked yet.
+   */
+  jciMalaysiaRegcode?: string | null;
 }
 
 export interface NonMemberLead {
