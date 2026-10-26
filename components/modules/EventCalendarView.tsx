@@ -38,9 +38,9 @@ function isSameDay(a: Date, b: Date) {
     && a.getDate() === b.getDate();
 }
 
-// Events longer than this don't span the grid (a 200-day programme would flood it); they show on their start day
+// Events longer than this don't span the grid (a long programme would flood it); they show on their start day
 // only, and the month list always shows their start–end range so the end date is still visible.
-const MAX_SPAN_DAYS = 14;
+const MAX_SPAN_DAYS = 4;
 const dayOnly = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 
 /** Start/end (date-only) and inclusive day count for an event (uses `endDate`; falls back to a single day). */
