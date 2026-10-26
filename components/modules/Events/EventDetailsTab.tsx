@@ -36,13 +36,9 @@ export const EventDetailsTab: React.FC<EventDetailsTabProps> = ({
   myRegistration,
 }) => (
   <div className="space-y-3 animate-fade-in">
-    {myRegistration?.jciMalaysiaRegcode && myRegistration.status !== 'cancelled' && (
-      <div className="rounded-2xl border border-slate-100 bg-white px-3.5 py-4">
-        <RegcodeQr regcode={myRegistration.jciMalaysiaRegcode} label="Your JCI Malaysia check-in code" />
-        <p className="mt-2 text-center text-[11px] text-slate-400">Show this at the event to check in.</p>
-      </div>
-    )}
-    <div className="divide-y divide-slate-100 rounded-2xl border border-slate-100 overflow-hidden">
+    {/* Details on the left; the member's own check-in QR sits to the right on wider screens (stacks on mobile). */}
+    <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex-1 min-w-0 self-start divide-y divide-slate-100 rounded-2xl border border-slate-100 overflow-hidden">
       <div className="flex items-center gap-3 px-3.5 py-3 bg-white">
         <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
           <Calendar size={14} className="text-jci-blue" />
@@ -101,6 +97,13 @@ export const EventDetailsTab: React.FC<EventDetailsTabProps> = ({
               <div style={{ width: `${Math.min(100, attendancePercent)}%` }} className="h-full bg-jci-blue rounded-full" />
             </div>
           </div>
+        </div>
+      )}
+      </div>
+      {myRegistration?.jciMalaysiaRegcode && myRegistration.status !== 'cancelled' && (
+        <div className="sm:w-56 shrink-0 self-start rounded-2xl border border-slate-100 bg-white px-3.5 py-4">
+          <RegcodeQr regcode={myRegistration.jciMalaysiaRegcode} label="Your JCI Malaysia check-in code" />
+          <p className="mt-2 text-center text-[11px] text-slate-400">Show this at the event to check in.</p>
         </div>
       )}
     </div>
