@@ -88,6 +88,7 @@
 | jciCareer.joinDate | string | ✓ | | joinDate / joinedDate | 角色: B+；系统: 注册/审批/导入 | 会员年资计算、晋升条件判断 |
 | jciCareer.jciMalaysiaMembershipNo | string | — | JCI Malaysia（jcimalaysia.cc）会员编号，如 `JCIKL-025-0159`；对方为 "N/A" 时不写 | | 系统: `scripts/syncJciMalaysia.mjs`（按需执行，Admin SDK），来源 SheetScraper Pro 数据库 `member_directory.membership`（只取 JCI Kuala Lumpur 的记录；对应顺序：手动对应表 `scripts/data/jciMalaysiaOverrides.json` → 已存编号 → 电邮 → 电话） | 之后的同步按此编号对应；`MemberDetailCareerTab`（JCI Career 分页）只读显示 |
 | jciCareer.jciMalaysiaJoinDate | string | — | JCI Malaysia 入会日期（YYYY-MM-DD） | | 系统: `scripts/syncJciMalaysia.mjs`，来源 `member_directory.joindate` | `MemberDetailCareerTab`（JCI Career 分页）只读显示 |
+| jciCareer.jciMalaysiaUserId | string | — | JCI Malaysia（jcimalaysia.cc）用户编号，对方每人固定不变 | | 系统: `scripts/syncJciMalaysia.mjs`，来源 `member_directory.id` | 之后的同步优先按此编号对应（手动对应表之后）；应用内不显示 |
 | jciCareer.introducer | string | — | | introducer | 角色: B+；系统: 导入 normalize | introducer stats recalculation |
 | jciCareer.senatorship | object | ✓ | |  | B+ 操作 / senatorship validation | Senator 资格、编号及董事会验证 |
 | jciCareer.senatorship.certified | boolean | ✓ | | senatorCertified | 角色: B+；系统: senatorship validation | Senator 资格展示、换届董事会验证 |

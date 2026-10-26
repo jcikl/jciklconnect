@@ -287,6 +287,8 @@ export interface Member {
     jciMalaysiaMembershipNo?: string;
     /** JCI Malaysia join date (YYYY-MM-DD). Written by scripts/syncJciMalaysia.mjs. */
     jciMalaysiaJoinDate?: string;
+    /** JCI Malaysia user id (the jcimalaysia.cc member record id). Internal match key, not shown. Written by scripts/syncJciMalaysia.mjs. */
+    jciMalaysiaUserId?: string;
   };
   createdAt?: string | Timestamp | Date;
   updatedAt?: string | Timestamp | Date;

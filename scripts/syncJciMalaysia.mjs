@@ -1,9 +1,9 @@
 /**
  * On-demand: copy the JCI Malaysia membership no. and JCI Malaysia join date from the SheetScraper Pro
  * database (Firestore project gen-lang-client-0772255734, collection member_directory) into our KL
- * members as jciCareer.jciMalaysiaMembershipNo / jciCareer.jciMalaysiaJoinDate.
+ * members as jciCareer.jciMalaysiaMembershipNo / jciMalaysiaJoinDate / jciMalaysiaUserId (the source record id).
  *
- * Match (owner decision 2026-10-26): stored membership no. → email → phone. Rows of the same person in
+ * Match (owner decision 2026-10-26): manual picks → stored user id → stored membership no. → email → phone. Rows of the same person in
  * several chapters: the JCI Kuala Lumpur row wins, then the latest join date. Only JCI Kuala Lumpur rows are
  * written (a person found only in another chapter is skipped and listed). Email and phone pointing to
  * different membership numbers = conflict, skipped and listed; the owner's picks for those live in
@@ -61,14 +61,14 @@ const members = (await db.collection('members').get()).docs
   .filter(m => (m.loId ?? 'jcikl') === 'jcikl');
 
 const name = m => m.general?.name ?? m.name ?? m.id;
-const counts = { members: members.length, byManual: 0, byMembershipNo: 0, byEmail: 0, byPhone: 0, conflict: 0, otherChapter: 0, none: 0, toWrite: 0, unchanged: 0 };
+const counts = { members: members.length, byManual: 0, byUserId: 0, byMembershipNo: 0, byEmail: 0, byPhone: 0, conflict: 0, otherChapter: 0, none: 0, toWrite: 0, unchanged: 0 };
 const writes = [], conflicts = [], unmatched = [], otherChapter = [];
 for (const m of members) {
   const res = matchMember(m, index, overrides);
   if (res.status === 'conflict') { counts.conflict++; conflicts.push(name(m)); continue; }
   if (res.status === 'none') { counts.none++; unmatched.push(name(m)); continue; }
   if (res.status === 'otherChapter') { counts.otherChapter++; otherChapter.push(`${name(m)} (${res.row.chapter}, by ${res.by})`); continue; }
-  counts[{ manual: 'byManual', membershipNo: 'byMembershipNo', email: 'byEmail', phone: 'byPhone' }[res.by]]++;
+  counts[{ manual: 'byManual', userId: 'byUserId', membershipNo: 'byMembershipNo', email: 'byEmail', phone: 'byPhone' }[res.by]]++;
   const updates = planUpdate(m, res.row);
   if (!Object.keys(updates).length) { counts.unchanged++; continue; }
   counts.toWrite++;
@@ -78,9 +78,9 @@ for (const m of members) {
 console.log(`source rows: ${rows.length}`);
 console.log(JSON.stringify(counts));
 for (const w of writes) {
-  const before = { no: w.m.jciCareer?.jciMalaysiaMembershipNo ?? '', join: w.m.jciCareer?.jciMalaysiaJoinDate ?? '' };
-  const after = { no: w.updates['jciCareer.jciMalaysiaMembershipNo'] ?? before.no, join: w.updates['jciCareer.jciMalaysiaJoinDate'] ?? before.join };
-  console.log(`  ${name(w.m)}: no ${before.no || '∅'} -> ${after.no || '∅'} | join ${before.join || '∅'} -> ${after.join || '∅'} | by ${w.by}`);
+  const before = { no: w.m.jciCareer?.jciMalaysiaMembershipNo ?? '', join: w.m.jciCareer?.jciMalaysiaJoinDate ?? '', uid: w.m.jciCareer?.jciMalaysiaUserId ?? '' };
+  const after = { no: w.updates['jciCareer.jciMalaysiaMembershipNo'] ?? before.no, join: w.updates['jciCareer.jciMalaysiaJoinDate'] ?? before.join, uid: w.updates['jciCareer.jciMalaysiaUserId'] ?? before.uid };
+  console.log(`  ${name(w.m)}: no ${before.no || '∅'} -> ${after.no || '∅'} | join ${before.join || '∅'} -> ${after.join || '∅'} | user id ${before.uid || '∅'} -> ${after.uid || '∅'} | by ${w.by}`);
 }
 console.log(`\nconflicts (email and phone point to different people) — check manually: ${conflicts.length}`);
 conflicts.forEach(n => console.log(`  ${n}`));
@@ -96,7 +96,7 @@ mkdirSync(backupDir, { recursive: true });
 const backupFile = path.join(backupDir, `jci-malaysia-sync-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
 writeFileSync(backupFile, JSON.stringify(writes.map(w => ({
   memberId: w.m.id,
-  before: { jciMalaysiaMembershipNo: w.m.jciCareer?.jciMalaysiaMembershipNo ?? null, jciMalaysiaJoinDate: w.m.jciCareer?.jciMalaysiaJoinDate ?? null },
+  before: { jciMalaysiaMembershipNo: w.m.jciCareer?.jciMalaysiaMembershipNo ?? null, jciMalaysiaJoinDate: w.m.jciCareer?.jciMalaysiaJoinDate ?? null, jciMalaysiaUserId: w.m.jciCareer?.jciMalaysiaUserId ?? null },
 })), null, 2));
 console.log(`backup of old values: ${backupFile}`);
 

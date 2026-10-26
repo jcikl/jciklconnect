@@ -52,7 +52,7 @@ export function pickRow(rows) {
 
 /**
  * Match one of our members. Returns { status, by?, row? }:
- *  - 'matched'  by 'manual' | 'membershipNo' | 'email' | 'phone'
+ *  - 'matched'  by 'manual' | 'userId' | 'membershipNo' | 'email' | 'phone'
  *  - 'conflict'     email and phone lead to different JCI Malaysia membership numbers
  *  - 'otherChapter' the person's only record is in another chapter (owner decision: skip, list for a manual check)
  *  - 'none'
@@ -63,6 +63,12 @@ export function matchMember(member, index, overrides = {}) {
   if (manualId != null) {
     const row = index.byId.get(String(manualId));
     if (row) return { status: 'matched', by: 'manual', row };
+  }
+  // The JCI Malaysia user id (source record id) never changes, so it is the most reliable key once stored.
+  const storedUserId = String(member.jciCareer?.jciMalaysiaUserId ?? '').trim();
+  if (storedUserId) {
+    const row = index.byId.get(storedUserId);
+    if (row) return { status: 'matched', by: 'userId', row };
   }
   const stored = membershipKey(member.jciCareer?.jciMalaysiaMembershipNo);
   if (stored) {
@@ -88,11 +94,13 @@ export function matchMember(member, index, overrides = {}) {
   return { status: 'matched', ...hit };
 }
 
-/** The two fields to write (only those that change). Empty source values never overwrite ours. */
+/** The fields to write (only those that change). Empty source values never overwrite ours. */
 export function planUpdate(member, row) {
   const updates = {};
   const no = membershipNo(row.membership);
   const join = toIsoDate(row.joindate);
+  const userId = row.id != null ? String(row.id).trim() : '';
+  if (userId && userId !== String(member.jciCareer?.jciMalaysiaUserId ?? '')) updates['jciCareer.jciMalaysiaUserId'] = userId;
   if (no && no !== (member.jciCareer?.jciMalaysiaMembershipNo ?? '')) updates['jciCareer.jciMalaysiaMembershipNo'] = no;
   if (join && join !== (member.jciCareer?.jciMalaysiaJoinDate ?? '')) updates['jciCareer.jciMalaysiaJoinDate'] = join;
   return updates;
