@@ -86,6 +86,8 @@
 | jciCareer.membershipType | enum | ✓ | `Guest` \| `Probation` \| `Official` \| `Honorary` \| `Senator` \| `Visiting` \| `Associate` | membershipType | 角色: B+；系统: 注册/审批/晋升/会费同步/导入 | `members.role` 推导；会费记录同步依据 |
 | jciCareer.membershipStatus | enum | ✓ | `paid_due` \| `unpaid_due` \| `terminated` \| `pending` \| `paid` \| `overdue` \| `partial` \| `over paid` |  | 角色: B+；系统: membership/finance sync | 会员状态过滤、权限判断、会费仪表盘 |
 | jciCareer.joinDate | string | ✓ | | joinDate / joinedDate | 角色: B+；系统: 注册/审批/导入 | 会员年资计算、晋升条件判断 |
+| jciCareer.jciMalaysiaMembershipNo | string | — | JCI Malaysia（jcimalaysia.cc）会员编号，如 `JCIKL-025-0159`；对方为 "N/A" 时不写 | | 系统: `scripts/syncJciMalaysia.mjs`（按需执行，Admin SDK），来源 SheetScraper Pro 数据库 `member_directory.membership`（只取 JCI Kuala Lumpur 的记录；对应顺序：手动对应表 `scripts/data/jciMalaysiaOverrides.json` → 已存编号 → 电邮 → 电话） | 之后的同步按此编号对应；应用内暂无读取 |
+| jciCareer.jciMalaysiaJoinDate | string | — | JCI Malaysia 入会日期（YYYY-MM-DD） | | 系统: `scripts/syncJciMalaysia.mjs`，来源 `member_directory.joindate` | 应用内暂无读取 |
 | jciCareer.introducer | string | — | | introducer | 角色: B+；系统: 导入 normalize | introducer stats recalculation |
 | jciCareer.senatorship | object | ✓ | |  | B+ 操作 / senatorship validation | Senator 资格、编号及董事会验证 |
 | jciCareer.senatorship.certified | boolean | ✓ | | senatorCertified | 角色: B+；系统: senatorship validation | Senator 资格展示、换届董事会验证 |
