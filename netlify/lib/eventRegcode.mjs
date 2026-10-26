@@ -102,17 +102,35 @@ export function resolveRegcode({ project, member, index }) {
 // Loaders (Admin SDK). Kept thin so the pure parts above stay testable.
 // ---------------------------------------------------------------------------
 
-/** Every source event doc (field-masked), optionally filtered to a set of needed eventIds. */
+// How many source subcollection reads to run at once. The snapshot is event_participants/{yyyymm}/{LO}/{eventId}
+// with hundreds of {LO} subcollections; reading them sequentially blows past Netlify's 10s function limit (504),
+// so fan out with a cap that keeps us well under it without opening an unbounded number of sockets.
+export const SOURCE_READ_CONCURRENCY = 200;
+
+/** Map over items with a concurrency cap, preserving input order in the result. */
+async function mapLimit(items, limit, fn) {
+  const results = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i], i);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+/** Every source event doc (field-masked), optionally filtered to a set of needed eventIds. Reads fan out (see above). */
 export async function loadSourceEventDocs(sourceDb, neededEventIds = null) {
   const monthDocs = await sourceDb.collection(SOURCE_COLLECTION).listDocuments();
+  const subsPerMonth = await mapLimit(monthDocs, SOURCE_READ_CONCURRENCY, mon => mon.listCollections());
+  const subs = subsPerMonth.flat();
+  const snaps = await mapLimit(subs, SOURCE_READ_CONCURRENCY, sub => sub.select(...SOURCE_FIELDS).get());
   const docs = [];
-  for (const mon of monthDocs) {
-    const subs = await mon.listCollections();
-    for (const sub of subs) {
-      const snap = await sub.select(...SOURCE_FIELDS).get();
-      for (const d of snap.docs) {
-        if (!neededEventIds || neededEventIds.has(d.id)) docs.push({ eventId: d.id, data: d.data() });
-      }
+  for (const snap of snaps) {
+    for (const d of snap.docs) {
+      if (!neededEventIds || neededEventIds.has(d.id)) docs.push({ eventId: d.id, data: d.data() });
     }
   }
   return docs;
