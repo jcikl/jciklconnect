@@ -89,8 +89,6 @@ import { MemberDetail } from './Members/MemberDetail';
 import { MentorMatchingModal } from './Members/MentorMatchingModal';
 import { MemberCreateModal } from './Members/MemberCreateModal';
 import { JciMalaysiaSyncButton } from './Members/JciMalaysiaSyncButton';
-import { EventRegcodeSyncButton } from './Members/EventRegcodeSyncButton';
-import { SenatorshipSyncButton } from './Members/SenatorshipSyncButton';
 import { useSisterChapters } from '../../hooks/useSisterChapters';
 import { DEFAULT_LO_ID } from '../../config/constants';
 import { BatchFieldUpdateModal } from './Members/BatchFieldUpdateModal';
@@ -479,10 +477,9 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
                   )}
                 </div>
               )}
-              {/* Developer accounts only (renders nothing otherwise); visible on mobile too */}
+              {/* Developer accounts only (renders nothing otherwise); visible on mobile too.
+                  One button, three tabs: Membership / Event QR / Senatorship. */}
               <JciMalaysiaSyncButton />
-              <EventRegcodeSyncButton />
-              <SenatorshipSyncButton />
             </div>
           }
         >

@@ -89,6 +89,18 @@
 | jciCareer.jciMalaysiaMembershipNo | string | — | JCI Malaysia（jcimalaysia.cc）会员编号，如 `JCIKL-025-0159`；对方为 "N/A" 时不写 | | 系统: `netlify/lib/jciMalaysiaSync.mjs`（按需执行，Admin SDK；入口为 CLI `scripts/syncJciMalaysia.mjs` 与应用内 `netlify/functions/jci-malaysia-sync`，仅开发者账号），来源 SheetScraper Pro 数据库 `member_directory.membership`（只取 JCI Kuala Lumpur 的记录；对应顺序：手动对应 `jciMalaysiaOverrides` → 已存用户编号 → 已存编号 → 电邮 → 电话） | 之后的同步按此编号对应；`MemberDetailCareerTab`（JCI Career 分页）只读显示 |
 | jciCareer.jciMalaysiaJoinDate | string | — | JCI Malaysia 入会日期（YYYY-MM-DD） | | 系统: `netlify/lib/jciMalaysiaSync.mjs`（CLI 与应用内同步），来源 `member_directory.joindate` | `MemberDetailCareerTab`（JCI Career 分页）只读显示 |
 | jciCareer.jciMalaysiaUserId | string | — | JCI Malaysia（jcimalaysia.cc）用户编号，对方每人固定不变 | | 系统: `netlify/lib/jciMalaysiaSync.mjs`（CLI 与应用内同步），来源 `member_directory.id` | 之后的同步优先按此编号对应（手动对应表之后）；应用内不显示 |
+| jciCareer.jciMalaysiaChapter | string | — | JCI Malaysia 所属分会（如 `JCI Kuala Lumpur`）；应用内同步可选字段 | | 系统: 同步时勾选，来源 `member_directory.chapter`（非空才写） | 参考 |
+| jciCareer.jciMalaysiaLevel | string | — | JCI Malaysia 会籍等级（如 `member`/`free`）；可选字段 | | 系统: 同步时勾选，来源 `member_directory.level` | 参考 |
+| jciCareer.jciMalaysiaArea | string | — | JCI Malaysia 区域（如 `Area Central`）；可选字段 | | 系统: 同步时勾选，来源 `member_directory.area` | 参考 |
+| jciCareer.jciMalaysiaRenewYear | number | — | JCI Malaysia 续费年份；可选字段 | | 系统: 同步时勾选，来源 `member_directory.renew_year` | 参考 |
+| jciCareer.jciMalaysiaRenewWindow | string | — | JCI Malaysia 续费窗口（如 `2026-11-01 to 2027-01-01`）；可选字段 | | 系统: 同步时勾选，来源 `member_directory.renew_window` | 参考 |
+| jciCareer.jciMalaysiaVerified | string | — | JCI Malaysia 验证标记（来源原值）；可选字段 | | 系统: 同步时勾选，来源 `member_directory.verify` | 参考 |
+| jciCareer.jciMalaysiaProfileLink | string | — | JCI Malaysia（jvc.jci.cc）档案链接；可选字段 | | 系统: 同步时勾选，来源 `member_directory.profileDetails.jci.profileLink` | 参考 |
+
+> **同步也可选填以下栏位**（均「仅当我方为空时才填」，绝不覆盖已有值；需在应用内「Fields to load」勾选。固定同步的 3 项 UserId/MembershipNo/JoinDate 始终写入）：
+> - 顶层来源：`general.name` / `general.gender` / `general.dob` / `contact.email` / `contact.phone`（来源 `member_directory.fullname/gender/dob/email/contact`）。
+> - 嵌套来源 `member_directory.profileDetails.*`（仅 ~4.5% 会员有）：`business.companyName/industry/position/companyWebsite`、`contact.socials.facebook/instagram/linkedin`、`contact.address/state`、`general.nationality`、`others.hobbies`（数组）/`others.bio`、`jciCareer.senatorship.senatorNumber`（与参议员同步重叠，仅填空故不动已验证编号）。
+> - **预览去敏**：email/phone/dob/address 打码为 `•••`；所有显示值去除嵌入的邮箱/@句柄，自由文本（bio/公司/职称/兴趣）另去除嵌入电话；「none」「http://none」等占位值当空不写。真实值只在服务端写入与备份。
 | jciCareer.introducer | string | — | | introducer | 角色: B+；系统: 导入 normalize | introducer stats recalculation |
 | jciCareer.senatorship | object | ✓ | |  | B+ 操作 / senatorship validation | Senator 资格、编号及董事会验证 |
 | jciCareer.senatorship.certified | boolean | ✓ | | senatorCertified | 角色: B+；系统: senatorship validation | Senator 资格展示、换届董事会验证 |
@@ -372,7 +384,7 @@
 | by | string | ✓ | 执行者 uid | 系统: `jci-malaysia-sync` `apply`（`applySync`） | 审计 |
 | at | Timestamp | ✓ | | 系统: 同上 | 审计 |
 | counts | map | ✓ | 与预览相同的计数（members、byManual … toWrite、unchanged） | 系统: 同上（服务端重新计算的计划） | 审计；`auditLog.metadata.counts` 同值 |
-| before | array | ✓ | `[{ memberId, before: { jciMalaysiaMembershipNo, jciMalaysiaJoinDate, jciMalaysiaUserId } }]`（原值，缺失为 null） | 系统: 同上，在写 `members` 之前写入 | 人工恢复：用 Admin SDK 把这些值写回 `members.jciCareer.*`（R-097） |
+| before | array | ✓ | `[{ memberId, before: { "<字段点路径>": 原值 } }]`，仅含本次改动的字段（点路径键如 `jciCareer.jciMalaysiaMembershipNo`、`general.gender`；缺失为 null） | 系统: 同上，在写 `members` 之前写入 | 人工恢复：用 Admin SDK 把这些点路径值写回 `members`（R-097） |
 | status | string | ✓ | `started` → `done`；停在 `started` 表示批次中途失败（部分会员已写入） | 系统: 同上 | 恢复判断 |
 | written | number | ✓ | 已写入的会员数 | 系统: 同上 | 审计 |
 
@@ -496,7 +508,8 @@
 | paymentMethod | enum | — | `toyyib` \| `bank_transfer` \| `cash` | 角色: 会员/财务；系统: 付款流程 | 付款处理分支 |
 | registrantLoId | string \| null | — | 报名人所属分会；`loId` 仍是主办 LO | 系统: `EventsService.registerForEvent` 从 `members.loId` 读取（读取失败时用 `jcikl`）；创建后自己不可改（`firestore.rules` 自更新锁定列表） | 仅作参考记录，尚无应用读取者 |
 | currency | enum \| null | — | `MYR` \| `USD` | 系统: `EventsService.registerForEvent`：报名人 role 为 `AFFILIATE` / `CHAPTER_ADMIN` 时写 `USD`，否则 `MYR`；创建后自己不可改（自更新锁定列表） | `EventPaymentService.markRegistrationPaid`（USD 时把活动价记为 `transactions.originalAmount`）；`EventMarkPaidModal`；USD 价格展示 |
-| jciMalaysiaRegcode | string \| null | — | JCI Malaysia 签到码（6 位）；会员自更新锁定列表，仅服务端可写 | 系统: 仅 `netlify/functions/jci-malaysia-regcode`（Admin SDK）：经 `projects.roadmapId` 关联到 JCI Malaysia `event_participants` 快照，按 IC(`general.idNumber`)→email→phone 匹配该活动人员记录的 `regcode`；email 与 phone 指向不同 regcode 则跳过。批量回填（developer-only `applyRegcodes`）或报名后 best-effort（`attachMyRegcode`，仅限本人 `{eventId}_{uid}`）写入 | `components/ui/RegcodeQr`：在活动详情（本人）与报名名单展开行（B+/委员会）用它重新生成 QR 并显示号码；不使用来源的 `qrcode` 图片 |
+| jciMalaysiaRegcode | string \| null | — | JCI Malaysia 签到码（6 位）；会员自更新锁定列表，仅服务端可写 | 系统: 仅 `netlify/functions/jci-malaysia-regcode`（Admin SDK）：经 `projects.roadmapId` 关联到 JCI Malaysia `event_participants` 快照，按 IC(`general.idNumber`)→email→phone 匹配该活动人员记录的 `regcode`；email 与 phone 指向不同 regcode 则跳过。批量回填（developer-only `applyRegcodes`）或报名后 best-effort（`attachMyRegcode`，仅限本人 `{eventId}_{uid}`）写入；回填时也随新建报名一并写入（见下行）。 | `components/ui/RegcodeQr`：在活动详情（本人）与报名名单展开行（B+/委员会）用它重新生成 QR 并显示号码；不使用来源的 `qrcode` 图片 |
+| jciMalaysiaRole | enum \| null | — | `approved` \| `pending` \| `committee` \| `trainer`；会员自更新锁定列表（`firestore.rules` ER-U6），仅服务端可写。标记该报名是从 JCI Malaysia 快照哪个人员数组回填而来 | 系统: 仅 `netlify/functions/jci-malaysia-backfill-background`（Admin SDK background function，`逻辑 netlify/lib/eventRegBackfill.mjs`）：对每个有 `roadmapId` 的 `projects`，查 `event_participants` 对应活动，把 `approved`/`pending`/`committee`/`trainers` 四数组中可匹配到 KL 会员（IC→email→phone，冲突默认跳过）且尚无 `eventRegistrations/{projectId}_{memberId}` 的人，**新建**报名（`status` 一律 `'registered'`，不写任何付款字段）。`status` 枚举只有 registered/paid/checked_in/cancelled，故 approved/pending/committee/trainer 的区分由本字段承载 | 用于区分回填来源与出席口径分析；无付款联动 |
 
 ---
 

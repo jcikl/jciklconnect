@@ -161,7 +161,7 @@ export async function loadProjectsRoadmap(db, ids) {
   const out = new Map();
   const refs = [...ids].map(id => db.collection('projects').doc(id));
   for (let i = 0; i < refs.length; i += BATCH_SIZE) {
-    const snaps = await db.getAll(...refs.slice(i, i + BATCH_SIZE), { fieldMask: ['roadmapId'] });
+    const snaps = await db.getAll(...refs.slice(i, i + BATCH_SIZE), { fieldMask: ['roadmapId', 'title', 'name'] });
     for (const s of snaps) if (s.exists) out.set(s.id, s.data());
   }
   return out;
@@ -172,7 +172,7 @@ export async function loadMembersIdentity(db, ids) {
   const out = new Map();
   const refs = [...ids].map(id => db.collection('members').doc(id));
   for (let i = 0; i < refs.length; i += BATCH_SIZE) {
-    const snaps = await db.getAll(...refs.slice(i, i + BATCH_SIZE), { fieldMask: ['general.idNumber', 'contact.email', 'contact.phone'] });
+    const snaps = await db.getAll(...refs.slice(i, i + BATCH_SIZE), { fieldMask: ['general.name', 'general.idNumber', 'contact.email', 'contact.phone'] });
     for (const s of snaps) if (s.exists) out.set(s.id, s.data());
   }
   return out;
@@ -186,6 +186,9 @@ export function buildPlan({ registrations, projectsById, membersById, index }) {
     noRoadmapId: 0, eventNotInSnapshot: 0, memberNotInList: 0, memberMissing: 0,
   };
   const writes = [];
+  // Per-registration detail for the preview UI (member · event — regcode) so a human can verify before applying.
+  // Kept out of writes so the write path stays { id, regcode }.
+  const items = [];
   for (const reg of registrations) {
     const project = projectsById.get(reg.eventId);
     if (!project || project.roadmapId == null || String(project.roadmapId).trim() === '') { counts.noRoadmapId++; continue; }
@@ -200,8 +203,9 @@ export function buildPlan({ registrations, projectsById, membersById, index }) {
     if ((reg.jciMalaysiaRegcode ?? null) === res.regcode) { counts.alreadySet++; continue; }
     counts.toWrite++;
     writes.push({ id: reg.id, regcode: res.regcode });
+    items.push({ member: member.general?.name ?? reg.memberId, event: project.title ?? project.name ?? reg.eventId, regcode: res.regcode, by: res.by });
   }
-  return { counts, writes };
+  return { counts, writes, items };
 }
 
 /** Read our registrations + the source (only the events we reference) and build the plan. */
@@ -237,10 +241,10 @@ export async function applyPlan(db, plan, now, onProgress) {
 
 const fail = (status, error) => ({ status, body: { error } });
 
-/** preview action: counts only, no PII. */
+/** preview action: counts + the per-registration list of proposed writes (member · event — regcode) for verification. */
 export async function previewRegcodes({ sourceDb, db }) {
   const plan = await computePlan({ sourceDb, db });
-  return { status: 200, body: { counts: plan.counts } };
+  return { status: 200, body: { counts: plan.counts, items: plan.items } };
 }
 
 /**

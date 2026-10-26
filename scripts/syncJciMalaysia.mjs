@@ -62,8 +62,8 @@ const plan = await computePlan({ sourceDb: source, db, overrides });
 console.log(`source rows: ${plan.sourceRows}`);
 console.log(JSON.stringify(plan.counts));
 for (const w of plan.writes) {
-  const { before: b, after: a } = w;
-  console.log(`  ${w.name}: no ${b.membershipNo || '∅'} -> ${a.membershipNo || '∅'} | join ${b.joinDate || '∅'} -> ${a.joinDate || '∅'} | user id ${b.userId || '∅'} -> ${a.userId || '∅'} | by ${w.by}`);
+  const changes = w.fields.map(f => `${f.label} ${f.before || '∅'} -> ${f.after || '∅'}`).join(' | ');
+  console.log(`  ${w.name}: ${changes} | by ${w.by}`);
 }
 console.log(`\nconflicts (email and phone point to different people) — check manually: ${plan.conflicts.length}`);
 plan.conflicts.forEach(c => console.log(`  ${c.name}`));

@@ -289,6 +289,20 @@ export interface Member {
     jciMalaysiaJoinDate?: string;
     /** JCI Malaysia user id (the jcimalaysia.cc member record id). Internal match key, not shown. Written by scripts/syncJciMalaysia.mjs. */
     jciMalaysiaUserId?: string;
+    /** JCI Malaysia chapter the member belongs to (e.g. "JCI Kuala Lumpur"). Opt-in in the JCI Malaysia sync. */
+    jciMalaysiaChapter?: string;
+    /** JCI Malaysia membership level (e.g. "member", "free"). Opt-in in the JCI Malaysia sync. */
+    jciMalaysiaLevel?: string;
+    /** JCI Malaysia area (e.g. "Area Central"). Opt-in in the JCI Malaysia sync. */
+    jciMalaysiaArea?: string;
+    /** JCI Malaysia renewal year. Opt-in in the JCI Malaysia sync. */
+    jciMalaysiaRenewYear?: number;
+    /** JCI Malaysia renewal window (e.g. "2026-11-01 to 2027-01-01"). Opt-in in the JCI Malaysia sync. */
+    jciMalaysiaRenewWindow?: string;
+    /** JCI Malaysia verification flag as reported by the source. Opt-in in the JCI Malaysia sync. */
+    jciMalaysiaVerified?: string;
+    /** JCI Malaysia (jvc.jci.cc) profile link. Opt-in in the JCI Malaysia sync (from the scraped profileDetails). */
+    jciMalaysiaProfileLink?: string;
   };
   createdAt?: string | Timestamp | Date;
   updatedAt?: string | Timestamp | Date;

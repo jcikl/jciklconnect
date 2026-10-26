@@ -9,9 +9,12 @@ import { db, auth, hasAdminCredentials } from '../lib/firebaseAdmin.mjs';
 import { SECRET_COLLECTION, SECRET_DOC_ID, isSyncDeveloper } from '../lib/jciMalaysiaSync.mjs';
 import { SOURCE_DATABASE_ID, previewRegcodes, applyRegcodes, attachMyRegcode } from '../lib/eventRegcode.mjs';
 import { previewSenatorship, applySenatorship } from '../lib/senatorshipSync.mjs';
+import { previewBackfill, sanitizeResolutions } from '../lib/eventRegBackfill.mjs';
 
 const ALLOWED_ORIGINS = ['https://app.jcikl.cc', 'http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'];
-const DEVELOPER_ACTIONS = ['previewRegcodes', 'applyRegcodes', 'previewSenatorship', 'applySenatorship'];
+// Note: back-fill APPLY is a separate Netlify BACKGROUND function (jci-malaysia-backfill-background) — ~2,614
+// creates exceed this function's 10s synchronous limit. Only the read-only previewBackfill lives here.
+const DEVELOPER_ACTIONS = ['previewRegcodes', 'applyRegcodes', 'previewSenatorship', 'applySenatorship', 'previewBackfill'];
 const MEMBER_ACTIONS = ['attachMyRegcode'];
 const SOURCE_APP_NAME = 'jciMalaysiaSource';
 
@@ -76,6 +79,7 @@ export default async (req) => {
     else if (action === 'applyRegcodes') res = await applyRegcodes({ sourceDb, db, by: callerUid, now });
     else if (action === 'previewSenatorship') res = await previewSenatorship({ sourceDb, db });
     else if (action === 'applySenatorship') res = await applySenatorship({ sourceDb, db, by: callerUid, now });
+    else if (action === 'previewBackfill') res = await previewBackfill({ sourceDb, db, resolutions: sanitizeResolutions(body.resolutions) });
     else res = await attachMyRegcode({ sourceDb, db, callerUid, eventId: body.eventId, now });
     const elapsedMs = Date.now() - started;
     console.log(`[jci-malaysia-regcode] ${action} ${res.status} in ${elapsedMs} ms`);

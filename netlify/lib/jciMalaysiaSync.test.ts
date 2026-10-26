@@ -75,11 +75,10 @@ describe('jciMalaysiaSync core', () => {
     const plan = await computePlan({ sourceDb: source.db, db: target.db });
     expect(plan.sourceRows).toBe(5);
     expect(plan.counts).toMatchObject({ members: 5, byEmail: 1, byUserId: 1, conflict: 1, otherChapter: 1, none: 1, toWrite: 1, unchanged: 1 });
-    expect(plan.writes).toEqual([expect.objectContaining({
-      memberId: 'ali', name: 'Ali', by: 'email',
-      before: { membershipNo: null, joinDate: null, userId: null },
-      after: { membershipNo: 'JCIKL-1', joinDate: '2020-01-02', userId: '1' },
-    })]);
+    expect(plan.writes[0]).toMatchObject({ memberId: 'ali', name: 'Ali', by: 'email' });
+    expect(Object.fromEntries(plan.writes[0].fields.map((f: Data) => [f.key, f.after]))).toEqual({
+      userId: '1', membershipNo: 'JCIKL-1', joinDate: '2020-01-02',
+    });
     expect(plan.conflicts).toEqual([{
       memberId: 'bob', name: 'Bob',
       candidates: {
@@ -95,7 +94,10 @@ describe('jciMalaysiaSync core', () => {
     const { source, target } = setup();
     await computePlan({ sourceDb: source.db, db: target.db });
     expect(source.log.selects).toEqual([{ collection: 'member_directory', fields: SOURCE_FIELDS }]);
-    expect(SOURCE_FIELDS).toEqual(['id', 'membership', 'joindate', 'email', 'contact', 'chapter', 'fullname', 'gender']);
+    // SOURCE_FIELDS is derived from the field catalog; it must cover the match keys and the nested profile object.
+    for (const need of ['id', 'membership', 'joindate', 'email', 'contact', 'chapter', 'fullname', 'gender', 'dob', 'level', 'area', 'profileDetails']) {
+      expect(SOURCE_FIELDS).toContain(need);
+    }
   });
 
   it('the preview never contains emails or phone numbers', async () => {
@@ -112,7 +114,9 @@ describe('jciMalaysiaSync core', () => {
     const { source, target } = setup({ jciMalaysiaOverrides: { bob: { sourceId: '3', pickedBy: 'dev', pickedAt: 'x' } } });
     const plan = await computePlan({ sourceDb: source.db, db: target.db });
     expect(plan.conflicts).toEqual([]);
-    expect(plan.writes.find((w: Data) => w.memberId === 'bob')).toMatchObject({ by: 'manual', after: { membershipNo: 'JCIKL-3' } });
+    const bob = plan.writes.find((w: Data) => w.memberId === 'bob');
+    expect(bob).toMatchObject({ by: 'manual' });
+    expect(Object.fromEntries(bob.fields.map((f: Data) => [f.key, f.after])).membershipNo).toBe('JCIKL-3');
   });
 
   it('apply recomputes the plan server-side and ignores a client-sent plan', async () => {
@@ -130,7 +134,7 @@ describe('jciMalaysiaSync core', () => {
 
     const run = target.store.jciMalaysiaSyncRuns[res.body.runId];
     expect(run).toMatchObject({ by: 'dev1', at: 'NOW', status: 'done', written: 1, counts: { toWrite: 1 } });
-    expect(run.before).toEqual([{ memberId: 'ali', before: { jciMalaysiaMembershipNo: null, jciMalaysiaJoinDate: null, jciMalaysiaUserId: null } }]);
+    expect(run.before).toEqual([{ memberId: 'ali', before: { 'jciCareer.jciMalaysiaUserId': null, 'jciCareer.jciMalaysiaMembershipNo': null, 'jciCareer.jciMalaysiaJoinDate': null } }]);
 
     const audits = Object.values(target.store.auditLog);
     expect(audits).toHaveLength(1);
@@ -188,8 +192,59 @@ describe('jciMalaysiaSync core', () => {
     expect(isSyncDeveloper(null)).toBe(false);
   });
 
-  it('backupOf keeps the raw old values', () => {
+  it('backupOf keeps the raw old values of the changed fields (dot-path keys for rollback)', () => {
     const plan = buildPlan({ rows: [sourceRows.r1], members: [{ id: 'a', contact: { email: 'ali@x.com' }, jciCareer: { jciMalaysiaMembershipNo: 'OLD' } }] });
-    expect(backupOf(plan)).toEqual([{ memberId: 'a', before: { jciMalaysiaMembershipNo: 'OLD', jciMalaysiaJoinDate: null, jciMalaysiaUserId: null } }]);
+    expect(backupOf(plan)).toEqual([{ memberId: 'a', before: { 'jciCareer.jciMalaysiaMembershipNo': 'OLD', 'jciCareer.jciMalaysiaJoinDate': null, 'jciCareer.jciMalaysiaUserId': null } }]);
+  });
+
+  it('selected fields: JCIM-only fields write; core profile fields only fill a blank', () => {
+    const row = { id: '7', membership: 'JCIKL-9', joindate: '2024-01-02 00:00:00', email: 'x@x.com', chapter: 'JCI Kuala Lumpur', fullname: 'From JCIM', gender: 'Female' };
+    const member = { id: 'm', contact: { email: 'x@x.com' }, general: { name: 'Our Name' } }; // has a name already, no gender
+    const plan = buildPlan({ rows: [row], members: [member], selected: ['chapter', 'name', 'gender'] });
+    const w = plan.writes[0];
+    const by = Object.fromEntries(w.fields.map(f => [f.key, f.after]));
+    expect(by.chapter).toBe('JCI Kuala Lumpur');          // JCIM-only field written
+    expect(by.gender).toBe('Female');                    // core field was blank -> filled
+    expect('name' in by).toBe(false);                    // core field already set -> NOT overwritten
+    expect(w.updates['general.name']).toBeUndefined();
+  });
+
+  it('nested profileDetails fields: fill a blank, skip placeholders, handle arrays', () => {
+    const row = {
+      id: '7', membership: 'JCIKL-9', joindate: '2024-01-02 00:00:00', email: 'x@x.com', chapter: 'JCI Kuala Lumpur',
+      profileDetails: {
+        employment: { companyName: 'Acme', industry: 'Tech', website: 'http://none', linkedin: 'none' },
+        personal: { address: '12 Jalan X', state: 'Selangor', bio: 'hi', interests: ['A', 'B'] },
+        jci: { profileLink: 'https://jvc.jci.cc/p/7' },
+        general: { nationality: 'Malaysian' },
+      },
+    };
+    const member = { id: 'm', contact: { email: 'x@x.com', address: 'OLD ADDR' } }; // already has an address
+    const plan = buildPlan({ rows: [row], members: [member], selected: ['company', 'industry', 'companyWebsite', 'linkedin', 'address', 'state', 'bio', 'interests', 'nationality', 'profileLink'] });
+    const u = plan.writes[0].updates;
+    expect(u['business.companyName']).toBe('Acme');
+    expect(u['business.industry']).toBe('Tech');
+    expect(u['business.companyWebsite']).toBeUndefined();   // 'http://none' placeholder -> skipped
+    expect(u['contact.socials.linkedin']).toBeUndefined();  // 'none' placeholder -> skipped
+    expect(u['contact.address']).toBeUndefined();           // already have an address -> fill-if-empty skips
+    expect(u['contact.state']).toBe('Selangor');
+    expect(u['others.bio']).toBe('hi');
+    expect(u['others.hobbies']).toEqual(['A', 'B']);        // array fills a blank
+    expect(u['general.nationality']).toBe('Malaysian');
+    expect(u['jciCareer.jciMalaysiaProfileLink']).toBe('https://jvc.jci.cc/p/7');
+  });
+
+  it('preview masks PII embedded in free-text values, but the real value is still written', () => {
+    const row = {
+      id: '7', membership: 'JCIKL-9', joindate: '2024-01-02 00:00:00', email: 'x@x.com', chapter: 'JCI Kuala Lumpur',
+      profileDetails: { personal: { bio: 'Reach me at john@mail.com or 012-3456789' }, employment: { title: 'Head @ Acme' } },
+    };
+    const member = { id: 'm', contact: { email: 'x@x.com' } };
+    const plan = buildPlan({ rows: [row], members: [member], selected: ['bio', 'position'] });
+    const shown = Object.fromEntries(plan.writes[0].fields.map(f => [f.key, f.after]));
+    expect(shown.bio).not.toMatch(/@/);           // email stripped
+    expect(shown.bio).not.toMatch(/\d{6,}/);      // phone stripped
+    expect(shown.position).not.toMatch(/@/);      // lone "@" -> "at"
+    expect(plan.writes[0].updates['others.bio']).toContain('john@mail.com'); // real value preserved for the write
   });
 });

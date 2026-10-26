@@ -795,7 +795,10 @@ service cloud.firestore {
         'eventId', 'memberId', 'loId', 'registrantLoId', 'currency', 'createdAt', 'updatedAt',
         // ER-U5: jciMalaysiaRegcode (JCI Malaysia check-in code) is server-written only (Admin SDK). A member
         // must never set/forge it on their own registration, so it stays in this locked (deny) list.
-        'jciMalaysiaRegcode'];
+        'jciMalaysiaRegcode',
+        // ER-U6: jciMalaysiaRole is set only by the Admin-SDK back-fill (jci-malaysia-backfill-background). A
+        // member must never set/forge the approved/pending/committee/trainer tag on their own registration.
+        'jciMalaysiaRole'];
       return unchanged.toSet().difference(request.resource.data.diff(resource.data).affectedKeys()).size() == unchanged.size();
     }
     match /eventRegistrations/{regId} {
