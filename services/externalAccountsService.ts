@@ -147,4 +147,15 @@ export class ExternalAccountsService {
     const res = await this.run<{ emailSent: boolean }>('resendInvite', { action: 'resendInvite', memberId }, { memberId });
     return res.emailSent;
   }
+
+  /**
+   * PERMANENT: delete an external account (member doc, email slot, card, email-change request, public listing,
+   * then the login). KL admin: any external; chapter admin: own-chapter AFFILIATE. `authDeleted: false` means the
+   * profile is gone but the login is not: a KL admin can call this again with the same id to finish.
+   */
+  static async deleteAccount(memberId: string): Promise<{ authDeleted: boolean }> {
+    if (isDevMode()) return { authDeleted: true };
+    const res = await this.run<{ authDeleted: boolean }>('deleteAccount', { action: 'deleteAccount', memberId }, { memberId });
+    return { authDeleted: res.authDeleted };
+  }
 }

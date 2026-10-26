@@ -31,6 +31,12 @@ export function useExternalAccounts() {
     [wrap]
   );
 
+  /** PERMANENT delete of an external login account (server checks scope). */
+  const deleteAccount = useCallback(
+    (memberId: string): Promise<{ authDeleted: boolean }> => wrap(() => ExternalAccountsService.deleteAccount(memberId)),
+    [wrap]
+  );
+
   /**
    * Legacy sister-chapter doc without a login (old "Add Member": role MEMBER, loId != jcikl): soft-delete via
    * MembersService.deleteMember, which also releases the email slot and deletes the memberCards doc
@@ -41,5 +47,5 @@ export function useExternalAccounts() {
     [wrap]
   );
 
-  return { busy, createChapterAdmins, inviteMembers, setStatus, resendInvite, removeLegacyMember };
+  return { busy, createChapterAdmins, inviteMembers, setStatus, resendInvite, deleteAccount, removeLegacyMember };
 }

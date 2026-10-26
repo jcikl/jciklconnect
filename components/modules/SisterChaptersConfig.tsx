@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Plus, Pencil, Trash2, Globe, ChevronDown, UserPlus, User, ShieldCheck, PauseCircle, Mail } from 'lucide-react';
+import { Plus, Pencil, Trash2, Globe, ChevronDown, UserPlus, User, ShieldCheck, PauseCircle, Mail, RotateCcw } from 'lucide-react';
 import { Button, Modal, useToast, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
 import type { ConfirmState } from '../ui/Common';
 import { Input } from '../ui/Form';
@@ -74,7 +74,7 @@ export const SisterChaptersConfig: React.FC<{ canEditChapters?: boolean }> = ({ 
   const [memberModalChapterId, setMemberModalChapterId] = useState<string | null>(null);
   const [accountMode, setAccountMode] = useState<AccountMode>('invite');
   const [memberForm, setMemberForm] = useState(MEMBER_EMPTY);
-  const { busy: savingMember, createChapterAdmins, inviteMembers, setStatus: setMemberStatus, removeLegacyMember, resendInvite } = useExternalAccounts();
+  const { busy: savingMember, createChapterAdmins, inviteMembers, setStatus: setMemberStatus, removeLegacyMember, resendInvite, deleteAccount } = useExternalAccounts();
 
   // KL approval queue (affiliation.status == 'pending_kl', all chapters). Status changes go through the
   // external-accounts function so the member card follows.
@@ -245,6 +245,45 @@ export const SisterChaptersConfig: React.FC<{ canEditChapters?: boolean }> = ({ 
           await loadMembers(chapterId);
         } catch (err: any) {
           showToast(err?.message ?? 'Failed to suspend member', 'error');
+        }
+      },
+    });
+  };
+
+  // KL admins may lift any suspension (setStatus → active), including one a chapter admin made.
+  const handleReactivateMember = async (member: Member, chapterId: string) => {
+    try {
+      await setMemberStatus(member.id, 'active');
+      showToast('Member reactivated', 'success');
+      await loadMembers(chapterId);
+    } catch (err: any) {
+      showToast(err?.message ?? 'Failed to reactivate member', 'error');
+    }
+  };
+
+  // PERMANENT delete (external-accounts deleteAccount). If the login could not be removed the row is kept, so
+  // pressing Delete again retries the login cleanup (the server allows that retry for KL admins).
+  const handleDeleteAccount = (member: Member, chapterId: string) => {
+    const displayName = member.general?.name ?? member.id;
+    setConfirmState({
+      open: true,
+      title: 'Delete account',
+      message: `Permanently delete ${displayName}? Their login, profile and directory card are removed. This cannot be undone.`,
+      confirmLabel: 'Delete',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmState(CONFIRM_CLOSED);
+        try {
+          const { authDeleted } = await deleteAccount(member.id);
+          approvals.reload();
+          if (!authDeleted) {
+            showToast('Profile deleted, but the login could not be removed. Press Delete again to retry.', 'error');
+            return;
+          }
+          showToast('Account deleted', 'success');
+          await loadMembers(chapterId);
+        } catch (err: any) {
+          showToast(err?.message ?? 'Failed to delete account', 'error');
         }
       },
     });
@@ -421,8 +460,17 @@ export const SisterChaptersConfig: React.FC<{ canEditChapters?: boolean }> = ({ 
                           )}
                         </div>
                         {isExternalDoc(m) ? (
-                          m.affiliation?.status === 'suspended' ? (
-                            <span className="text-[10px] text-slate-400 shrink-0">Suspended</span>
+                          <>
+                          {m.affiliation?.status === 'suspended' ? (
+                            <button
+                              onClick={() => handleReactivateMember(m, ch.id)}
+                              disabled={savingMember}
+                              className="p-1 rounded hover:bg-green-50 text-slate-300 hover:text-green-600 transition-colors shrink-0"
+                              aria-label="Reactivate member"
+                              title="Reactivate (suspended)"
+                            >
+                              <RotateCcw size={12} />
+                            </button>
                           ) : (
                             <>
                             <button
@@ -444,7 +492,17 @@ export const SisterChaptersConfig: React.FC<{ canEditChapters?: boolean }> = ({ 
                               <PauseCircle size={12} />
                             </button>
                             </>
-                          )
+                          )}
+                          <button
+                            onClick={() => handleDeleteAccount(m, ch.id)}
+                            disabled={savingMember}
+                            className="p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors shrink-0"
+                            aria-label="Delete account permanently"
+                            title="Delete account"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                          </>
                         ) : m.role !== UserRole.INACTIVE && (
                           <button
                             onClick={() => handleDeleteMember(m, ch.id)}
