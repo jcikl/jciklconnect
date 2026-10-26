@@ -38,6 +38,27 @@ function isSameDay(a: Date, b: Date) {
     && a.getDate() === b.getDate();
 }
 
+// Events longer than this don't span the grid (a 200-day programme would flood it); they show on their start day
+// only, and the month list always shows their start–end range so the end date is still visible.
+const MAX_SPAN_DAYS = 14;
+const dayOnly = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+/** Start/end (date-only) and inclusive day count for an event (uses `endDate`; falls back to a single day). */
+function eventSpan(e: Event) {
+  const start = dayOnly(new Date(e.date));
+  const endRaw = e.endDate ? new Date(e.endDate) : null;
+  const end = endRaw && !isNaN(endRaw.getTime()) && endRaw > start ? dayOnly(endRaw) : start;
+  const days = Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
+  return { start, end, days };
+}
+
+/** Whether an event occupies `date`: multi-day events up to the cap cover every day start..end; others their start day. */
+function eventCoversDate(e: Event, date: Date) {
+  const { start, end, days } = eventSpan(e);
+  if (days > 1 && days <= MAX_SPAN_DAYS) { const d = dayOnly(date); return d >= start && d <= end; }
+  return isSameDay(new Date(e.date), date);
+}
+
 // Event colour by level / JCI KL involvement (not by activity type): KL host-or-co-host, else national / jci / area.
 type EventCategory = 'kl' | 'national' | 'jci' | 'area' | 'other';
 const CATEGORY_COLORS: Record<EventCategory, { chip: string; bar: string; dot: string }> = {
@@ -153,7 +174,7 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
   };
 
   const getEventsForDate = (date: Date) =>
-    events.filter(e => isSameDay(new Date(e.date), date));
+    events.filter(e => eventCoversDate(e, date));
 
   // ── Drag-and-drop ──────────────────────────────────────────────────────────
   const handleDragStart = (e: React.DragEvent, event: Event) => {
@@ -345,20 +366,21 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
                     )}
                     {dayEvents.slice(0, 2).map(event => {
                       const c = getColors(event);
+                      const { days } = eventSpan(event);
+                      // A multi-day event shows its title on the start day and a plain colour band on the days it continues.
+                      const isContinuation = days > 1 && days <= MAX_SPAN_DAYS && !isSameDay(new Date(event.date), date);
                       return (
                         <div
                           key={event.id}
-                          draggable={!readonly}
+                          draggable={!readonly && !isContinuation}
                           onDragStart={(e) => handleDragStart(e, event)}
                           onClick={(e) => { e.stopPropagation(); onEventClick?.(event); }}
-                          className={[
-                            'w-full text-[8px] font-semibold truncate px-1 py-[1px] rounded-sm leading-tight cursor-pointer',
-                            c.chip,
-                            !inMonth ? 'opacity-40' : '',
-                          ].join(' ')}
+                          className={isContinuation
+                            ? `w-full h-[11px] rounded-sm cursor-pointer ${c.bar} ${!inMonth ? 'opacity-40' : ''}`
+                            : ['w-full text-[8px] font-semibold truncate px-1 py-[1px] rounded-sm leading-tight cursor-pointer', c.chip, !inMonth ? 'opacity-40' : ''].join(' ')}
                           title={event.title}
                         >
-                          {event.title}
+                          {isContinuation ? '' : event.title}
                         </div>
                       );
                     })}
@@ -456,7 +478,12 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-slate-900 truncate">{event.title}</p>
                     <p className="text-xs text-slate-400 truncate">
-                      {formatTime(d)}{event.location ? ` · ${event.location}` : ''}
+                      {(() => {
+                        const sp = eventSpan(event);
+                        return sp.days > 1
+                          ? `${MONTH_ABBR[sp.start.getMonth()]} ${sp.start.getDate()} – ${MONTH_ABBR[sp.end.getMonth()]} ${sp.end.getDate()} · ${sp.days}d`
+                          : `${formatTime(d)}${event.location ? ` · ${event.location}` : ''}`;
+                      })()}
                     </p>
                   </div>
                 </div>
