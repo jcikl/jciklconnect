@@ -17,10 +17,10 @@
 
 | 層 | 檔案數 | 位置 |
 |---|---|---|
-| Service（業務邏輯與資料存取） | 73 | `services/` |
-| Hook（React 資料綁定） | 43 | `hooks/` |
+| Service（業務邏輯與資料存取） | 74 | `services/` |
+| Hook（React 資料綁定） | 44 | `hooks/` |
 | Util（純函數工具） | 27 | `utils/` |
-| UI 元件（通用） | 33 | `components/ui/` |
+| UI 元件（通用） | 34 | `components/ui/` |
 | 共用業務元件 | 10 | `components/shared/` |
 | Context | 2 | `contexts/` |
 | Cloud Functions | 0 | `functions/src/` |
@@ -482,8 +482,9 @@
 | `activityPlansService.ts` | 621 | 2 | Activity Plans Service - CRUD Operations P0 fix: all methods now query COLLECTIONS.ACTIVITY_PLANS (was COLLECTIONS.PROJECTS) P1 fixes: isDev… | ACTIVITY_PLANS, PROJECTS |
 | `eventFeedbackService.ts` | 226 | 3 | Event Feedback Service - Collects and manages event feedback | EVENT_FEEDBACK |
 | `eventPaymentService.ts` | 89 | 1 | Event payment (mark-paid) — creates the finance income record, then flips the registration to 'paid'. | PROJECTS |
-| `eventRegistrationService.ts` | 391 | 7 | Event Registration Service - 报名/缴费/签到统一名单（Story 8.1） | EVENT_REGISTRATIONS, PROJECTS |
-| `eventsService.ts` | 1,136 | 14 | Events Service - CRUD Operations | EVENT_BUDGETS, EVENT_FEEDBACK, EVENT_REGISTRATIONS, GUEST_REGISTRATIONS, MEMBERS, NOTIFICATIONS … |
+| `eventRegcodeService.ts` | 96 | 3 | "My event QR": copy each member's JCI Malaysia regcode onto their own eventRegistration. Everything runs in the Netlify function jci-malaysi… | — |
+| `eventRegistrationService.ts` | 393 | 7 | Event Registration Service - 报名/缴费/签到统一名单（Story 8.1） | EVENT_REGISTRATIONS, PROJECTS |
+| `eventsService.ts` | 1,142 | 14 | Events Service - CRUD Operations | EVENT_BUDGETS, EVENT_FEEDBACK, EVENT_REGISTRATIONS, GUEST_REGISTRATIONS, MEMBERS, NOTIFICATIONS … |
 | `flagshipProjectsService.ts` | 156 | 3 | ⚠️ 無說明 | FLAGSHIP_PROJECTS |
 | `projectReportService.ts` | 775 | 3 | Project Report Service - Generates automated project reports | TEMPLATES |
 | `projectsService.ts` | 823 | 21 | Projects Service - CRUD Operations | ACTIVITY_PLANS, MEMBERS, POINTS, PROJECTS, PROJECT_REPORTS, PROJECT_TRANSACTIONS … |
@@ -527,6 +528,16 @@
 
 </details>
 
+<details><summary><code>services/eventRegcodeService.ts</code> — 3 個方法</summary>
+
+| 方法 | 行 | 說明 |
+|---|---|---|
+| `preview` | 69 | Developer only: counts (registrations, linkable, would-get-regcode, conflicts, …). No PII. |
+| `apply` | 75 | Developer only: the server recomputes the plan, backs up the ids, writes, audits. |
+| `attachMine` | 84 | Best-effort: attach the caller's OWN regcode for one event after registering. Never throws — a failure just le… |
+
+</details>
+
 <details><summary><code>services/eventRegistrationService.ts</code> — 0 個方法、1 個函數/常數</summary>
 
 
@@ -538,25 +549,25 @@
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `invalidateEventsCache` | 44 |  |
-| `getAllEvents` | 95 | Approved projects with eventStartDate (for Event List: Upcoming + Completed) |
-| `getUpcomingEvents` | 133 | Events starting today (MYT) or later, same statuses as getAllEvents. Filters on eventStartDate (YYYY-MM-DD str… |
-| `getKlEvents` | 160 | Every event JCI Kuala Lumpur hosts or co-hosts (any date / status except Cancelled), newest first — the board … |
-| `getKlRelevantEvents` | 186 | Events a JCI KL member sees in the event list / calendar (same rule as isKlRelevantEvent): KL hosts or co-host… |
-| `getEventById` | 215 | Get event by ID (from projects collection) |
-| `createEvent` | 251 | Create new event |
-| `updateEvent` | 305 | Update event |
-| `deleteEvent` | 339 | Delete event |
-| `registerForEvent` | 418 | Register member for event |
-| `cancelRegistration` | 524 | Cancel event registration |
-| `completeEvent` | 627 | P1-A: Mark an event as Completed (no existing method existed) |
-| `cancelEvent` | 661 | Cancel entire event — batch-cancels all active registrations and their income transactions |
-| `markAttendance` | 830 | Mark attendance (check-in) P0 guard: only BOARD+ or ADMIN callers should mark attendance; MEMBER/GUEST are blo… |
-| `undoAttendance` | 900 | Undo attendance (un-check-in) — FIX E3 P0 guard: only BOARD+ or ADMIN callers should undo attendance. |
-| `getEventsByType` | 1005 | Get events by type |
-| `registerGuestForEvent` | 1022 | Register a guest (signed out) for an event. Writes the registration and a phone-index doc in one writeBatch wi… |
-| `getGuestRegistrations` | 1074 | Fetch all guest registrations for an event. Exposes a service-layer method so components don't query Firestore… |
-| `cancelGuestRegistration` | 1108 | Cancel a guest registration. P1 FIX: also updates the phone-index sentinel doc so the phone number is freed fo… |
+| `invalidateEventsCache` | 45 |  |
+| `getAllEvents` | 96 | Approved projects with eventStartDate (for Event List: Upcoming + Completed) |
+| `getUpcomingEvents` | 134 | Events starting today (MYT) or later, same statuses as getAllEvents. Filters on eventStartDate (YYYY-MM-DD str… |
+| `getKlEvents` | 161 | Every event JCI Kuala Lumpur hosts or co-hosts (any date / status except Cancelled), newest first — the board … |
+| `getKlRelevantEvents` | 187 | Events a JCI KL member sees in the event list / calendar (same rule as isKlRelevantEvent): KL hosts or co-host… |
+| `getEventById` | 216 | Get event by ID (from projects collection) |
+| `createEvent` | 252 | Create new event |
+| `updateEvent` | 306 | Update event |
+| `deleteEvent` | 340 | Delete event |
+| `registerForEvent` | 419 | Register member for event |
+| `cancelRegistration` | 530 | Cancel event registration |
+| `completeEvent` | 633 | P1-A: Mark an event as Completed (no existing method existed) |
+| `cancelEvent` | 667 | Cancel entire event — batch-cancels all active registrations and their income transactions |
+| `markAttendance` | 836 | Mark attendance (check-in) P0 guard: only BOARD+ or ADMIN callers should mark attendance; MEMBER/GUEST are blo… |
+| `undoAttendance` | 906 | Undo attendance (un-check-in) — FIX E3 P0 guard: only BOARD+ or ADMIN callers should undo attendance. |
+| `getEventsByType` | 1011 | Get events by type |
+| `registerGuestForEvent` | 1028 | Register a guest (signed out) for an event. Writes the registration and a phone-index doc in one writeBatch wi… |
+| `getGuestRegistrations` | 1080 | Fetch all guest registrations for an event. Exposes a service-layer method so components don't query Firestore… |
+| `cancelGuestRegistration` | 1114 | Cancel a guest registration. P1 FIX: also updates the phone-index sentinel doc so the phone number is freed fo… |
 
 </details>
 
@@ -1135,7 +1146,7 @@
 | `cacheService.ts` | 314 | 35 | 缓存服务 - 提供内存缓存和本地存储缓存功能 Cache Service - Provides in-memory and localStorage caching capabilities | — |
 | `cloudinaryService.ts` | 337 | 14 | Cloudinary Upload Service | — |
 | `dataImportExportService.ts` | 913 | 3 | ⚠️ 無說明 | EVENTS, MEMBERS, MEMBER_EMAILS |
-| `errorLoggingService.ts` | 354 | 71 | ⚠️ 無說明 | ERROR_LOGS |
+| `errorLoggingService.ts` | 354 | 72 | ⚠️ 無說明 | ERROR_LOGS |
 | `firestoreLogger.ts` | 197 | 3 | System Logger — Firestore ops + Performance monitoring Fire-and-forget buffered logger. Buffers events for 3 seconds then writes one batched… | SYSTEM_LOGS |
 | `inventoryService.ts` | 1,638 | 3 | Inventory Service - CRUD Operations | INVENTORY, INVENTORY_ALERTS, MAINTENANCE_SCHEDULES, STOCK_MOVEMENTS, TRANSACTIONS |
 | `mockData.ts` | 689 | 17 | ⚠️ 無說明 | — |
@@ -1328,12 +1339,13 @@
 | `useActivityPlans.ts` | 130 | 1 | `useActivityPlans` | activityPlansService | ⚠️ 無說明 |
 | `useAdvertisements.ts` | 111 | 2 | `useAdvertisements` | advertisementService, errorLoggingService | Advertisements Data Hook |
 | `useAppNavigation.ts` | 239 | 1 | `useAppNavigation` | — | ⚠️ 無說明 |
-| `useAuth.tsx` | 880 | 60 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, memberCardsService, membersService, mockData | Authentication Hook |
+| `useAuth.tsx` | 880 | 61 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, memberCardsService, membersService, mockData | Authentication Hook |
 | `useAutomation.ts` | 149 | 3 | `useAutomation` | automationService | useAutomation Hook - Manage automation workflows and rules |
 | `useBusinessDirectory.ts` | 51 | 4 | `useBusinessDirectory` | businessDirectoryService | ⚠️ 無說明 |
 | `useChapterBirthdays.ts` | 23 | 1 | `useChapterBirthdays` | chapterBirthdaysService | Own-chapter birthdays for an active external user (dashboard birthday widget). `month` null → nothing loads. |
 | `useChapterMembers.ts` | 87 | 2 | `useChapterMembers`, `usePendingKlApprovals` | externalAccountsService | Chapter roster for an active CHAPTER_ADMIN (own chapter) and the KL approval queue (pending_kl, KL admins). Status changes / invites go thro… |
 | `useCommunication.ts` | 123 | 2 | `useCommunication` | communicationService | Communication Data Hook |
+| `useEventRegcodeSync.ts` | 56 | 1 | `useEventRegcodeSync` | eventRegcodeService | Developer-only back-fill of JCI Malaysia regcodes onto eventRegistrations: preview then apply. The server enforces developer-only. |
 | `useEvents.ts` | 191 | 8 | `useEvents` | errorLoggingService, eventsService, membersService | Events Data Hook |
 | `useExternalAccounts.ts` | 52 | 1 | `useExternalAccounts` | externalAccountsService, membersService | External (sister-chapter) account actions for components: create chapter admins, invite, status, resend. |
 | `useFinanceData.ts` | 2,034 | 4 | `useFinanceData` | errorLoggingService, financeService, inventoryService, membersService, membershipConfigService, paymentRequestService, projectFinancialService, projectsService | TODO (PERF-A-004): This hook has ~90 useState declarations, causing full FinanceView re-renders on any state update. Planned refactor: split… |
@@ -1352,7 +1364,7 @@
 | `useMemberSearch.ts` | 53 | 1 | `useMemberSearch` | — | ⚠️ 無說明 |
 | `useMembers.ts` | 195 | 20 | `useMembers`, `usePaginatedMembers` | membersService | Members Data Hook |
 | `useNotifications.ts` | 107 | 0 | `useNotifications` | communicationService, errorLoggingService, mockData | ⚠️ 無說明 |
-| `usePermissions.ts` | 212 | 31 | `usePermissions` | — | Permission Management Hook |
+| `usePermissions.ts` | 212 | 32 | `usePermissions` | — | Permission Management Hook |
 | `usePoints.ts` | 61 | 2 | `usePoints` | pointsService | Points Data Hook |
 | `useProjects.ts` | 170 | 7 | `useProjects` | projectsService | Projects Data Hook |
 | `usePushNotifications.ts` | 63 | 0 | `usePushNotifications` | — | ⚠️ 無說明 |
@@ -1478,7 +1490,7 @@
 | `getStartOfYear` | 163 |  |
 | `getEndOfYear` | 170 |  |
 
-### `utils/devMode.ts` （36 行，73 處引用）
+### `utils/devMode.ts` （36 行，74 處引用）
 > Developer Mode Utility This utility helps services detect if the app is running in developer mode and return mock data instead of accessing …
 
 | 函數 | 行 | 說明 |
@@ -1619,8 +1631,8 @@
 | `Card.tsx` | 77 | 1 | `Card`, `StatCardsContainer` |
 | `ColumnFilterHeader.tsx` | 118 | 2 | `ColumnFilterHeader` |
 | `Combobox.tsx` | 255 | 11 | `Combobox` |
-| `Common.tsx` | 26 | 235 | — |
-| `ConfirmDialog.tsx` | 100 | 3 | `ConfirmDialog`, `CONFIRM_CLOSED` |
+| `Common.tsx` | 26 | 236 | — |
+| `ConfirmDialog.tsx` | 100 | 4 | `ConfirmDialog`, `CONFIRM_CLOSED` |
 | `DataTable.tsx` | 172 | 0 | `DataTable` |
 | `Drawer.tsx` | 139 | 2 | `Drawer` |
 | `EmptyState.tsx` | 36 | 4 | `EmptyState` |
@@ -1630,7 +1642,7 @@
 | `Form.tsx` | 502 | 99 | `Input`, `Select`, `Textarea`, `Checkbox`, `RadioGroup`, `ButtonGroup` |
 | `IntroducerSelector.tsx` | 338 | 6 | `IntroducerSelector` |
 | `LedgerTable.tsx` | 183 | 1 | `LedgerTable` |
-| `Loading.tsx` | 47 | 32 | `LoadingSpinner`, `LoadingOverlay` |
+| `Loading.tsx` | 47 | 33 | `LoadingSpinner`, `LoadingOverlay` |
 | `LoadingState.tsx` | 63 | 3 | `LoadingState` |
 | `MemberSelector.tsx` | 231 | 4 | `MemberSelector` |
 | `MembersOnlyOverlay.tsx` | 42 | 3 | `MembersOnlyOverlay` |
@@ -1641,6 +1653,7 @@
 | `PageScaffold.tsx` | 89 | 1 | `PageScaffold` |
 | `Pagination.tsx` | 201 | 5 | `Pagination` |
 | `PerfMonitor.tsx` | 78 | 1 | `PerfMonitor` |
+| `RegcodeQr.tsx` | 57 | 2 | `RegcodeQr` |
 | `Responsive.tsx` | 74 | 0 | `ResponsiveGrid`, `MobileOnly`, `DesktopOnly`, `ResponsiveContainer` |
 | `Tabs.tsx` | 154 | 4 | `Tabs` |
 | `Toast.tsx` | 66 | 1 | `useToast`, `ToastProvider` |

@@ -89,6 +89,7 @@ import { MemberDetail } from './Members/MemberDetail';
 import { MentorMatchingModal } from './Members/MentorMatchingModal';
 import { MemberCreateModal } from './Members/MemberCreateModal';
 import { JciMalaysiaSyncButton } from './Members/JciMalaysiaSyncButton';
+import { EventRegcodeSyncButton } from './Members/EventRegcodeSyncButton';
 import { useSisterChapters } from '../../hooks/useSisterChapters';
 import { DEFAULT_LO_ID } from '../../config/constants';
 import { BatchFieldUpdateModal } from './Members/BatchFieldUpdateModal';
@@ -479,6 +480,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
               )}
               {/* Developer accounts only (renders nothing otherwise); visible on mobile too */}
               <JciMalaysiaSyncButton />
+              <EventRegcodeSyncButton />
             </div>
           }
         >

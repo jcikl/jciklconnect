@@ -75,6 +75,7 @@ export const EventRegistrationService = {
             registeredByName: data.registeredByName ?? null,
             paidByName: data.paidByName ?? null,
             checkedInByName: data.checkedInByName ?? null,
+            jciMalaysiaRegcode: data.jciMalaysiaRegcode ?? null,
           } as EventRegistration;
         });
       }
@@ -99,6 +100,7 @@ export const EventRegistrationService = {
           createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? data.createdAt ?? new Date().toISOString(),
           updatedAt: data.updatedAt?.toDate?.()?.toISOString?.() ?? data.updatedAt ?? null,
           loId: data.loId ?? null,
+          jciMalaysiaRegcode: data.jciMalaysiaRegcode ?? null,
         } as EventRegistration;
       }
     );

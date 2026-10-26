@@ -398,6 +398,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                   formatDay={formatDay}
                   formatDayShort={formatDayShort}
                   formatWeekday={formatWeekday}
+                  myRegistration={myRegistration}
                 />
               )}
 

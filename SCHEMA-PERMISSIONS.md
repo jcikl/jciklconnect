@@ -43,7 +43,7 @@ esource.data 仅在 get 中可用，因此部分集合的 list 权限会比 get 
 | projectTrx | B+/A+ | B+/A+ | B+(字段白名单) | B+(非对账，字段白名单) | B+(非对账) | |
 | ankAccounts | Finance(同LO) | A+/Finance | Finance | Finance | Finance | get 限同LO |
 | paymentRequests | 登(自己/Finance/A+) | M+/Finance/A+ | 登(自己) 或 B+/A+(代他人提交) | 自己(draft/cancel/resubmit) 或 Finance | 自己(draft) 或 A+ | 代他人提交来自 commit `b83d671`，2026-10-18 随 R-034 一起部署 |
-| eventRegistrations | 登(自己/B+)；文档不存在时，仅当 id 以 `_` 加调用者 uid 结尾才允许（报名事务要先读尚不存在的 `{eventId}_{uid}`） | M+/B+；active 外部用户只列自己的（查询须带 `where('memberId','==',uid)`） | 登(自己或B+)；外部用户须 active | B+(字段白名单) 或 自己(非财务字段；`registrantLoId`、`currency` 也被锁定) | B+ | Phase 1：新增 `registrantLoId`、`currency` |
+| eventRegistrations | 登(自己/B+)；文档不存在时，仅当 id 以 `_` 加调用者 uid 结尾才允许（报名事务要先读尚不存在的 `{eventId}_{uid}`） | M+/B+；active 外部用户只列自己的（查询须带 `where('memberId','==',uid)`） | 登(自己或B+)；外部用户须 active | B+(字段白名单) 或 自己(非财务字段；`registrantLoId`、`currency`、`jciMalaysiaRegcode` 也被锁定) | B+ | `jciMalaysiaRegcode` 仅服务端（Admin SDK，`netlify/functions/jci-malaysia-regcode`）可写；自更新锁定列表禁止会员伪造 |
 | points | 登 | 登 | B+ | B+/A+ | B+/A+ | |
 | 
 otifications | 自己 或 B+ | B+/A+ | B+ 或 M+(特定类型) | 自己(仅read字段) 或 B+ | 自己 或 B+ | list P0：resource.data 失效 |

@@ -792,7 +792,10 @@ service cloud.firestore {
         'matchedBankTxId', 'toyyibBillCode', 'toyyibPaymentUrl', 'toyyibPaymentStatus', 'billExternalReferenceNo',
         'cancelledAt', 'cancelledBy', 'cancelledByName', 'cancelledByRole',
         'registeredBy', 'registeredByName', 'memberName',
-        'eventId', 'memberId', 'loId', 'registrantLoId', 'currency', 'createdAt', 'updatedAt'];
+        'eventId', 'memberId', 'loId', 'registrantLoId', 'currency', 'createdAt', 'updatedAt',
+        // ER-U5: jciMalaysiaRegcode (JCI Malaysia check-in code) is server-written only (Admin SDK). A member
+        // must never set/forge it on their own registration, so it stays in this locked (deny) list.
+        'jciMalaysiaRegcode'];
       return unchanged.toSet().difference(request.resource.data.diff(resource.data).affectedKeys()).size() == unchanged.size();
     }
     match /eventRegistrations/{regId} {
