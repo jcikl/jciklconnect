@@ -1,9 +1,13 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Share2, Calendar as CalendarIcon } from 'lucide-react';
 import { Modal, Button, useToast } from '../ui/Common';
 import { Event } from '../../types';
 import { formatTime } from '../../utils/dateUtils';
 import { involvesLo, KL_LO_NAME } from '../../utils/loHosting.mjs';
+import { MalaysiaHolidaysService, type MalaysiaHoliday } from '../../services/malaysiaHolidaysService';
+
+/** Local YYYY-MM-DD (matches the holiday dates, which are calendar dates with no timezone). */
+const toIsoLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 import { EventsService } from '../../services/eventsService';
 import { EventRow } from './Events/EventRow';
 
@@ -112,6 +116,33 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
     [events, currentDate]
   );
+
+  // Malaysia public holidays for every year the grid touches (cached; empty when the API key isn't configured).
+  const [holidays, setHolidays] = useState<MalaysiaHoliday[]>([]);
+  useEffect(() => {
+    let alive = true;
+    const years = new Set<number>([currentDate.getFullYear()]);
+    for (const w of calendarWeeks) for (const d of w) years.add(d.getFullYear());
+    Promise.all([...years].map(y => MalaysiaHolidaysService.getHolidays(y)))
+      .then(lists => { if (alive) setHolidays(lists.flat()); })
+      .catch(() => { /* calendar just shows no holidays */ });
+    return () => { alive = false; };
+  }, [currentDate, calendarWeeks]);
+
+  const holidayByDate = useMemo(() => {
+    const m = new Map<string, MalaysiaHoliday>();
+    for (const h of holidays) if (!m.has(h.date)) m.set(h.date, h);
+    return m;
+  }, [holidays]);
+
+  // Events + public holidays in the shown month, merged and sorted, for the list under the grid.
+  const monthItems = useMemo(() => {
+    const evs = monthEvents.map(e => ({ kind: 'event' as const, at: new Date(e.date), event: e }));
+    const hols = holidays
+      .filter(h => { const [y, mo] = h.date.split('-').map(Number); return y === currentDate.getFullYear() && mo - 1 === currentDate.getMonth(); })
+      .map(h => ({ kind: 'holiday' as const, at: new Date(`${h.date}T00:00:00`), holiday: h }));
+    return [...evs, ...hols].sort((a, b) => a.at.getTime() - b.at.getTime());
+  }, [monthEvents, holidays, currentDate]);
 
   const navigateMonth = (dir: 'prev' | 'next') => {
     setCurrentDate(prev => {
@@ -267,6 +298,7 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
               const isSelected  = !!selectedDate && isSameDay(date, selectedDate);
               const inMonth     = date.getMonth() === currentDate.getMonth();
               const isSunday    = di === 6;
+              const holiday     = holidayByDate.get(toIsoLocal(date));
 
               return (
                 <div
@@ -286,19 +318,31 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
                       ? 'bg-jci-blue text-white'
                       : isSelected
                         ? 'bg-slate-200 text-slate-900'
-                        : isSunday
+                        : holiday
                           ? inMonth
-                            ? 'text-red-400 group-hover:bg-red-50'
-                            : 'text-red-200'
-                          : inMonth
-                            ? 'text-slate-800 group-hover:bg-slate-100'
-                            : 'text-slate-300',
+                            ? 'text-rose-500 group-hover:bg-rose-50'
+                            : 'text-rose-200'
+                          : isSunday
+                            ? inMonth
+                              ? 'text-red-400 group-hover:bg-red-50'
+                              : 'text-red-200'
+                            : inMonth
+                              ? 'text-slate-800 group-hover:bg-slate-100'
+                              : 'text-slate-300',
                   ].join(' ')}>
                     {date.getDate()}
                   </div>
 
-                  {/* Event chips — max 2 visible, then "+N" */}
+                  {/* Holiday tag (not clickable) + up to 2 event chips, then "+N" */}
                   <div className="w-full px-0.5 space-y-0.5">
+                    {holiday && (
+                      <div
+                        className={`w-full text-[8px] font-semibold truncate px-1 py-[1px] rounded-sm leading-tight bg-rose-500 text-white ${!inMonth ? 'opacity-40' : ''}`}
+                        title={`Public holiday: ${holiday.name}`}
+                      >
+                        {holiday.name}
+                      </div>
+                    )}
                     {dayEvents.slice(0, 2).map(event => {
                       const c = getColors(event);
                       return (
@@ -357,17 +401,42 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
               {CATEGORY_LABEL[cat]}
             </span>
           ))}
+          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-500">
+            <span className="w-2 h-2 rounded-full bg-rose-500" />
+            Holiday
+          </span>
         </div>
 
-        {/* Event list for the whole month */}
+        {/* Events + public holidays for the whole month */}
         <div className="max-h-72 overflow-y-auto">
-          {monthEvents.length === 0 ? (
+          {monthItems.length === 0 ? (
             <p className="text-center text-sm text-slate-400 py-5">No events this month</p>
           ) : (
-            monthEvents.map(event => {
-              const d = new Date(event.date);
-              const c = getColors(event);
+            monthItems.map(item => {
+              const d = item.at;
               const onSelectedDay = !!selectedDate && isSameDay(d, selectedDate);
+
+              if (item.kind === 'holiday') {
+                return (
+                  <div
+                    key={`hol-${item.holiday.date}-${item.holiday.name}`}
+                    className={`flex items-center gap-3 px-4 py-2.5 border-b border-slate-50 last:border-0 ${onSelectedDay ? 'bg-rose-50/60' : ''}`}
+                  >
+                    <div className="w-1 h-10 rounded-full shrink-0 bg-rose-500" />
+                    <div className="w-10 h-10 rounded-xl shrink-0 flex flex-col items-center justify-center bg-rose-500 text-white">
+                      <span className="text-[8px] font-bold leading-none uppercase">{MONTH_ABBR[d.getMonth()]}</span>
+                      <span className="text-sm font-black leading-tight">{d.getDate()}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-slate-900 truncate">{item.holiday.name}</p>
+                      <p className="text-xs text-rose-400 truncate">Public holiday</p>
+                    </div>
+                  </div>
+                );
+              }
+
+              const event = item.event;
+              const c = getColors(event);
               return (
                 <div
                   key={event.id}

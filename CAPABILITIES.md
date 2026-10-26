@@ -17,7 +17,7 @@
 
 | 層 | 檔案數 | 位置 |
 |---|---|---|
-| Service（業務邏輯與資料存取） | 76 | `services/` |
+| Service（業務邏輯與資料存取） | 77 | `services/` |
 | Hook（React 資料綁定） | 46 | `hooks/` |
 | Util（純函數工具） | 27 | `utils/` |
 | UI 元件（通用） | 34 | `components/ui/` |
@@ -1298,6 +1298,7 @@
 | `chapterBirthdaysService.ts` | 46 | 1 | Own-chapter birthdays for external users: calls the Netlify function chapter-birthdays (read-only). | — |
 | `externalAccountsService.ts` | 162 | 3 | External (sister-chapter) accounts. Writes go through the Netlify function external-accounts (uid = member doc id); reads (chapter roster, K… | MEMBERS |
 | `jciMalaysiaSyncService.ts` | 168 | 2 | In-app JCI Malaysia sync (developer accounts only). Everything runs in the Netlify function jci-malaysia-sync: the source key, the overrides… | — |
+| `malaysiaHolidaysService.ts` | 48 | 1 | Malaysia public holidays for the calendar. Fetched from the Netlify function `malaysia-holidays` (which proxies Calendarific with a server-s… | — |
 | `reportService.ts` | 615 | 2 | ⚠️ 無說明 | — |
 
 <details><summary><code>services/chapterBirthdaysService.ts</code> — 1 個方法</summary>
@@ -1330,6 +1331,14 @@
 | `preview` | 145 | The plan: counts, changes (before/after), conflicts with candidates A/B, other chapter, not found. |
 | `pick` | 151 | Save a manual pick for one conflict (server validates the source record). |
 | `apply` | 160 | Apply: the server recomputes the plan for the selected fields, backs up old values, writes, audits. No plan is… |
+
+</details>
+
+<details><summary><code>services/malaysiaHolidaysService.ts</code> — 1 個方法</summary>
+
+| 方法 | 行 | 說明 |
+|---|---|---|
+| `getHolidays` | 26 | Public holidays for one year. Resolves to [] on any failure (never throws). |
 
 </details>
 
@@ -1512,7 +1521,7 @@
 | `getStartOfYear` | 163 |  |
 | `getEndOfYear` | 170 |  |
 
-### `utils/devMode.ts` （36 行，76 處引用）
+### `utils/devMode.ts` （36 行，77 處引用）
 > Developer Mode Utility This utility helps services detect if the app is running in developer mode and return mock data instead of accessing …
 
 | 函數 | 行 | 說明 |
@@ -1653,7 +1662,7 @@
 | `Card.tsx` | 77 | 1 | `Card`, `StatCardsContainer` |
 | `ColumnFilterHeader.tsx` | 118 | 2 | `ColumnFilterHeader` |
 | `Combobox.tsx` | 255 | 11 | `Combobox` |
-| `Common.tsx` | 26 | 238 | — |
+| `Common.tsx` | 26 | 239 | — |
 | `ConfirmDialog.tsx` | 100 | 5 | `ConfirmDialog`, `CONFIRM_CLOSED` |
 | `DataTable.tsx` | 172 | 0 | `DataTable` |
 | `Drawer.tsx` | 139 | 2 | `Drawer` |
@@ -1675,7 +1684,7 @@
 | `PageScaffold.tsx` | 89 | 1 | `PageScaffold` |
 | `Pagination.tsx` | 201 | 5 | `Pagination` |
 | `PerfMonitor.tsx` | 78 | 1 | `PerfMonitor` |
-| `RegcodeQr.tsx` | 57 | 2 | `RegcodeQr` |
+| `RegcodeQr.tsx` | 61 | 2 | `RegcodeQr` |
 | `Responsive.tsx` | 74 | 0 | `ResponsiveGrid`, `MobileOnly`, `DesktopOnly`, `ResponsiveContainer` |
 | `Tabs.tsx` | 154 | 4 | `Tabs` |
 | `Toast.tsx` | 66 | 1 | `useToast`, `ToastProvider` |
