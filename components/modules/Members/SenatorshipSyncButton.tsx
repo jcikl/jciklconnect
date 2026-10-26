@@ -98,6 +98,22 @@ export const SenatorshipSyncButton: React.FC = () => {
                     Preview only — nothing is written until you apply. Board-validated senator numbers are never overwritten; blanks are never written.
                   </p>
                   <Counts counts={preview.counts} />
+                  {preview.items && preview.items.length > 0 && (
+                    <div className="space-y-1">
+                      <p className={muted}>Proposed changes ({preview.items.length}) — verify before applying:</p>
+                      <div className={`${card} divide-y divide-slate-200 dark:divide-slate-700 max-h-64 overflow-y-auto`}>
+                        {preview.items.map((it, i) => (
+                          <div key={i} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                            <span className="truncate text-slate-800 dark:text-slate-100">{it.name}</span>
+                            <span className="font-mono text-xs whitespace-nowrap">
+                              {it.before && <span className="text-slate-400 line-through mr-1.5">{it.before}</span>}
+                              <span className="font-semibold text-slate-900 dark:text-slate-100">{it.incoming}</span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </LoadingState>

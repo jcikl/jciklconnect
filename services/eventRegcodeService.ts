@@ -22,8 +22,17 @@ export interface EventRegcodeCounts {
   memberMissing: number;
 }
 
+/** One proposed write, for the developer to verify before applying. */
+export interface EventRegcodePreviewItem {
+  member: string;
+  event: string;
+  regcode: string;
+  by?: string;
+}
+
 export interface EventRegcodePreview {
   counts: EventRegcodeCounts;
+  items?: EventRegcodePreviewItem[];
   elapsedMs?: number;
 }
 
@@ -65,9 +74,9 @@ export class EventRegcodeService {
     }
   }
 
-  /** Developer only: counts (registrations, linkable, would-get-regcode, conflicts, …). No PII. */
+  /** Developer only: counts + the per-registration list of proposed writes (member · event — regcode) for verification. */
   static async preview(): Promise<EventRegcodePreview> {
-    if (isDevMode()) return { counts: MOCK_COUNTS };
+    if (isDevMode()) return { counts: MOCK_COUNTS, items: [{ member: 'Mock Member', event: 'Mock Event', regcode: 'ABC123', by: 'ic' }] };
     return this.call<EventRegcodePreview>('preview', { action: 'previewRegcodes' });
   }
 

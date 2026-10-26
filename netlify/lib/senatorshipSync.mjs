@@ -85,6 +85,9 @@ export function buildSenatorshipPlan({ members, index }) {
     skippedBoardValidated: 0, skippedNoValue: 0, conflicts: 0, alreadySame: 0, unmatched: 0,
   };
   const writes = [];
+  // Per-member detail for the preview UI so a human can verify each proposed change before applying.
+  // Carries the member name (developer-only UI); kept out of writes so the write path stays { id, senatorNumber, before }.
+  const items = [];
   for (const m of members) {
     const res = resolveSenatorship(index, memberIdentity(m));
     if (res.status === 'none') { counts.unmatched++; continue; }
@@ -97,14 +100,15 @@ export function buildSenatorshipPlan({ members, index }) {
     if (current === res.senatorship) { counts.alreadySame++; continue; }
     counts.wouldWrite++;
     writes.push({ id: m.id, senatorNumber: res.senatorship, before: current || null });
+    items.push({ name: m.general?.name ?? m.id, before: current || null, incoming: res.senatorship, by: res.by });
   }
-  return { counts, writes };
+  return { counts, writes, items };
 }
 
 /** All our members with just the fields the matcher and merge rule need. */
 export async function loadMembers(db) {
   const snap = await db.collection('members')
-    .select('general.idNumber', 'contact.email', 'contact.phone', 'jciCareer.senatorship')
+    .select('general.name', 'general.idNumber', 'contact.email', 'contact.phone', 'jciCareer.senatorship')
     .get();
   return snap.docs.map(d => ({ ...d.data(), id: d.id }));
 }
@@ -133,10 +137,10 @@ export async function applySenatorshipPlan(db, plan, now, onProgress) {
   return done;
 }
 
-/** preview action: counts only, no PII. */
+/** preview action: counts + the per-member list of proposed writes (name · old → new) for developer verification. */
 export async function previewSenatorship({ sourceDb, db }) {
   const plan = await computeSenatorshipPlan({ sourceDb, db });
-  return { status: 200, body: { counts: plan.counts } };
+  return { status: 200, body: { counts: plan.counts, items: plan.items } };
 }
 
 /**

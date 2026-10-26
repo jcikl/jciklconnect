@@ -19,8 +19,17 @@ export interface SenatorshipCounts {
   unmatched: number;
 }
 
+/** One proposed write, for the developer to verify before applying. `before` = the member's current senator number. */
+export interface SenatorshipPreviewItem {
+  name: string;
+  before: string | null;
+  incoming: string;
+  by?: string;
+}
+
 export interface SenatorshipPreview {
   counts: SenatorshipCounts;
+  items?: SenatorshipPreviewItem[];
   elapsedMs?: number;
 }
 
@@ -62,9 +71,9 @@ export class SenatorshipSyncService {
     }
   }
 
-  /** Developer only: counts (matched, would-write, skipped-board-validated, skipped-no-value, conflicts, …). No PII. */
+  /** Developer only: counts + the per-member list of proposed writes (name · old → new) for verification. */
   static async preview(): Promise<SenatorshipPreview> {
-    if (isDevMode()) return { counts: MOCK_COUNTS };
+    if (isDevMode()) return { counts: MOCK_COUNTS, items: [{ name: 'Mock Member', before: null, incoming: 'S-MOCK1', by: 'ic' }] };
     return this.call<SenatorshipPreview>('preview', { action: 'previewSenatorship' });
   }
 

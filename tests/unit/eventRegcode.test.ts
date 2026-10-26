@@ -112,4 +112,7 @@ describe('buildPlan', () => {
   it('writes carry only id + regcode (no PII)', () => {
     expect(plan.writes).toEqual([{ id: 'ev1_m-ic', regcode: 'IC1234' }]);
   });
+  it('items carry member + event + regcode for the preview UI (name/title fall back to ids)', () => {
+    expect(plan.items).toEqual([{ member: 'm-ic', event: 'ev1', regcode: 'IC1234', by: 'ic' }]);
+  });
 });

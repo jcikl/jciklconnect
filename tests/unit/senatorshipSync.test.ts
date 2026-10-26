@@ -51,6 +51,8 @@ describe('buildSenatorshipPlan merge rule', () => {
     const plan = buildSenatorshipPlan({ members, index });
     expect(plan.counts.wouldWrite).toBe(1);
     expect(plan.writes).toEqual([{ id: 'm1', senatorNumber: 'S-12345', before: 'OLD' }]);
+    // preview detail for the UI: name (falls back to id) · old -> new
+    expect(plan.items).toEqual([{ name: 'm1', before: 'OLD', incoming: 'S-12345', by: 'ic' }]);
   });
 
   it('(b) PRESERVES a board-validated number even when the incoming value differs', () => {
