@@ -283,6 +283,10 @@ export interface Member {
     senatorshipValidatedAt?: string;
     senatorshipValidatedBy?: string;
     careerHistory?: CareerMilestone[];
+    /** JCI Malaysia (jcimalaysia.cc) membership no., e.g. "JCIKL-025-0159". Written by scripts/syncJciMalaysia.mjs. */
+    jciMalaysiaMembershipNo?: string;
+    /** JCI Malaysia join date (YYYY-MM-DD). Written by scripts/syncJciMalaysia.mjs. */
+    jciMalaysiaJoinDate?: string;
   };
   createdAt?: string | Timestamp | Date;
   updatedAt?: string | Timestamp | Date;
