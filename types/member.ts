@@ -300,6 +300,8 @@ export interface Member {
   role?: UserRole | string;
   idealReferralIndustry?: string;
   loId?: string;
+  /** Developer account (set by an admin / Admin SDK; members cannot set it). Gates the JCI Malaysia sync. */
+  isDeveloper?: boolean;
   churnRisk?: string;
   companyName?: string;
   industry?: string;
