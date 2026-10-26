@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Share2, Calendar as CalendarIcon } from 'luc
 import { Modal, Button, useToast } from '../ui/Common';
 import { Event } from '../../types';
 import { formatTime } from '../../utils/dateUtils';
+import { involvesLo, KL_LO_NAME } from '../../utils/loHosting.mjs';
 import { EventsService } from '../../services/eventsService';
 import { EventRow } from './Events/EventRow';
 
@@ -33,17 +34,27 @@ function isSameDay(a: Date, b: Date) {
     && a.getDate() === b.getDate();
 }
 
-// Event type → chip colour (bg + text) and bar colour
-const EVENT_COLORS: Record<string, { chip: string; bar: string }> = {
-  Community:   { chip: 'bg-teal-500 text-white',    bar: 'bg-teal-500' },
-  Training:    { chip: 'bg-blue-500 text-white',     bar: 'bg-blue-500' },
-  Social:      { chip: 'bg-amber-500 text-white',    bar: 'bg-amber-500' },
-  Sports:      { chip: 'bg-orange-500 text-white',   bar: 'bg-orange-500' },
-  Fundraising: { chip: 'bg-purple-500 text-white',   bar: 'bg-purple-500' },
-  Meeting:     { chip: 'bg-indigo-500 text-white',   bar: 'bg-indigo-500' },
+// Event colour by level / JCI KL involvement (not by activity type): KL host-or-co-host, else national / jci / area.
+type EventCategory = 'kl' | 'national' | 'jci' | 'area' | 'other';
+const CATEGORY_COLORS: Record<EventCategory, { chip: string; bar: string; dot: string }> = {
+  kl:       { chip: 'bg-jci-blue text-white',    bar: 'bg-jci-blue',    dot: 'bg-jci-blue' },
+  national: { chip: 'bg-purple-500 text-white',  bar: 'bg-purple-500',  dot: 'bg-purple-500' },
+  jci:      { chip: 'bg-emerald-500 text-white', bar: 'bg-emerald-500', dot: 'bg-emerald-500' },
+  area:     { chip: 'bg-amber-500 text-white',   bar: 'bg-amber-500',   dot: 'bg-amber-500' },
+  other:    { chip: 'bg-slate-400 text-white',   bar: 'bg-slate-400',   dot: 'bg-slate-400' },
 };
-const DEFAULT_COLOR = { chip: 'bg-jci-blue text-white', bar: 'bg-jci-blue' };
-const getColors = (type: string) => EVENT_COLORS[type] ?? DEFAULT_COLOR;
+const CATEGORY_LABEL: Record<EventCategory, string> = { kl: 'JCI KL', national: 'National', jci: 'JCI', area: 'Area', other: 'Other' };
+const LEGEND_ORDER: EventCategory[] = ['kl', 'national', 'jci', 'area'];
+// JCI KL involvement wins, so any event KL hosts / co-hosts reads as "JCI KL" whatever its level.
+function getCategory(e: Event): EventCategory {
+  if (involvesLo(e as any, KL_LO_NAME)) return 'kl';
+  const level = typeof (e as any).level === 'string' ? (e as any).level.trim().toLowerCase() : '';
+  if (level === 'national') return 'national';
+  if (level === 'jci') return 'jci';
+  if (level === 'area' || level.startsWith('area')) return 'area';
+  return 'other';
+}
+const getColors = (e: Event) => CATEGORY_COLORS[getCategory(e)];
 
 // Build a Monday-first week grid for the given month
 function buildCalendarWeeks(year: number, month: number): Date[][] {
@@ -289,7 +300,7 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
                   {/* Event chips — max 2 visible, then "+N" */}
                   <div className="w-full px-0.5 space-y-0.5">
                     {dayEvents.slice(0, 2).map(event => {
-                      const c = getColors(event.type);
+                      const c = getColors(event);
                       return (
                         <div
                           key={event.id}
@@ -338,6 +349,16 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
           )}
         </div>
 
+        {/* Colour legend — event level / JCI KL involvement */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-1.5 border-b border-slate-50">
+          {LEGEND_ORDER.map(cat => (
+            <span key={cat} className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-500">
+              <span className={`w-2 h-2 rounded-full ${CATEGORY_COLORS[cat].dot}`} />
+              {CATEGORY_LABEL[cat]}
+            </span>
+          ))}
+        </div>
+
         {/* Event list for the whole month */}
         <div className="max-h-72 overflow-y-auto">
           {monthEvents.length === 0 ? (
@@ -345,7 +366,7 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
           ) : (
             monthEvents.map(event => {
               const d = new Date(event.date);
-              const c = getColors(event.type);
+              const c = getColors(event);
               const onSelectedDay = !!selectedDate && isSameDay(d, selectedDate);
               return (
                 <div
