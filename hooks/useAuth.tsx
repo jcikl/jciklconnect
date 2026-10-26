@@ -10,6 +10,10 @@ import {
   signInWithPopup,
   signInWithCredential,
   sendPasswordResetEmail,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updatePassword,
+  verifyBeforeUpdateEmail,
   updateProfile,
   setPersistence,
   browserLocalPersistence,
@@ -31,6 +35,8 @@ import { buildSelfSignUpMember, buildExternalSignUpMember, type ExternalSignUpIn
 import { MemberCardsService } from '../services/memberCardsService';
 import { applyMergeUpdates } from '../utils/memberCard.mjs';
 import { canRunLoader } from '../utils/externalAccess';
+import { validatePasswordChange, validateEmailChange, accountSecurityErrorMessage } from '../utils/accountSecurity';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
 interface AuthContextType {
   user: User | null;
@@ -46,6 +52,10 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateMemberProfile: (updates: Partial<Member>) => Promise<void>;
+  /** Own password: reauthenticates with the current password, then updates it. Throws a user-facing Error. */
+  changePassword: (currentPassword: string, newPassword: string, confirmPassword: string) => Promise<void>;
+  /** Own login email: reauthenticates, checks the address is free, then emails a verification link to it. */
+  requestEmailChange: (newEmail: string, currentPassword: string) => Promise<void>;
   simulateRole: (role: UserRole | null) => void;
   simulateAsMember: (memberId: string, role: UserRole) => Promise<void>;
   authError: string | null;
@@ -186,6 +196,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               setUser(firebaseUser);
               setMember(memberData);
               setSignedInHint(true);
+
+              // Own-email change: the verification link was clicked, so the (verified) Auth email now differs
+              // from members.contact.email. The self-email function moves contact.email and the memberEmails slot.
+              if (firebaseUser.emailVerified && firebaseUser.email && memberData.contact?.email
+                && firebaseUser.email.toLowerCase() !== memberData.contact.email.toLowerCase()) {
+                firebaseUser.getIdToken(true)
+                  .then(token => fetchWithTimeout('/.netlify/functions/self-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({ action: 'finalize' }),
+                  }))
+                  .then(res => { if (!res.ok && res.status !== 404) throw new Error(`self-email finalize returned ${res.status}`); })
+                  .catch(err => errorLoggingService.logError(err, { action: 'auth-email-change-finalize', uid: firebaseUser.uid }));
+              }
 
               // AUTH-001: Subscribe to real-time role changes so demotions/promotions take
               // effect within seconds instead of waiting up to 60 min for a token refresh.
@@ -662,6 +686,46 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, []);
 
+  const changePassword = useCallback(async (currentPassword: string, newPassword: string, confirmPassword: string) => {
+    const invalid = validatePasswordChange(currentPassword, newPassword, confirmPassword);
+    if (invalid) throw new Error(invalid);
+    const current = auth.currentUser;
+    if (isDevMode || !current?.email) throw new Error('Changing the password is not available in this session.');
+    try {
+      await reauthenticateWithCredential(current, EmailAuthProvider.credential(current.email, currentPassword));
+      await updatePassword(current, newPassword);
+    } catch (err: any) {
+      throw new Error(accountSecurityErrorMessage(err?.code));
+    }
+  }, [isDevMode]);
+
+  const requestEmailChange = useCallback(async (newEmail: string, currentPassword: string) => {
+    const current = auth.currentUser;
+    if (isDevMode || !current?.email) throw new Error('Changing the email is not available in this session.');
+    const email = newEmail.trim();
+    const invalid = validateEmailChange(email, current.email, currentPassword);
+    if (invalid) throw new Error(invalid);
+    try {
+      await reauthenticateWithCredential(current, EmailAuthProvider.credential(current.email, currentPassword));
+    } catch (err: any) {
+      throw new Error(accountSecurityErrorMessage(err?.code));
+    }
+    // Free of any other Auth account / memberEmails slot? (server side: members cannot read other members' slots)
+    const token = await current.getIdToken();
+    const res = await fetchWithTimeout('/.netlify/functions/self-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ action: 'check', newEmail: email }),
+    });
+    if (!res.ok) throw new Error('Could not check the new email. Please try again.');
+    if (!(await res.json()).available) throw new Error('That email is already used by another account.');
+    try {
+      await verifyBeforeUpdateEmail(current, email);
+    } catch (err: any) {
+      throw new Error(accountSecurityErrorMessage(err?.code));
+    }
+  }, [isDevMode]);
+
   const updateMemberProfile = useCallback(async (updates: Partial<Member>) => {
     if (!user) throw new Error('User not authenticated');
 
@@ -781,12 +845,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     signOut,
     resetPassword,
     updateMemberProfile,
+    changePassword,
+    requestEmailChange,
     simulateRole,
     simulateAsMember,
     authError,
   }), [
     user, member, loading, isDevMode, simulatedRole, simulatedMemberId, authError,
-    signIn, signUp, signUpExternal, signInWithGoogle, signOut, resetPassword, updateMemberProfile, simulateRole, simulateAsMember,
+    signIn, signUp, signUpExternal, signInWithGoogle, signOut, resetPassword, updateMemberProfile, changePassword, requestEmailChange, simulateRole, simulateAsMember,
   ]);
 
   return (

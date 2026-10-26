@@ -44,6 +44,7 @@ import { MemberDetailBasicTab } from './MemberDetailBasicTab';
 import { MemberDetailCareerTab } from './MemberDetailCareerTab';
 import { MemberDetailActivitiesTab } from './MemberDetailActivitiesTab';
 import { PrivacySettings } from './PrivacySettings';
+import { AccountSecuritySettings } from './AccountSecuritySettings';
 import { AsyncErrorBoundary } from '../../ui/AsyncErrorBoundary';
 import { canRunLoader, EXTERNAL_PROFILE_TABS, toExternalSelfUpdate } from '../../../utils/externalAccess';
 // Generate an inline SVG data URI with initials — avoids external requests blocked by CSP
@@ -1227,7 +1228,10 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
 
       {activeDetailTab === 'privacy' && isSelfView && (
         <AsyncErrorBoundary>
-          <PrivacySettings key={member.id} member={member} onSave={updateMemberProfile} />
+          <div className="space-y-6">
+            <PrivacySettings key={member.id} member={member} onSave={updateMemberProfile} />
+            <AccountSecuritySettings email={member.contact?.email ?? ''} />
+          </div>
         </AsyncErrorBoundary>
       )}
 

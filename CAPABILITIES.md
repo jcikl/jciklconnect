@@ -19,7 +19,7 @@
 |---|---|---|
 | Service（業務邏輯與資料存取） | 72 | `services/` |
 | Hook（React 資料綁定） | 42 | `hooks/` |
-| Util（純函數工具） | 26 | `utils/` |
+| Util（純函數工具） | 27 | `utils/` |
 | UI 元件（通用） | 33 | `components/ui/` |
 | 共用業務元件 | 9 | `components/shared/` |
 | Context | 2 | `contexts/` |
@@ -34,7 +34,7 @@
 | `formatCurrency` | `utils/formatUtils.ts` | `components/modules/SponsorshipView.tsx:10`<br>`components/modules/ProjectManagement/ProjectReportGenerator.tsx:181` |
 | `formatDate` | `utils/dateUtils.ts` | `components/modules/Finance/BankMatchingModal.tsx:27`<br>`components/modules/MemberManagement/BoardTransitionTools.tsx:161` |
 | `formatDateTime` | `utils/dateUtils.ts` | `components/modules/ZoomBookingView.tsx:59` |
-| `getInitialsSvg` | `utils/avatarUtils.ts` | `components/layout/SearchDropdown.tsx:5`<br>`components/modules/CommunicationView.tsx:16`<br>`components/modules/HobbyClubsView.tsx:4`<br>`components/modules/BusinessDirectory/businessDirectoryUtils.ts:2`<br>`components/modules/Members/MemberCreateModal.tsx:4`<br>`components/modules/Members/MemberDetail.tsx:50`<br>`components/modules/Members/MemberDetailCareerTab.tsx:8`<br>`components/modules/Members/MemberTable.tsx:10`<br>`components/modules/Members/MentorMatchingModal.tsx:9` |
+| `getInitialsSvg` | `utils/avatarUtils.ts` | `components/layout/SearchDropdown.tsx:5`<br>`components/modules/CommunicationView.tsx:16`<br>`components/modules/HobbyClubsView.tsx:4`<br>`components/modules/BusinessDirectory/businessDirectoryUtils.ts:2`<br>`components/modules/Members/MemberCreateModal.tsx:4`<br>`components/modules/Members/MemberDetail.tsx:51`<br>`components/modules/Members/MemberDetailCareerTab.tsx:8`<br>`components/modules/Members/MemberTable.tsx:10`<br>`components/modules/Members/MentorMatchingModal.tsx:9` |
 | `isFuture` | `utils/dateUtils.ts` | `components/modules/ZoomBookingView.tsx:65` |
 
 ### 1.2 同一函數在多個元件各寫一份（應抽出到 utils）
@@ -1316,7 +1316,7 @@
 | `useActivityPlans.ts` | 130 | 1 | `useActivityPlans` | activityPlansService | ⚠️ 無說明 |
 | `useAdvertisements.ts` | 111 | 2 | `useAdvertisements` | advertisementService, errorLoggingService | Advertisements Data Hook |
 | `useAppNavigation.ts` | 239 | 1 | `useAppNavigation` | — | ⚠️ 無說明 |
-| `useAuth.tsx` | 807 | 58 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, memberCardsService, membersService, mockData | Authentication Hook |
+| `useAuth.tsx` | 873 | 59 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, memberCardsService, membersService, mockData | Authentication Hook |
 | `useAutomation.ts` | 149 | 3 | `useAutomation` | automationService | useAutomation Hook - Manage automation workflows and rules |
 | `useBusinessDirectory.ts` | 51 | 4 | `useBusinessDirectory` | businessDirectoryService | ⚠️ 無說明 |
 | `useChapterBirthdays.ts` | 23 | 1 | `useChapterBirthdays` | chapterBirthdaysService | Own-chapter birthdays for an active external user (dashboard birthday widget). `month` null → nothing loads. |
@@ -1357,6 +1357,15 @@
 | `useZoomBookings.ts` | 52 | 1 | `useZoomBookings` | zoomBookingService | ⚠️ 無說明 |
 
 ## 4. Util 層（純函數，優先複用）
+
+### `utils/accountSecurity.ts` （47 行，2 處引用）
+> Pure helpers for "Change password" / "Change email" on the member's own profile (hooks/useAuth does the Firebase calls).
+
+| 函數 | 行 | 說明 |
+|---|---|---|
+| `validatePasswordChange` | 7 | Returns an error message, or null when the three password entries are acceptable. |
+| `validateEmailChange` | 16 | Returns an error message, or null when `next` is an acceptable new login email. |
+| `accountSecurityErrorMessage` | 25 | User-facing message for a Firebase Auth error code raised while reauthenticating / changing credentials. |
 
 ### `utils/activityPhase.ts` （23 行，2 處引用）
 
@@ -1475,7 +1484,7 @@
 | `isViewAllowedForRole` | 99 | True when `view` may be opened. Non-external roles are unrestricted here (their own rules still apply). |
 | `getExternalStatusMessage` | 108 |  |
 
-### `utils/fetchWithTimeout.ts` （31 行，4 處引用）
+### `utils/fetchWithTimeout.ts` （31 行，5 處引用）
 > ERR-R-005: fetch wrapper that aborts after `ms` milliseconds. Netlify functions on the free plan time out server-side after 10 s, but the br…
 
 | 函數 | 行 | 說明 |
@@ -1596,7 +1605,7 @@
 | `Card.tsx` | 77 | 1 | `Card`, `StatCardsContainer` |
 | `ColumnFilterHeader.tsx` | 118 | 2 | `ColumnFilterHeader` |
 | `Combobox.tsx` | 255 | 11 | `Combobox` |
-| `Common.tsx` | 26 | 233 | — |
+| `Common.tsx` | 26 | 234 | — |
 | `ConfirmDialog.tsx` | 100 | 2 | `ConfirmDialog`, `CONFIRM_CLOSED` |
 | `DataTable.tsx` | 172 | 0 | `DataTable` |
 | `Drawer.tsx` | 139 | 2 | `Drawer` |
@@ -1604,7 +1613,7 @@
 | `ErrorBoundary.tsx` | 261 | 3 | `ErrorFallback`, `SectionErrorFallback`, `ErrorBoundary`, `AsyncErrorBoundary`, `withErrorBoundary`, `useErrorHandler` |
 | `FilterDrawer.tsx` | 65 | 1 | `FilterDrawer` |
 | `FirstUseBanner.tsx` | 82 | 2 | `FirstUseBanner` |
-| `Form.tsx` | 502 | 97 | `Input`, `Select`, `Textarea`, `Checkbox`, `RadioGroup`, `ButtonGroup` |
+| `Form.tsx` | 502 | 98 | `Input`, `Select`, `Textarea`, `Checkbox`, `RadioGroup`, `ButtonGroup` |
 | `IntroducerSelector.tsx` | 338 | 6 | `IntroducerSelector` |
 | `LedgerTable.tsx` | 183 | 1 | `LedgerTable` |
 | `Loading.tsx` | 47 | 31 | `LoadingSpinner`, `LoadingOverlay` |
