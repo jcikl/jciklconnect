@@ -1,10 +1,10 @@
 /**
  * "Membership" tab of the unified JCI Malaysia sync modal — developer accounts only (the server checks again).
- * Syncs JCI Malaysia membership no. / join date / user id onto members. Preview (counts, changes, conflicts with
- * A/B picks, other chapter, not found) → Apply behind a confirm → result.
- * Rendered as a self-contained panel; the preview loads lazily the first time the tab becomes active.
+ * Syncs JCI Malaysia membership no. / join date / user id onto members. The preview reads a heavy snapshot, so it
+ * runs ONLY when the user clicks "Load preview" (never automatically on open or tab switch). Preview (counts,
+ * changes, conflicts with A/B picks, other chapter, not found) → Apply behind a confirm.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { Button, Badge, useToast } from '../../ui/Common';
 import { LoadingState } from '../../ui/Loading';
@@ -73,16 +73,10 @@ const ConflictRow: React.FC<{ conflict: JciMalaysiaConflict; busy: boolean; onSa
   );
 };
 
-export const MembershipSyncPanel: React.FC<{ active: boolean }> = ({ active }) => {
+export const MembershipSyncPanel: React.FC = () => {
   const { preview, result, loading, busy, error, loadPreview, pick, apply } = useJciMalaysiaSync();
   const { showToast } = useToast();
   const [confirming, setConfirming] = useState(false);
-  const [loadedOnce, setLoadedOnce] = useState(false);
-
-  // Lazy: only read the (heavy) JCI Malaysia data the first time this tab is opened.
-  useEffect(() => {
-    if (active && !loadedOnce) { setLoadedOnce(true); loadPreview(); }
-  }, [active, loadedOnce, loadPreview]);
 
   const toWrite = preview?.writes.length ?? 0;
 
@@ -120,69 +114,72 @@ export const MembershipSyncPanel: React.FC<{ active: boolean }> = ({ active }) =
             <Stat label="Not found" value={result.counts.none} />
           </div>
         </div>
+      ) : preview ? (
+        <>
+          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+          <p className={muted}>
+            Preview only — nothing is written until you apply. {preview.sourceRows} JCI Malaysia records read.
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <Stat label="KL members" value={preview.counts.members} />
+            <Stat label="To update" value={preview.counts.toWrite} />
+            <Stat label="Unchanged" value={preview.counts.unchanged} />
+            <Stat label="Conflicts" value={preview.counts.conflict} />
+          </div>
+          <p className={muted}>
+            Matched by manual pick {preview.counts.byManual} · user id {preview.counts.byUserId} · membership no. {preview.counts.byMembershipNo} · email {preview.counts.byEmail} · phone {preview.counts.byPhone}
+          </p>
+
+          <Section title="Changes" count={preview.writes.length}>
+            {preview.writes.map(w => (
+              <div key={w.memberId} className="py-1 border-b last:border-b-0 border-slate-100 dark:border-slate-700">
+                <p className="text-sm font-medium break-words">
+                  {w.name} <span className={muted}>· by {BY_LABEL[w.by] ?? w.by}</span>
+                </p>
+                <ul className={`${muted} space-y-0.5`}>
+                  {(Object.keys(FIELD_LABEL) as (keyof JciMalaysiaFields)[])
+                    .filter(k => (w.before[k] ?? '') !== (w.after[k] ?? ''))
+                    .map(k => (
+                      <li key={k} className="break-words">
+                        {FIELD_LABEL[k]}: <span className="font-mono">{show(w.before[k])}</span> → <span className="font-mono text-slate-800 dark:text-slate-100">{show(w.after[k])}</span>
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            ))}
+          </Section>
+
+          <Section title="Conflicts — email and phone point to different records" count={preview.conflicts.length} defaultOpen={preview.conflicts.length > 0}>
+            {preview.conflicts.map(c => (
+              <ConflictRow key={c.memberId} conflict={c} busy={busy || loading} onSave={sourceId => savePick(c.memberId, sourceId)} />
+            ))}
+          </Section>
+
+          <Section title="Only in another chapter (skipped)" count={preview.otherChapter.length}>
+            {preview.otherChapter.map(o => (
+              <p key={o.memberId} className="text-sm break-words">{o.name} <span className={muted}>· {o.chapter}</span></p>
+            ))}
+          </Section>
+
+          <Section title="Not found in JCI Malaysia data" count={preview.notFound.length}>
+            {preview.notFound.map(n => <p key={n.memberId} className="text-sm break-words">{n.name}</p>)}
+          </Section>
+
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-1">
+            <Button variant="outline" onClick={loadPreview} disabled={loading || busy}>
+              <RefreshCw size={14} className="mr-1.5" /> Refresh
+            </Button>
+            <Button onClick={() => setConfirming(true)} disabled={loading || busy || !toWrite}>
+              {busy ? 'Working…' : `Apply ${toWrite} change${toWrite === 1 ? '' : 's'}`}
+            </Button>
+          </div>
+        </>
       ) : (
-        <LoadingState loading={loading && !preview} error={preview ? null : error} onRetry={loadPreview} loadingMessage="Reading JCI Malaysia data…">
-          {preview && (
-            <>
-              {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-              <p className={muted}>
-                Preview only — nothing is written until you apply. {preview.sourceRows} JCI Malaysia records read.
-              </p>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <Stat label="KL members" value={preview.counts.members} />
-                <Stat label="To update" value={preview.counts.toWrite} />
-                <Stat label="Unchanged" value={preview.counts.unchanged} />
-                <Stat label="Conflicts" value={preview.counts.conflict} />
-              </div>
-              <p className={muted}>
-                Matched by manual pick {preview.counts.byManual} · user id {preview.counts.byUserId} · membership no. {preview.counts.byMembershipNo} · email {preview.counts.byEmail} · phone {preview.counts.byPhone}
-              </p>
-
-              <Section title="Changes" count={preview.writes.length}>
-                {preview.writes.map(w => (
-                  <div key={w.memberId} className="py-1 border-b last:border-b-0 border-slate-100 dark:border-slate-700">
-                    <p className="text-sm font-medium break-words">
-                      {w.name} <span className={muted}>· by {BY_LABEL[w.by] ?? w.by}</span>
-                    </p>
-                    <ul className={`${muted} space-y-0.5`}>
-                      {(Object.keys(FIELD_LABEL) as (keyof JciMalaysiaFields)[])
-                        .filter(k => (w.before[k] ?? '') !== (w.after[k] ?? ''))
-                        .map(k => (
-                          <li key={k} className="break-words">
-                            {FIELD_LABEL[k]}: <span className="font-mono">{show(w.before[k])}</span> → <span className="font-mono text-slate-800 dark:text-slate-100">{show(w.after[k])}</span>
-                          </li>
-                        ))}
-                    </ul>
-                  </div>
-                ))}
-              </Section>
-
-              <Section title="Conflicts — email and phone point to different records" count={preview.conflicts.length} defaultOpen={preview.conflicts.length > 0}>
-                {preview.conflicts.map(c => (
-                  <ConflictRow key={c.memberId} conflict={c} busy={busy || loading} onSave={sourceId => savePick(c.memberId, sourceId)} />
-                ))}
-              </Section>
-
-              <Section title="Only in another chapter (skipped)" count={preview.otherChapter.length}>
-                {preview.otherChapter.map(o => (
-                  <p key={o.memberId} className="text-sm break-words">{o.name} <span className={muted}>· {o.chapter}</span></p>
-                ))}
-              </Section>
-
-              <Section title="Not found in JCI Malaysia data" count={preview.notFound.length}>
-                {preview.notFound.map(n => <p key={n.memberId} className="text-sm break-words">{n.name}</p>)}
-              </Section>
-
-              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-1">
-                <Button variant="outline" onClick={loadPreview} disabled={loading || busy}>
-                  <RefreshCw size={14} className="mr-1.5" /> Refresh
-                </Button>
-                <Button onClick={() => setConfirming(true)} disabled={loading || busy || !toWrite}>
-                  {busy ? 'Working…' : `Apply ${toWrite} change${toWrite === 1 ? '' : 's'}`}
-                </Button>
-              </div>
-            </>
-          )}
+        <LoadingState loading={loading} error={error} onRetry={loadPreview} loadingMessage="Reading JCI Malaysia data…">
+          <div className={`${card} p-4 flex flex-col items-start gap-3`}>
+            <p className={muted}>Reading the JCI Malaysia snapshot can take several seconds. It runs only when you load it.</p>
+            <Button onClick={loadPreview}>Load preview</Button>
+          </div>
         </LoadingState>
       )}
 

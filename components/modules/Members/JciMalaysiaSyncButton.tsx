@@ -69,11 +69,12 @@ export const JciMalaysiaSyncButton: React.FC = () => {
           </div>
 
           {open && (
-            // key by openSeq: remount all panels on each open so previews reload fresh.
+            // key by openSeq: remount all panels on each open so each starts idle again (nothing auto-runs).
+            // All three stay mounted (hidden) so a preview you loaded is kept when you switch tabs within this open.
             <div key={openSeq}>
-              <div className={tab === 'membership' ? '' : 'hidden'}><MembershipSyncPanel active={tab === 'membership'} /></div>
-              <div className={tab === 'regcode' ? '' : 'hidden'}><EventRegcodeSyncPanel active={tab === 'regcode'} /></div>
-              <div className={tab === 'senatorship' ? '' : 'hidden'}><SenatorshipSyncPanel active={tab === 'senatorship'} /></div>
+              <div className={tab === 'membership' ? '' : 'hidden'}><MembershipSyncPanel /></div>
+              <div className={tab === 'regcode' ? '' : 'hidden'}><EventRegcodeSyncPanel /></div>
+              <div className={tab === 'senatorship' ? '' : 'hidden'}><SenatorshipSyncPanel /></div>
             </div>
           )}
         </div>

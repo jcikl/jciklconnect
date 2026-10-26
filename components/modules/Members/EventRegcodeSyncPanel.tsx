@@ -1,10 +1,10 @@
 /**
  * "Event QR" tab of the unified JCI Malaysia sync modal — developer accounts only (the server checks again).
  * Back-fills jciMalaysiaRegcode onto every eventRegistration from the JCI Malaysia event_participants snapshot.
- * Preview (counts + per-registration member · event — code) → Apply behind a confirm → result.
- * Rendered as a self-contained panel; the preview loads lazily the first time the tab becomes active.
+ * The preview reads a heavy snapshot, so it runs ONLY when the user clicks "Load preview" (never automatically on
+ * open or tab switch). Preview (counts + per-registration member · event — code) → Apply behind a confirm.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Button, useToast } from '../../ui/Common';
 import { LoadingState } from '../../ui/Loading';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
@@ -35,16 +35,10 @@ const Counts: React.FC<{ counts: EventRegcodeCounts }> = ({ counts }) => (
   </>
 );
 
-export const EventRegcodeSyncPanel: React.FC<{ active: boolean }> = ({ active }) => {
+export const EventRegcodeSyncPanel: React.FC = () => {
   const { preview, result, loading, busy, error, loadPreview, apply } = useEventRegcodeSync();
   const { showToast } = useToast();
   const [confirming, setConfirming] = useState(false);
-  const [loadedOnce, setLoadedOnce] = useState(false);
-
-  // Lazy: only read the (heavy) JCI Malaysia snapshot the first time this tab is opened.
-  useEffect(() => {
-    if (active && !loadedOnce) { setLoadedOnce(true); loadPreview(); }
-  }, [active, loadedOnce, loadPreview]);
 
   const toWrite = preview?.counts.toWrite ?? 0;
 
@@ -68,39 +62,42 @@ export const EventRegcodeSyncPanel: React.FC<{ active: boolean }> = ({ active })
           </p>
           <Counts counts={result.counts} />
         </div>
-      ) : (
-        <LoadingState loading={loading && !preview} error={preview ? null : error} onRetry={loadPreview} loadingMessage="Reading JCI Malaysia check-in data…">
-          {preview && (
-            <>
-              {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-              <p className={muted}>
-                Preview only — nothing is written until you apply. Each matched member's regcode is copied onto their own registration; the QR is regenerated from it in the app.
-              </p>
-              <Counts counts={preview.counts} />
-              {preview.items && preview.items.length > 0 && (
-                <div className="space-y-1">
-                  <p className={muted}>Proposed changes ({preview.items.length}) — verify before applying:</p>
-                  <div className={`${card} divide-y divide-slate-200 dark:divide-slate-700 max-h-64 overflow-y-auto`}>
-                    {preview.items.map((it, i) => (
-                      <div key={i} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-                        <span className="min-w-0">
-                          <span className="block truncate text-slate-800 dark:text-slate-100">{it.member}</span>
-                          <span className="block truncate text-xs text-slate-500 dark:text-slate-400">{it.event}</span>
-                        </span>
-                        <span className="font-mono font-semibold whitespace-nowrap text-slate-900 dark:text-slate-100">{it.regcode}</span>
-                      </div>
-                    ))}
+      ) : preview ? (
+        <>
+          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+          <p className={muted}>
+            Preview only — nothing is written until you apply. Each matched member's regcode is copied onto their own registration; the QR is regenerated from it in the app.
+          </p>
+          <Counts counts={preview.counts} />
+          {preview.items && preview.items.length > 0 && (
+            <div className="space-y-1">
+              <p className={muted}>Proposed changes ({preview.items.length}) — verify before applying:</p>
+              <div className={`${card} divide-y divide-slate-200 dark:divide-slate-700 max-h-64 overflow-y-auto`}>
+                {preview.items.map((it, i) => (
+                  <div key={i} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                    <span className="min-w-0">
+                      <span className="block truncate text-slate-800 dark:text-slate-100">{it.member}</span>
+                      <span className="block truncate text-xs text-slate-500 dark:text-slate-400">{it.event}</span>
+                    </span>
+                    <span className="font-mono font-semibold whitespace-nowrap text-slate-900 dark:text-slate-100">{it.regcode}</span>
                   </div>
-                </div>
-              )}
-              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-1">
-                <Button variant="outline" onClick={loadPreview} disabled={loading || busy}>Refresh</Button>
-                <Button onClick={() => setConfirming(true)} disabled={loading || busy || !toWrite}>
-                  {busy ? 'Working…' : `Apply ${toWrite} change${toWrite === 1 ? '' : 's'}`}
-                </Button>
+                ))}
               </div>
-            </>
+            </div>
           )}
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-1">
+            <Button variant="outline" onClick={loadPreview} disabled={loading || busy}>Refresh</Button>
+            <Button onClick={() => setConfirming(true)} disabled={loading || busy || !toWrite}>
+              {busy ? 'Working…' : `Apply ${toWrite} change${toWrite === 1 ? '' : 's'}`}
+            </Button>
+          </div>
+        </>
+      ) : (
+        <LoadingState loading={loading} error={error} onRetry={loadPreview} loadingMessage="Reading JCI Malaysia check-in data…">
+          <div className={`${card} p-4 flex flex-col items-start gap-3`}>
+            <p className={muted}>Reading the JCI Malaysia snapshot can take several seconds. It runs only when you load it.</p>
+            <Button onClick={loadPreview}>Load preview</Button>
+          </div>
         </LoadingState>
       )}
 
