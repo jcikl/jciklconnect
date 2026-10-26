@@ -19,8 +19,9 @@ export type SisterChapterMember = SisterChapterCard;
  * Reciprocity: unless the viewer shares their own card (or is a KL admin) the cards query does NOT run
  * (`canView` false); `optIn()` turns sharing on, then loads the cards.
  * Chapters and cards fail independently (allSettled): a card failure keeps the chapter list.
+ * `enabled: false` loads nothing (lets a view call the hook only for some viewers, e.g. externals).
  */
-export function useSisterChapterMembers() {
+export function useSisterChapterMembers({ enabled = true }: { enabled?: boolean } = {}) {
   const { member } = useAuth();
   const { isExternal, effectiveRole } = usePermissions();
   const { showToast } = useToast();
@@ -35,6 +36,13 @@ export function useSisterChapterMembers() {
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
+      if (!enabled) {
+        setChapters([]);
+        setMembers([]);
+        setError(null);
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       const [chaptersRes] = await Promise.allSettled([SisterChaptersService.getAll()]);
       const activeChapters = chaptersRes.status === 'fulfilled' ? chaptersRes.value.filter(c => c.isActive) : [];
@@ -64,7 +72,7 @@ export function useSisterChapterMembers() {
     };
     load();
     return () => { cancelled = true; };
-  }, [isExternal, canView, member?.loId, reloadKey]);
+  }, [enabled, isExternal, canView, member?.loId, reloadKey]);
 
   /** Turn on `privacy.shareCardInternationally` through MembersService.updateMember (which also syncs the card). */
   const optIn = useCallback(async () => {
