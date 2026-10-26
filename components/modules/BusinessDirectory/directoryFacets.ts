@@ -3,6 +3,7 @@
 import type { BusinessProfile } from '../../../types';
 import type { SisterChapterCard } from '../../../utils/internationalCards';
 import { KL_CHAPTER } from '../../../utils/internationalCards';
+import { isOfferLive, todayIso } from '../../../utils/specialOffers.mjs';
 
 export type DirectorySource = 'local' | 'sister';
 
@@ -99,6 +100,11 @@ export function businessToDirectoryItem(
 /** Sister-chapter (or, for externals, any chapter's) member card -> item. */
 export function cardToDirectoryItem(card: SisterChapterCard, fallbackAvatar: (name: string) => string): DirectoryItem {
   const name = card.displayName ?? '';
+  // A shared card lists its offers: re-check expiry (the card is only rewritten when its member saves).
+  // Otherwise fall back to the summary (written from the first live offer).
+  const cardDeal = card.specialOffers
+    ? (card.specialOffers.find(o => isOfferLive(o, todayIso()))?.description ?? '')
+    : (card.specialOfferSummary ?? '');
   return {
     key: `sister:${card.id}`,
     id: card.id,
@@ -112,8 +118,8 @@ export function cardToDirectoryItem(card: SisterChapterCard, fallbackAvatar: (na
     industry: card.industry ?? '',
     categories: card.businessCategory ?? [],
     idealReferrals: card.idealReferrals ?? [],
-    hasDeal: !!card.specialOfferSummary,
-    dealSummary: card.specialOfferSummary ?? '',
+    hasDeal: !!cardDeal,
+    dealSummary: cardDeal,
     acceptsInternationalBusiness: card.acceptInternationalBusiness === 'Yes',
     description: card.companyDescription ?? '',
     website: card.website ?? '',

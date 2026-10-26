@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getBenefitEligibility, type BenefitViewer, type BenefitTargetable } from './benefitEligibility';
+import { getBenefitEligibility, getOfferEligibility, type BenefitViewer, type BenefitTargetable } from './benefitEligibility';
 
 const kl: BenefitViewer = { isKl: true, role: 'MEMBER', tier: 'Gold', country: 'Malaysia' };
 const sg: BenefitViewer = { isKl: false, role: 'AFFILIATE', category: 'sister', country: 'Singapore' };
@@ -49,6 +49,28 @@ describe('getBenefitEligibility', () => {
     else {
       expect(r.eligible).toBe(false);
       if ("label" in r) expect(r.label).toBe(expected);
+    }
+  });
+});
+
+describe('getOfferEligibility (member offers use the same rule)', () => {
+  it('offer with no audiences is KL-only', () => {
+    expect(getOfferEligibility({}, kl)).toEqual({ eligible: true });
+    expect(getOfferEligibility({ audiences: [] }, kl)).toEqual({ eligible: true });
+    expect(getOfferEligibility({}, sg)).toMatchObject({ eligible: false, reason: 'audience', label: 'JCI KL members only' });
+  });
+
+  it('reads the offer audiences and countries', () => {
+    expect(getOfferEligibility({ audiences: ['kl', 'sister'] }, sg)).toEqual({ eligible: true });
+    expect(getOfferEligibility({ audiences: ['sister'] }, kl)).toMatchObject({ eligible: false, label: 'Not available to JCI KL members' });
+    expect(getOfferEligibility({ audiences: ['sister', 'apicc'], countries: ['Singapore'] }, apicc)).toMatchObject({ eligible: false, reason: 'country', label: 'Not available in Thailand' });
+    expect(getOfferEligibility({ audiences: ['kl'], countries: ['malaysia'] }, kl)).toEqual({ eligible: true });
+  });
+
+  it('matches getBenefitEligibility for every row above', () => {
+    for (const [, target, viewer] of rows) {
+      const tc = target.targetCriteria ?? {};
+      expect(getOfferEligibility({ audiences: tc.audiences, countries: tc.countries }, viewer)).toEqual(getBenefitEligibility(target, viewer));
     }
   });
 });

@@ -176,6 +176,51 @@ describe.skipIf(!HOST)('firestore.rules — buildMemberCard output (emulator)', 
     expect(await commit('klMember', [{ path: 'memberCards/klMember', data: { ...base, socials: { linkedin: 'https://l.in/a' } } }])).toBe(DENIED);
   });
 
+  const offers = [
+    { description: '10% off', terms: 'T&C', expiryDate: '2999-12-31', audiences: ['kl', 'sister'], countries: ['Singapore'] },
+    { description: 'Paused', status: 'Paused' },
+  ];
+  const offerMember = (share: boolean) => ({
+    ...klMember,
+    business: { ...klMember.business, specialOffers: offers },
+    privacy: { shareCardInternationally: share },
+  });
+  const saveMemberDoc = async (m: ReturnType<typeof offerMember>) => {
+    const { id: _id, ...doc } = m;
+    expect(await commit('klMember', [{ path: 'members/klMember', data: doc as unknown as Doc }])).toBe(OK);
+  };
+
+  it('sharing member: card with specialOffers (live offers only) is accepted', async () => {
+    const sharing = offerMember(true);
+    await saveMemberDoc(sharing);
+    const card = buildMemberCard(sharing) as unknown as Doc;
+    expect(card.specialOffers).toEqual([
+      { description: '10% off', terms: 'T&C', expiryDate: '2999-12-31', audiences: ['kl', 'sister'], countries: ['Singapore'] },
+    ]);
+    expect(await commit('klMember', [{ path: 'memberCards/klMember', data: card }])).toBe(OK);
+  });
+
+  it('card with specialOffers plus an unknown key is still rejected', async () => {
+    const card: Doc = { ...(buildMemberCard(offerMember(true)) as unknown as Doc), email: 'x@example.test' };
+    expect(card.specialOffers).toBeDefined();
+    expect(await commit('klMember', [{ path: 'memberCards/klMember', data: card }])).toBe(DENIED);
+  });
+
+  it('specialOffers that is not a list is rejected', async () => {
+    const card = { ...(buildMemberCard(offerMember(true)) as unknown as Doc), specialOffers: '10% off' };
+    expect(await commit('klMember', [{ path: 'memberCards/klMember', data: card }])).toBe(DENIED);
+  });
+
+  it('card carrying specialOffers while international is false is rejected', async () => {
+    const notSharing = offerMember(false);
+    await saveMemberDoc(notSharing);
+    const base = buildMemberCard(notSharing) as unknown as Doc;
+    expect(base.international).toBe(false);
+    expect('specialOffers' in base).toBe(false);
+    expect(await commit('klMember', [{ path: 'memberCards/klMember', data: base }])).toBe(OK);
+    expect(await commit('klMember', [{ path: 'memberCards/klMember', data: { ...base, specialOffers: [{ description: '10% off' }] } }])).toBe(DENIED);
+  });
+
   it('GUEST cannot create a card', async () => {
     const card = buildMemberCard({ ...klGuest, role: 'MEMBER' }) as unknown as Doc;
     expect(await commit('klGuest', [{ path: 'memberCards/klGuest', data: card }])).toBe(DENIED);

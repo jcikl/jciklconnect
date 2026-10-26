@@ -20,7 +20,7 @@ import { MOCK_BUSINESSES } from './mockData';
 import { MembersService } from './membersService';
 import { apiCache, CACHE_TTL_3MIN } from './cacheService';
 import { errorLoggingService } from './errorLoggingService';
-import { getSpecialOfferSummary } from '../types/member';
+import { getLiveOffers, todayIso } from '../utils/specialOffers.mjs';
 import { normalizeIdealReferrals } from '../utils/idealReferrals.mjs';
 
 const CACHE_KEY_ALL_PUBLIC = 'businessDirectory:public:all';
@@ -51,6 +51,8 @@ export function mapMemberToBusinessProfile(id: string, data: Record<string, unkn
     referralTypes.length > 0
       ? referralTypes
       : normalizeIdealReferrals(business.idealReferrals ?? data.idealReferral ?? data.idealReferrals);
+  // First live (active, not expired) offer across both formats (business.specialOffers / legacy specialOffer).
+  const liveOffer = getLiveOffers(data, todayIso())[0];
 
   return {
     id,
@@ -71,18 +73,9 @@ export function mapMemberToBusinessProfile(id: string, data: Record<string, unkn
       (data.companyWebsite as string | undefined) ||
       (business.companyWebsite as string | undefined) ||
       '',
-    offer:
-      getSpecialOfferSummary(data.specialOffer as any) ||
-      getSpecialOfferSummary(business.specialOffer as any) ||
-      '',
-    offerTerms: (() => {
-      const raw = (data.specialOffer ?? business.specialOffer) as any;
-      return (raw && typeof raw === 'object' ? (raw.terms as string | undefined) : undefined) ?? '';
-    })(),
-    offerExpiry: (() => {
-      const raw = (data.specialOffer ?? business.specialOffer) as any;
-      return (raw && typeof raw === 'object' ? (raw.expiryDate as string | undefined) : undefined) ?? '';
-    })(),
+    offer: liveOffer?.description ?? '',
+    offerTerms: liveOffer?.terms ?? '',
+    offerExpiry: liveOffer?.expiryDate ?? '',
     logo:
       (data.companyLogoUrl as string | undefined) ||
       (business.companyLogoUrl as string | undefined) ||

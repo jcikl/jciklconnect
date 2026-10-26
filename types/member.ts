@@ -24,6 +24,10 @@ export interface SpecialOffer {
   logoUrl?: string;
   imageUrl?: string;
   status?: 'Active' | 'Paused';
+  /** Who can redeem (same meaning as advertisements.targetCriteria.audiences). Missing/empty = JCI KL only. */
+  audiences?: ('kl' | AffiliationCategory)[];
+  /** When set, the viewer's country must be listed (case-insensitive). Missing/empty = any country. */
+  countries?: string[];
 }
 
 export interface MembershipRecord {
@@ -391,8 +395,10 @@ export interface MemberCard {
   companyDescription?: string;
   website?: string;
   acceptInternationalBusiness?: 'Yes' | 'No' | 'Willing to Explore';
-  /** Plain-text summary (see getSpecialOfferSummary). */
+  /** Description of the member's first live (active, not expired) offer, across both offer formats. */
   specialOfferSummary?: string;
+  /** The member's live offers (public keys only). Present only when international is true; omitted when empty. */
+  specialOffers?: MemberCardOffer[];
   /** Same source, order and normalisation as the local directory's idealReferralTypes (business.idealReferralTypes, else business.idealReferrals ?? idealReferral ?? idealReferrals); omitted when empty. */
   idealReferrals?: string[];
   /** Primary phone (contact.phone). Present only when international is true. */
@@ -403,6 +409,9 @@ export interface MemberCard {
   international: boolean;
   updatedAt: string;
 }
+
+/** One offer on a public card: a live SpecialOffer without `status`. */
+export type MemberCardOffer = Pick<SpecialOffer, 'description' | 'terms' | 'expiryDate' | 'logoUrl' | 'imageUrl' | 'audiences' | 'countries'>;
 
 /** Returns a short display string for any specialOffer value (structured or legacy string). */
 export function getSpecialOfferSummary(offer: SpecialOffer | string | undefined): string {

@@ -65,3 +65,14 @@ export function getBenefitEligibility(item: BenefitTargetable, viewer: BenefitVi
 
   return { eligible: true };
 }
+
+/**
+ * Eligibility of a member's own special offer (members.business.specialOffers[] or a card's specialOffers[]):
+ * the same rule as advertisements, reading the offer's own `audiences` / `countries`.
+ */
+export function getOfferEligibility(
+  offer: { audiences?: BenefitAudience[]; countries?: string[] },
+  viewer: BenefitViewer,
+): BenefitEligibility {
+  return getBenefitEligibility({ targetCriteria: { audiences: offer.audiences, countries: offer.countries } }, viewer);
+}
