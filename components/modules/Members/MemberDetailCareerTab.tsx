@@ -110,6 +110,17 @@ const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) 
           {activeCareerTab === 'career' && (
             <div className="px-5 pb-5">
             <h3 className="sticky top-0 z-10 bg-white -mx-5 px-5 py-3 mb-1 text-sm font-bold text-slate-800 border-b border-slate-100">JCI Career Path</h3>
+            {/* JCI Malaysia (jcimalaysia.cc) record — read-only, filled by scripts/syncJciMalaysia.mjs */}
+            <div className="mt-3 mb-5 grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-lg border border-slate-100 bg-slate-50 px-4 py-3 text-xs">
+              <div>
+                <span className="block uppercase tracking-wide font-semibold text-slate-400">JCI Malaysia Membership No.</span>
+                <span className="font-mono text-sm text-slate-800">{member.jciCareer?.jciMalaysiaMembershipNo || '—'}</span>
+              </div>
+              <div>
+                <span className="block uppercase tracking-wide font-semibold text-slate-400">JCI Malaysia Join Date</span>
+                <span className="text-sm text-slate-800">{member.jciCareer?.jciMalaysiaJoinDate ? formatDateToDDMMMYYYY(member.jciCareer.jciMalaysiaJoinDate) : '—'}</span>
+              </div>
+            </div>
             <div className="relative pl-8 space-y-8 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
               {/* Join milestone */}
               <div className="relative">
