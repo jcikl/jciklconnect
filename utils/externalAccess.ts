@@ -60,8 +60,8 @@ export type KlOnlyLoader = typeof KL_ONLY_LOADERS[number];
 export const canRunLoader = (role: UserRole | string | null | undefined, loader: KlOnlyLoader): boolean =>
   !isExternalRole(role) || !KL_ONLY_LOADERS.includes(loader);
 
-/** MemberDetail tabs an external sees on their own profile (JCI Career and Activities are KL records). */
-export const EXTERNAL_PROFILE_TABS = ['basic'] as const;
+/** MemberDetail tabs an external sees on their own profile (JCI Career and Activities are KL records); Privacy & Security is the own-profile settings tab. */
+export const EXTERNAL_PROFILE_TABS = ['basic', 'privacy'] as const;
 
 /**
  * Keys of MemberDetail's profile save that an external must not send: KL-only fields (introducer, join date,

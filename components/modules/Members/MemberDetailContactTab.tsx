@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Phone, MessageCircle, MapPin, Linkedin, Facebook, Instagram, Lock, Eye, EyeOff } from 'lucide-react';
+import { Phone, MessageCircle, MapPin, Linkedin, Facebook, Instagram, Lock } from 'lucide-react';
 import { Card } from '../../ui/Common';
 import type { Member } from '../../../types';
 
@@ -21,9 +21,6 @@ interface MemberDetailContactTabProps {
 const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
   member, isEditMode, inlineValues, setInlineValues, canViewSensitiveFields, isSelfView = false,
 }) => {
-  const privacy = inlineValues?.privacy ?? member.privacy ?? {};
-  const togglePrivacy = (key: 'showPhone' | 'showAlternatePhone' | 'showSocials') =>
-    setInlineValues((prev: any) => ({ ...prev, privacy: { ...privacy, [key]: !(privacy[key] ?? true) } }));
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <Card title="Contact Information">
@@ -33,11 +30,6 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
               <div>
                 <label className="text-slate-500 flex items-center gap-1.5 text-xs uppercase font-medium mb-1">
                   Primary Phone
-                  {isSelfView && (
-                    <button type="button" onClick={() => togglePrivacy('showPhone')} className="text-slate-400 hover:text-jci-blue transition-colors" title={(privacy.showPhone ?? true) ? 'Visible to members' : 'Hidden from members'}>
-                      {(privacy.showPhone ?? true) ? <Eye size={12} /> : <EyeOff size={12} />}
-                    </button>
-                  )}
                 </label>
                 <input
                   type="text"
@@ -49,11 +41,6 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
               <div>
                 <label className="text-slate-500 flex items-center gap-1.5 text-xs uppercase font-medium mb-1">
                   Alternate Phone
-                  {isSelfView && (
-                    <button type="button" onClick={() => togglePrivacy('showAlternatePhone')} className="text-slate-400 hover:text-jci-blue transition-colors" title={(privacy.showAlternatePhone ?? true) ? 'Visible to members' : 'Hidden from members'}>
-                      {(privacy.showAlternatePhone ?? true) ? <Eye size={12} /> : <EyeOff size={12} />}
-                    </button>
-                  )}
                 </label>
                 <input
                   type="text"
@@ -147,11 +134,6 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
             <div className="border-t pt-3">
               <h4 className="text-xs font-bold text-slate-400 uppercase border-b pb-1 mb-3 flex items-center gap-1.5">
                 Social Media Links
-                {isSelfView && (
-                  <button type="button" onClick={() => togglePrivacy('showSocials')} className="text-slate-400 hover:text-jci-blue transition-colors font-normal" title={(privacy.showSocials ?? true) ? 'Visible to members' : 'Hidden from members'}>
-                    {(privacy.showSocials ?? true) ? <Eye size={12} /> : <EyeOff size={12} />}
-                  </button>
-                )}
               </h4>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -202,7 +184,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                 </div>
                 <div>
                   <p className="text-xs text-slate-500 uppercase font-medium">Primary Phone</p>
-                  {(isSelfView || canViewSensitiveFields || (member.privacy?.showPhone ?? true))
+                  {(isSelfView || canViewSensitiveFields || (member.privacy?.shareCardInternationally === true))
                     ? <p className="text-sm font-bold">{member.contact?.phone || 'N/A'}</p>
                     : <RestrictedField />}
                 </div>
@@ -213,7 +195,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                 </div>
                 <div>
                   <p className="text-xs text-slate-500 uppercase font-medium">Alternate Phone</p>
-                  {(isSelfView || canViewSensitiveFields || (member.privacy?.showAlternatePhone ?? true))
+                  {(isSelfView || canViewSensitiveFields)
                     ? <p className="text-sm font-bold">{member.contact?.alternatePhone || 'N/A'}</p>
                     : <RestrictedField />}
                 </div>
@@ -248,7 +230,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
               </div>
 
               <h4 className="text-xs font-bold text-slate-400 uppercase border-b pb-1 mt-4">Social Media</h4>
-              {(isSelfView || canViewSensitiveFields || (member.privacy?.showSocials ?? true)) ? (
+              {(isSelfView || canViewSensitiveFields || (member.privacy?.shareCardInternationally === true)) ? (
                 <div className="flex gap-4 items-center">
                   {member.contact?.socials?.linkedin
                     ? <a href={member.contact?.socials?.linkedin} target="_blank" rel="noreferrer" className="text-[#0077B5]"><Linkedin size={20} /></a>

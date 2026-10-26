@@ -314,6 +314,7 @@ export interface Member {
   tendencyTags?: string[];
   internationalConnections?: InternationalConnection[];
   privacy?: {
+    /** Legacy: no longer read (phone and socials follow shareCardInternationally; alternate phone is never shown). Stored values are kept. */
     showPhone?: boolean;
     showAlternatePhone?: boolean;
     showSocials?: boolean;
@@ -394,6 +395,10 @@ export interface MemberCard {
   specialOfferSummary?: string;
   /** Same source, order and normalisation as the local directory's idealReferralTypes (business.idealReferralTypes, else business.idealReferrals ?? idealReferral ?? idealReferrals); omitted when empty. */
   idealReferrals?: string[];
+  /** Primary phone (contact.phone). Present only when international is true. */
+  phone?: string;
+  /** Non-empty social links (linkedin / facebook / instagram / wechat). Present only when international is true. */
+  socials?: Record<string, string>;
   /** Visible to members of other chapters. Must equal members.privacy.shareCardInternationally (default false). */
   international: boolean;
   updatedAt: string;

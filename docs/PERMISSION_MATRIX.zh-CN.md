@@ -56,7 +56,7 @@
 | `EVENTS` | 活动 | 是 | 是 | 否 |
 | `SURVEYS` | 问卷 | 是 | 是 | 否 |
 | `CLUBS` | 兴趣社群 | 是 | 是 | 否 |
-| `MEMBERS` | 仅本人资料（`MyProfileSelfView`） | 是 | 是 | 是 |
+| `MEMBERS` | 仅本人资料（`MemberDetail` 本人视图） | 是 | 是 | 是 |
 | `MY_CHAPTER` | 本分会审批 / 成员 / 邀请（`ChapterAdminView`） | 否 | 是 | 否 |
 
 - 非 active 外部用户只能打开 `MEMBERS`，并看到 `ExternalAccessNotice` 状态提示（`getExternalStatusMessage`）。

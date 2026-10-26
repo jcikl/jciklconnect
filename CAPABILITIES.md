@@ -19,7 +19,7 @@
 |---|---|---|
 | Service（業務邏輯與資料存取） | 72 | `services/` |
 | Hook（React 資料綁定） | 42 | `hooks/` |
-| Util（純函數工具） | 26 | `utils/` |
+| Util（純函數工具） | 27 | `utils/` |
 | UI 元件（通用） | 33 | `components/ui/` |
 | 共用業務元件 | 9 | `components/shared/` |
 | Context | 2 | `contexts/` |
@@ -34,7 +34,7 @@
 | `formatCurrency` | `utils/formatUtils.ts` | `components/modules/SponsorshipView.tsx:10`<br>`components/modules/ProjectManagement/ProjectReportGenerator.tsx:181` |
 | `formatDate` | `utils/dateUtils.ts` | `components/modules/Finance/BankMatchingModal.tsx:27`<br>`components/modules/MemberManagement/BoardTransitionTools.tsx:161` |
 | `formatDateTime` | `utils/dateUtils.ts` | `components/modules/ZoomBookingView.tsx:59` |
-| `getInitialsSvg` | `utils/avatarUtils.ts` | `components/layout/SearchDropdown.tsx:5`<br>`components/modules/CommunicationView.tsx:16`<br>`components/modules/HobbyClubsView.tsx:4`<br>`components/modules/BusinessDirectory/businessDirectoryUtils.ts:2`<br>`components/modules/Members/MemberCreateModal.tsx:4`<br>`components/modules/Members/MemberDetail.tsx:49`<br>`components/modules/Members/MemberDetailCareerTab.tsx:8`<br>`components/modules/Members/MemberTable.tsx:10`<br>`components/modules/Members/MentorMatchingModal.tsx:9` |
+| `getInitialsSvg` | `utils/avatarUtils.ts` | `components/layout/SearchDropdown.tsx:5`<br>`components/modules/CommunicationView.tsx:16`<br>`components/modules/HobbyClubsView.tsx:4`<br>`components/modules/BusinessDirectory/businessDirectoryUtils.ts:2`<br>`components/modules/Members/MemberCreateModal.tsx:4`<br>`components/modules/Members/MemberDetail.tsx:51`<br>`components/modules/Members/MemberDetailCareerTab.tsx:8`<br>`components/modules/Members/MemberTable.tsx:10`<br>`components/modules/Members/MentorMatchingModal.tsx:9` |
 | `isFuture` | `utils/dateUtils.ts` | `components/modules/ZoomBookingView.tsx:65` |
 
 ### 1.2 同一函數在多個元件各寫一份（應抽出到 utils）
@@ -64,6 +64,7 @@
 | `hooks/useMemberBenefits.ts` | 102 | Member Benefits Data Hook Wraps MemberBenefitsService with React state (loading / error / data). |
 | `hooks/useMemberMutations.ts` | 107 | ⚠️ 無說明 |
 | `hooks/useNotifications.ts` | 107 | ⚠️ 無說明 |
+| `hooks/usePushNotifications.ts` | 63 | ⚠️ 無說明 |
 | `services/pointsRuleService.ts` | 690 | Points Rule Service - Points Rule Configuration Management |
 | `services/projectAccountsService.ts` | 236 | Project Financial Accounts Service |
 | `services/reconciliationService.ts` | 861 | Reconciliation Service - Auto-matching & splitting bank transactions with project transactions |
@@ -481,8 +482,8 @@
 | `activityPlansService.ts` | 621 | 2 | Activity Plans Service - CRUD Operations P0 fix: all methods now query COLLECTIONS.ACTIVITY_PLANS (was COLLECTIONS.PROJECTS) P1 fixes: isDev… | ACTIVITY_PLANS, PROJECTS |
 | `eventFeedbackService.ts` | 226 | 3 | Event Feedback Service - Collects and manages event feedback | EVENT_FEEDBACK |
 | `eventPaymentService.ts` | 89 | 1 | Event payment (mark-paid) — creates the finance income record, then flips the registration to 'paid'. | PROJECTS |
-| `eventRegistrationService.ts` | 391 | 8 | Event Registration Service - 报名/缴费/签到统一名单（Story 8.1） | EVENT_REGISTRATIONS, PROJECTS |
-| `eventsService.ts` | 1,136 | 15 | Events Service - CRUD Operations | EVENT_BUDGETS, EVENT_FEEDBACK, EVENT_REGISTRATIONS, GUEST_REGISTRATIONS, MEMBERS, NOTIFICATIONS … |
+| `eventRegistrationService.ts` | 391 | 7 | Event Registration Service - 报名/缴费/签到统一名单（Story 8.1） | EVENT_REGISTRATIONS, PROJECTS |
+| `eventsService.ts` | 1,136 | 14 | Events Service - CRUD Operations | EVENT_BUDGETS, EVENT_FEEDBACK, EVENT_REGISTRATIONS, GUEST_REGISTRATIONS, MEMBERS, NOTIFICATIONS … |
 | `flagshipProjectsService.ts` | 156 | 3 | ⚠️ 無說明 | FLAGSHIP_PROJECTS |
 | `projectReportService.ts` | 775 | 3 | Project Report Service - Generates automated project reports | TEMPLATES |
 | `projectsService.ts` | 823 | 21 | Projects Service - CRUD Operations | ACTIVITY_PLANS, MEMBERS, POINTS, PROJECTS, PROJECT_REPORTS, PROJECT_TRANSACTIONS … |
@@ -1315,7 +1316,7 @@
 | `useActivityPlans.ts` | 130 | 1 | `useActivityPlans` | activityPlansService | ⚠️ 無說明 |
 | `useAdvertisements.ts` | 111 | 2 | `useAdvertisements` | advertisementService, errorLoggingService | Advertisements Data Hook |
 | `useAppNavigation.ts` | 239 | 1 | `useAppNavigation` | — | ⚠️ 無說明 |
-| `useAuth.tsx` | 807 | 58 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, memberCardsService, membersService, mockData | Authentication Hook |
+| `useAuth.tsx` | 880 | 59 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, memberCardsService, membersService, mockData | Authentication Hook |
 | `useAutomation.ts` | 149 | 3 | `useAutomation` | automationService | useAutomation Hook - Manage automation workflows and rules |
 | `useBusinessDirectory.ts` | 51 | 4 | `useBusinessDirectory` | businessDirectoryService | ⚠️ 無說明 |
 | `useChapterBirthdays.ts` | 23 | 1 | `useChapterBirthdays` | chapterBirthdaysService | Own-chapter birthdays for an active external user (dashboard birthday widget). `month` null → nothing loads. |
@@ -1341,7 +1342,7 @@
 | `usePermissions.ts` | 212 | 30 | `usePermissions` | — | Permission Management Hook |
 | `usePoints.ts` | 61 | 2 | `usePoints` | pointsService | Points Data Hook |
 | `useProjects.ts` | 170 | 7 | `useProjects` | projectsService | Projects Data Hook |
-| `usePushNotifications.ts` | 63 | 1 | `usePushNotifications` | — | ⚠️ 無說明 |
+| `usePushNotifications.ts` | 63 | 0 | `usePushNotifications` | — | ⚠️ 無說明 |
 | `useSisterChapterMembers.ts` | 87 | 1 | `useSisterChapterMembers` | memberCardsService, membersService, sisterChaptersService | ⚠️ 無說明 |
 | `useSisterChapters.ts` | 26 | 6 | `useSisterChapters` | sisterChaptersService | ⚠️ 無說明 |
 | `useSocialPersonas.ts` | 46 | 2 | `useSocialPersonas` | socialPersonaService | ⚠️ 無說明 |
@@ -1356,6 +1357,15 @@
 | `useZoomBookings.ts` | 52 | 1 | `useZoomBookings` | zoomBookingService | ⚠️ 無說明 |
 
 ## 4. Util 層（純函數，優先複用）
+
+### `utils/accountSecurity.ts` （47 行，2 處引用）
+> Pure helpers for "Change password" / "Change email" on the member's own profile (hooks/useAuth does the Firebase calls).
+
+| 函數 | 行 | 說明 |
+|---|---|---|
+| `validatePasswordChange` | 7 | Returns an error message, or null when the three password entries are acceptable. |
+| `validateEmailChange` | 16 | Returns an error message, or null when `next` is an acceptable new login email. |
+| `accountSecurityErrorMessage` | 25 | User-facing message for a Firebase Auth error code raised while reauthenticating / changing credentials. |
 
 ### `utils/activityPhase.ts` （23 行，2 處引用）
 
@@ -1432,7 +1442,7 @@
 |---|---|---|
 | `removeUndefined` | 6 | recursivley removes undefined values from an object. Firestore does not support 'undefined' values, so this he… |
 
-### `utils/dateUtils.ts` （176 行，46 處引用）
+### `utils/dateUtils.ts` （176 行，45 處引用）
 > Date Utility Functions
 
 | 函數 | 行 | 說明 |
@@ -1474,7 +1484,7 @@
 | `isViewAllowedForRole` | 99 | True when `view` may be opened. Non-external roles are unrestricted here (their own rules still apply). |
 | `getExternalStatusMessage` | 108 |  |
 
-### `utils/fetchWithTimeout.ts` （31 行，4 處引用）
+### `utils/fetchWithTimeout.ts` （31 行，5 處引用）
 > ERR-R-005: fetch wrapper that aborts after `ms` milliseconds. Netlify functions on the free plan time out server-side after 10 s, but the br…
 
 | 函數 | 行 | 說明 |

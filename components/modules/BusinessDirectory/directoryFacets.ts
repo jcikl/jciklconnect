@@ -27,6 +27,9 @@ export interface DirectoryItem {
   acceptsInternationalBusiness: boolean;
   description: string;
   website: string;
+  /** Sister-chapter cards only, present when the member shares their card. */
+  phone?: string;
+  socials?: Record<string, string>;
 }
 
 /** Multi-value sections: OR inside a section, AND across sections. */
@@ -114,6 +117,8 @@ export function cardToDirectoryItem(card: SisterChapterCard, fallbackAvatar: (na
     acceptsInternationalBusiness: card.acceptInternationalBusiness === 'Yes',
     description: card.companyDescription ?? '',
     website: card.website ?? '',
+    ...(card.phone ? { phone: card.phone } : {}),
+    ...(card.socials && Object.keys(card.socials).length > 0 ? { socials: card.socials } : {}),
   };
 }
 

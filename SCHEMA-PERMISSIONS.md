@@ -114,6 +114,7 @@ econciliations | B+/A+ | B+/A+ | B+/A+(必填字段) | A+ 或 B+(仅notes字段)
 | webhook_logs | B+ | B+ | B+(字段白名单) | × (不可变) | A+ | |
 | emailLogs | B+/A+ | B+/A+ | 登 | A+ | A+ | ⚠️ P0：无写入者，集合永远为空 |
 | memberEmails | B+/A+ | B+/A+ | B+/A+ | A+ | A+ | |
+| emailChangeRequests | × | × | × | × | × | 仅 Admin SDK（`netlify/functions/self-email`）读写；规则 `if false` |
 | pointsRules | 登 | 登 | B+/A+ | B+/A+ | B+/A+ | |
 | pointsRuleExecutions | B+/A+ | B+/A+ | 登(字段白名单) | A+ | A+ | ⚠️ P0：竞态→双倍积分 |
 | irthdayNotificationsSent | × | × | × | × | × | ⚠️ 全禁止，仅Cloud Function |
@@ -140,7 +141,7 @@ econciliations | B+/A+ | B+/A+ | B+/A+(必填字段) | A+ 或 B+(仅notes字段)
 | 集合 | 外部用户可做的事 | 限制 |
 |------|------------------|------|
 | `members` | 读自己的完整文档；active CHAPTER_ADMIN 读本分会文档；自己改非锁定字段 | 不能读其他外部会员完整文档；`affiliation` 锁定 |
-| `memberCards` | 本人已开放名片后，读 `international == true` 或本分会的卡片（自己的卡片随时可读） | 只读；卡片写入由成员本人或 KL 编辑者完成 |
+| `memberCards` | 本人已开放名片后，读 `international == true` 或本分会的卡片（自己的卡片随时可读） | 只读；卡片写入由成员本人或 KL 编辑者完成；`memberCardKeys()` 为固定键集，含 `phone` / `socials`，且仅 `international == true` 的卡片可带这两个键（`validMemberCard`） |
 | `events` | 读（`get` 登录即可，`list` 公开）；更新 `attendees` / `registeredMembers` / `updatedAt` | 不能创建、删除；规则对 `list` 没有 KL 限制，只有应用层查询按 KL 主办 / 协办过滤（见 `RISK_REGISTER.md` R-058） |
 | `eventRegistrations` | 只读和创建自己的报名 | 查询须带 `where('memberId','==',uid)` |
 | `surveys` | 读 `specificMemberIds` 包含自己的问卷，或 B+ 已开放（`openToExternals == true`）且 `Active` 的问卷（list 查询须带对应过滤条件） | 只能在作答时把 `responsesCount` 加 1，不能创建、删除或改其他字段 |

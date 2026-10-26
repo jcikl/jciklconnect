@@ -5,7 +5,7 @@ const NOW = '2026-10-19T00:00:00.000Z';
 const RULE_KEYS = [
   'displayName', 'avatarUrl', 'loId', 'country', 'companyName', 'position', 'department', 'industry',
   'businessCategory', 'companyDescription', 'website', 'acceptInternationalBusiness', 'specialOfferSummary',
-  'idealReferrals', 'international', 'updatedAt',
+  'idealReferrals', 'phone', 'socials', 'international', 'updatedAt',
 ];
 
 const full = {
@@ -154,5 +154,37 @@ describe('applyMemberUpdates', () => {
 
   it('creates missing parents for dot-paths', () => {
     expect(applyMemberUpdates({}, { 'business.companyDescription': 'x' })).toEqual({ business: { companyDescription: 'x' } });
+  });
+});
+
+describe('card phone and socials', () => {
+  const contact = { phone: ' +60 12 345 ', alternatePhone: '999', socials: { linkedin: 'https://l.in/a', facebook: '', wechat: 'ali_w', other: 'x' } };
+
+  it('carries primary phone and non-empty socials only when sharing', () => {
+    const card = buildMemberCard({ ...full, contact }, NOW) as unknown as Record<string, unknown>;
+    expect(card.phone).toBe('+60 12 345');
+    expect(card.socials).toEqual({ linkedin: 'https://l.in/a', wechat: 'ali_w' });
+    expect(JSON.stringify(card)).not.toContain('999');
+  });
+
+  it('omits both keys when not sharing, or when there is nothing to share', () => {
+    const off = buildMemberCard({ ...full, contact, privacy: { shareCardInternationally: false } }, NOW);
+    expect(off).not.toHaveProperty('phone');
+    expect(off).not.toHaveProperty('socials');
+    const empty = buildMemberCard({ ...full, contact: { phone: '', socials: {} } }, NOW);
+    expect(empty).not.toHaveProperty('phone');
+    expect(empty).not.toHaveProperty('socials');
+  });
+
+  it('planCardSync upserts when phone, socials or the share flag change', () => {
+    const a = { ...full, contact };
+    expect(planCardSync(a, { ...a, contact: { ...contact, phone: '123' } })).toBe('upsert');
+    expect(planCardSync(a, { ...a, contact: { ...contact, socials: { linkedin: 'https://l.in/b' } } })).toBe('upsert');
+    expect(planCardSync(a, { ...a, privacy: { shareCardInternationally: false } })).toBe('upsert');
+    // alternate phone is never on the card
+    expect(planCardSync(a, { ...a, contact: { ...contact, alternatePhone: '000' } })).toBe('none');
+    // phone changes while not sharing do not touch the card
+    const off = { ...a, privacy: { shareCardInternationally: false } };
+    expect(planCardSync(off, { ...off, contact: { ...contact, phone: '123' } })).toBe('none');
   });
 });

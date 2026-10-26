@@ -1,5 +1,5 @@
 import React from 'react';
-import { Gift, Globe } from 'lucide-react';
+import { Gift, Globe, Phone } from 'lucide-react';
 import { Button, Modal } from '../../ui/Common';
 import type { DirectoryItem } from './directoryFacets';
 
@@ -8,7 +8,7 @@ interface SisterMemberDetailModalProps {
   onClose: () => void;
 }
 
-/** Detail view of a member card (sister chapter, or any chapter for externals). Cards carry no contact details, so no Contact. */
+/** Detail view of a member card (sister chapter, or any chapter for externals). A card carries phone and social links only when the member shares it. */
 export const SisterMemberDetailModal: React.FC<SisterMemberDetailModalProps> = ({ item, onClose }) => {
   if (!item) return null;
   return (
@@ -28,6 +28,16 @@ export const SisterMemberDetailModal: React.FC<SisterMemberDetailModalProps> = (
           {item.hasDeal && <span className="flex items-center gap-0.5 rounded-full border border-amber-100 bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-700"><Gift size={9} /> Deal</span>}
         </div>
         {item.description && <p className="text-sm leading-relaxed text-slate-600">{item.description}</p>}
+        {(item.phone || item.socials) && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-700">
+            {item.phone && <a href={`tel:${item.phone}`} className="flex items-center gap-1 text-jci-blue"><Phone size={14} /> {item.phone}</a>}
+            {item.socials && Object.entries(item.socials).map(([k, v]) => (
+              /^https?:\/\//i.test(v)
+                ? <a key={k} href={v} target="_blank" rel="noopener noreferrer" className="capitalize text-jci-blue">{k}</a>
+                : <span key={k}><span className="capitalize">{k}</span>: {v}</span>
+            ))}
+          </div>
+        )}
         {item.idealReferrals.length > 0 && (
           <div>
             <p className="mb-1 text-[10px] font-black uppercase tracking-wider text-slate-400">Ideal Referrals</p>
