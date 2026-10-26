@@ -910,3 +910,15 @@ Recommended action: replay a KL MEMBER self-edit payload against the rules in th
 Evidence: `AdvertisementService.getActiveAdvertisements` marks expired ads with a Board-only write; `firestoreLogger` writes to admin-only `systemLogs`. Both fail for ordinary users (logged as warnings or silently).
 
 Recommended action: move these writes to an admin path or drop them for non-privileged users.
+
+### R-092 External Account Deletion Is Permanent (P2, accepted by owner 2026-10-26)
+
+Evidence: `netlify/functions/external-accounts` action `deleteAccount` (scope in `netlify/lib/externalAccounts.mjs` `canDeleteAccount`: KL ADMIN / SUPER_ADMIN → any AFFILIATE / CHAPTER_ADMIN whose loId is not `jcikl`; active CHAPTER_ADMIN → own-chapter AFFILIATE; never self, never KL). One Admin batch deletes `members/{id}`, the `memberEmails` slot(s) whose `memberId == id`, `memberCards/{id}`, `emailChangeRequests/{id}` and `publicBusinessListings/{id}` and writes the `auditLog` entry; then the Firebase Auth user is deleted.
+
+Recovery path: none. There is no soft delete, trash or backup restore for these docs; the `auditLog` entry keeps only role, loId, previous status and counts (no name, no email). To bring a person back, invite them again (new member id; old history is not re-linked).
+
+Kept on purpose (history, now pointing at a missing member): `eventRegistrations`, `surveyResponses`, `notifications`, `benefitUsage`, `auditLog` and any other record that stores the `memberId`. Pages that look up the name show a placeholder. The avatar image on Cloudinary is not deleted.
+
+Partial failure: if deleting the Auth user fails after the batch, the response is `authDeleted: false` and the login still exists without a profile (it can sign in but has no member doc, so the app shows no data). A KL admin retries by pressing Delete again in Global Relations (the row stays until the login is gone); the server allows the retry only for a KL admin and only when an earlier `external_accounts_deleteAccount` audit entry exists for that id. A chapter admin cannot retry; their toast asks JCI KL to finish, and JCI KL then needs the member id from the `auditLog` entry.
+
+Recommended action: none required; consider an export of the member doc into the audit entry if the owner later wants an undo.
