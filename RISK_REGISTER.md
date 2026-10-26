@@ -945,8 +945,10 @@ Mitigation: readers of `memberCards.specialOffers` re-check `isOfferLive` (exter
 
 Recommended action: run the card backfill after deploy (owner decision; this change did not run it against production), and optionally on a schedule.
 
-### R-096 Member Offers Cannot Be Claimed (P3, existing gap)
+### R-096 Member Offers Cannot Be Claimed (P3, accepted)
 
 Evidence: the Benefits page has no claim action; "Claimed" only reflects existing `benefitUsage` records. `MemberBenefitsService.claimBenefit` looks the benefit up in `memberBenefits` / `advertisements`, so a member offer id (`member_offer_<memberId>_<n>`) has no benefit doc and its transaction update would fail. This is true for KL and external viewers alike. `firestore.rules` already lets active externals create their own `benefitUsage`, so a future claim path needs no rules change for the usage record itself.
 
 Recommended action: decide whether member offers should be claimable; if so, add a usage-only path (no counter update) for member offers.
+
+Decision (2026-10-26, owner): member offers stay view-only — no claim action. Members contact the offering member directly (phone / social media on the shared card).
