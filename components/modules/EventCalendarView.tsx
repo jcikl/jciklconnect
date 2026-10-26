@@ -16,7 +16,6 @@ interface EventCalendarViewProps {
 }
 
 const MONTH_ABBR = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-const DAY_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 // Monday-first column labels; index 6 = Sunday (red)
 const WEEK_DAY_LABELS = ['M','T','W','T','F','S','S'];
 
@@ -95,6 +94,14 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
     [currentDate]
   );
 
+  // All events in the month currently shown, sorted by date — listed (scrollable) under the grid.
+  const monthEvents = useMemo(
+    () => events
+      .filter(e => { const d = new Date(e.date); return d.getMonth() === currentDate.getMonth() && d.getFullYear() === currentDate.getFullYear(); })
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+    [events, currentDate]
+  );
+
   const navigateMonth = (dir: 'prev' | 'next') => {
     setCurrentDate(prev => {
       const d = new Date(prev);
@@ -164,9 +171,6 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
       </div>
     );
   }
-
-  // ── Selected date events ───────────────────────────────────────────────────
-  const selectedDateEvents = selectedDate ? getEventsForDate(selectedDate) : [];
 
   // ── Main calendar (Samsung-style) ─────────────────────────────────────────
   return (
@@ -316,62 +320,61 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
         ))}
       </div>
 
-      {/* ── Selected date panel ── */}
-      {selectedDate && (
-        <div className="border-t border-slate-100">
+      {/* ── This month's events (scrollable) ── selected day (if any) is highlighted ── */}
+      <div className="border-t border-slate-100">
 
-          {/* Day header */}
-          <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-50/70">
-            <span className="text-base font-black text-slate-900">
-              {selectedDate.getDate()}
+        {/* Month header */}
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-50/70">
+          <span className="text-sm font-black text-slate-900">
+            {MONTH_ABBR[currentDate.getMonth()]} {currentDate.getFullYear()}
+          </span>
+          <span className="text-xs font-semibold text-slate-400">
+            {monthEvents.length} event{monthEvents.length === 1 ? '' : 's'}
+          </span>
+          {selectedDate && isSameDay(selectedDate, today) && (
+            <span className="ml-auto text-[10px] font-bold bg-jci-blue/10 text-jci-blue px-2 py-0.5 rounded-full">
+              Today
             </span>
-            <span className="text-sm font-semibold text-slate-400">
-              {DAY_FULL[selectedDate.getDay()]}
-            </span>
-            {isSameDay(selectedDate, today) && (
-              <span className="ml-auto text-[10px] font-bold bg-jci-blue/10 text-jci-blue px-2 py-0.5 rounded-full">
-                Today
-              </span>
-            )}
-          </div>
-
-          {/* Event list for selected date */}
-          <div className="max-h-60 overflow-y-auto">
-            {selectedDateEvents.length === 0 ? (
-              <p className="text-center text-sm text-slate-400 py-5">No events on this day</p>
-            ) : (
-              selectedDateEvents.map(event => {
-                const d = new Date(event.date);
-                const c = getColors(event.type);
-                return (
-                  <div
-                    key={event.id}
-                    className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors"
-                    onClick={() => onEventClick?.(event)}
-                  >
-                    {/* Coloured left bar */}
-                    <div className={`w-1 h-10 rounded-full shrink-0 ${c.bar}`} />
-                    {/* Date badge */}
-                    <div className={`w-10 h-10 rounded-xl shrink-0 flex flex-col items-center justify-center ${c.chip}`}>
-                      <span className="text-[8px] font-bold leading-none uppercase">
-                        {MONTH_ABBR[d.getMonth()]}
-                      </span>
-                      <span className="text-sm font-black leading-tight">{d.getDate()}</span>
-                    </div>
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-slate-900 truncate">{event.title}</p>
-                      <p className="text-xs text-slate-400 truncate">
-                        {formatTime(d)}{event.location ? ` · ${event.location}` : ''}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
+          )}
         </div>
-      )}
+
+        {/* Event list for the whole month */}
+        <div className="max-h-72 overflow-y-auto">
+          {monthEvents.length === 0 ? (
+            <p className="text-center text-sm text-slate-400 py-5">No events this month</p>
+          ) : (
+            monthEvents.map(event => {
+              const d = new Date(event.date);
+              const c = getColors(event.type);
+              const onSelectedDay = !!selectedDate && isSameDay(d, selectedDate);
+              return (
+                <div
+                  key={event.id}
+                  className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer border-b border-slate-50 last:border-0 transition-colors ${onSelectedDay ? 'bg-blue-50/60' : 'hover:bg-slate-50'}`}
+                  onClick={() => onEventClick?.(event)}
+                >
+                  {/* Coloured left bar */}
+                  <div className={`w-1 h-10 rounded-full shrink-0 ${c.bar}`} />
+                  {/* Date badge */}
+                  <div className={`w-10 h-10 rounded-xl shrink-0 flex flex-col items-center justify-center ${c.chip}`}>
+                    <span className="text-[8px] font-bold leading-none uppercase">
+                      {MONTH_ABBR[d.getMonth()]}
+                    </span>
+                    <span className="text-sm font-black leading-tight">{d.getDate()}</span>
+                  </div>
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-slate-900 truncate">{event.title}</p>
+                    <p className="text-xs text-slate-400 truncate">
+                      {formatTime(d)}{event.location ? ` · ${event.location}` : ''}
+                    </p>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
 
       {/* ── iCal subscription modal ── */}
       <Modal isOpen={showICalModal} onClose={() => setShowICalModal(false)} title="Subscribe to Calendar">
