@@ -92,7 +92,7 @@
 | jciCareer.introducer | string | — | | introducer | 角色: B+；系统: 导入 normalize | introducer stats recalculation |
 | jciCareer.senatorship | object | ✓ | |  | B+ 操作 / senatorship validation | Senator 资格、编号及董事会验证 |
 | jciCareer.senatorship.certified | boolean | ✓ | | senatorCertified | 角色: B+；系统: senatorship validation | Senator 资格展示、换届董事会验证 |
-| jciCareer.senatorship.senatorNumber | string | — | | senatorshipId | 角色: B+；锁定后仅 A+ 可改 | Senator 编号展示 |
+| jciCareer.senatorship.senatorNumber | string | — | | senatorshipId；系统: developer-only `netlify/functions/jci-malaysia-regcode` `applySenatorship` 从 JCI Malaysia `event_participants` 快照按 IC(`general.idNumber`)→email→phone 匹配人员记录的 `senatorship` 写入——仅当 `boardValidated !== true` 时覆盖（已验证的编号保留），空值不写；只改 `senatorNumber`，`certified`/`boardValidated`/`validated*` 不动；写前备份到 `jciMalaysiaSyncRuns`（`kind:'senatorship'`） | 角色: B+；锁定后仅 A+ 可改 | Senator 编号展示 |
 | jciCareer.senatorship.boardValidated | boolean | — | | senatorshipBoardValidated | 角色: B+；系统: senatorship validation | Senator 资格验证状态展示 |
 | jciCareer.currentBoardYear | number | — | | currentBoardYear | 系统: `boardMembers.term` 当前届 active 记录 | 权限判断/board 展示 |
 | jciCareer.currentBoardPosition | string | — | | currentBoardPosition | 系统: `boardMembers.position` 当前届 active 记录 | 权限判断/board 展示 |

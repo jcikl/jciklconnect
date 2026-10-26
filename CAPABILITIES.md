@@ -17,8 +17,8 @@
 
 | 層 | 檔案數 | 位置 |
 |---|---|---|
-| Service（業務邏輯與資料存取） | 74 | `services/` |
-| Hook（React 資料綁定） | 44 | `hooks/` |
+| Service（業務邏輯與資料存取） | 75 | `services/` |
+| Hook（React 資料綁定） | 45 | `hooks/` |
 | Util（純函數工具） | 27 | `utils/` |
 | UI 元件（通用） | 34 | `components/ui/` |
 | 共用業務元件 | 10 | `components/shared/` |
@@ -95,10 +95,11 @@
 | `memberCardsService.ts` | 136 | 9 | Member Cards Service — keeps `memberCards/{memberId}` (the public directory card, Phase 0 WP2) in sync with `members`. The card is written A… | MEMBER_CARDS |
 | `memberJourneyService.ts` | 155 | 2 | Leadership Journey + Trainer Pathway derivation (dashboard journey card for pre-2025 members) | — |
 | `memberStatsService.ts` | 319 | 2 | Member Statistics Service - Generates comprehensive member statistics and reports | — |
-| `membersService.ts` | 2,334 | 44 | Members Service - CRUD Operations | BOARD_MEMBERS, EVENT_REGISTRATIONS, MEMBERS, MEMBER_EMAILS, NOTIFICATIONS, PAYMENT_REQUESTS … |
+| `membersService.ts` | 2,334 | 45 | Members Service - CRUD Operations | BOARD_MEMBERS, EVENT_REGISTRATIONS, MEMBERS, MEMBER_EMAILS, NOTIFICATIONS, PAYMENT_REQUESTS … |
 | `membershipConfigService.ts` | 373 | 17 | ⚠️ 無說明 | SYSTEM_SETTINGS |
 | `mentorshipService.ts` | 638 | 4 | Mentorship Matching Service | MEMBERS, MENTORSHIP_FEEDBACK, MENTOR_MATCHES |
 | `promotionService.ts` | 1,191 | 4 | ⚠️ 無說明 | MANUAL_PROMOTION_REQUESTS, MEMBERS, PROMOTION_HISTORY, SYSTEM |
+| `senatorshipSyncService.ts` | 79 | 2 | Developer-only back-fill of JCI Malaysia senator numbers onto members. Runs in the Netlify function jci-malaysia-regcode (Admin SDK) so the … | — |
 
 <details><summary><code>services/engagementAutoSuggestService.ts</code> — 0 個方法、1 個函數/常數</summary>
 
@@ -269,6 +270,15 @@
 | `backfillOfficialMembershipType` | 986 | Backfill: sync jciCareer.membershipType for all members where root membershipType === 'Official' but jciCareer… |
 | `approveManualPromotionRequest` | 1015 | Approve a manual promotion request and trigger the actual promotion. |
 | `rejectManualPromotionRequest` | 1045 | Reject a manual promotion request with a reason. |
+
+</details>
+
+<details><summary><code>services/senatorshipSyncService.ts</code> — 2 個方法</summary>
+
+| 方法 | 行 | 說明 |
+|---|---|---|
+| `preview` | 66 | Developer only: counts (matched, would-write, skipped-board-validated, skipped-no-value, conflicts, …). No PII… |
+| `apply` | 72 | Developer only: recompute, back up prior numbers, write (board-validated preserved), audit. |
 
 </details>
 
@@ -1146,7 +1156,7 @@
 | `cacheService.ts` | 314 | 35 | 缓存服务 - 提供内存缓存和本地存储缓存功能 Cache Service - Provides in-memory and localStorage caching capabilities | — |
 | `cloudinaryService.ts` | 337 | 14 | Cloudinary Upload Service | — |
 | `dataImportExportService.ts` | 913 | 3 | ⚠️ 無說明 | EVENTS, MEMBERS, MEMBER_EMAILS |
-| `errorLoggingService.ts` | 354 | 72 | ⚠️ 無說明 | ERROR_LOGS |
+| `errorLoggingService.ts` | 354 | 73 | ⚠️ 無說明 | ERROR_LOGS |
 | `firestoreLogger.ts` | 197 | 3 | System Logger — Firestore ops + Performance monitoring Fire-and-forget buffered logger. Buffers events for 3 seconds then writes one batched… | SYSTEM_LOGS |
 | `inventoryService.ts` | 1,638 | 3 | Inventory Service - CRUD Operations | INVENTORY, INVENTORY_ALERTS, MAINTENANCE_SCHEDULES, STOCK_MOVEMENTS, TRANSACTIONS |
 | `mockData.ts` | 689 | 17 | ⚠️ 無說明 | — |
@@ -1339,7 +1349,7 @@
 | `useActivityPlans.ts` | 130 | 1 | `useActivityPlans` | activityPlansService | ⚠️ 無說明 |
 | `useAdvertisements.ts` | 111 | 2 | `useAdvertisements` | advertisementService, errorLoggingService | Advertisements Data Hook |
 | `useAppNavigation.ts` | 239 | 1 | `useAppNavigation` | — | ⚠️ 無說明 |
-| `useAuth.tsx` | 880 | 61 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, memberCardsService, membersService, mockData | Authentication Hook |
+| `useAuth.tsx` | 880 | 62 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, memberCardsService, membersService, mockData | Authentication Hook |
 | `useAutomation.ts` | 149 | 3 | `useAutomation` | automationService | useAutomation Hook - Manage automation workflows and rules |
 | `useBusinessDirectory.ts` | 51 | 4 | `useBusinessDirectory` | businessDirectoryService | ⚠️ 無說明 |
 | `useChapterBirthdays.ts` | 23 | 1 | `useChapterBirthdays` | chapterBirthdaysService | Own-chapter birthdays for an active external user (dashboard birthday widget). `month` null → nothing loads. |
@@ -1364,10 +1374,11 @@
 | `useMemberSearch.ts` | 53 | 1 | `useMemberSearch` | — | ⚠️ 無說明 |
 | `useMembers.ts` | 195 | 20 | `useMembers`, `usePaginatedMembers` | membersService | Members Data Hook |
 | `useNotifications.ts` | 107 | 0 | `useNotifications` | communicationService, errorLoggingService, mockData | ⚠️ 無說明 |
-| `usePermissions.ts` | 212 | 32 | `usePermissions` | — | Permission Management Hook |
+| `usePermissions.ts` | 212 | 33 | `usePermissions` | — | Permission Management Hook |
 | `usePoints.ts` | 61 | 2 | `usePoints` | pointsService | Points Data Hook |
 | `useProjects.ts` | 170 | 7 | `useProjects` | projectsService | Projects Data Hook |
 | `usePushNotifications.ts` | 63 | 0 | `usePushNotifications` | — | ⚠️ 無說明 |
+| `useSenatorshipSync.ts` | 56 | 1 | `useSenatorshipSync` | senatorshipSyncService | Developer-only back-fill of JCI Malaysia senator numbers onto members: preview then apply. The server enforces developer-only. |
 | `useSisterChapterMembers.ts` | 95 | 2 | `useSisterChapterMembers` | memberCardsService, membersService, sisterChaptersService | ⚠️ 無說明 |
 | `useSisterChapters.ts` | 26 | 6 | `useSisterChapters` | sisterChaptersService | ⚠️ 無說明 |
 | `useSocialPersonas.ts` | 46 | 2 | `useSocialPersonas` | socialPersonaService | ⚠️ 無說明 |
@@ -1490,7 +1501,7 @@
 | `getStartOfYear` | 163 |  |
 | `getEndOfYear` | 170 |  |
 
-### `utils/devMode.ts` （36 行，74 處引用）
+### `utils/devMode.ts` （36 行，75 處引用）
 > Developer Mode Utility This utility helps services detect if the app is running in developer mode and return mock data instead of accessing …
 
 | 函數 | 行 | 說明 |
@@ -1631,8 +1642,8 @@
 | `Card.tsx` | 77 | 1 | `Card`, `StatCardsContainer` |
 | `ColumnFilterHeader.tsx` | 118 | 2 | `ColumnFilterHeader` |
 | `Combobox.tsx` | 255 | 11 | `Combobox` |
-| `Common.tsx` | 26 | 236 | — |
-| `ConfirmDialog.tsx` | 100 | 4 | `ConfirmDialog`, `CONFIRM_CLOSED` |
+| `Common.tsx` | 26 | 237 | — |
+| `ConfirmDialog.tsx` | 100 | 5 | `ConfirmDialog`, `CONFIRM_CLOSED` |
 | `DataTable.tsx` | 172 | 0 | `DataTable` |
 | `Drawer.tsx` | 139 | 2 | `Drawer` |
 | `EmptyState.tsx` | 36 | 4 | `EmptyState` |
@@ -1642,7 +1653,7 @@
 | `Form.tsx` | 502 | 99 | `Input`, `Select`, `Textarea`, `Checkbox`, `RadioGroup`, `ButtonGroup` |
 | `IntroducerSelector.tsx` | 338 | 6 | `IntroducerSelector` |
 | `LedgerTable.tsx` | 183 | 1 | `LedgerTable` |
-| `Loading.tsx` | 47 | 33 | `LoadingSpinner`, `LoadingOverlay` |
+| `Loading.tsx` | 47 | 34 | `LoadingSpinner`, `LoadingOverlay` |
 | `LoadingState.tsx` | 63 | 3 | `LoadingState` |
 | `MemberSelector.tsx` | 231 | 4 | `MemberSelector` |
 | `MembersOnlyOverlay.tsx` | 42 | 3 | `MembersOnlyOverlay` |

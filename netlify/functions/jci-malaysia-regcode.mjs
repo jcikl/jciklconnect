@@ -8,9 +8,10 @@ import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { db, auth, hasAdminCredentials } from '../lib/firebaseAdmin.mjs';
 import { SECRET_COLLECTION, SECRET_DOC_ID, isSyncDeveloper } from '../lib/jciMalaysiaSync.mjs';
 import { SOURCE_DATABASE_ID, previewRegcodes, applyRegcodes, attachMyRegcode } from '../lib/eventRegcode.mjs';
+import { previewSenatorship, applySenatorship } from '../lib/senatorshipSync.mjs';
 
 const ALLOWED_ORIGINS = ['https://app.jcikl.cc', 'http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'];
-const DEVELOPER_ACTIONS = ['previewRegcodes', 'applyRegcodes'];
+const DEVELOPER_ACTIONS = ['previewRegcodes', 'applyRegcodes', 'previewSenatorship', 'applySenatorship'];
 const MEMBER_ACTIONS = ['attachMyRegcode'];
 const SOURCE_APP_NAME = 'jciMalaysiaSource';
 
@@ -73,6 +74,8 @@ export default async (req) => {
     let res;
     if (action === 'previewRegcodes') res = await previewRegcodes({ sourceDb, db });
     else if (action === 'applyRegcodes') res = await applyRegcodes({ sourceDb, db, by: callerUid, now });
+    else if (action === 'previewSenatorship') res = await previewSenatorship({ sourceDb, db });
+    else if (action === 'applySenatorship') res = await applySenatorship({ sourceDb, db, by: callerUid, now });
     else res = await attachMyRegcode({ sourceDb, db, callerUid, eventId: body.eventId, now });
     const elapsedMs = Date.now() - started;
     console.log(`[jci-malaysia-regcode] ${action} ${res.status} in ${elapsedMs} ms`);
