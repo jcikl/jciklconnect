@@ -19,7 +19,8 @@
 #   CRON_SECRET
 # Optional (calendar public holidays, netlify/functions/malaysia-holidays):
 #   CALENDARIFIC_API_KEY   — free key from calendarific.com (no holidays shown if unset)
-#   CALENDARIFIC_LOCATION  — optional ISO-3166-2 state (e.g. 'my-14' for Kuala Lumpur) for state holidays
+#   CALENDARIFIC_LOCATION  — comma-separated ISO-3166-2 states; defaults to 'my-14,my-10'
+#                            (Kuala Lumpur + Selangor), fetched per state and de-duplicated
 #
 # Do NOT set these legacy/browser-prefixed secrets in Netlify:
 #   VITE_FIREBASE_PRIVATE_KEY, VITE_FIREBASE_CLIENT_EMAIL, VITE_CLOUDINARY_API_SECRET, VITE_WHAPI_TOKEN

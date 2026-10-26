@@ -23,30 +23,38 @@ export default async (req) => {
   if (year < 2000 || year > 2100) return json({ error: 'invalid year' }, 400);
 
   const key = process.env.CALENDARIFIC_API_KEY;
-  const location = process.env.CALENDARIFIC_LOCATION || '';
   if (!key) return json({ configured: false, year, holidays: [] });
 
-  const cacheKey = `${year}:${location}`;
+  // Default to Kuala Lumpur (my-14) + Selangor (my-10); override with a comma-separated CALENDARIFIC_LOCATION.
+  // Calendarific takes one state per call, so we fetch each and dedupe across them (national holidays overlap).
+  const locations = (process.env.CALENDARIFIC_LOCATION || 'my-14,my-10')
+    .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  const cacheKey = `${year}:${locations.join('+') || 'national'}`;
   if (cache.has(cacheKey)) return json({ configured: true, year, holidays: cache.get(cacheKey) });
 
-  try {
-    const qs = new URLSearchParams({ api_key: key, country: COUNTRY, year: String(year) });
-    if (location) qs.set('location', location);
-    const res = await fetch(`${API}?${qs}`);
-    if (!res.ok) return json({ configured: true, year, holidays: [], error: `upstream ${res.status}` }, 200);
-    const data = await res.json();
-    const raw = data?.response?.holidays ?? [];
-    const seen = new Set();
-    const holidays = [];
-    for (const h of raw) {
+  const addFrom = (data, seen, out) => {
+    for (const h of data?.response?.holidays ?? []) {
       const date = isoDate(h?.date?.iso);
       if (!date) continue;
       const types = (Array.isArray(h?.type) ? h.type : []).map(t => String(t).toLowerCase());
       if (!types.some(t => PUBLIC_TYPES.has(t))) continue;
-      const dedupe = `${date}|${h?.name}`;
+      const name = String(h?.name ?? '').trim();
+      const dedupe = `${date}|${name.toLowerCase()}`;   // same holiday across states -> once
       if (seen.has(dedupe)) continue;
       seen.add(dedupe);
-      holidays.push({ date, name: String(h?.name ?? '').trim(), type: types.includes('national holiday') ? 'national' : 'local' });
+      out.push({ date, name, type: types.includes('national holiday') ? 'national' : 'local' });
+    }
+  };
+
+  try {
+    const seen = new Set();
+    const holidays = [];
+    for (const loc of (locations.length ? locations : [''])) {
+      const qs = new URLSearchParams({ api_key: key, country: COUNTRY, year: String(year) });
+      if (loc) qs.set('location', loc);
+      const res = await fetch(`${API}?${qs}`);
+      if (!res.ok) { console.error(`[malaysia-holidays] ${loc || 'national'} upstream ${res.status}`); continue; }
+      addFrom(await res.json(), seen, holidays);
     }
     holidays.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
     cache.set(cacheKey, holidays);
