@@ -94,7 +94,10 @@ describe('jciMalaysiaSync core', () => {
     const { source, target } = setup();
     await computePlan({ sourceDb: source.db, db: target.db });
     expect(source.log.selects).toEqual([{ collection: 'member_directory', fields: SOURCE_FIELDS }]);
-    expect(SOURCE_FIELDS).toEqual(['id', 'membership', 'joindate', 'email', 'contact', 'chapter', 'fullname', 'gender']);
+    // SOURCE_FIELDS is derived from the field catalog; it must cover the match keys and the nested profile object.
+    for (const need of ['id', 'membership', 'joindate', 'email', 'contact', 'chapter', 'fullname', 'gender', 'dob', 'level', 'area', 'profileDetails']) {
+      expect(SOURCE_FIELDS).toContain(need);
+    }
   });
 
   it('the preview never contains emails or phone numbers', async () => {
@@ -204,5 +207,44 @@ describe('jciMalaysiaSync core', () => {
     expect(by.gender).toBe('Female');                    // core field was blank -> filled
     expect('name' in by).toBe(false);                    // core field already set -> NOT overwritten
     expect(w.updates['general.name']).toBeUndefined();
+  });
+
+  it('nested profileDetails fields: fill a blank, skip placeholders, handle arrays', () => {
+    const row = {
+      id: '7', membership: 'JCIKL-9', joindate: '2024-01-02 00:00:00', email: 'x@x.com', chapter: 'JCI Kuala Lumpur',
+      profileDetails: {
+        employment: { companyName: 'Acme', industry: 'Tech', website: 'http://none', linkedin: 'none' },
+        personal: { address: '12 Jalan X', state: 'Selangor', bio: 'hi', interests: ['A', 'B'] },
+        jci: { profileLink: 'https://jvc.jci.cc/p/7' },
+        general: { nationality: 'Malaysian' },
+      },
+    };
+    const member = { id: 'm', contact: { email: 'x@x.com', address: 'OLD ADDR' } }; // already has an address
+    const plan = buildPlan({ rows: [row], members: [member], selected: ['company', 'industry', 'companyWebsite', 'linkedin', 'address', 'state', 'bio', 'interests', 'nationality', 'profileLink'] });
+    const u = plan.writes[0].updates;
+    expect(u['business.companyName']).toBe('Acme');
+    expect(u['business.industry']).toBe('Tech');
+    expect(u['business.companyWebsite']).toBeUndefined();   // 'http://none' placeholder -> skipped
+    expect(u['contact.socials.linkedin']).toBeUndefined();  // 'none' placeholder -> skipped
+    expect(u['contact.address']).toBeUndefined();           // already have an address -> fill-if-empty skips
+    expect(u['contact.state']).toBe('Selangor');
+    expect(u['others.bio']).toBe('hi');
+    expect(u['others.hobbies']).toEqual(['A', 'B']);        // array fills a blank
+    expect(u['general.nationality']).toBe('Malaysian');
+    expect(u['jciCareer.jciMalaysiaProfileLink']).toBe('https://jvc.jci.cc/p/7');
+  });
+
+  it('preview masks PII embedded in free-text values, but the real value is still written', () => {
+    const row = {
+      id: '7', membership: 'JCIKL-9', joindate: '2024-01-02 00:00:00', email: 'x@x.com', chapter: 'JCI Kuala Lumpur',
+      profileDetails: { personal: { bio: 'Reach me at john@mail.com or 012-3456789' }, employment: { title: 'Head @ Acme' } },
+    };
+    const member = { id: 'm', contact: { email: 'x@x.com' } };
+    const plan = buildPlan({ rows: [row], members: [member], selected: ['bio', 'position'] });
+    const shown = Object.fromEntries(plan.writes[0].fields.map(f => [f.key, f.after]));
+    expect(shown.bio).not.toMatch(/@/);           // email stripped
+    expect(shown.bio).not.toMatch(/\d{6,}/);      // phone stripped
+    expect(shown.position).not.toMatch(/@/);      // lone "@" -> "at"
+    expect(plan.writes[0].updates['others.bio']).toContain('john@mail.com'); // real value preserved for the write
   });
 });

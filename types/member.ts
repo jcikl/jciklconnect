@@ -301,6 +301,8 @@ export interface Member {
     jciMalaysiaRenewWindow?: string;
     /** JCI Malaysia verification flag as reported by the source. Opt-in in the JCI Malaysia sync. */
     jciMalaysiaVerified?: string;
+    /** JCI Malaysia (jvc.jci.cc) profile link. Opt-in in the JCI Malaysia sync (from the scraped profileDetails). */
+    jciMalaysiaProfileLink?: string;
   };
   createdAt?: string | Timestamp | Date;
   updatedAt?: string | Timestamp | Date;

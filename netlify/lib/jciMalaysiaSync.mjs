@@ -13,7 +13,9 @@ import { KL_LO_ID } from '../../utils/memberCard.mjs';
 
 export const SOURCE_DATABASE_ID = 'ai-studio-cba40058-0493-450b-8680-948d1cb07c7d';
 export const SOURCE_COLLECTION = 'member_directory';
-export const SOURCE_FIELDS = ['id', 'membership', 'joindate', 'email', 'contact', 'chapter', 'fullname', 'gender'];
+// Every top-level source field any catalog field needs (nested profileDetails.* reads require the whole
+// `profileDetails` object). Derived from the catalog so a new field is never silently left unread.
+export const SOURCE_FIELDS = [...new Set(FIELD_CATALOG.map(f => f.source.split('.')[0]))];
 export const OVERRIDES_COLLECTION = 'jciMalaysiaOverrides';
 export const RUNS_COLLECTION = 'jciMalaysiaSyncRuns';
 export const SECRET_COLLECTION = 'systemSecrets';
@@ -29,7 +31,26 @@ const BY_COUNT = { manual: 'byManual', userId: 'byUserId', membershipNo: 'byMemb
 // target dot-path -> catalog field, for turning an update map into labelled before/after detail.
 const FIELD_BY_TARGET = new Map(FIELD_CATALOG.map(f => [f.target, f]));
 const getPath = (obj, path) => path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
-const asStr = v => (v == null ? '' : String(v));
+const asStr = v => (v == null ? '' : Array.isArray(v) ? v.join(', ') : String(v));
+// Preview values can be free text (bio, company, …) that members typed an email or phone into. Redact emails
+// from every displayed value, and phone-like digit runs from free-text fields (structured dates/links are left
+// alone). The real values still go to the member write; only the preview response is scrubbed.
+// Any token containing "@" (an email or an @handle) is stripped from every displayed value — no structured field
+// legitimately contains one. Phone-like digit runs are stripped from free-text fields only (dates/links stay intact).
+const AT_RE = /\S*@\S+/g;           // an attached email or @handle
+const PHONE_RE = /\d[\d\s().+-]{6,}\d/g;
+const scrubValue = (v, freetext) => {
+  let s = asStr(v).replace(AT_RE, '[contact]');
+  if (freetext) {
+    // Free text can carry a lone "@" meaning "at" (e.g. "Officer @ Web3") — keep the words, drop the symbol —
+    // and phone-like digit runs.
+    s = s.replace(/@/g, ' at ').replace(/\s{2,}/g, ' ').trim();
+    s = s.replace(PHONE_RE, m => (m.replace(/\D/g, '').length >= 8 ? '[number]' : m));
+  } else {
+    s = s.replace(/@/g, '');          // no structured field legitimately contains "@"
+  }
+  return s;
+};
 /** The field catalog, as the UI needs it (no internal getters). `always` fields are written on every match. */
 export const publicFieldCatalog = () => FIELD_CATALOG.map(({ key, label, core, fillIfEmpty, always }) => ({ key, label, core: !!core, fillIfEmpty: !!fillIfEmpty, always: !!always }));
 
@@ -103,8 +124,8 @@ export function buildPlan({ rows, members, overrides = {}, selected = [] }) {
       const sensitive = !!f?.sensitive;
       return {
         key: f?.key ?? t, label: f?.label ?? t, core: !!f?.core,
-        before: sensitive ? (asStr(prior[t]) ? '•••' : '') : asStr(prior[t]),
-        after: sensitive ? '•••' : asStr(updates[t]),
+        before: sensitive ? (asStr(prior[t]) ? '•••' : '') : scrubValue(prior[t], f?.freetext),
+        after: sensitive ? '•••' : scrubValue(updates[t], f?.freetext),
       };
     });
     writes.push({ memberId: m.id, name: memberName(m), by: res.by, chapter: res.row.chapter ?? '', updates, prior, fields });

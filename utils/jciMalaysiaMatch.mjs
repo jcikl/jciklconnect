@@ -121,6 +121,23 @@ export const FIELD_CATALOG = [
   { key: 'dob',          label: 'Date of birth',  source: 'dob',          target: 'general.dob',    core: true, fillIfEmpty: true, sensitive: true },
   { key: 'email',        label: 'Email',          source: 'email',        target: 'contact.email',  core: true, fillIfEmpty: true, sensitive: true },
   { key: 'phone',        label: 'Phone',          source: 'contact',      target: 'contact.phone',  core: true, fillIfEmpty: true, sensitive: true },
+  // Nested fields from the richer scraped profile (member_directory.profileDetails.*). Only ~4.5% of members have
+  // these; `source` is a dot-path into the row. All fill-a-blank only, like the other core fields.
+  { key: 'company',        label: 'Company',          source: 'profileDetails.employment.companyName', target: 'business.companyName',     core: true, fillIfEmpty: true, freetext: true },
+  { key: 'industry',       label: 'Industry',         source: 'profileDetails.employment.industry',    target: 'business.industry',        core: true, fillIfEmpty: true },
+  { key: 'position',       label: 'Position / title', source: 'profileDetails.employment.title',       target: 'business.position',        core: true, fillIfEmpty: true, freetext: true },
+  { key: 'companyWebsite', label: 'Company website',  source: 'profileDetails.employment.website',     target: 'business.companyWebsite',  core: true, fillIfEmpty: true },
+  { key: 'facebook',       label: 'Facebook',         source: 'profileDetails.employment.facebook',    target: 'contact.socials.facebook', core: true, fillIfEmpty: true },
+  { key: 'instagram',      label: 'Instagram',        source: 'profileDetails.employment.instagram',   target: 'contact.socials.instagram',core: true, fillIfEmpty: true },
+  { key: 'linkedin',       label: 'LinkedIn',         source: 'profileDetails.employment.linkedin',    target: 'contact.socials.linkedin', core: true, fillIfEmpty: true },
+  { key: 'address',        label: 'Address',          source: 'profileDetails.personal.address',       target: 'contact.address',          core: true, fillIfEmpty: true, sensitive: true },
+  { key: 'state',          label: 'State',            source: 'profileDetails.personal.state',         target: 'contact.state',            core: true, fillIfEmpty: true },
+  { key: 'nationality',    label: 'Nationality',      source: 'profileDetails.general.nationality',    target: 'general.nationality',      core: true, fillIfEmpty: true },
+  { key: 'interests',      label: 'Interests',        source: 'profileDetails.personal.interests',     target: 'others.hobbies',           core: true, fillIfEmpty: true, array: true, freetext: true },
+  { key: 'bio',            label: 'Bio',              source: 'profileDetails.personal.bio',           target: 'others.bio',               core: true, fillIfEmpty: true, freetext: true },
+  { key: 'profileLink',    label: 'JCIM profile link',source: 'profileDetails.jci.profileLink',        target: 'jciCareer.jciMalaysiaProfileLink' },
+  // Overlaps the dedicated senatorship sync; fillIfEmpty means a board-validated (non-blank) number is never touched.
+  { key: 'senatorshipNo',  label: 'Senator no. (JCIM)',source: 'profileDetails.jci.senatorshipNo',     target: 'jciCareer.senatorship.senatorNumber', core: true, fillIfEmpty: true },
 ];
 
 /** Field keys always written on a match (the three match keys). */
@@ -131,12 +148,24 @@ const CATALOG_BY_KEY = new Map(FIELD_CATALOG.map(f => [f.key, f]));
 
 const getPath = (obj, path) => path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
 
-/** The source value for one catalog field, normalised; '' when empty/unusable. */
+// Scraped placeholders that mean "no value" — never write these onto a member.
+const PLACEHOLDER = new Set(['', 'none', 'n/a', 'na', 'nil', '-', 'http://none', 'https://none', 'null', 'undefined']);
+const cleanStr = v => { const s = String(v ?? '').trim(); return PLACEHOLDER.has(s.toLowerCase()) ? '' : s; };
+
+/** True when the member's current value at a target is empty (handles arrays and scalars). */
+const isEmptyCurrent = v => (Array.isArray(v) ? v.length === 0 : (v == null || String(v).trim() === ''));
+
+/** The source value for one catalog field, normalised; '' (or [] for arrays) when empty/unusable. The source
+ *  may be a dot-path into the row (nested profileDetails.*). Known junk placeholders are treated as empty. */
 export function sourceFieldValue(f, row) {
-  const raw = row[f.source];
+  const raw = f.source.includes('.') ? getPath(row, f.source) : row[f.source];
   if (f.get) return f.get(raw);
+  if (f.array) {
+    const arr = Array.isArray(raw) ? raw.map(x => cleanStr(typeof x === 'string' ? x : (x?.name ?? x?.label ?? ''))).filter(Boolean) : [];
+    return arr.length ? arr : '';
+  }
   if (f.number) { const n = Number(raw); return Number.isFinite(n) ? n : ''; }
-  return String(raw ?? '').trim();
+  return cleanStr(raw);
 }
 
 /**
@@ -151,11 +180,10 @@ export function planUpdate(member, row, selected = []) {
     const f = CATALOG_BY_KEY.get(key);
     if (!f) continue;
     const val = sourceFieldValue(f, row);
-    if (val === '' || val == null) continue;                // empty source never overwrites
+    if (val === '' || val == null || (Array.isArray(val) && !val.length)) continue;   // empty source never overwrites
     const current = getPath(member, f.target);
-    const curStr = current == null ? '' : String(current);
-    if (f.fillIfEmpty) { if (curStr === '') updates[f.target] = val; }
-    else if (String(val) !== curStr) updates[f.target] = val;
+    if (f.fillIfEmpty) { if (isEmptyCurrent(current)) updates[f.target] = val; }
+    else if (String(val) !== (current == null ? '' : String(current))) updates[f.target] = val;
   }
   return updates;
 }

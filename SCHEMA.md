@@ -95,8 +95,12 @@
 | jciCareer.jciMalaysiaRenewYear | number | — | JCI Malaysia 续费年份；可选字段 | | 系统: 同步时勾选，来源 `member_directory.renew_year` | 参考 |
 | jciCareer.jciMalaysiaRenewWindow | string | — | JCI Malaysia 续费窗口（如 `2026-11-01 to 2027-01-01`）；可选字段 | | 系统: 同步时勾选，来源 `member_directory.renew_window` | 参考 |
 | jciCareer.jciMalaysiaVerified | string | — | JCI Malaysia 验证标记（来源原值）；可选字段 | | 系统: 同步时勾选，来源 `member_directory.verify` | 参考 |
+| jciCareer.jciMalaysiaProfileLink | string | — | JCI Malaysia（jvc.jci.cc）档案链接；可选字段 | | 系统: 同步时勾选，来源 `member_directory.profileDetails.jci.profileLink` | 参考 |
 
-> **同步也可选填核心个人资料**（`general.name` / `general.gender` / `general.dob` / `contact.email` / `contact.phone`，来源 `member_directory.fullname/gender/dob/email/contact`）：仅当我方该栏位**为空时才填**，绝不覆盖已有值；email/phone/dob 在预览里打码（真实值只在服务端写入/备份，不进预览响应）。固定同步的 3 项（UserId/MembershipNo/JoinDate）始终写入；其余均需在应用内「Fields to load」勾选。
+> **同步也可选填以下栏位**（均「仅当我方为空时才填」，绝不覆盖已有值；需在应用内「Fields to load」勾选。固定同步的 3 项 UserId/MembershipNo/JoinDate 始终写入）：
+> - 顶层来源：`general.name` / `general.gender` / `general.dob` / `contact.email` / `contact.phone`（来源 `member_directory.fullname/gender/dob/email/contact`）。
+> - 嵌套来源 `member_directory.profileDetails.*`（仅 ~4.5% 会员有）：`business.companyName/industry/position/companyWebsite`、`contact.socials.facebook/instagram/linkedin`、`contact.address/state`、`general.nationality`、`others.hobbies`（数组）/`others.bio`、`jciCareer.senatorship.senatorNumber`（与参议员同步重叠，仅填空故不动已验证编号）。
+> - **预览去敏**：email/phone/dob/address 打码为 `•••`；所有显示值去除嵌入的邮箱/@句柄，自由文本（bio/公司/职称/兴趣）另去除嵌入电话；「none」「http://none」等占位值当空不写。真实值只在服务端写入与备份。
 | jciCareer.introducer | string | — | | introducer | 角色: B+；系统: 导入 normalize | introducer stats recalculation |
 | jciCareer.senatorship | object | ✓ | |  | B+ 操作 / senatorship validation | Senator 资格、编号及董事会验证 |
 | jciCareer.senatorship.certified | boolean | ✓ | | senatorCertified | 角色: B+；系统: senatorship validation | Senator 资格展示、换届董事会验证 |
