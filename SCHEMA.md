@@ -315,6 +315,19 @@
 
 ---
 
+## `emailChangeRequests`
+> **TS Interface:** 无 | **Doc ID:** 等于 `members` 文档 ID（uid）
+> 本人修改登录邮箱时由 `netlify/functions/self-email`（Admin SDK）记录的待确认请求；客户端不可读写（`firestore.rules` `allow read, write: if false`）。
+
+| 字段路径 | 类型 | 必填 | 枚举值 / 说明 | 来 | 往 |
+|--------|------|:----:|------------|----|----|
+| newEmail | string | ✓ | 本人申请的新邮箱 | 系统: `self-email` `request` 动作（先检查未被其他 Auth 账号或 `memberEmails` 槽位占用，之后客户端才调用 `verifyBeforeUpdateEmail`） | `self-email` `finalize`：仅当它与已验证的 Auth 邮箱相等（不分大小写）才继续 |
+| requestedAt | string | ✓ | ISO 时间；超过 7 天失效（`netlify/lib/selfEmail.mjs` `canFinalizeEmailChange`） | 系统: 同上 | 同上；`finalize` 成功时在同一批次内删除该文档，并移动 `members.contact.email`（及旧的顶层 `email`）与 `memberEmails` 槽位 |
+
+> 没有请求记录时，Auth 邮箱与 `contact.email` 不一致不会被同步（例如管理员直接改过 Auth 邮箱的账号）。
+
+---
+
 ## `mentorMatches`
 > **TS Interface:** `MentorMatch` | **Constants key:** `COLLECTIONS.MENTOR_MATCHES`
 

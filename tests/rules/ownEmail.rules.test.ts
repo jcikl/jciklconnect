@@ -74,6 +74,7 @@ describe.skipIf(!HOST)('firestore.rules — own email change (emulator)', () => 
     expect(await commit('owner', [
       { path: 'members/klMember', data: klMember as Doc },
       { path: 'members/aff', data: aff as Doc },
+      { path: 'members/klAdmin', data: { role: 'ADMIN', loId: KL, general: { name: 'Admin' }, contact: { email: 'admin@example.test' } } as Doc },
       { path: 'memberEmails/ali@example.test', data: slot('ali@example.test', 'klMember') },
       { path: 'memberEmails/mei@example.test', data: slot('mei@example.test', 'aff') },
     ])).toBe(OK);
@@ -85,6 +86,17 @@ describe.skipIf(!HOST)('firestore.rules — own email change (emulator)', () => 
 
   it('active external can update their own contact.email on the member doc', async () => {
     expect(await commit('aff', [{ path: 'members/aff', data: { contact: { email: 'mei2@example.test' } }, maskFields: ['contact.email'] }])).toBe(OK);
+  });
+
+  it('emailChangeRequests: no client read or write, not even by the owner or an admin', async () => {
+    const req: Doc = { newEmail: 'ali2@example.test', requestedAt: '2026-10-26T00:00:00.000Z' };
+    expect(await commit('klMember', [{ path: 'emailChangeRequests/klMember', data: req }])).toBe(DENIED);
+    expect(await commit('klAdmin', [{ path: 'emailChangeRequests/klMember', data: req }])).toBe(DENIED);
+    expect(await commit('owner', [{ path: 'emailChangeRequests/klMember', data: req }])).toBe(OK);
+    for (const uid of ['klMember', 'klAdmin']) {
+      const res = await fetch(`${BASE}/emailChangeRequests/klMember`, { headers: authHeader(uid) });
+      expect(res.status).toBe(DENIED);
+    }
   });
 
   it('a member cannot create their new memberEmails slot from the client', async () => {

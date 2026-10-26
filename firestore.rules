@@ -1644,6 +1644,12 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // Pending own-email changes written ONLY by netlify/functions/self-email (Admin SDK): { newEmail, requestedAt }.
+    // finalize moves contact.email only for a change recorded here, so clients never read or write it.
+    match /emailChangeRequests/{uid} {
+      allow read, write: if false;
+    }
+
     // Member email dedup slots — one document per sanitised email address to enforce uniqueness
     // Members can read their own slot (to check status); only the service layer (Admin SDK) writes
     match /memberEmails/{email} {

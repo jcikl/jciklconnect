@@ -114,6 +114,7 @@ econciliations | B+/A+ | B+/A+ | B+/A+(必填字段) | A+ 或 B+(仅notes字段)
 | webhook_logs | B+ | B+ | B+(字段白名单) | × (不可变) | A+ | |
 | emailLogs | B+/A+ | B+/A+ | 登 | A+ | A+ | ⚠️ P0：无写入者，集合永远为空 |
 | memberEmails | B+/A+ | B+/A+ | B+/A+ | A+ | A+ | |
+| emailChangeRequests | × | × | × | × | × | 仅 Admin SDK（`netlify/functions/self-email`）读写；规则 `if false` |
 | pointsRules | 登 | 登 | B+/A+ | B+/A+ | B+/A+ | |
 | pointsRuleExecutions | B+/A+ | B+/A+ | 登(字段白名单) | A+ | A+ | ⚠️ P0：竞态→双倍积分 |
 | irthdayNotificationsSent | × | × | × | × | × | ⚠️ 全禁止，仅Cloud Function |

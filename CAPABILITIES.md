@@ -1316,7 +1316,7 @@
 | `useActivityPlans.ts` | 130 | 1 | `useActivityPlans` | activityPlansService | ⚠️ 無說明 |
 | `useAdvertisements.ts` | 111 | 2 | `useAdvertisements` | advertisementService, errorLoggingService | Advertisements Data Hook |
 | `useAppNavigation.ts` | 239 | 1 | `useAppNavigation` | — | ⚠️ 無說明 |
-| `useAuth.tsx` | 873 | 59 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, memberCardsService, membersService, mockData | Authentication Hook |
+| `useAuth.tsx` | 880 | 59 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, memberCardsService, membersService, mockData | Authentication Hook |
 | `useAutomation.ts` | 149 | 3 | `useAutomation` | automationService | useAutomation Hook - Manage automation workflows and rules |
 | `useBusinessDirectory.ts` | 51 | 4 | `useBusinessDirectory` | businessDirectoryService | ⚠️ 無說明 |
 | `useChapterBirthdays.ts` | 23 | 1 | `useChapterBirthdays` | chapterBirthdaysService | Own-chapter birthdays for an active external user (dashboard birthday widget). `month` null → nothing loads. |

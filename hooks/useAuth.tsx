@@ -199,8 +199,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
               // Own-email change: the verification link was clicked, so the (verified) Auth email now differs
               // from members.contact.email. The self-email function moves contact.email and the memberEmails slot.
-              if (firebaseUser.emailVerified && firebaseUser.email && memberData.contact?.email
+              // The server only acts when this member requested the change (emailChangeRequests); the session flag
+              // just keeps an unrequested mismatch from calling the function on every load.
+              const mismatchKey = `emailFinalize:${firebaseUser.uid}:${(firebaseUser.email ?? '').toLowerCase()}`;
+              let alreadyTried = false;
+              try { alreadyTried = sessionStorage.getItem(mismatchKey) === '1'; } catch { /* storage unavailable */ }
+              if (!alreadyTried && firebaseUser.emailVerified && firebaseUser.email && memberData.contact?.email
                 && firebaseUser.email.toLowerCase() !== memberData.contact.email.toLowerCase()) {
+                try { sessionStorage.setItem(mismatchKey, '1'); } catch { /* storage unavailable */ }
                 firebaseUser.getIdToken(true)
                   .then(token => fetchWithTimeout('/.netlify/functions/self-email', {
                     method: 'POST',
@@ -710,12 +716,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (err: any) {
       throw new Error(accountSecurityErrorMessage(err?.code));
     }
-    // Free of any other Auth account / memberEmails slot? (server side: members cannot read other members' slots)
+    // Free of any other Auth account / memberEmails slot? Also records the requested change server-side, which is the
+    // only thing that later lets 'finalize' move contact.email (members cannot read other members' slots).
     const token = await current.getIdToken();
     const res = await fetchWithTimeout('/.netlify/functions/self-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ action: 'check', newEmail: email }),
+      body: JSON.stringify({ action: 'request', newEmail: email }),
     });
     if (!res.ok) throw new Error('Could not check the new email. Please try again.');
     if (!(await res.json()).available) throw new Error('That email is already used by another account.');
