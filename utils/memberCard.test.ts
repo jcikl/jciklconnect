@@ -240,6 +240,14 @@ describe('card special offers', () => {
     expect(buildMemberCard({ ...full, business: { specialOffers: [] } }, NOW)).not.toHaveProperty('specialOffers');
   });
 
+  it('takes at most the first 20 live offers (rules cap)', () => {
+    const many = Array.from({ length: 25 }, (_, i) => ({ description: `Offer ${i}` }));
+    const card = buildMemberCard({ ...sharing, business: { specialOffers: [{ description: 'P', status: 'Paused' }, ...many] } }, NOW) as unknown as Record<string, any>;
+    expect(card.specialOffers).toHaveLength(20);
+    expect(card.specialOffers[0].description).toBe('Offer 0');
+    expect(card.specialOffers[19].description).toBe('Offer 19');
+  });
+
   it('planCardSync upserts when the offers change', () => {
     const withOffers = (list: unknown[]) => ({ ...sharing, business: { ...sharing.business, specialOffers: list } });
     const base = withOffers(offers);

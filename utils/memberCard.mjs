@@ -12,6 +12,8 @@ export const KL_LO_ID = 'jcikl';
 
 const INTERNAL_CARD_ROLES = ['MEMBER', 'BOARD', 'ADMIN', 'SUPER_ADMIN'];
 const EXTERNAL_ROLES = ['AFFILIATE', 'CHAPTER_ADMIN'];
+/** Max offers on a card (firestore.rules validMemberCard: specialOffers.size() <= 20). */
+export const MAX_CARD_OFFERS = 20;
 
 /** @param {unknown} v @returns {string | undefined} trimmed non-empty string, else undefined */
 function str(v) {
@@ -112,8 +114,8 @@ export function buildMemberCard(member, nowIso = new Date().toISOString()) {
     // Contact details travel on the card only while the member shares it (firestore.rules enforces the same).
     phone: sharing ? str(member?.contact?.phone) : undefined,
     socials: sharing ? socialsMap(member?.contact?.socials) : undefined,
-    // Full live offers (with audiences / countries) only on a shared card; omitted when empty.
-    specialOffers: sharing && liveOffers.length > 0 ? liveOffers.map(cardOffer) : undefined,
+    // Full live offers (with audiences / countries) only on a shared card; omitted when empty; first 20 (rules cap).
+    specialOffers: sharing && liveOffers.length > 0 ? liveOffers.slice(0, MAX_CARD_OFFERS).map(cardOffer) : undefined,
   };
   /** @type {Record<string, unknown>} */
   const card = {

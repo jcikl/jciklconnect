@@ -211,6 +211,14 @@ describe.skipIf(!HOST)('firestore.rules — buildMemberCard output (emulator)', 
     expect(await commit('klMember', [{ path: 'memberCards/klMember', data: card }])).toBe(DENIED);
   });
 
+  it('specialOffers: 20 offers are accepted, 21 are rejected', async () => {
+    await saveMemberDoc(offerMember(true));
+    const base = buildMemberCard(offerMember(true)) as unknown as Doc;
+    const list = (n: number) => Array.from({ length: n }, (_, i) => ({ description: `Offer ${i}` }));
+    expect(await commit('klMember', [{ path: 'memberCards/klMember', data: { ...base, specialOffers: list(20) } }])).toBe(OK);
+    expect(await commit('klMember', [{ path: 'memberCards/klMember', data: { ...base, specialOffers: list(21) } }])).toBe(DENIED);
+  });
+
   it('card carrying specialOffers while international is false is rejected', async () => {
     const notSharing = offerMember(false);
     await saveMemberDoc(notSharing);

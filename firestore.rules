@@ -434,7 +434,7 @@ service cloud.firestore {
              (card.international == true || !card.keys().hasAny(['phone', 'socials', 'specialOffers'])) &&
              (!('phone' in card) || card.phone is string) &&
              (!('socials' in card) || card.socials is map) &&
-             (!('specialOffers' in card) || card.specialOffers is list);
+             (!('specialOffers' in card) || (card.specialOffers is list && card.specialOffers.size() <= 20));
     }
 
     // Reciprocity (owner rule): a non-admin may view other people's cards only after opting in
