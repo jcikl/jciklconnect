@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Calendar, Info, Users, Building2, Maximize2 } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
 import type { Event, EventRegistration } from '../../../types';
 import { RegcodeQr } from '../../ui/RegcodeQr';
 import { Modal } from '../../ui/Common';
@@ -136,15 +135,11 @@ export const EventDetailsTab: React.FC<EventDetailsTabProps> = ({
       )}
     </div>
 
-    {/* Enlarged check-in QR for scanning at the gate. */}
+    {/* Enlarged check-in QR for scanning at the gate (reuses RegcodeQr — no extra qrcode.react import site). */}
     <Modal isOpen={qrZoom} onClose={() => setQrZoom(false)} title="Check-in code">
       {regcode && (
-        <div className="flex flex-col items-center gap-4 py-2">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Your JCI Malaysia check-in code</p>
-          <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-            <QRCodeSVG value={regcode} size={260} level="M" marginSize={0} bgColor="#ffffff" fgColor="#0f172a" className="h-auto w-full max-w-[280px]" />
-          </div>
-          <p className="font-mono text-3xl font-bold tracking-[0.3em] text-slate-900">{regcode}</p>
+        <div className="flex flex-col items-center gap-3 py-2">
+          <RegcodeQr regcode={regcode} label="Your JCI Malaysia check-in code" size={260} maxWidthClass="max-w-[260px]" />
           <p className="text-xs text-slate-400">Show this at the event to check in.</p>
         </div>
       )}

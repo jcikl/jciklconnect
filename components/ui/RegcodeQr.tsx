@@ -11,6 +11,8 @@ interface RegcodeQrProps {
   /** When false and there is no regcode, render nothing instead of the subtle hint. Defaults to true. */
   showEmptyHint?: boolean;
   className?: string;
+  /** Tailwind max-width class capping the rendered QR (defaults to 'max-w-[180px]'; larger for the zoomed view). */
+  maxWidthClass?: string;
 }
 
 /**
@@ -24,6 +26,7 @@ export const RegcodeQr: React.FC<RegcodeQrProps> = ({
   size = 132,
   showEmptyHint = true,
   className = '',
+  maxWidthClass = 'max-w-[180px]',
 }) => {
   const code = (regcode ?? '').trim();
 
@@ -37,7 +40,7 @@ export const RegcodeQr: React.FC<RegcodeQrProps> = ({
   return (
     <div className={`flex flex-col items-center gap-2 ${className}`}>
       {label && (
-        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">{label}</p>
+        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</p>
       )}
       <div className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
         <QRCodeSVG
@@ -47,10 +50,11 @@ export const RegcodeQr: React.FC<RegcodeQrProps> = ({
           marginSize={0}
           bgColor="#ffffff"
           fgColor="#0f172a"
-          className="h-auto w-full max-w-[180px]"
+          className={`h-auto w-full ${maxWidthClass}`}
         />
       </div>
-      <p className="font-mono text-2xl font-bold tracking-[0.3em] text-slate-900 dark:text-slate-100">{code}</p>
+      {/* The card is always white, so the code stays dark in both themes (a dark: variant would hide it on white). */}
+      <p className="font-mono text-2xl font-bold tracking-[0.3em] text-slate-900">{code}</p>
     </div>
   );
 };
