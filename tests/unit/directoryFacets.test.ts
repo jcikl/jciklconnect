@@ -152,4 +152,15 @@ describe('normalisers', () => {
       acceptsInternationalBusiness: true,
     });
   });
+
+  it('sister card with specialOffers: deal is the first offer still live today (expired ones skipped)', () => {
+    const base = {
+      id: 'c2', displayName: 'Mei', loId: 'sg', international: true, updatedAt: '', specialOfferSummary: 'old',
+      sisterChapter: { id: 'sg', name: 'JCI Singapore', country: 'Singapore' },
+    };
+    const card = { ...base, specialOffers: [{ description: 'gone', expiryDate: '2000-01-01' }, { description: 'live' }] } as unknown as SisterChapterCard;
+    expect(cardToDirectoryItem(card, n => n)).toMatchObject({ hasDeal: true, dealSummary: 'live' });
+    const expired = { ...base, specialOffers: [{ description: 'gone', expiryDate: '2000-01-01' }] } as unknown as SisterChapterCard;
+    expect(cardToDirectoryItem(expired, n => n)).toMatchObject({ hasDeal: false, dealSummary: '' });
+  });
 });

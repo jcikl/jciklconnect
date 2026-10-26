@@ -20,6 +20,7 @@ import { normalizeIdealReferrals, joinIdealReferralIndustries } from '../../../u
 import { isMalaysianIC, getBirthPlaceFromIC, getDateOfBirthFromIC, getGenderFromIC } from '../../../utils/malaysianIdUtils';
 import { formatDateToDDMMMYYYY } from '../../../utils/dateUtils';
 import { uploadMemberOfferLogoToCloudinary, uploadMemberOfferBannerToCloudinary } from '../../../services/cloudinaryService';
+import { RedeemAudienceFields } from '../../shared/RedeemAudienceFields';
 
 const HOBBY_OPTIONS = [
   'Art & Design', 'Badminton', 'Baking', 'Basketball', 'Car Enthusiast',
@@ -816,6 +817,12 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
             <label className="text-xs text-slate-500 whitespace-nowrap ml-auto">Expiry</label>
             <input type="date" value={draftOffer.expiryDate ?? ''} onChange={e => updateDraft({ expiryDate: e.target.value })} className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:outline-none" />
           </div>
+          <RedeemAudienceFields
+            audiences={draftOffer.audiences ?? ['kl']}
+            countries={draftOffer.countries ?? []}
+            onAudiencesChange={audiences => updateDraft({ audiences })}
+            onCountriesChange={countries => updateDraft({ countries })}
+          />
         </div>
       </Drawer>
     </>

@@ -74,7 +74,8 @@
 - 外部用户在各视图的实际范围（Phase 1）：
   - 生日：本分会（active 外部成员）的生日由 `chapter-birthdays` function 返回（只含 id、姓名、头像、月日，不含年份，跳过 `privacy.hideBirthday`）。
   - 目录（`DIRECTORY`）：只显示 `memberCards` 名片，没有 Contact；范围是已开放名片的 KL 会员、本分会、以及其他分会 `international == true` 的名片；自己的名片未开放时查询不会执行（互惠规则，`useSisterChapterMembers` 的 `canView`）。
-  - 福利（`BENEFITS`）：不显示会员优惠与新增优惠入口；按 `targetCriteria.audiences` / `countries`（`utils/benefitEligibility.ts`）判断，不符合的福利灰显并说明原因、隐藏详情里的行动按钮。
+  - 福利（`BENEFITS`）：没有新增优惠入口。会员优惠来自他们能读的名片（与目录同一组查询和互惠规则：本人未开放名片时不显示，并提示开放名片），只显示开放分享的会员（`international == true` 的卡）当天仍生效的优惠。合作福利按 `targetCriteria.audiences` / `countries`、会员优惠按优惠自己的 `audiences` / `countries`（`utils/benefitEligibility.ts` `getBenefitEligibility` / `getOfferEligibility`）判断；不符合的灰显并说明原因、隐藏详情里的行动按钮。会员优惠没有 `audiences` 时只给 JCI KL，外部会员看到的是灰显。
+  - KL 用户的福利页：会员优惠同样按优惠的 `audiences` / `countries` 判断（没有设置 = 仅 KL，所以现有优惠不变）；他人暂停或过期的优惠不显示，本人的显示并标注 Paused / Expired。
   - 问卷（`SURVEYS`）：只看到定向给自己的，或 B+ 已开放（`openToExternals`）且 Active 的问卷；只能作答，不能创建、分发，也看不到结果。
   - 兴趣社群（`CLUBS`）：只看到已开放（`openToExternals`）的社群，不能创建；「Join」仍是打开社群群聊链接。
   - 活动（`EVENTS`）：只看到 KL 主办或协办的活动（应用层查询过滤，规则对 `events` list 没有此限制，见 R-058）；价格数字以美元符号显示，不做换算；可以报名；付款方式为线下（说明文字见 `config/constants.ts` `EXTERNAL_OFFLINE_PAYMENT_NOTE`），由财务操作员 / 管理员标记已付款：标记时由财务确认实际收到的马币金额（窗口预填列出的价格，可修改）。

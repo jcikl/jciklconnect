@@ -21,7 +21,7 @@
 | Hook（React 資料綁定） | 42 | `hooks/` |
 | Util（純函數工具） | 27 | `utils/` |
 | UI 元件（通用） | 33 | `components/ui/` |
-| 共用業務元件 | 9 | `components/shared/` |
+| 共用業務元件 | 10 | `components/shared/` |
 | Context | 2 | `contexts/` |
 | Cloud Functions | 0 | `functions/src/` |
 
@@ -890,7 +890,7 @@
 | Service | 行數 | 引用 | 用途 | 集合 |
 |---|---|---|---|---|
 | `advertisementService.ts` | 422 | 11 | Advertisement & Promotions Service | ADVERTISEMENTS, BENEFIT_USAGE, PROMOTION_PACKAGES |
-| `businessDirectoryService.ts` | 255 | 1 | Business Directory Service - CRUD Operations | MEMBERS, PUBLIC_BUSINESS_LISTINGS |
+| `businessDirectoryService.ts` | 248 | 1 | Business Directory Service - CRUD Operations | MEMBERS, PUBLIC_BUSINESS_LISTINGS |
 | `communicationService.ts` | 651 | 9 | Communication Service - CRUD Operations | COMMUNICATION, NOTIFICATIONS, SYSTEM_CONFIG |
 | `emailService.ts` | 442 | 2 | Email Service - Email Integration Service | EMAIL_LOGS |
 | `guestAnalyticsService.ts` | 142 | 4 | ⚠️ 無說明 | GUEST_PAGE_STATS |
@@ -928,11 +928,11 @@
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `syncPublicListing` | 121 |  |
-| `getAllBusinesses` | 154 |  |
-| `getBusinessById` | 200 |  |
-| `searchBusinesses` | 230 |  |
-| `getBusinessesByIndustry` | 240 |  |
+| `syncPublicListing` | 114 |  |
+| `getAllBusinesses` | 147 |  |
+| `getBusinessById` | 193 |  |
+| `searchBusinesses` | 223 |  |
+| `getBusinessesByIndustry` | 233 |  |
 
 **其他 export：** `mapMemberToBusinessProfile` (L37)
 
@@ -1344,7 +1344,7 @@
 | `usePoints.ts` | 61 | 2 | `usePoints` | pointsService | Points Data Hook |
 | `useProjects.ts` | 170 | 7 | `useProjects` | projectsService | Projects Data Hook |
 | `usePushNotifications.ts` | 63 | 0 | `usePushNotifications` | — | ⚠️ 無說明 |
-| `useSisterChapterMembers.ts` | 87 | 1 | `useSisterChapterMembers` | memberCardsService, membersService, sisterChaptersService | ⚠️ 無說明 |
+| `useSisterChapterMembers.ts` | 95 | 2 | `useSisterChapterMembers` | memberCardsService, membersService, sisterChaptersService | ⚠️ 無說明 |
 | `useSisterChapters.ts` | 26 | 6 | `useSisterChapters` | sisterChaptersService | ⚠️ 無說明 |
 | `useSocialPersonas.ts` | 46 | 2 | `useSocialPersonas` | socialPersonaService | ⚠️ 無說明 |
 | `useSocialPosts.ts` | 74 | 1 | `useSocialPosts` | socialPostService | ⚠️ 無說明 |
@@ -1399,11 +1399,12 @@
 |---|---|---|
 | `getInitialsSvg` | 3 | Generate an inline SVG data URI with initials so avatars do not rely on external requests. URI-encoded (not bt… |
 
-### `utils/benefitEligibility.ts` （68 行，4 處引用）
+### `utils/benefitEligibility.ts` （79 行，5 處引用）
 
 | 函數 | 行 | 說明 |
 |---|---|---|
 | `getBenefitEligibility` | 44 | Decide whether `viewer` may redeem/claim `item`. Pure; no I/O. - audiences: missing/empty = ['kl']; the viewer… |
+| `getOfferEligibility` | 73 | Eligibility of a member's own special offer (members.business.specialOffers[] or a card's specialOffers[]): th… |
 
 ### `utils/boardMembership.ts` （86 行，5 處引用）
 
@@ -1614,7 +1615,7 @@
 | `ErrorBoundary.tsx` | 261 | 3 | `ErrorFallback`, `SectionErrorFallback`, `ErrorBoundary`, `AsyncErrorBoundary`, `withErrorBoundary`, `useErrorHandler` |
 | `FilterDrawer.tsx` | 65 | 1 | `FilterDrawer` |
 | `FirstUseBanner.tsx` | 82 | 2 | `FirstUseBanner` |
-| `Form.tsx` | 502 | 98 | `Input`, `Select`, `Textarea`, `Checkbox`, `RadioGroup`, `ButtonGroup` |
+| `Form.tsx` | 502 | 99 | `Input`, `Select`, `Textarea`, `Checkbox`, `RadioGroup`, `ButtonGroup` |
 | `IntroducerSelector.tsx` | 338 | 6 | `IntroducerSelector` |
 | `LedgerTable.tsx` | 183 | 1 | `LedgerTable` |
 | `Loading.tsx` | 47 | 31 | `LoadingSpinner`, `LoadingOverlay` |
@@ -1638,6 +1639,7 @@
 | 檔案 | 行數 | Export |
 |---|---|---|
 | `MembershipTypeDisplay.tsx` | 72 | `MembershipTypeDisplay` |
+| `RedeemAudienceFields.tsx` | 56 | `RedeemAudienceFields` |
 | `batchImport/BatchImportModal.tsx` | 1486 | `BatchImportModal` |
 | `batchImport/batchImportTypes.ts` | 155 | — |
 | `batchImport/batchImportUtils.ts` | 247 | `preprocessRow`, `trimPreprocessor`, `trimLowerPreprocessor`, `trimUpperPreprocessor`, `trimProperPreprocessor`, `toNumberPreprocessor`, `removeWhitespacePreprocessor`, `splitCommaPreprocessor`, `formatPhonePreprocessor`, `createChainedPreprocessor`, `createDefaultPreprocessor`, `parseDatePreprocessor` |

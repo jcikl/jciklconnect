@@ -922,3 +922,33 @@ Kept on purpose (history, now pointing at a missing member): `eventRegistrations
 Partial failure: if deleting the Auth user fails after the batch, the response is `authDeleted: false` and the login still exists without a profile (it can sign in but has no member doc, so the app shows no data). A KL admin retries by pressing Delete again in Global Relations (the row stays until the login is gone); the server allows the retry only for a KL admin and only when an earlier `external_accounts_deleteAccount` audit entry exists for that id. A chapter admin cannot retry; their toast asks JCI KL to finish, and JCI KL then needs the member id from the `auditLog` entry.
 
 Recommended action: none required; consider an export of the member doc into the audit entry if the owner later wants an undo.
+
+## Added 2026-10-26: Member Offer Audience
+
+### R-093 Directory and Card Ignored the specialOffers Array (P2, resolved 2026-10-26)
+
+Evidence: `services/businessDirectoryService.ts` `mapMemberToBusinessProfile` and `utils/memberCard.mjs` `buildMemberCard` read only the legacy `business.specialOffer`, so offers saved in `business.specialOffers` never showed "Deal" or counted under "Has Deal", and paused or expired offers still did.
+
+Fix: both read `utils/specialOffers.mjs` `getLiveOffers` (both formats; `specialOffers` wins when it is an array) and use the first live offer for the deal / `specialOfferSummary`. Tests: `tests/unit/directoryOfferParity.test.ts`, `utils/memberCard.test.ts`.
+
+### R-094 Benefits Page Showed Paused and Expired Member Offers (P2, resolved 2026-10-26)
+
+Evidence: `MemberBenefitsView` listed every member offer regardless of `status` / `expiryDate`.
+
+Fix: other members' offers are listed only when `isOfferLive(offer, today)`; the owner still sees their own, labelled "Paused" or "Expired". Tests: `utils/specialOffers.test.ts`.
+
+### R-095 Card Offers Go Stale After Their Expiry Date (P3)
+
+Evidence: a card is rewritten only when its member is saved (`MemberCardsService.syncCards`) or by `scripts/backfillMemberCards.mjs`. An offer that expires later stays in `memberCards.specialOffers` / `specialOfferSummary` until then.
+
+Mitigation: readers of `memberCards.specialOffers` re-check `isOfferLive` (external Benefits page, `directoryFacets.ts` `cardToDirectoryItem`). A card that is not shared has only `specialOfferSummary`, which cannot be re-checked, so a KL user may see an expired "Deal" on a non-shared sister-chapter card until that member saves again.
+
+Recommended action: run the card backfill after deploy (owner decision; this change did not run it against production), and optionally on a schedule.
+
+### R-096 Member Offers Cannot Be Claimed (P3, accepted)
+
+Evidence: the Benefits page has no claim action; "Claimed" only reflects existing `benefitUsage` records. `MemberBenefitsService.claimBenefit` looks the benefit up in `memberBenefits` / `advertisements`, so a member offer id (`member_offer_<memberId>_<n>`) has no benefit doc and its transaction update would fail. This is true for KL and external viewers alike. `firestore.rules` already lets active externals create their own `benefitUsage`, so a future claim path needs no rules change for the usage record itself.
+
+Recommended action: decide whether member offers should be claimable; if so, add a usage-only path (no counter update) for member offers.
+
+Decision (2026-10-26, owner): member offers stay view-only — no claim action. Members contact the offering member directly (phone / social media on the shared card).

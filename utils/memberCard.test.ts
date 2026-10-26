@@ -5,7 +5,7 @@ const NOW = '2026-10-19T00:00:00.000Z';
 const RULE_KEYS = [
   'displayName', 'avatarUrl', 'loId', 'country', 'companyName', 'position', 'department', 'industry',
   'businessCategory', 'companyDescription', 'website', 'acceptInternationalBusiness', 'specialOfferSummary',
-  'idealReferrals', 'phone', 'socials', 'international', 'updatedAt',
+  'idealReferrals', 'phone', 'socials', 'specialOffers', 'international', 'updatedAt',
 ];
 
 const full = {
@@ -27,6 +27,7 @@ describe('buildMemberCard', () => {
       companyName: 'Acme', position: 'Director', department: 'Sales Dept', industry: 'IT',
       businessCategory: ['Software', 'AI'], companyDescription: 'We build', website: 'https://acme.example',
       acceptInternationalBusiness: 'Yes', specialOfferSummary: '10% off', idealReferrals: ['Banks', 'Lawyers'],
+      specialOffers: [{ description: '10% off' }],
       international: true, updatedAt: NOW,
     });
   });
@@ -186,5 +187,74 @@ describe('card phone and socials', () => {
     // phone changes while not sharing do not touch the card
     const off = { ...a, privacy: { shareCardInternationally: false } };
     expect(planCardSync(off, { ...off, contact: { ...contact, phone: '123' } })).toBe('none');
+  });
+});
+
+describe('card special offers', () => {
+  // NOW is 2026-10-19.
+  const offers = [
+    { description: 'Paused deal', status: 'Paused' },
+    { description: 'Expired deal', expiryDate: '2026-10-01' },
+    {
+      description: ' 10% off ', terms: 'T&C', expiryDate: '2026-12-31', logoUrl: 'https://img/l.png', imageUrl: '',
+      status: 'Active', audiences: ['kl', 'sister'], countries: ['Singapore', ' '],
+    },
+    { description: 'Free coffee' },
+  ];
+  const sharing = { ...full, business: { ...full.business, specialOffer: { description: 'Paused deal', status: 'Paused' }, specialOffers: offers } };
+  const notSharing = { ...sharing, privacy: { shareCardInternationally: false } };
+
+  it('carries only live offers, public keys only, no empty or undefined values, when sharing', () => {
+    const card = buildMemberCard(sharing, NOW) as unknown as Record<string, any>;
+    expect(card.specialOffers).toEqual([
+      { description: '10% off', terms: 'T&C', expiryDate: '2026-12-31', logoUrl: 'https://img/l.png', audiences: ['kl', 'sister'], countries: ['Singapore'] },
+      { description: 'Free coffee' },
+    ]);
+    for (const o of card.specialOffers) {
+      expect(o).not.toHaveProperty('status');
+      for (const v of Object.values(o)) expect(v).not.toBeUndefined();
+    }
+    for (const k of Object.keys(card)) expect(RULE_KEYS).toContain(k);
+  });
+
+  it('summary comes from the first live offer across both formats', () => {
+    expect(buildMemberCard(sharing, NOW).specialOfferSummary).toBe('10% off');
+    // legacy only, paused → no summary
+    const legacyPaused = { ...full, business: { ...full.business, specialOffer: { description: 'x', status: 'Paused' } } };
+    expect(buildMemberCard(legacyPaused, NOW)).not.toHaveProperty('specialOfferSummary');
+    // legacy string still works
+    expect(buildMemberCard({ ...full, business: { specialOffer: 'free coffee' } }, NOW).specialOfferSummary).toBe('free coffee');
+  });
+
+  it('omits specialOffers when not sharing (summary stays)', () => {
+    const card = buildMemberCard(notSharing, NOW);
+    expect(card).not.toHaveProperty('specialOffers');
+    expect(card.specialOfferSummary).toBe('10% off');
+  });
+
+  it('omits specialOffers and the summary when no offer is live', () => {
+    const none = { ...full, business: { ...full.business, specialOffers: offers.slice(0, 2) } };
+    const card = buildMemberCard(none, NOW);
+    expect(card).not.toHaveProperty('specialOffers');
+    expect(card).not.toHaveProperty('specialOfferSummary');
+    expect(buildMemberCard({ ...full, business: { specialOffers: [] } }, NOW)).not.toHaveProperty('specialOffers');
+  });
+
+  it('takes at most the first 20 live offers (rules cap)', () => {
+    const many = Array.from({ length: 25 }, (_, i) => ({ description: `Offer ${i}` }));
+    const card = buildMemberCard({ ...sharing, business: { specialOffers: [{ description: 'P', status: 'Paused' }, ...many] } }, NOW) as unknown as Record<string, any>;
+    expect(card.specialOffers).toHaveLength(20);
+    expect(card.specialOffers[0].description).toBe('Offer 0');
+    expect(card.specialOffers[19].description).toBe('Offer 19');
+  });
+
+  it('planCardSync upserts when the offers change', () => {
+    const withOffers = (list: unknown[]) => ({ ...sharing, business: { ...sharing.business, specialOffers: list } });
+    const base = withOffers(offers);
+    expect(planCardSync(base, withOffers([...offers, { description: 'New' }]))).toBe('upsert');
+    expect(planCardSync(base, withOffers(offers.map((o, i) => (i === 3 ? { ...o, status: 'Paused' } : o))))).toBe('upsert');
+    expect(planCardSync(base, withOffers(offers.map((o, i) => (i === 3 ? { ...o, audiences: ['global'] } : o))))).toBe('upsert');
+    // a change to a non-live offer does not touch the card
+    expect(planCardSync(base, withOffers(offers.map((o, i) => (i === 0 ? { ...o, description: 'Still paused' } : o))))).toBe('none');
   });
 });

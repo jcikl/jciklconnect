@@ -5,12 +5,15 @@
 //  - `loId` and `international` must equal the member doc's values after the write.
 
 import { normalizeIdealReferrals } from './idealReferrals.mjs';
+import { getLiveOffers, todayIso } from './specialOffers.mjs';
 
 /** KL's own chapter id (same as DEFAULT_LO_ID in config/constants.ts). */
 export const KL_LO_ID = 'jcikl';
 
 const INTERNAL_CARD_ROLES = ['MEMBER', 'BOARD', 'ADMIN', 'SUPER_ADMIN'];
 const EXTERNAL_ROLES = ['AFFILIATE', 'CHAPTER_ADMIN'];
+/** Max offers on a card (firestore.rules validMemberCard: specialOffers.size() <= 20). */
+export const MAX_CARD_OFFERS = 20;
 
 /** @param {unknown} v @returns {string | undefined} trimmed non-empty string, else undefined */
 function str(v) {
@@ -29,6 +32,25 @@ function socialsMap(socials) {
     if (v !== undefined) out[k] = v;
   }
   return Object.keys(out).length > 0 ? out : undefined;
+}
+
+/**
+ * Card copy of one live offer: only the public keys, no empty values.
+ * @param {any} o a live offer (see specialOffers.mjs)
+ * @returns {Record<string, unknown>}
+ */
+function cardOffer(o) {
+  /** @type {Record<string, unknown>} */
+  const out = { description: str(o.description) };
+  for (const k of ['terms', 'expiryDate', 'logoUrl', 'imageUrl']) {
+    const v = str(o[k]);
+    if (v !== undefined) out[k] = v;
+  }
+  for (const k of ['audiences', 'countries']) {
+    const list = Array.isArray(o[k]) ? o[k].map(str).filter(Boolean) : [];
+    if (list.length > 0) out[k] = list;
+  }
+  return out;
 }
 
 /** @param {any} member @returns {boolean} */
@@ -62,14 +84,16 @@ export function buildMemberCard(member, nowIso = new Date().toISOString()) {
   const categories = Array.isArray(b.businessCategory)
     ? b.businessCategory.filter(c => typeof c === 'string' && c.trim() !== '')
     : [];
-  const offer = b.specialOffer;
   // Ideal referral types, read exactly like the local directory's idealReferralTypes
   // (businessDirectoryService mapMemberToBusinessProfile) so one person shows the same values in both.
   const referralTypes = normalizeIdealReferrals(b.idealReferralTypes);
   const idealReferrals = referralTypes.length > 0
     ? referralTypes
     : normalizeIdealReferrals(b.idealReferrals ?? member?.idealReferral ?? member?.idealReferrals);
-  const offerSummary = str(typeof offer === 'string' ? offer : offer?.description);
+  // Live offers (active, not expired) across both formats; the summary is the first one's description.
+  const nowDate = new Date(nowIso);
+  const liveOffers = getLiveOffers(member, todayIso(Number.isNaN(nowDate.getTime()) ? new Date() : nowDate));
+  const offerSummary = str(liveOffers[0]?.description);
   const sharing = member?.privacy?.shareCardInternationally === true;
 
   /** @type {Record<string, unknown>} */
@@ -90,6 +114,8 @@ export function buildMemberCard(member, nowIso = new Date().toISOString()) {
     // Contact details travel on the card only while the member shares it (firestore.rules enforces the same).
     phone: sharing ? str(member?.contact?.phone) : undefined,
     socials: sharing ? socialsMap(member?.contact?.socials) : undefined,
+    // Full live offers (with audiences / countries) only on a shared card; omitted when empty; first 20 (rules cap).
+    specialOffers: sharing && liveOffers.length > 0 ? liveOffers.slice(0, MAX_CARD_OFFERS).map(cardOffer) : undefined,
   };
   /** @type {Record<string, unknown>} */
   const card = {

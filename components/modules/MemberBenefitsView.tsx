@@ -6,17 +6,59 @@ import { LoadingState } from '../ui/Loading';
 import { useAdvertisements } from '../../hooks/useAdvertisements';
 import { useAuth } from '../../hooks/useAuth';
 import { useMembers } from '../../hooks/useMembers';
+import { useSisterChapterMembers } from '../../hooks/useSisterChapterMembers';
 import { Advertisement, BenefitUsage } from '../../services/advertisementService';
 import { formatDate, toDate } from '../../utils/dateUtils';
-import { getBenefitEligibility, KL_COUNTRY, type BenefitViewer } from '../../utils/benefitEligibility';
+import { getBenefitEligibility, getOfferEligibility, KL_COUNTRY, type BenefitViewer } from '../../utils/benefitEligibility';
 import { isExternalRole } from '../../utils/externalAccess';
 import { PartnershipDetailModal } from '../dashboard/PartnershipDetailModal';
-import { hasSpecialOffer, getSpecialOfferSummary, SpecialOffer } from '../../types/member';
+import { getSpecialOfferSummary, SpecialOffer } from '../../types/member';
+import { getMemberOffers, isOfferLive, todayIso } from '../../utils/specialOffers.mjs';
 import { uploadMemberOfferLogoToCloudinary, uploadMemberOfferBannerToCloudinary } from '../../services/cloudinaryService';
+import { RedeemAudienceFields } from '../shared/RedeemAudienceFields';
 
 const EMPTY_OFFER: SpecialOffer = { description: '', terms: '', expiryDate: '', status: 'Active' };
 
-type BenefitItem = Advertisement & { _isMemberOffer?: boolean; _memberId?: string; _memberName?: string; _isSelf?: boolean };
+type BenefitItem = Advertisement & {
+  _isMemberOffer?: boolean; _memberId?: string; _memberName?: string; _isSelf?: boolean;
+  /** Member offers: who can redeem (offer.audiences / countries). */
+  _offer?: Pick<SpecialOffer, 'audiences' | 'countries'>;
+  /** The owner's own offer that is not live (others never see it). */
+  _offerState?: 'Paused' | 'Expired';
+};
+
+/** A member offer (from a member doc or a public card) as a Benefits grid item. */
+function toOfferItem(
+  offer: SpecialOffer,
+  idx: number,
+  owner: { id: string; name: string; company: string; avatarUrl: string; createdAt?: any; updatedAt?: any },
+  isSelf: boolean,
+  today: string,
+): BenefitItem {
+  return {
+    id: `member_offer_${owner.id}_${idx}`,
+    title: getSpecialOfferSummary(offer),
+    description: offer.description || '',
+    type: 'Banner' as const,
+    placement: [],
+    imageUrl: offer.imageUrl || owner.avatarUrl,
+    logoUrl: offer.logoUrl || owner.avatarUrl,
+    status: 'Active' as const,
+    impressions: 0,
+    clicks: 0,
+    priority: 0,
+    startDate: owner.createdAt || new Date(),
+    provider: owner.company,
+    termsAndConditions: offer.terms,
+    createdAt: owner.createdAt || new Date(),
+    updatedAt: owner.updatedAt || new Date(),
+    _isMemberOffer: true,
+    _memberId: owner.id,
+    _memberName: isSelf ? 'Your Offer' : owner.name,
+    _offer: { audiences: offer.audiences, countries: offer.countries },
+    ...(isSelf && !isOfferLive(offer, today) ? { _offerState: offer.status === 'Paused' ? 'Paused' as const : 'Expired' as const } : {}),
+  } as BenefitItem;
+}
 
 
 function getDaysRemaining(endDate: Advertisement['endDate']): number | null {
@@ -45,13 +87,19 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
   const { members, updateMember } = useMembers();
   const { showToast } = useToast();
 
-  // Externals (other chapters) cannot read other members' docs: no member offers, no offer editing.
+  // Externals (other chapters) cannot read other members' docs: their member offers come from the
+  // public cards they may read (same queries + reciprocity as the directory); no offer editing.
   const isExternal = isExternalRole(member?.role);
+  const { members: offerCards, canView: canViewCards } = useSisterChapterMembers({ enabled: isExternal });
+  const today = todayIso();
   const viewer = useMemo((): BenefitViewer => isExternal
     ? { isKl: false, role: member?.role, tier: member?.tier as string | undefined, category: member?.affiliation?.category, country: member?.affiliation?.country }
     : { isKl: true, role: member?.role, tier: member?.tier as string | undefined, country: KL_COUNTRY },
     [isExternal, member?.role, member?.tier, member?.affiliation?.category, member?.affiliation?.country]);
-  const eligibilityOf = (b: BenefitItem) => b._isMemberOffer ? { eligible: true as const } : getBenefitEligibility(b, viewer);
+  // Member offers use the same audience/country rule as partner benefits; your own offer is never greyed out.
+  const eligibilityOf = (b: BenefitItem) => b._isMemberOffer
+    ? (b._memberId === member?.id ? { eligible: true as const } : getOfferEligibility(b._offer ?? {}, viewer))
+    : getBenefitEligibility(b, viewer);
 
   // ── Special offer drawer (current user's own offer) ──
   const [offerDrawerOpen, setOfferDrawerOpen] = useState(false);
@@ -119,44 +167,29 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
   };
 
   const memberOffers = useMemo((): BenefitItem[] => {
-    if (isExternal) return [];
-    return members
-      .filter(m => {
-        const offersList = m.business?.specialOffers;
-        if (Array.isArray(offersList) && offersList.length > 0) return true;
-        return hasSpecialOffer(m.business?.specialOffer || (m as any).specialOffer);
-      })
-      .flatMap(m => {
-        const isSelf = m.id === member?.id;
-        const offersList: SpecialOffer[] = m.business?.specialOffers ??
-          (m.business?.specialOffer ? [typeof m.business.specialOffer === 'string' ? { description: m.business.specialOffer } : m.business.specialOffer] : []);
-        return offersList.map((offerObj, idx) => {
-        const offer = offerObj;
-        const summary = getSpecialOfferSummary(offerObj);
-        return {
-          id: `member_offer_${m.id}_${idx}`,
-          title: summary,
-          description: offerObj.description || '',
-          type: 'Banner' as const,
-          placement: [],
-          imageUrl: offerObj.imageUrl || m.general?.avatarUrl || (m as any).avatarUrl || '',
-          logoUrl: offerObj.logoUrl || m.general?.avatarUrl || (m as any).avatarUrl || '',
-          status: 'Active' as const,
-          impressions: 0,
-          clicks: 0,
-          priority: 0,
-          startDate: m.createdAt || new Date(),
-          provider: m.companyName || '',
-          termsAndConditions: offerObj.terms,
-          createdAt: m.createdAt || new Date(),
-          updatedAt: m.updatedAt || new Date(),
-          _isMemberOffer: true,
-          _memberId: m.id,
-          _memberName: isSelf ? 'Your Offer' : (m.general?.name || (m as any).name || ''),
-        } as BenefitItem;
-        });
-      });
-  }, [members, member?.id, isExternal]);
+    if (isExternal) {
+      // Cards carry only live offers, but re-check: a card is rewritten only when its member saves.
+      return offerCards.flatMap(card => (card.specialOffers ?? []).flatMap((offer, idx) =>
+        isOfferLive(offer, today)
+          ? [toOfferItem(offer, idx, { id: card.id, name: card.displayName, company: card.companyName ?? '', avatarUrl: card.avatarUrl ?? '' }, card.id === member?.id, today)]
+          : []));
+    }
+    return members.flatMap(m => {
+      const isSelf = m.id === member?.id;
+      return (getMemberOffers(m) as SpecialOffer[]).flatMap((offer, idx) =>
+        // Other members' paused / expired offers are hidden; the owner still sees theirs (labelled).
+        isSelf || isOfferLive(offer, today)
+          ? [toOfferItem(offer, idx, {
+              id: m.id,
+              name: m.general?.name || (m as any).name || '',
+              company: m.companyName || '',
+              avatarUrl: m.general?.avatarUrl || (m as any).avatarUrl || '',
+              createdAt: m.createdAt,
+              updatedAt: m.updatedAt,
+            }, isSelf, today)]
+          : []);
+    });
+  }, [members, offerCards, member?.id, isExternal, today]);
 
   useEffect(() => {
     if (member) loadClaimedBenefits();
@@ -230,6 +263,9 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
       <div>
         <h2 className="text-2xl font-bold text-slate-900">Member Benefits</h2>
         <p className="text-slate-500 text-sm mt-0.5">Exclusive privileges for JCI KL members.</p>
+        {isExternal && !canViewCards && (
+          <p className="text-slate-500 text-xs mt-1">Share your card in the international directory to see offers from members.</p>
+        )}
       </div>
 
       {/* Featured Strip — desktop only, top-priority benefits */}
@@ -356,6 +392,9 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
                       <span className="flex items-center gap-0.5 text-[9px] font-bold bg-violet-600 text-white px-1.5 py-0.5 rounded-full shadow">
                         <Users size={8} /> {b._memberId === member?.id ? 'Your Offer' : 'Member Offer'}
                       </span>
+                    )}
+                    {b._offerState && (
+                      <Badge variant="neutral">{b._offerState}</Badge>
                     )}
                     {isExpiringSoon && !b._isMemberOffer && (
                       <span className="flex items-center gap-0.5 text-[9px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full shadow">
@@ -512,6 +551,12 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
               className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:outline-none"
             />
           </div>
+          <RedeemAudienceFields
+            audiences={draftOffer.audiences ?? ['kl']}
+            countries={draftOffer.countries ?? []}
+            onAudiencesChange={audiences => updateDraft({ audiences })}
+            onCountriesChange={countries => updateDraft({ countries })}
+          />
         </div>
       </Drawer>
     </div>

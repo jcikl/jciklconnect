@@ -7,6 +7,7 @@ import { getSpecialOfferSummary, hasSpecialOffer } from '../../../types/member';
 import { INDUSTRY_OPTIONS, IDEAL_REFERRAL_OPTIONS, BUSINESS_CATEGORIES_OPTIONS } from '../../../config/constants';
 import { normalizeIdealReferrals, joinIdealReferralIndustries } from '../../../utils/idealReferrals.mjs';
 import { uploadMemberOfferLogoToCloudinary, uploadMemberOfferBannerToCloudinary } from '../../../services/cloudinaryService';
+import { RedeemAudienceFields } from '../../shared/RedeemAudienceFields';
 
 const EMPTY_OFFER: SpecialOffer = { description: '', terms: '', expiryDate: '', status: 'Active' };
 
@@ -466,6 +467,12 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
               className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:outline-none"
             />
           </div>
+          <RedeemAudienceFields
+            audiences={draftOffer.audiences ?? ['kl']}
+            countries={draftOffer.countries ?? []}
+            onAudiencesChange={audiences => updateDraft({ audiences })}
+            onCountriesChange={countries => updateDraft({ countries })}
+          />
         </div>
       </Drawer>
     </div>
