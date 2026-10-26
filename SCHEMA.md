@@ -86,9 +86,9 @@
 | jciCareer.membershipType | enum | ✓ | `Guest` \| `Probation` \| `Official` \| `Honorary` \| `Senator` \| `Visiting` \| `Associate` | membershipType | 角色: B+；系统: 注册/审批/晋升/会费同步/导入 | `members.role` 推导；会费记录同步依据 |
 | jciCareer.membershipStatus | enum | ✓ | `paid_due` \| `unpaid_due` \| `terminated` \| `pending` \| `paid` \| `overdue` \| `partial` \| `over paid` |  | 角色: B+；系统: membership/finance sync | 会员状态过滤、权限判断、会费仪表盘 |
 | jciCareer.joinDate | string | ✓ | | joinDate / joinedDate | 角色: B+；系统: 注册/审批/导入 | 会员年资计算、晋升条件判断 |
-| jciCareer.jciMalaysiaMembershipNo | string | — | JCI Malaysia（jcimalaysia.cc）会员编号，如 `JCIKL-025-0159`；对方为 "N/A" 时不写 | | 系统: `scripts/syncJciMalaysia.mjs`（按需执行，Admin SDK），来源 SheetScraper Pro 数据库 `member_directory.membership`（只取 JCI Kuala Lumpur 的记录；对应顺序：手动对应表 `scripts/data/jciMalaysiaOverrides.json` → 已存编号 → 电邮 → 电话） | 之后的同步按此编号对应；`MemberDetailCareerTab`（JCI Career 分页）只读显示 |
-| jciCareer.jciMalaysiaJoinDate | string | — | JCI Malaysia 入会日期（YYYY-MM-DD） | | 系统: `scripts/syncJciMalaysia.mjs`，来源 `member_directory.joindate` | `MemberDetailCareerTab`（JCI Career 分页）只读显示 |
-| jciCareer.jciMalaysiaUserId | string | — | JCI Malaysia（jcimalaysia.cc）用户编号，对方每人固定不变 | | 系统: `scripts/syncJciMalaysia.mjs`，来源 `member_directory.id` | 之后的同步优先按此编号对应（手动对应表之后）；应用内不显示 |
+| jciCareer.jciMalaysiaMembershipNo | string | — | JCI Malaysia（jcimalaysia.cc）会员编号，如 `JCIKL-025-0159`；对方为 "N/A" 时不写 | | 系统: `netlify/lib/jciMalaysiaSync.mjs`（按需执行，Admin SDK；入口为 CLI `scripts/syncJciMalaysia.mjs` 与应用内 `netlify/functions/jci-malaysia-sync`，仅开发者账号），来源 SheetScraper Pro 数据库 `member_directory.membership`（只取 JCI Kuala Lumpur 的记录；对应顺序：手动对应 `jciMalaysiaOverrides` → 已存用户编号 → 已存编号 → 电邮 → 电话） | 之后的同步按此编号对应；`MemberDetailCareerTab`（JCI Career 分页）只读显示 |
+| jciCareer.jciMalaysiaJoinDate | string | — | JCI Malaysia 入会日期（YYYY-MM-DD） | | 系统: `netlify/lib/jciMalaysiaSync.mjs`（CLI 与应用内同步），来源 `member_directory.joindate` | `MemberDetailCareerTab`（JCI Career 分页）只读显示 |
+| jciCareer.jciMalaysiaUserId | string | — | JCI Malaysia（jcimalaysia.cc）用户编号，对方每人固定不变 | | 系统: `netlify/lib/jciMalaysiaSync.mjs`（CLI 与应用内同步），来源 `member_directory.id` | 之后的同步优先按此编号对应（手动对应表之后）；应用内不显示 |
 | jciCareer.introducer | string | — | | introducer | 角色: B+；系统: 导入 normalize | introducer stats recalculation |
 | jciCareer.senatorship | object | ✓ | |  | B+ 操作 / senatorship validation | Senator 资格、编号及董事会验证 |
 | jciCareer.senatorship.certified | boolean | ✓ | | senatorCertified | 角色: B+；系统: senatorship validation | Senator 资格展示、换届董事会验证 |
@@ -154,6 +154,7 @@
 | system.roleChangedAt | string \| Timestamp | — | ISO timestamp of last role change | roleChangedAt | 系统: updateMemberRole | audit trail |
 | system.role | enum | — | `GUEST` \| `MEMBER` \| `BOARD` \| `ADMIN` \| `SUPER_ADMIN` \| `INACTIVE` | role | 角色: B+ / A+；系统: registration / approval / membership sync / board sync | Firestore rules / UI permissions / `boardMembers.displayRole` |
 | churnRisk | string | — | |  | 系统: AI churn prediction；角色: B+ | analytics/dashboard |
+| isDeveloper | boolean | — | 开发者账号；本人不可修改（`firestore.rules` 自助更新锁定字段） |  |  | `firestore.rules` `isDeveloper()`；`netlify/functions/jci-malaysia-sync`（`netlify/lib/jciMalaysiaSync.mjs` `isSyncDeveloper`：必须 `=== true` 且角色不是 `INACTIVE`，否则 403）；`hooks/useJciMalaysiaSync.ts` 只用于显示按钮 |
 | idealReferralIndustry | string | — | 理想转介**行业**（`INDUSTRY_OPTIONS`），以 `||` 连接（`joinIdealReferralIndustries`）。保持字符串是因为已安装的旧版 app 会对它调用 `.split()`；`||` 不会出现在任何选项里，`,` 会（如 `Architecture, Engineering & Construction`）。读取一律用 `normalizeIdealReferrals`（兼容旧的 `, ` 分隔值） |  | 角色: 自己(非锁定字段) 或 B+（`MemberEditForm`、`MemberDetailProfessionalTab` / `MemberDetailBasicTab`）；系统: `MembersService.normalizeMemberData` 统一改写为 `||` 格式（含导入）；一次性 `scripts/normalizeIdealReferrals.mjs`（从类型字段移入行业值） | 商业目录「Ideal match」排序（`BusinessDirectoryView`，与条目 `industry` 比较）；资料完整度「Ideal referral」；会员资料展示。不进 `business.idealReferrals`、不进名片 |
 | tier | MemberTier \| string | — | |  | 系统: tier/gamification calculation；角色: B+ | member segmentation |
 | skills | string[] | — | |  | 角色: 自己(非锁定字段) 或 B+ | 会员资料展示、项目技能匹配 |
@@ -332,6 +333,50 @@
 
 > 删除：`self-email` `finalize` 成功时；外部账号被 `external-accounts` `deleteAccount` 永久删除时随成员文档同批删除。
 > 没有请求记录时，Auth 邮箱与 `contact.email` 不一致不会被同步（例如管理员直接改过 Auth 邮箱的账号）。
+
+---
+
+## `systemSecrets`
+> **TS Interface:** 无 | **Doc ID:** 固定名称（目前只有 `jciMalaysiaSource`）
+> 服务端密钥。客户端不可读写（`firestore.rules` `allow read, write: if false`，管理员与开发者也不行），只有 Admin SDK 可读。
+
+| 字段路径 | 类型 | 必填 | 枚举值 / 说明 | 来 | 往 |
+|--------|------|:----:|------------|----|----|
+| （`jciMalaysiaSource`）type / project_id / private_key_id / private_key / client_email / client_id / auth_uri / token_uri / … | string | ✓ | JCI Malaysia 来源项目（`gen-lang-client-0772255734`）服务账号 JSON 的全部字段，只读该项目 | 系统: `scripts/uploadJciMalaysiaSourceKey.mjs`（一次性，从 `secrets/source-firebase.json` 上传） | `netlify/functions/jci-malaysia-sync` 用它初始化具名 Admin app（暖启动缓存） |
+| （`jciMalaysiaSource`）uploadedAt | Timestamp | ✓ | 上传时间 | 系统: 同上 | 无 |
+
+> 换密钥：在来源项目生成新密钥 → 重新运行上传脚本 → 在来源项目删除旧密钥。见 `RISK_REGISTER.md` R-097。
+
+---
+
+## `jciMalaysiaOverrides`
+> **TS Interface:** 无 | **Doc ID:** 等于 `members` 文档 ID
+> JCI Malaysia 同步的手动对应（电邮与电话指向不同记录时由开发者选择）。客户端不可读写（`firestore.rules` `if false`）。
+
+| 字段路径 | 类型 | 必填 | 枚举值 / 说明 | 来 | 往 |
+|--------|------|:----:|------------|----|----|
+| sourceId | string | ✓ | 来源 `member_directory.id`；必须是该会员的冲突候选 A / B 之一，或任一 JCI Kuala Lumpur 记录 | 系统: `jci-malaysia-sync` `pick` 动作（`netlify/lib/jciMalaysiaSync.mjs` `savePick` 校验）；`scripts/uploadJciMalaysiaSourceKey.mjs --seed-overrides`（从 `scripts/data/jciMalaysiaOverrides.json` 补入，已有的不覆盖） | `jciMalaysiaSync.mjs` `loadOverrides` → 匹配第一顺位（`matchMember` `manual`）；CLI 在集合为空时退回 JSON 文件 |
+| pickedBy | string | ✓ | 选择者 uid；种子数据为 `seed:scripts/data/jciMalaysiaOverrides.json` | 系统: 同上 | 审计 |
+| pickedAt | Timestamp | ✓ | | 系统: 同上 | 审计 |
+
+> 每次 `pick` 另写一条 `auditLog`（`jci_malaysia_sync_pick`，只含 memberId 与 sourceId）。没有删除入口；要撤销只能用 Admin SDK 删除文档。
+
+---
+
+## `jciMalaysiaSyncRuns`
+> **TS Interface:** 无 | **Doc ID:** 自动
+> 应用内 JCI Malaysia 同步每次 `apply` 的备份（写入前的旧值），用于恢复。客户端不可读写（`firestore.rules` `if false`）。
+
+| 字段路径 | 类型 | 必填 | 枚举值 / 说明 | 来 | 往 |
+|--------|------|:----:|------------|----|----|
+| by | string | ✓ | 执行者 uid | 系统: `jci-malaysia-sync` `apply`（`applySync`） | 审计 |
+| at | Timestamp | ✓ | | 系统: 同上 | 审计 |
+| counts | map | ✓ | 与预览相同的计数（members、byManual … toWrite、unchanged） | 系统: 同上（服务端重新计算的计划） | 审计；`auditLog.metadata.counts` 同值 |
+| before | array | ✓ | `[{ memberId, before: { jciMalaysiaMembershipNo, jciMalaysiaJoinDate, jciMalaysiaUserId } }]`（原值，缺失为 null） | 系统: 同上，在写 `members` 之前写入 | 人工恢复：用 Admin SDK 把这些值写回 `members.jciCareer.*`（R-097） |
+| status | string | ✓ | `started` → `done`；停在 `started` 表示批次中途失败（部分会员已写入） | 系统: 同上 | 恢复判断 |
+| written | number | ✓ | 已写入的会员数 | 系统: 同上 | 审计 |
+
+> 写入顺序：本文档 → `members` 批次（每批 ≤ 400）→ `status: done` → 一条 `auditLog`（`jci_malaysia_sync_apply`，只含计数与 runId）。没有需要写的变更时不建立文档。
 
 ---
 

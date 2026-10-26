@@ -952,3 +952,15 @@ Evidence: the Benefits page has no claim action; "Claimed" only reflects existin
 Recommended action: decide whether member offers should be claimable; if so, add a usage-only path (no counter update) for member offers.
 
 Decision (2026-10-26, owner): member offers stay view-only — no claim action. Members contact the offering member directly (phone / social media on the shared card).
+
+### R-097 JCI Malaysia Source Key Stored in Firestore; Developer-Only In-App Sync (P2, accepted 2026-10-26)
+
+Evidence: `netlify/functions/jci-malaysia-sync` reads the source project's service account key (read access to `gen-lang-client-0772255734`, database `ai-studio-cba40058-...`, `member_directory`) from `systemSecrets/jciMalaysiaSource`, written once by `scripts/uploadJciMalaysiaSourceKey.mjs`. `firestore.rules` deny every client read and write of `systemSecrets`, `jciMalaysiaOverrides` and `jciMalaysiaSyncRuns` (`if false`, tested in `tests/rules/jciMalaysiaSync.rules.test.ts` for SUPER_ADMIN, ADMIN, developer and the member concerned). Anyone holding our Admin credentials (Netlify env, `.env`) can read the key, and a Firestore export or backup contains it in plain text. The key is never returned, logged or printed (the uploader prints only `project_id` and `client_email`).
+
+The function only accepts callers whose Firestore member doc has `isDeveloper === true` and role not `INACTIVE` (`isSyncDeveloper`); everyone else gets 403. Members cannot set `isDeveloper` themselves (self-update lock in `firestore.rules`). As of 2026-10-26 no production member has `isDeveloper: true`, so nobody can use the button until it is set on the developer account(s) with the Admin SDK or the console. `apply` always recomputes the plan on the server and ignores any client-sent plan; it writes only `jciCareer.jciMalaysiaMembershipNo`, `jciMalaysiaJoinDate` and `jciMalaysiaUserId` on KL members.
+
+Recovery: each `apply` first stores `jciMalaysiaSyncRuns/{runId}` = `{ by, at, counts, before: [{ memberId, before }], status, written }`; `status: started` left behind means a batch failed part-way. To roll back, write each `before` value back to `members/{memberId}.jciCareer.*` with the Admin SDK (null = delete the field). `auditLog` has one `jci_malaysia_sync_apply` entry per run (counts and runId only) and one `jci_malaysia_sync_pick` per pick.
+
+Timing: synchronous Netlify functions time out after about 10 s by default. Measured 2026-10-26 from a local machine (read-only, real data): source read with the field mask 1.7 s for 14,777 rows (3.3 s without it), KL members 0.5 s, whole CLI dry run 2.5 s; `apply` adds one batch commit per 400 members. Cold starts add the Admin init and the `systemSecrets` read. If the source grows a lot or runs slow, raise the function timeout in the Netlify UI (it cannot be set in `netlify.toml`) or move `apply` to a background function.
+
+Recommended action: rotate the source key if the Netlify env or a Firestore export may have leaked (new key → re-run the uploader → delete the old key in the source project). Keep `isDeveloper` limited to the developer accounts.
