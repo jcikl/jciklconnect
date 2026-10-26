@@ -1265,7 +1265,7 @@
 | Service | 行數 | 引用 | 用途 | 集合 |
 |---|---|---|---|---|
 | `chapterBirthdaysService.ts` | 46 | 1 | Own-chapter birthdays for external users: calls the Netlify function chapter-birthdays (read-only). | — |
-| `externalAccountsService.ts` | 151 | 3 | External (sister-chapter) accounts. Writes go through the Netlify function external-accounts (uid = member doc id); reads (chapter roster, K… | MEMBERS |
+| `externalAccountsService.ts` | 162 | 3 | External (sister-chapter) accounts. Writes go through the Netlify function external-accounts (uid = member doc id); reads (chapter roster, K… | MEMBERS |
 | `reportService.ts` | 615 | 2 | ⚠️ 無說明 | — |
 
 <details><summary><code>services/chapterBirthdaysService.ts</code> — 1 個方法</summary>
@@ -1276,7 +1276,7 @@
 
 </details>
 
-<details><summary><code>services/externalAccountsService.ts</code> — 7 個方法</summary>
+<details><summary><code>services/externalAccountsService.ts</code> — 8 個方法</summary>
 
 | 方法 | 行 | 說明 |
 |---|---|---|
@@ -1287,6 +1287,7 @@
 | `inviteMembers` | 133 | Invite AFFILIATE members (active immediately). A chapter admin's own chapter is enforced by the server (loId i… |
 | `setStatus` | 139 | Change an external member's affiliation status (server checks the transition table and syncs the card). |
 | `resendInvite` | 145 | Send the password setup email again. Returns whether the email was sent. |
+| `deleteAccount` | 156 | PERMANENT: delete an external account (member doc, email slot, card, email-change request, public listing, the… |
 
 </details>
 
@@ -1320,10 +1321,10 @@
 | `useAutomation.ts` | 149 | 3 | `useAutomation` | automationService | useAutomation Hook - Manage automation workflows and rules |
 | `useBusinessDirectory.ts` | 51 | 4 | `useBusinessDirectory` | businessDirectoryService | ⚠️ 無說明 |
 | `useChapterBirthdays.ts` | 23 | 1 | `useChapterBirthdays` | chapterBirthdaysService | Own-chapter birthdays for an active external user (dashboard birthday widget). `month` null → nothing loads. |
-| `useChapterMembers.ts` | 75 | 2 | `useChapterMembers`, `usePendingKlApprovals` | externalAccountsService | Chapter roster for an active CHAPTER_ADMIN (own chapter) and the KL approval queue (pending_kl, KL admins). Status changes / invites go thro… |
+| `useChapterMembers.ts` | 87 | 2 | `useChapterMembers`, `usePendingKlApprovals` | externalAccountsService | Chapter roster for an active CHAPTER_ADMIN (own chapter) and the KL approval queue (pending_kl, KL admins). Status changes / invites go thro… |
 | `useCommunication.ts` | 123 | 2 | `useCommunication` | communicationService | Communication Data Hook |
 | `useEvents.ts` | 191 | 8 | `useEvents` | errorLoggingService, eventsService, membersService | Events Data Hook |
-| `useExternalAccounts.ts` | 46 | 1 | `useExternalAccounts` | externalAccountsService, membersService | External (sister-chapter) account actions for components: create chapter admins, invite, status, resend. |
+| `useExternalAccounts.ts` | 52 | 1 | `useExternalAccounts` | externalAccountsService, membersService | External (sister-chapter) account actions for components: create chapter admins, invite, status, resend. |
 | `useFinanceData.ts` | 2,034 | 4 | `useFinanceData` | errorLoggingService, financeService, inventoryService, membersService, membershipConfigService, paymentRequestService, projectFinancialService, projectsService | TODO (PERF-A-004): This hook has ~90 useState declarations, causing full FinanceView re-renders on any state update. Planned refactor: split… |
 | `useFirestoreCollection.ts` | 171 | 18 | `useFirestoreCollection` | — | ⚠️ 無說明 |
 | `useGamification.ts` | 148 | 1 | `useGamification` | gamificationService | useGamification.ts - Unified Hook for Awards (Achievements + Badges) |

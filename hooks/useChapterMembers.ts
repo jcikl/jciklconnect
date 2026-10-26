@@ -64,7 +64,19 @@ export function useChapterMembers(loId: string | null | undefined) {
     }
   }, [reload]);
 
-  return { ...list, resendInvite, inviteMembers, inviting };
+  /** PERMANENT delete of an own-chapter AFFILIATE (server checks scope); the list reloads afterwards. */
+  const deleteAccount = useCallback(async (memberId: string): Promise<{ authDeleted: boolean }> => {
+    setBusyId(memberId);
+    try {
+      const res = await ExternalAccountsService.deleteAccount(memberId);
+      reload();
+      return res;
+    } finally {
+      setBusyId(null);
+    }
+  }, [setBusyId, reload]);
+
+  return { ...list, resendInvite, inviteMembers, inviting, deleteAccount };
 }
 
 /** KL admins: members waiting for KL approval across all chapters. */

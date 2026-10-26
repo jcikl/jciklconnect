@@ -5,6 +5,11 @@
 //   action 'setStatus':          { memberId, status } — transition table in netlify/lib/externalAccounts.mjs;
 //                                keeps memberCards in sync (create / delete via shouldHaveCard).
 //   action 'resendInvite':       { memberId } — password setup email again.
+//   action 'deleteAccount':      { memberId } — PERMANENT. Scope in canDeleteAccount (KL admin: any external;
+//                                chapter admin: own-chapter AFFILIATE). One batch deletes the member doc, its
+//                                memberEmails slot(s), memberCards, emailChangeRequests and publicBusinessListings
+//                                docs plus writes the auditLog entry; then the Auth user is deleted. If that fails
+//                                the response says authDeleted: false and a KL admin can call again (retry path).
 // Caller role / status / loId come from the caller's Firestore member doc, never the body.
 // Every call writes one auditLog entry; responses never contain emails.
 import { Timestamp } from 'firebase-admin/firestore';
@@ -13,10 +18,56 @@ import { sendPasswordSetupEmail, memberEmail } from '../lib/memberAuth.mjs';
 import {
   validateInvitees, resolveCreateScope, checkChapter, checkCap, buildExternalMemberDoc, buildEmailSlot,
   emailSlotId, cardFor, checkStatusTransition, statusUpdates, withStatus, canManageMember, CAP_COUNTED_STATUSES,
+  isKlAdmin, canDeleteAccount, canRetryAccountDeletion, planAccountDeletion,
 } from '../lib/externalAccounts.mjs';
 
 const ALLOWED_ORIGINS = ['https://app.jcikl.cc', 'http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'];
-const ACTIONS = ['createChapterAdmin', 'inviteMember', 'setStatus', 'resendInvite'];
+const ACTIONS = ['createChapterAdmin', 'inviteMember', 'setStatus', 'resendInvite', 'deleteAccount'];
+const DELETE_AUDIT_ACTION = 'external_accounts_deleteAccount';
+
+/** Metadata of an earlier deleteAccount audit entry for this id, or null (the retry guard). */
+async function priorDeletion(memberId) {
+  const snap = await db.collection('auditLog').where('targetId', '==', memberId).get();
+  const entry = snap.docs.map(d => d.data()).find(d => d.action === DELETE_AUDIT_ACTION);
+  return entry ? (entry.metadata ?? {}) : null;
+}
+
+/**
+ * Permanent delete: one batch (planAccountDeletion docs + this call's auditLog entry), then the Auth user.
+ * The audit entry is in the batch so a later retry can prove this id was an external account deleted here.
+ * Returns whether the Auth user is gone (a missing Auth user counts as gone).
+ */
+async function deleteAccount(callerUid, memberId, metadata) {
+  const slots = await db.collection('memberEmails').where('memberId', '==', memberId).get();
+  const auditRef = db.collection('auditLog').doc();
+  const batch = db.batch();
+  for (const [col, id] of planAccountDeletion(memberId, slots.docs.map(d => d.id))) batch.delete(db.collection(col).doc(id));
+  batch.set(auditRef, {
+    action: DELETE_AUDIT_ACTION,
+    performedBy: callerUid,
+    targetCollection: 'members',
+    targetId: memberId,
+    before: null,
+    after: null,
+    // No email and no slot ids (a slot id is the email).
+    metadata: { ...metadata, slotsDeleted: slots.size, authDeleted: null },
+    timestamp: Timestamp.now(),
+    _source: 'netlify-function',
+  });
+  await batch.commit();
+  let authDeleted = true;
+  try {
+    await auth.deleteUser(memberId);
+  } catch (e) {
+    if (e.code !== 'auth/user-not-found') {
+      authDeleted = false;
+      console.error('[external-accounts] deleteUser failed (retry deleteAccount as a KL admin):', memberId, e.code || e.message);
+    }
+  }
+  await auditRef.update({ 'metadata.authDeleted': authDeleted })
+    .catch(err => console.error('[external-accounts] audit update failed:', memberId, err.code || err.message));
+  return authDeleted;
+}
 
 async function emailTaken(email) {
   const slot = await db.collection('memberEmails').doc(emailSlotId(email)).get();
@@ -138,12 +189,28 @@ export default async (req) => {
       return json({ action, loId: scope.loId, summary, results });
     }
 
-    // setStatus / resendInvite: one target member.
+    // setStatus / resendInvite / deleteAccount: one target member.
     const memberId = typeof body.memberId === 'string' ? body.memberId : '';
     if (!memberId) return json({ error: 'memberId is required' }, 400);
     const ref = db.collection('members').doc(memberId);
     const snap = await ref.get();
     const target = snap.exists ? snap.data() : null;
+
+    if (action === 'deleteAccount') {
+      if (!target) {
+        // Retry: profile already deleted but the Auth step failed. KL admin + earlier deleteAccount audit only.
+        const prior = isKlAdmin(caller) ? await priorDeletion(memberId) : null;
+        if (!canRetryAccountDeletion(caller, callerUid, memberId, prior !== null)) return json({ error: 'Member not found' }, 404);
+        const authDeleted = await deleteAccount(callerUid, memberId, { role: prior.role ?? null, loId: prior.loId ?? null, retry: true });
+        return json({ action, memberId, authDeleted, retry: true });
+      }
+      const check = canDeleteAccount(caller, callerUid, memberId, target);
+      if (!check.ok) return json({ error: check.error }, check.status);
+      const authDeleted = await deleteAccount(callerUid, memberId, {
+        role: target.role, loId: target.loId, status: target.affiliation?.status ?? null, retry: false,
+      });
+      return json({ action, memberId, authDeleted, retry: false });
+    }
 
     if (action === 'setStatus') {
       const check = checkStatusTransition(caller, callerUid, memberId, target, body.status);

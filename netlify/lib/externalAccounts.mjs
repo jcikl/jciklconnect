@@ -222,3 +222,43 @@ export function canManageMember(caller, callerUid, targetId, target) {
   return isActiveChapterAdmin(caller) && targetId !== callerUid &&
     target.role === 'AFFILIATE' && target.loId === caller.loId;
 }
+
+/**
+ * deleteAccount scope (permanent delete). Never self, never a KL member (non-external role, or loId 'jcikl' /
+ * missing). KL admin → any external (AFFILIATE / CHAPTER_ADMIN); active CHAPTER_ADMIN → own-chapter AFFILIATE only.
+ * Returns { ok: true } or { ok: false, status, error }.
+ */
+export function canDeleteAccount(caller, callerUid, targetId, target) {
+  if (!target) return { ok: false, status: 404, error: 'Member not found' };
+  if (!targetId || targetId === callerUid) return { ok: false, status: 403, error: 'You cannot delete your own account' };
+  if (!EXTERNAL_ROLES.includes(target.role) || (target.loId ?? KL_LO_ID) === KL_LO_ID) {
+    return { ok: false, status: 400, error: 'Not an external member' };
+  }
+  if (isKlAdmin(caller)) return { ok: true };
+  if (isActiveChapterAdmin(caller) && target.role === 'AFFILIATE' && target.loId === caller.loId) return { ok: true };
+  return { ok: false, status: 403, error: 'Forbidden' };
+}
+
+/**
+ * Retry after a delete whose Auth step failed: the member doc is already gone, so the target cannot be checked
+ * again. Only a KL admin may finish it, and only when an earlier deleteAccount audit entry exists for that id
+ * (proof it was an external account removed by this action, never a KL member).
+ */
+export function canRetryAccountDeletion(caller, callerUid, targetId, priorDeletionLogged) {
+  return isKlAdmin(caller) && !!targetId && targetId !== callerUid && priorDeletionLogged === true;
+}
+
+/**
+ * Docs one deleteAccount batch removes, as [collection, id] pairs: the member doc, its memberEmails slots
+ * (only slots whose memberId is this member, found by query), the card, the pending email-change request and the
+ * public business listing. Deleting a missing doc is a no-op, so the same plan is safe on a retry.
+ */
+export function planAccountDeletion(memberId, slotIds = []) {
+  return [
+    ['members', memberId],
+    ...[...new Set(slotIds)].map(id => ['memberEmails', id]),
+    ['memberCards', memberId],
+    ['emailChangeRequests', memberId],
+    ['publicBusinessListings', memberId],
+  ];
+}

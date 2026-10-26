@@ -11,6 +11,7 @@
 > `平铺冗余字段（等待替换）` 列记录 legacy/import flat aliases，主要来自 `MembersService.normalizeMemberData()` 的 flat-to-nested 映射。
 > `来` / `往` 记录字段的数据流：`来` 只写明角色填写、系统计算、服务同步或其他字段引用等写入来源；`往` 只写明页面展示、权限判断、统计计算、服务流程或其他集合字段等实际使用目标。它们不是 Firestore 自动触发器；空白代表当前未确认有代码级联动。
 > **外部会员文档（role `AFFILIATE` / `CHAPTER_ADMIN`）的创建来源（Phase 1）：** ① `netlify/functions/external-accounts`（Admin SDK，`createChapterAdmin` / `inviteMember`，账号创建即 `active`，同批写入 `memberEmails` 槽位与 `memberCards`）；② 外部自助注册：`hooks/useAuth` `signUpExternal`（`utils/signUpPayload.ts` `buildExternalSignUpMember`），role `AFFILIATE`、`affiliation.status` = `pending_chapter`，不写 `memberEmails`；③ `scripts/auditChapterMemberDocs.mjs --apply`：把旧 Global Relations「Add Member」建出的 role `MEMBER`、`loId` 不是 `jcikl` 的文档转为外部 `AFFILIATE`（`active`）。
+> **外部会员文档的永久删除（2026-10-26）：** 只有 `netlify/functions/external-accounts` `deleteAccount`（Admin SDK；KL 管理员任意外部账号，active CHAPTER_ADMIN 只限本分会 AFFILIATE，`netlify/lib/externalAccounts.mjs` `canDeleteAccount`）。同一批次删除 `members/{id}`、`memberEmails`（`memberId == id` 的槽位）、`memberCards/{id}`、`emailChangeRequests/{id}`、`publicBusinessListings/{id}`，并写 `auditLog`；之后删除 Auth 账号。保留引用该 id 的历史记录（`eventRegistrations`、`surveyResponses`、`notifications`、`benefitUsage`、`auditLog`）。无法恢复，见 `RISK_REGISTER.md` R-092。KL 会员与旧的无登录 `MEMBER` 文档不走这条路径（后者仍由 `MembersService.deleteMember` 软删除）。
 
 | 字段路径 | 类型 | 必填 | 枚举值 / 说明 | 平铺冗余字段（等待替换） | 来 | 往 |
 |--------|------|:----:|------------|--------------|----|----|
@@ -173,7 +174,7 @@
 ## `memberCards`
 > **TS Interface:** `MemberCard`（`types/member.ts`） | **Constants key:** `COLLECTIONS.MEMBER_CARDS`（`'memberCards'`） | **Doc ID:** 等于 `members` 文档 ID
 > 目录安全的公开名片。仅当成员开启 `privacy.shareCardInternationally` 时，才带上主电话与社交媒体（`phone` / `socials`），其余不含 PII；备用电话、邮箱、证件号永不上卡。它是外部用户能读到的其他人资料的唯一来源（见 `SCHEMA-PERMISSIONS.md`）。
-> **来：** 由 `MemberCardsService.syncCards`（`services/memberCardsService.ts`）写入，`membersService` 在成员写入成功之后调用（create / update / 软删除 / 角色变更 / 批量更新），`hooks/useAuth` `updateMemberProfile` 在自己的资料保存后也调用（Phase 1）；卡片写入失败只记日志、不回滚成员写入。另有 `netlify/functions/external-accounts`（Admin SDK）：创建账号时随成员文档同批写入，`setStatus` 时同批写入或删除（`shouldHaveCard`）；`scripts/backfillMemberCards.mjs --apply` 回填。卡片构建逻辑在 `utils/memberCard.mjs`（`buildMemberCard`，`shouldHaveCard`，`planCardSync`）。
+> **来：** 由 `MemberCardsService.syncCards`（`services/memberCardsService.ts`）写入，`membersService` 在成员写入成功之后调用（create / update / 软删除 / 角色变更 / 批量更新），`hooks/useAuth` `updateMemberProfile` 在自己的资料保存后也调用（Phase 1）；卡片写入失败只记日志、不回滚成员写入。另有 `netlify/functions/external-accounts`（Admin SDK）：创建账号时随成员文档同批写入，`setStatus` 时同批写入或删除（`shouldHaveCard`），`deleteAccount` 时随成员文档同批删除；`scripts/backfillMemberCards.mjs --apply` 回填。卡片构建逻辑在 `utils/memberCard.mjs`（`buildMemberCard`，`shouldHaveCard`，`planCardSync`）。
 > **往：** 国际目录经 `hooks/useSisterChapterMembers` 读取：KL 用户与外部用户都在 `BusinessDirectoryView`（同一布局与筛选面板，`components/modules/BusinessDirectory/directoryFacets.ts`；KL 用户与本地商家合并为同一列表，外部用户为 `cardsOnly` 模式，只有卡片）；外部用户读 `international == true` 的卡（含已开放的 KL 卡）加本分会的卡；卡片没有联系方式字段，外部目录不提供 Contact。读取范围由 firestore.rules 决定（`externalCanReadCard`、`isActiveMember`、`canReadOrgMembers`）。外部用户的生日列表不读 `memberCards`，走 `netlify/functions/chapter-birthdays`。
 > 卡片只在 `shouldHaveCard` 为真时存在：role `MEMBER` / `BOARD` / `ADMIN` / `SUPER_ADMIN`，或 active 外部会员；GUEST / INACTIVE 与软删除的成员没有卡。
 
@@ -311,6 +312,7 @@
 | memberId | string | ✓ | 对应 members doc ID | 系统: 创建会员时生成；导入时从会员文档关联；`external-accounts` 创建外部账号时 | 关联 `members/{memberId}`；查询邮箱对应会员 |
 | createdAt | Timestamp | ✓ | | 系统: 创建邮箱去重槽位时生成 | 去重槽位审计记录 |
 
+> 删除：`netlify/functions/external-accounts` `deleteAccount` 按 `where('memberId','==',id)` 找到槽位，随外部会员文档同批删除（只删属于该成员的槽位）。
 > 外部自助注册（`signUpExternal`）不写入槽位：`memberEmails` 的创建规则只允许 B+，自助注册的外部会员没有槽位（见 `RISK_REGISTER.md` R-066）。
 
 ---
@@ -324,6 +326,7 @@
 | newEmail | string | ✓ | 本人申请的新邮箱 | 系统: `self-email` `request` 动作（先检查未被其他 Auth 账号或 `memberEmails` 槽位占用，之后客户端才调用 `verifyBeforeUpdateEmail`） | `self-email` `finalize`：仅当它与已验证的 Auth 邮箱相等（不分大小写）才继续 |
 | requestedAt | string | ✓ | ISO 时间；超过 7 天失效（`netlify/lib/selfEmail.mjs` `canFinalizeEmailChange`） | 系统: 同上 | 同上；`finalize` 成功时在同一批次内删除该文档，并移动 `members.contact.email`（及旧的顶层 `email`）与 `memberEmails` 槽位 |
 
+> 删除：`self-email` `finalize` 成功时；外部账号被 `external-accounts` `deleteAccount` 永久删除时随成员文档同批删除。
 > 没有请求记录时，Auth 邮箱与 `contact.email` 不一致不会被同步（例如管理员直接改过 Auth 邮箱的账号）。
 
 ---
@@ -2094,7 +2097,7 @@
 
 ## `publicBusinessListings`
 > **TS Interface:** `BusinessProfile` (`types/member.ts`，同上，通过 `mapMemberToBusinessProfile` 映射写入) | **Constants key:** `COLLECTIONS.PUBLIC_BUSINESS_LISTINGS`
-> **注意：** 此集合是 `members` 集合 business 字段的公开去标准化副本，由 `businessDirectoryService.syncPublicListing` 维护。字段结构与 `businessProfiles` 完全相同，doc ID = memberId。
+> **注意：** 此集合是 `members` 集合 business 字段的公开去标准化副本，由 `businessDirectoryService.syncPublicListing` 维护。字段结构与 `businessProfiles` 完全相同，doc ID = memberId。外部账号被 `netlify/functions/external-accounts` `deleteAccount` 永久删除时，同 id 的文档随成员文档同批删除（不存在时无操作）。
 
 字段同 `businessProfiles`，见上方。
 

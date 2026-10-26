@@ -3,6 +3,7 @@ import {
   MAX_PER_CALL, CHAPTER_MEMBER_CAP, isKlAdmin, isActiveChapterAdmin, emailSlotId, mmddFromDob, categoryForChapter,
   validateInvitees, resolveCreateScope, checkChapter, checkCap, buildExternalMemberDoc, cardFor,
   checkStatusTransition, statusUpdates, withStatus, canManageMember, CAP_COUNTED_STATUSES, countsTowardCap,
+  canDeleteAccount, canRetryAccountDeletion, planAccountDeletion,
 } from './externalAccounts.mjs';
 
 const SG = 'jcicitysg';
@@ -201,5 +202,107 @@ describe('canManageMember (resendInvite)', () => {
     expect(canManageMember(chAdmin, 'c', 'c', aff('active'))).toBe(false);
     expect(canManageMember(chAdmin, 'c', 't', { ...aff('active'), loId: 'jcitokyo' })).toBe(false);
     expect(canManageMember(board, 'b', 't', aff('active'))).toBe(false);
+  });
+});
+
+describe('canDeleteAccount', () => {
+  const ok = { ok: true };
+  const chAdminTarget = { ...aff('active'), role: 'CHAPTER_ADMIN' };
+  const klMember = { role: 'MEMBER', loId: 'jcikl' };
+  const statuses = ['pending_chapter', 'pending_kl', 'active', 'suspended', 'expired', 'rejected'];
+
+  it('KL admin (ADMIN / SUPER_ADMIN): any external account, any status, any chapter', () => {
+    for (const caller of [klAdmin, superAdmin]) {
+      for (const s of statuses) {
+        expect(canDeleteAccount(caller, 'k', 't', aff(s))).toEqual(ok);
+        expect(canDeleteAccount(caller, 'k', 't', { ...aff(s), role: 'CHAPTER_ADMIN' })).toEqual(ok);
+      }
+      expect(canDeleteAccount(caller, 'k', 't', { ...aff('active'), loId: 'jcitokyo' })).toEqual(ok);
+    }
+  });
+
+  it('never a KL member: internal role, or external role on a KL / missing loId', () => {
+    for (const caller of [klAdmin, superAdmin, chAdmin]) {
+      for (const role of ['MEMBER', 'BOARD', 'ADMIN', 'SUPER_ADMIN', 'GUEST', 'INACTIVE']) {
+        expect(canDeleteAccount(caller, 'k', 't', { role, loId: 'jcikl' })).toMatchObject({ ok: false, status: 400 });
+        expect(canDeleteAccount(caller, 'k', 't', { role })).toMatchObject({ ok: false, status: 400 });
+        // An internal role on a sister-chapter doc (legacy MEMBER) is not an external login account either.
+        expect(canDeleteAccount(caller, 'k', 't', { role, loId: SG })).toMatchObject({ ok: false, status: 400 });
+      }
+      expect(canDeleteAccount(caller, 'k', 't', { ...aff('active'), loId: 'jcikl' })).toMatchObject({ ok: false, status: 400 });
+      expect(canDeleteAccount(caller, 'k', 't', { ...aff('active'), loId: undefined })).toMatchObject({ ok: false, status: 400 });
+    }
+  });
+
+  it('never self', () => {
+    expect(canDeleteAccount(klAdmin, 'k', 'k', klMember)).toMatchObject({ ok: false, status: 403 });
+    expect(canDeleteAccount(chAdmin, 'c', 'c', { ...chAdmin, general: { name: 'Me' } })).toMatchObject({ ok: false, status: 403 });
+    expect(canDeleteAccount(chAdmin, 'c', 'c', aff('active'))).toMatchObject({ ok: false, status: 403 });
+  });
+
+  it('missing target → 404; empty target id → 403', () => {
+    expect(canDeleteAccount(klAdmin, 'k', 't', null)).toMatchObject({ ok: false, status: 404 });
+    expect(canDeleteAccount(klAdmin, 'k', '', aff('active'))).toMatchObject({ ok: false, status: 403 });
+  });
+
+  it('active chapter admin: own-chapter AFFILIATE only, any status', () => {
+    for (const s of statuses) expect(canDeleteAccount(chAdmin, 'c', 't', aff(s))).toEqual(ok);
+  });
+
+  it('chapter admin: not another chapter admin, not another chapter, not KL', () => {
+    expect(canDeleteAccount(chAdmin, 'c', 't', chAdminTarget)).toMatchObject({ ok: false, status: 403 });
+    expect(canDeleteAccount(chAdmin, 'c', 't', { ...aff('active'), loId: 'jcitokyo' })).toMatchObject({ ok: false, status: 403 });
+    expect(canDeleteAccount(chAdmin, 'c', 't', klMember)).toMatchObject({ ok: false, status: 400 });
+  });
+
+  it('anyone else is forbidden: pending / suspended chapter admin, KL BOARD / MEMBER, AFFILIATE, ADMIN of another LO', () => {
+    const callers = [
+      chAdminPending,
+      { ...chAdmin, affiliation: { status: 'suspended' } },
+      board,
+      { role: 'MEMBER', loId: 'jcikl' },
+      { ...aff('active'), role: 'AFFILIATE' },
+      { role: 'ADMIN', loId: SG },
+      null,
+    ];
+    for (const caller of callers) {
+      expect(canDeleteAccount(caller, 'x', 't', aff('active'))).toMatchObject({ ok: false, status: 403 });
+    }
+  });
+});
+
+describe('canRetryAccountDeletion', () => {
+  it('KL admin with an earlier deleteAccount audit entry only, never self', () => {
+    expect(canRetryAccountDeletion(klAdmin, 'k', 't', true)).toBe(true);
+    expect(canRetryAccountDeletion(superAdmin, 'k', 't', true)).toBe(true);
+    expect(canRetryAccountDeletion(klAdmin, 'k', 't', false)).toBe(false);
+    expect(canRetryAccountDeletion(klAdmin, 'k', 'k', true)).toBe(false);
+    expect(canRetryAccountDeletion(klAdmin, 'k', '', true)).toBe(false);
+    expect(canRetryAccountDeletion(chAdmin, 'c', 't', true)).toBe(false);
+    expect(canRetryAccountDeletion(board, 'b', 't', true)).toBe(false);
+    expect(canRetryAccountDeletion(null, 'b', 't', true)).toBe(false);
+  });
+});
+
+describe('planAccountDeletion', () => {
+  it('member, its slots, card, email-change request, public listing — nothing else', () => {
+    expect(planAccountDeletion('m1', ['a@x.com', 'b@x.com'])).toEqual([
+      ['members', 'm1'],
+      ['memberEmails', 'a@x.com'],
+      ['memberEmails', 'b@x.com'],
+      ['memberCards', 'm1'],
+      ['emailChangeRequests', 'm1'],
+      ['publicBusinessListings', 'm1'],
+    ]);
+  });
+  it('no slots (self-registered) and repeated slot ids', () => {
+    expect(planAccountDeletion('m1')).toHaveLength(4);
+    expect(planAccountDeletion('m1', ['a@x.com', 'a@x.com']).filter(([c]) => c === 'memberEmails')).toHaveLength(1);
+  });
+  it('history collections are kept', () => {
+    const cols = planAccountDeletion('m1', ['a@x.com']).map(([c]) => c);
+    for (const kept of ['eventRegistrations', 'surveyResponses', 'notifications', 'auditLog', 'benefitUsage']) {
+      expect(cols).not.toContain(kept);
+    }
   });
 });

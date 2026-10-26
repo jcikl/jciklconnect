@@ -158,6 +158,8 @@ econciliations | B+/A+ | B+/A+ | B+/A+(必填字段) | A+ 或 B+(仅notes字段)
 
 其余集合依赖 `isMember()` / `isActiveMember()` / `canReadOrgMembers()` / `isBoard()` / `isAdmin()` 等角色函数，外部用户默认被拒绝。
 
+**外部账号的重新激活与永久删除（2026-10-26，服务端，不经过规则）：** 都由 `netlify/functions/external-accounts`（Admin SDK）完成，`firestore.rules` 无需修改，客户端仍不能删除这些文档。重新激活 = `setStatus` → `active`：KL 管理员（ADMIN / SUPER_ADMIN）任意；active CHAPTER_ADMIN 只能解除 `suspendedByRole == 'CHAPTER_ADMIN'` 的本分会 AFFILIATE。永久删除 = `deleteAccount`（`canDeleteAccount`）：KL 管理员可删任何外部账号（AFFILIATE / CHAPTER_ADMIN，`loId` 不是 `jcikl`）；active CHAPTER_ADMIN 只能删本分会 AFFILIATE；不能删自己或 KL 会员。删除范围：`members`、`memberEmails`（`memberId` 相同的槽位）、`memberCards`、`emailChangeRequests`、`publicBusinessListings` 的同 id 文档与 Auth 账号；见 `RISK_REGISTER.md` R-092。
+
 ## P0 规则缺陷速查
 
 | # | 集合 | 缺陷描述 | 状态 |

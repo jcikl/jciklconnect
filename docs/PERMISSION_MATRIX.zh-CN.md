@@ -68,7 +68,9 @@
   - 状态变更（`setStatus`）：分会管理人只能处理本分会的 AFFILIATE：`pending_chapter` → `pending_kl`（批准）、`pending_chapter` / `pending_kl` → `rejected`、`active` → `suspended`、`suspended` → `active`（只能解除分会管理人自己做的停用，即 `affiliation.suspendedByRole` 为 `CHAPTER_ADMIN`；JCI KL 做的停用分会管理人不能解除）；`pending_kl` → `active` 只有 KL 管理员；KL 管理员可在任意两个不同状态间切换。
   - 每个分会最多 100 个成员，名额只计算状态为 `active` 和 `suspended` 的成员（待审批、已拒绝、已过期的不占名额）。
   - 重发密码设置邮件（`resendInvite`）：KL 管理员，或 active 的 `CHAPTER_ADMIN`（只限本分会 AFFILIATE，不含自己）。
-- 配置页（`SYSTEM_CONFIG`，`utils/configAccess.ts`）：ADMIN 现在可以打开，但只能看到 Global Relations 标签（创建分会管理人、邀请成员、批准 `pending_kl`、停用）；增删改分会列表与启用开关仍只有 SUPER_ADMIN。
+  - 重新激活（`setStatus` → `active`）：KL 管理员可解除任何外部会员的停用（Global Relations 停用行上的 Reactivate 按钮）；分会管理人只能解除分会管理人自己做的停用（My Chapter 只在 `suspendedByRole` 为 `CHAPTER_ADMIN` 时显示按钮）。
+  - 永久删除账号（`deleteAccount`，`netlify/lib/externalAccounts.mjs` `canDeleteAccount`）：KL 管理员可删除任何外部账号（AFFILIATE / CHAPTER_ADMIN，`loId` 不是 `jcikl`）；active 的 `CHAPTER_ADMIN` 只能删除本分会的 AFFILIATE（不能删其他分会管理人、其他分会、KL 会员或自己）；任何人都不能删除 KL 会员或自己。删除登录账号、会员文档、邮箱槽位、名片、改邮箱请求与公开商家条目，无法恢复（见 `RISK_REGISTER.md` R-092）。登录账号删除失败时，只有 KL 管理员可以再次调用完成删除。
+- 配置页（`SYSTEM_CONFIG`，`utils/configAccess.ts`）：ADMIN 现在可以打开，但只能看到 Global Relations 标签（创建分会管理人、邀请成员、批准 `pending_kl`、停用、重新激活、永久删除外部账号）；增删改分会列表与启用开关仍只有 SUPER_ADMIN。
 - 外部用户在各视图的实际范围（Phase 1）：
   - 生日：本分会（active 外部成员）的生日由 `chapter-birthdays` function 返回（只含 id、姓名、头像、月日，不含年份，跳过 `privacy.hideBirthday`）。
   - 目录（`DIRECTORY`）：只显示 `memberCards` 名片，没有 Contact；范围是已开放名片的 KL 会员、本分会、以及其他分会 `international == true` 的名片；自己的名片未开放时查询不会执行（互惠规则，`useSisterChapterMembers` 的 `canView`）。
@@ -216,7 +218,7 @@
 | `cloudinary-delete.mjs` | Firebase ID token | `BOARD`/`ADMIN`/`SUPER_ADMIN` | Cloudinary signed delete | 有 publicId prefix allowlist。 |
 | `chapter-birthdays.mjs` | Firebase ID token | active 外部会员（`AFFILIATE` / `CHAPTER_ADMIN`，`affiliation.status == active`，非 KL 分会；角色与状态取自调用者的 Firestore 文档） | 只读 `members`（`loId` == 调用者分会），返回 id / 姓名 / 头像 / 月日 | 不返回年份与联系方式；跳过 `privacy.hideBirthday`；无 secret。 |
 | `delete-auth-user.mjs` | Firebase ID token | `ADMIN`/`SUPER_ADMIN` | 删除 Firebase Auth user | 高风险，不应给 board。 |
-| `external-accounts.mjs` | Firebase ID token | 按 action：`createChapterAdmin` 仅 `ADMIN`/`SUPER_ADMIN`（KL）；`inviteMember` active `CHAPTER_ADMIN`（强制自己的分会）或 KL 管理员；`setStatus` / `resendInvite` 见上方外部用户说明。角色、状态、分会取自调用者的 Firestore 文档，不取请求体 | 写 `members`、`memberEmails`、`memberCards`、`auditLog`；创建 / 删除 Firebase Auth 账号；发送密码设置邮件 | 需要 Firebase Admin 凭证，响应不含邮箱；每次调用写一条 `auditLog`（`external_accounts_*`）；每次最多 20 人、每个分会最多 100 个成员文档，没有限流；本地 `netlify dev` 跑不了（`firebase-admin/auth` 问题），需在预览版验证（见 R-071）。 |
+| `external-accounts.mjs` | Firebase ID token | 按 action：`createChapterAdmin` 仅 `ADMIN`/`SUPER_ADMIN`（KL）；`inviteMember` active `CHAPTER_ADMIN`（强制自己的分会）或 KL 管理员；`setStatus` / `resendInvite` / `deleteAccount` 见上方外部用户说明。角色、状态、分会取自调用者的 Firestore 文档，不取请求体 | 写 `members`、`memberEmails`、`memberCards`、`auditLog`；`deleteAccount` 另删除 `emailChangeRequests`、`publicBusinessListings` 的同 id 文档；创建 / 删除 Firebase Auth 账号；发送密码设置邮件 | 需要 Firebase Admin 凭证，响应不含邮箱；每次调用写一条 `auditLog`（`external_accounts_*`）；每次最多 20 人、每个分会最多 100 个成员文档，没有限流；本地 `netlify dev` 跑不了（`firebase-admin/auth` 问题），需在预览版验证（见 R-071）。 |
 | `jci-proxy.mjs` | 无 | public | 代理 `jcimalaysia.cc` 公开 event HTML | eventid 限制为数字；返回 HTML。 |
 | `lark-sync.mjs` | Firebase ID token | 本人或 `BOARD`/`ADMIN`/`SUPER_ADMIN` | Lark API、Firestore member data | 同步范围和 PII 需审计。 |
 | `send-email.mjs` | Firebase ID token | `BOARD`/`ADMIN`/`SUPER_ADMIN` | Resend/SendGrid/SMTP 发送邮件 | 已限制 MEMBER，需继续限制 recipient flood。 |

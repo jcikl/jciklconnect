@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Check, X, PauseCircle, PlayCircle, Mail, User, UserPlus } from 'lucide-react';
+import { Check, X, PauseCircle, PlayCircle, Mail, User, UserPlus, Trash2 } from 'lucide-react';
 import { Badge, Button, Card, ConfirmDialog, CONFIRM_CLOSED, EmptyState, Tabs, useToast } from '../../ui/Common';
 import type { ConfirmState } from '../../ui/Common';
 import { Input } from '../../ui/Form';
@@ -67,7 +67,7 @@ export const ChapterAdminView: React.FC = () => {
   const loId = member?.loId ?? null;
   const { chapters } = useSisterChapters();
   const chapter = chapters.find(c => c.id === loId);
-  const { members, loading, error, setStatus, busyId, resendInvite, inviteMembers, inviting } = useChapterMembers(loId);
+  const { members, loading, error, setStatus, busyId, resendInvite, inviteMembers, inviting, deleteAccount } = useChapterMembers(loId);
   const { showToast } = useToast();
   const [tab, setTab] = useState<TabId>('pending');
   const [confirm, setConfirm] = useState<ConfirmState>(CONFIRM_CLOSED);
@@ -98,6 +98,29 @@ export const ChapterAdminView: React.FC = () => {
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Could not resend the invite', 'error');
     }
+  };
+
+  const confirmDelete = (m: Member) => {
+    const name = m.general?.name ?? 'this member';
+    setConfirm({
+      open: true,
+      title: 'Delete account',
+      message: `Permanently delete ${name}? Their login, profile and directory card are removed. This cannot be undone.`,
+      confirmLabel: 'Delete',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirm(CONFIRM_CLOSED);
+        try {
+          const { authDeleted } = await deleteAccount(m.id);
+          showToast(
+            authDeleted ? 'Account deleted' : 'Profile deleted, but the login could not be removed. Please ask JCI KL to finish the deletion.',
+            authDeleted ? 'success' : 'error'
+          );
+        } catch (err) {
+          showToast(err instanceof Error ? err.message : 'Could not delete the account', 'error');
+        }
+      },
+    });
   };
 
   const submitInvite = async () => {
@@ -181,6 +204,11 @@ export const ChapterAdminView: React.FC = () => {
                 {actionable(m) && m.affiliation?.status === 'suspended' && m.affiliation?.suspendedByRole === 'CHAPTER_ADMIN' && (
                   <Button size="sm" variant="success" disabled={busyId === m.id} onClick={() => change(m, 'active', 'Member reactivated')}>
                     <PlayCircle size={14} className="mr-1" />Reactivate
+                  </Button>
+                )}
+                {actionable(m) && (
+                  <Button size="sm" variant="danger" disabled={busyId === m.id} onClick={() => confirmDelete(m)}>
+                    <Trash2 size={14} className="mr-1" />Delete
                   </Button>
                 )}
               </MemberRow>
