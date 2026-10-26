@@ -134,7 +134,10 @@ const BackfillCountsView: React.FC<{ counts: BackfillCounts }> = ({ counts }) =>
       <Stat label="Already registered" value={counts.alreadyRegistered} />
     </div>
     <p className={muted}>
-      Would create — approved {counts.wouldCreate.approved} · pending {counts.wouldCreate.pending} · committee {counts.wouldCreate.committee} · trainers {counts.wouldCreate.trainers} · conflicts {counts.conflicts}
+      Would create — approved {counts.wouldCreate.approved} · pending {counts.wouldCreate.pending} · committee {counts.wouldCreate.committee} · trainers {counts.wouldCreate.trainers} · conflicts {counts.conflicts} · cancelled (left alone) {counts.cancelled}
+    </p>
+    <p className={muted}>
+      Also marks {counts.registeredMembersEnsured} member(s) as registered on their event (keeps the “Registered” badge and counts in sync; safe to re-run).
     </p>
   </>
 );
@@ -145,12 +148,17 @@ const BackfillSection: React.FC = () => {
   const [confirming, setConfirming] = useState(false);
 
   const toCreate = preview?.counts.wouldCreate.total ?? 0;
+  const toEnsure = preview?.counts.registeredMembersEnsured ?? 0;
+  // There is work whenever there are registrations to create OR members to (re)mark as registered — the latter
+  // lets a re-run patch registeredMembers for registrations an earlier run created.
+  const hasWork = toCreate > 0 || toEnsure > 0;
+  const actionLabel = toCreate > 0 ? `Create ${toCreate} registration${toCreate === 1 ? '' : 's'}` : `Sync ${toEnsure} registration${toEnsure === 1 ? '' : 's'}`;
 
   const runApply = async () => {
     setConfirming(false);
     try {
       await apply();
-      showToast(`Back-fill started in the background (~${toCreate} record${toCreate === 1 ? '' : 's'})`, 'success');
+      showToast('Back-fill started in the background', 'success');
     } catch {
       showToast('Back-fill failed to start', 'error');
     }
@@ -161,8 +169,8 @@ const BackfillSection: React.FC = () => {
       <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Back-fill missing registrations</p>
       {started ? (
         <div className={`${card} p-4 space-y-2`}>
-          <p className="text-base font-semibold">Back-fill started in the background (~{toCreate} record{toCreate === 1 ? '' : 's'}).</p>
-          <p className={muted}>Re-run the preview in a minute to confirm — “Would create” drops toward 0 as it completes.</p>
+          <p className="text-base font-semibold">Back-fill started in the background.</p>
+          <p className={muted}>Creating ~{toCreate} registration{toCreate === 1 ? '' : 's'} and marking {toEnsure} member(s) as registered. Re-run the preview in a minute to confirm — “Would create” drops toward 0 as it completes.</p>
           <Button variant="outline" onClick={loadPreview} disabled={loading}>Refresh preview</Button>
         </div>
       ) : preview ? (
@@ -222,8 +230,8 @@ const BackfillSection: React.FC = () => {
           )}
           <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-1">
             <Button variant="outline" onClick={loadPreview} disabled={loading || busy}>Refresh</Button>
-            <Button onClick={() => setConfirming(true)} disabled={loading || busy || !toCreate}>
-              {busy ? 'Starting…' : `Create ${toCreate} registration${toCreate === 1 ? '' : 's'}`}
+            <Button onClick={() => setConfirming(true)} disabled={loading || busy || !hasWork}>
+              {busy ? 'Starting…' : actionLabel}
             </Button>
           </div>
         </>
@@ -239,8 +247,8 @@ const BackfillSection: React.FC = () => {
       <ConfirmDialog
         open={confirming}
         variant="warning"
-        title={`Create ${toCreate} registration${toCreate === 1 ? '' : 's'}?`}
-        message="This runs in the background (it can take a minute). The server recomputes the plan from the JCI Malaysia snapshot, saves a backup run for rollback, then creates the registrations (status “registered”, no payment). Re-run the preview afterwards to confirm."
+        title={`${actionLabel}?`}
+        message="This runs in the background (it can take a minute). The server recomputes the plan from the JCI Malaysia snapshot, saves a backup run for rollback, then creates the missing registrations (status “registered”, no payment) and marks the matched members as registered on their events (keeps the “Registered” badge / counts in sync). Re-run the preview afterwards to confirm."
         confirmLabel="Start back-fill"
         onConfirm={runApply}
         onCancel={() => setConfirming(false)}

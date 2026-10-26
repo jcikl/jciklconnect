@@ -492,7 +492,7 @@
 | `activityPlansService.ts` | 621 | 2 | Activity Plans Service - CRUD Operations P0 fix: all methods now query COLLECTIONS.ACTIVITY_PLANS (was COLLECTIONS.PROJECTS) P1 fixes: isDev… | ACTIVITY_PLANS, PROJECTS |
 | `eventFeedbackService.ts` | 226 | 3 | Event Feedback Service - Collects and manages event feedback | EVENT_FEEDBACK |
 | `eventPaymentService.ts` | 89 | 1 | Event payment (mark-paid) — creates the finance income record, then flips the registration to 'paid'. | PROJECTS |
-| `eventRegBackfillService.ts` | 129 | 2 | Developer-only "Back-fill registrations from JCI Malaysia": create eventRegistrations for KL members who appear in a linked JCI Malaysia eve… | — |
+| `eventRegBackfillService.ts` | 134 | 2 | Developer-only "Back-fill registrations from JCI Malaysia": create eventRegistrations for KL members who appear in a linked JCI Malaysia eve… | — |
 | `eventRegcodeService.ts` | 105 | 3 | "My event QR": copy each member's JCI Malaysia regcode onto their own eventRegistration. Everything runs in the Netlify function jci-malaysi… | — |
 | `eventRegistrationService.ts` | 393 | 7 | Event Registration Service - 报名/缴费/签到统一名单（Story 8.1） | EVENT_REGISTRATIONS, PROJECTS |
 | `eventsService.ts` | 1,142 | 14 | Events Service - CRUD Operations | EVENT_BUDGETS, EVENT_FEEDBACK, EVENT_REGISTRATIONS, GUEST_REGISTRATIONS, MEMBERS, NOTIFICATIONS … |
@@ -543,8 +543,8 @@
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `preview` | 81 | Developer only: read-only counts + detail + conflicts. Comfortably under the 10s function limit. |
-| `apply` | 109 | Developer only: fire the background apply. Returns once the server has accepted it (202). The server recompute… |
+| `preview` | 86 | Developer only: read-only counts + detail + conflicts. Comfortably under the 10s function limit. |
+| `apply` | 114 | Developer only: fire the background apply. Returns once the server has accepted it (202). The server recompute… |
 
 </details>
 

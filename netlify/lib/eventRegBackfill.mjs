@@ -8,6 +8,7 @@
 //   Match (owner decision): NRIC/Passport -> email -> phone, normalized, KL members only. A person whose email
 //     maps to member A and phone to a DIFFERENT member B is a CONFLICT: skipped unless the developer resolves it.
 // The pure parts take plain data so they are testable with an in-memory fake (tests/unit/eventRegBackfill.test.ts).
+import { FieldValue } from 'firebase-admin/firestore';
 import { emailKey, phoneKey } from '../../utils/jciMalaysiaMatch.mjs';
 import { icKey, PARTICIPANT_ARRAYS, loadSourceEventDocs, BATCH_SIZE } from './eventRegcode.mjs';
 
@@ -85,20 +86,27 @@ const memberNameById = (membersById, id) => str(membersById.get(id)?.general?.na
 
 /**
  * Pure: the back-fill plan.
- *  - counts: { linkedEvents, personsMatched, alreadyRegistered, conflicts, wouldCreate:{approved,pending,committee,trainers,total} }
+ *  - counts: { linkedEvents, personsMatched, alreadyRegistered, cancelled, conflicts,
+ *             wouldCreate:{approved,pending,committee,trainers,total}, registeredMembersEnsured }
  *  - creates: the full registration docs to write ({ id, data }). Server-side only — NEVER returned in the preview.
+ *  - registeredSync: [{ projectId, memberIds }] to arrayUnion into project.registeredMembers so the app's
+ *    "registered" checks (cards, detail button, counts) match the registration docs. Covers matched members whose
+ *    registration is new OR already exists and is NOT cancelled; a cancelled member is never re-registered.
  *  - detail: PII-safe preview rows ({ memberName, event, role, hasRegcode }), capped at DETAIL_CAP.
  *  - conflicts: PII-safe ({ label (regcode/short id, never email/phone), memberA:{id,name}, memberB:{id,name} }).
+ * `existingRegs`: Map regId -> status of the current eventRegistration (so cancelled ones are left alone).
  * `resolutions`: map `${projectId}:${label}` -> 'skip' | 'A' | 'B' (developer choices; not persisted).
  */
-export function buildBackfillPlan({ projects, sourceByRoadmap, memberIndex, membersById = new Map(), existingRegIds = new Set(), resolutions = {}, nowIso }) {
+export function buildBackfillPlan({ projects, sourceByRoadmap, memberIndex, membersById = new Map(), existingRegs = new Map(), resolutions = {}, nowIso }) {
   const counts = {
-    linkedEvents: 0, personsMatched: 0, alreadyRegistered: 0, conflicts: 0,
+    linkedEvents: 0, personsMatched: 0, alreadyRegistered: 0, cancelled: 0, conflicts: 0,
     wouldCreate: { approved: 0, pending: 0, committee: 0, trainers: 0, total: 0 },
+    registeredMembersEnsured: 0,
   };
   const creates = [];
   const detail = [];
   const conflicts = [];
+  const registeredByProject = new Map();   // projectId -> Set<memberId> to add to registeredMembers
 
   for (const project of projects) {
     const roadmapId = project?.roadmapId != null ? String(project.roadmapId).trim() : '';
@@ -145,7 +153,15 @@ export function buildBackfillPlan({ projects, sourceByRoadmap, memberIndex, memb
         counts.personsMatched++;
 
         const regId = `${project.id}_${memberId}`;
-        if (existingRegIds.has(regId)) { counts.alreadyRegistered++; continue; }
+        const existingStatus = existingRegs.get(regId);
+        if (existingStatus === 'cancelled') { counts.cancelled++; continue; } // never re-register a cancelled member
+
+        // Ensure this member is in registeredMembers (new, or an existing non-cancelled registration).
+        const set = registeredByProject.get(project.id) ?? registeredByProject.set(project.id, new Set()).get(project.id);
+        set.add(memberId);
+        counts.registeredMembersEnsured++;
+
+        if (existingStatus !== undefined) { counts.alreadyRegistered++; continue; } // doc exists -> no create
 
         const regcode = str(person?.regcode) || null;
         const data = {
@@ -170,7 +186,8 @@ export function buildBackfillPlan({ projects, sourceByRoadmap, memberIndex, memb
       }
     }
   }
-  return { counts, creates, detail, conflicts };
+  const registeredSync = [...registeredByProject].map(([projectId, s]) => ({ projectId, memberIds: [...s] }));
+  return { counts, creates, detail, conflicts, registeredSync };
 }
 
 // ---------------------------------------------------------------------------
@@ -196,25 +213,25 @@ export async function loadMembers(db) {
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
-/** The ids of every existing eventRegistration (ids only — no fields read). */
-export async function loadExistingRegIds(db) {
-  const snap = await db.collection('eventRegistrations').select().get();
-  return new Set(snap.docs.map(d => d.id));
+/** Every existing eventRegistration's status, keyed by doc id (so cancelled ones are detectable). */
+export async function loadExistingRegs(db) {
+  const snap = await db.collection('eventRegistrations').select('status').get();
+  return new Map(snap.docs.map(d => [d.id, d.data().status ?? 'registered']));
 }
 
 /** Read our projects/members/registrations + the linked source events and build the plan. */
 export async function computeBackfillPlan({ sourceDb, db, resolutions = {}, nowIso }) {
-  const [projects, members, existingRegIds] = await Promise.all([
+  const [projects, members, existingRegs] = await Promise.all([
     loadProjectsWithRoadmap(db),
     loadMembers(db),
-    loadExistingRegIds(db),
+    loadExistingRegs(db),
   ]);
   const neededRoadmapIds = new Set(projects.map(p => p.roadmapId));
   const sourceDocs = await loadSourceEventDocs(sourceDb, neededRoadmapIds);
   const sourceByRoadmap = new Map(sourceDocs.map(({ eventId, data }) => [String(eventId), data]));
   const memberIndex = buildMemberIndex(members);
   const membersById = new Map(members.map(m => [m.id, m]));
-  return buildBackfillPlan({ projects, sourceByRoadmap, memberIndex, membersById, existingRegIds, resolutions, nowIso });
+  return buildBackfillPlan({ projects, sourceByRoadmap, memberIndex, membersById, existingRegs, resolutions, nowIso });
 }
 
 /** Sanitise the client-sent resolutions: only `${projectId}:${label}` -> 'A' | 'B' are kept (default is skip). */
@@ -246,8 +263,13 @@ export async function applyBackfill({ sourceDb, db, by, nowTs, resolutions = {} 
   const runId = runRef.id;
   await runRef.set({
     kind: 'eventRegBackfill', by, at: nowTs, counts: plan.counts,
-    created: plan.creates.map(c => c.id), status: 'started', written: 0,
+    created: plan.creates.map(c => c.id),
+    // for rollback: which members were added to which project.registeredMembers (arrayRemove to undo)
+    registered: plan.registeredSync,
+    status: 'started', written: 0, projectsSynced: 0,
   });
+
+  // 1) Create the missing registration docs.
   let written = 0;
   for (let i = 0; i < plan.creates.length; i += BATCH_SIZE) {
     const chunk = plan.creates.slice(i, i + BATCH_SIZE);
@@ -256,7 +278,25 @@ export async function applyBackfill({ sourceDb, db, by, nowTs, resolutions = {} 
     await batch.commit();
     written += chunk.length;
   }
-  await runRef.update({ status: 'done', written });
+
+  // 2) Keep the denormalised project.registeredMembers in sync (arrayUnion is idempotent, so a re-run patches
+  //    registrations created by an earlier run too). attendees is left as-is (not safely incrementable here).
+  let projectsSynced = 0;
+  for (let i = 0; i < plan.registeredSync.length; i += BATCH_SIZE) {
+    const chunk = plan.registeredSync.slice(i, i + BATCH_SIZE);
+    const batch = db.batch();
+    for (const s of chunk) {
+      if (!s.memberIds.length) continue;
+      batch.update(db.collection('projects').doc(s.projectId), {
+        registeredMembers: FieldValue.arrayUnion(...s.memberIds),
+        updatedAt: nowTs,
+      });
+    }
+    await batch.commit();
+    projectsSynced += chunk.length;
+  }
+
+  await runRef.update({ status: 'done', written, projectsSynced });
   await db.collection('auditLog').add({
     action: 'jci_malaysia_reg_backfill_apply',
     performedBy: by,
@@ -264,9 +304,9 @@ export async function applyBackfill({ sourceDb, db, by, nowTs, resolutions = {} 
     targetId: runId,
     before: null,
     after: null,
-    metadata: { runId, counts: plan.counts, written },
+    metadata: { runId, counts: plan.counts, written, projectsSynced },
     timestamp: nowTs,
     _source: 'netlify-function',
   });
-  return { runId, written, counts: plan.counts };
+  return { runId, written, projectsSynced, counts: plan.counts };
 }

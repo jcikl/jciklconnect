@@ -23,8 +23,12 @@ export interface BackfillCounts {
   linkedEvents: number;
   personsMatched: number;
   alreadyRegistered: number;
+  /** Matched members whose registration is cancelled — left alone (not re-created, not re-registered). */
+  cancelled: number;
   conflicts: number;
   wouldCreate: BackfillWouldCreate;
+  /** Matched, non-cancelled members ensured in project.registeredMembers (so cards/button/counts agree). */
+  registeredMembersEnsured: number;
 }
 
 export type BackfillRole = 'approved' | 'pending' | 'committee' | 'trainer';
@@ -62,8 +66,9 @@ const APPLY_ENDPOINT = '/.netlify/functions/jci-malaysia-backfill-background';
 
 const MOCK_PREVIEW: BackfillPreview = {
   counts: {
-    linkedEvents: 12, personsMatched: 40, alreadyRegistered: 8, conflicts: 1,
+    linkedEvents: 12, personsMatched: 40, alreadyRegistered: 8, cancelled: 0, conflicts: 1,
     wouldCreate: { approved: 20, pending: 6, committee: 4, trainers: 2, total: 32 },
+    registeredMembersEnsured: 32,
   },
   detail: [{ memberName: 'Mock Member', event: 'Mock Event', role: 'approved', hasRegcode: true }],
   conflicts: [{ key: 'proj-1:ABC123', label: 'ABC123', memberA: { id: 'm-a', name: 'Member A' }, memberB: { id: 'm-b', name: 'Member B' } }],
