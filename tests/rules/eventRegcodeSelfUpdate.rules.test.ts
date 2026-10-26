@@ -80,4 +80,17 @@ describe.skipIf(!HOST)('firestore.rules — eventRegistrations.jciMalaysiaRegcod
   it('the Admin SDK (owner) CAN write jciMalaysiaRegcode (server path)', async () => {
     expect(await write('owner', 'eventRegistrations/ev1_mem1', { jciMalaysiaRegcode: 'REAL01' })).toBe(200);
   });
+
+  // jciMalaysiaRole is set only by the Admin-SDK back-fill; a member must never forge it on their own registration.
+  it('member CANNOT set jciMalaysiaRole on their own registration', async () => {
+    expect(await write('mem1', 'eventRegistrations/ev1_mem1', { jciMalaysiaRole: 'committee' })).toBe(403);
+  });
+
+  it('member CANNOT sneak jciMalaysiaRole in alongside an allowed field', async () => {
+    expect(await write('mem1', 'eventRegistrations/ev1_mem1', { tshirtSize: 'S', jciMalaysiaRole: 'trainer' })).toBe(403);
+  });
+
+  it('the Admin SDK (owner) CAN write jciMalaysiaRole (server path)', async () => {
+    expect(await write('owner', 'eventRegistrations/ev1_mem1', { jciMalaysiaRole: 'approved' })).toBe(200);
+  });
 });

@@ -17,8 +17,8 @@
 
 | 層 | 檔案數 | 位置 |
 |---|---|---|
-| Service（業務邏輯與資料存取） | 75 | `services/` |
-| Hook（React 資料綁定） | 45 | `hooks/` |
+| Service（業務邏輯與資料存取） | 76 | `services/` |
+| Hook（React 資料綁定） | 46 | `hooks/` |
 | Util（純函數工具） | 27 | `utils/` |
 | UI 元件（通用） | 34 | `components/ui/` |
 | 共用業務元件 | 10 | `components/shared/` |
@@ -492,6 +492,7 @@
 | `activityPlansService.ts` | 621 | 2 | Activity Plans Service - CRUD Operations P0 fix: all methods now query COLLECTIONS.ACTIVITY_PLANS (was COLLECTIONS.PROJECTS) P1 fixes: isDev… | ACTIVITY_PLANS, PROJECTS |
 | `eventFeedbackService.ts` | 226 | 3 | Event Feedback Service - Collects and manages event feedback | EVENT_FEEDBACK |
 | `eventPaymentService.ts` | 89 | 1 | Event payment (mark-paid) — creates the finance income record, then flips the registration to 'paid'. | PROJECTS |
+| `eventRegBackfillService.ts` | 129 | 2 | Developer-only "Back-fill registrations from JCI Malaysia": create eventRegistrations for KL members who appear in a linked JCI Malaysia eve… | — |
 | `eventRegcodeService.ts` | 105 | 3 | "My event QR": copy each member's JCI Malaysia regcode onto their own eventRegistration. Everything runs in the Netlify function jci-malaysi… | — |
 | `eventRegistrationService.ts` | 393 | 7 | Event Registration Service - 报名/缴费/签到统一名单（Story 8.1） | EVENT_REGISTRATIONS, PROJECTS |
 | `eventsService.ts` | 1,142 | 14 | Events Service - CRUD Operations | EVENT_BUDGETS, EVENT_FEEDBACK, EVENT_REGISTRATIONS, GUEST_REGISTRATIONS, MEMBERS, NOTIFICATIONS … |
@@ -535,6 +536,15 @@
 |---|---|---|
 | `resolveBankAccountId` | 15 | Bank account an event's income goes into: the project's `financialAccountId` when it is a real bank account of… |
 | `markRegistrationPaid` | 37 | Mark a registration paid. The transaction records MYR; for a USD (external) registration the price the payer s… |
+
+</details>
+
+<details><summary><code>services/eventRegBackfillService.ts</code> — 2 個方法</summary>
+
+| 方法 | 行 | 說明 |
+|---|---|---|
+| `preview` | 81 | Developer only: read-only counts + detail + conflicts. Comfortably under the 10s function limit. |
+| `apply` | 109 | Developer only: fire the background apply. Returns once the server has accepted it (202). The server recompute… |
 
 </details>
 
@@ -1156,7 +1166,7 @@
 | `cacheService.ts` | 314 | 35 | 缓存服务 - 提供内存缓存和本地存储缓存功能 Cache Service - Provides in-memory and localStorage caching capabilities | — |
 | `cloudinaryService.ts` | 337 | 14 | Cloudinary Upload Service | — |
 | `dataImportExportService.ts` | 913 | 3 | ⚠️ 無說明 | EVENTS, MEMBERS, MEMBER_EMAILS |
-| `errorLoggingService.ts` | 354 | 73 | ⚠️ 無說明 | ERROR_LOGS |
+| `errorLoggingService.ts` | 354 | 74 | ⚠️ 無說明 | ERROR_LOGS |
 | `firestoreLogger.ts` | 197 | 3 | System Logger — Firestore ops + Performance monitoring Fire-and-forget buffered logger. Buffers events for 3 seconds then writes one batched… | SYSTEM_LOGS |
 | `inventoryService.ts` | 1,638 | 3 | Inventory Service - CRUD Operations | INVENTORY, INVENTORY_ALERTS, MAINTENANCE_SCHEDULES, STOCK_MOVEMENTS, TRANSACTIONS |
 | `mockData.ts` | 689 | 17 | ⚠️ 無說明 | — |
@@ -1355,6 +1365,7 @@
 | `useChapterBirthdays.ts` | 23 | 1 | `useChapterBirthdays` | chapterBirthdaysService | Own-chapter birthdays for an active external user (dashboard birthday widget). `month` null → nothing loads. |
 | `useChapterMembers.ts` | 87 | 2 | `useChapterMembers`, `usePendingKlApprovals` | externalAccountsService | Chapter roster for an active CHAPTER_ADMIN (own chapter) and the KL approval queue (pending_kl, KL admins). Status changes / invites go thro… |
 | `useCommunication.ts` | 123 | 2 | `useCommunication` | communicationService | Communication Data Hook |
+| `useEventRegBackfill.ts` | 48 | 1 | `useEventRegBackfill` | eventRegBackfillService | Developer-only back-fill of missing eventRegistrations from JCI Malaysia: preview then background apply. |
 | `useEventRegcodeSync.ts` | 56 | 1 | `useEventRegcodeSync` | eventRegcodeService | Developer-only back-fill of JCI Malaysia regcodes onto eventRegistrations: preview then apply. The server enforces developer-only. |
 | `useEvents.ts` | 191 | 8 | `useEvents` | errorLoggingService, eventsService, membersService | Events Data Hook |
 | `useExternalAccounts.ts` | 52 | 1 | `useExternalAccounts` | externalAccountsService, membersService | External (sister-chapter) account actions for components: create chapter admins, invite, status, resend. |
@@ -1501,7 +1512,7 @@
 | `getStartOfYear` | 163 |  |
 | `getEndOfYear` | 170 |  |
 
-### `utils/devMode.ts` （36 行，75 處引用）
+### `utils/devMode.ts` （36 行，76 處引用）
 > Developer Mode Utility This utility helps services detect if the app is running in developer mode and return mock data instead of accessing …
 
 | 函數 | 行 | 說明 |

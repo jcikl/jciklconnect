@@ -66,6 +66,12 @@ export interface EventRegistration {
    * written by the client. The app renders a QR from this string. Missing = not linked yet.
    */
   jciMalaysiaRegcode?: string | null;
+  /**
+   * Which JCI Malaysia participant array this registration was back-filled from (approved/pending/committee/
+   * trainers). Set ONLY by the Admin-SDK back-fill (jci-malaysia-backfill-background); `status` stays 'registered'
+   * for all, so this field carries the distinction. Never written by the client (firestore.rules locks it).
+   */
+  jciMalaysiaRole?: 'approved' | 'pending' | 'committee' | 'trainer' | null;
 }
 
 export interface NonMemberLead {
