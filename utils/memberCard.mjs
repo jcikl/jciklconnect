@@ -17,6 +17,20 @@ function str(v) {
   return typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined;
 }
 
+/**
+ * Small map of the member's non-empty social links (contact.socials: linkedin / facebook / instagram / wechat).
+ * @param {any} socials @returns {Record<string, string> | undefined}
+ */
+function socialsMap(socials) {
+  /** @type {Record<string, string>} */
+  const out = {};
+  for (const k of ['linkedin', 'facebook', 'instagram', 'wechat']) {
+    const v = str(socials?.[k]);
+    if (v !== undefined) out[k] = v;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 /** @param {any} member @returns {boolean} */
 export function isExternalMember(member) {
   return EXTERNAL_ROLES.includes(member?.role);
@@ -56,6 +70,7 @@ export function buildMemberCard(member, nowIso = new Date().toISOString()) {
     ? referralTypes
     : normalizeIdealReferrals(b.idealReferrals ?? member?.idealReferral ?? member?.idealReferrals);
   const offerSummary = str(typeof offer === 'string' ? offer : offer?.description);
+  const sharing = member?.privacy?.shareCardInternationally === true;
 
   /** @type {Record<string, unknown>} */
   const optional = {
@@ -72,12 +87,15 @@ export function buildMemberCard(member, nowIso = new Date().toISOString()) {
     acceptInternationalBusiness: str(b.acceptInternationalBusiness),
     specialOfferSummary: offerSummary,
     idealReferrals: idealReferrals.length > 0 ? idealReferrals : undefined,
+    // Contact details travel on the card only while the member shares it (firestore.rules enforces the same).
+    phone: sharing ? str(member?.contact?.phone) : undefined,
+    socials: sharing ? socialsMap(member?.contact?.socials) : undefined,
   };
   /** @type {Record<string, unknown>} */
   const card = {
     displayName: str(g.name) ?? str(member?.name) ?? '',
     loId: str(member?.loId) ?? KL_LO_ID,
-    international: member?.privacy?.shareCardInternationally === true,
+    international: sharing,
     updatedAt: nowIso,
   };
   for (const [k, v] of Object.entries(optional)) if (v !== undefined) card[k] = v;

@@ -416,7 +416,8 @@ service cloud.firestore {
     function memberCardKeys() {
       return ['displayName', 'avatarUrl', 'loId', 'country', 'companyName', 'position', 'department',
               'industry', 'businessCategory', 'companyDescription', 'website',
-              'acceptInternationalBusiness', 'specialOfferSummary', 'idealReferrals', 'international', 'updatedAt'];
+              'acceptInternationalBusiness', 'specialOfferSummary', 'idealReferrals', 'phone', 'socials',
+              'international', 'updatedAt'];
     }
 
     function validMemberCard(memberId) {
@@ -428,7 +429,11 @@ service cloud.firestore {
              card.loId is string &&
              card.international is bool &&
              card.loId == owner.get('loId', klLoId()) &&
-             card.international == owner.get('privacy', {}).get('shareCardInternationally', false);
+             card.international == owner.get('privacy', {}).get('shareCardInternationally', false) &&
+             // Contact details only on a card that is shared (international == true).
+             (card.international == true || !card.keys().hasAny(['phone', 'socials'])) &&
+             (!('phone' in card) || card.phone is string) &&
+             (!('socials' in card) || card.socials is map);
     }
 
     // Reciprocity (owner rule): a non-admin may view other people's cards only after opting in

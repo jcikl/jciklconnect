@@ -16,12 +16,9 @@ export const PrivacySettings: React.FC<{ member: Member; onSave: (updates: Parti
   const { showToast } = useToast();
   const [saving, setSaving] = useState(false);
   const [privacy, setPrivacy] = useState({
-    // Contact visibility defaults to ON when missing (admins and board can always see them)
-    showPhone: member.privacy?.showPhone ?? true,
-    showAlternatePhone: member.privacy?.showAlternatePhone ?? true,
-    showSocials: member.privacy?.showSocials ?? true,
     shareCardInternationally: member.privacy?.shareCardInternationally ?? false,
-    hideBirthday: member.privacy?.hideBirthday ?? false,
+    // Shown to the member as "Show my birthday" (ON = shown, the default); stored as hideBirthday (inverse).
+    showBirthday: !(member.privacy?.hideBirthday ?? false),
   });
   const canSetDobOnce = isExternalRole(member.role) && !member.general?.dob;
   const [dobOnce, setDobOnce] = useState('');
@@ -29,7 +26,7 @@ export const PrivacySettings: React.FC<{ member: Member; onSave: (updates: Parti
   const handleSave = async () => {
     setSaving(true);
     try {
-      const updates: Partial<Member> = { privacy: { ...member.privacy, ...privacy } };
+      const updates: Partial<Member> = { privacy: { ...member.privacy, shareCardInternationally: privacy.shareCardInternationally, hideBirthday: !privacy.showBirthday } };
       if (canSetDobOnce && /^\d{4}-\d{2}-\d{2}$/.test(dobOnce)) {
         // Whole general map (merged write); birthdayMMDD is the birthday index field.
         (updates as Record<string, unknown>).general = { ...member.general, dob: dobOnce };
@@ -46,11 +43,8 @@ export const PrivacySettings: React.FC<{ member: Member; onSave: (updates: Parti
   };
 
   const switches: { key: keyof typeof privacy; label: string; desc: string }[] = [
-    { key: 'showPhone', label: 'Show my phone number to members', desc: 'Admins and board can always see it.' },
-    { key: 'showAlternatePhone', label: 'Show my alternate phone to members', desc: 'Admins and board can always see it.' },
-    { key: 'showSocials', label: 'Show my social media to members', desc: 'Admins and board can always see them.' },
-    { key: 'shareCardInternationally', label: 'Share my card internationally', desc: 'Let JCI members of other chapters see your name, company and business card.' },
-    { key: 'hideBirthday', label: 'Hide my birthday', desc: 'Leave me out of the birthday list. Only the day and month are ever shown, never the year.' },
+    { key: 'shareCardInternationally', label: 'Share my card', desc: 'Your card, phone number and social media are visible to JCI KL members and members of other JCI chapters.' },
+    { key: 'showBirthday', label: 'Show my birthday', desc: 'Only the day and month are ever shown, never the year.' },
   ];
 
   return (

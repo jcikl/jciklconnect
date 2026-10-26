@@ -454,14 +454,14 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                       <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500"><Phone size={16} /></div>
                       <div>
                         <p className="text-xs text-slate-500 uppercase font-medium">Primary Phone</p>
-                        {(isSelfView || canViewSensitiveFields || (member.privacy?.showPhone ?? true)) ? <p className="text-sm font-bold">{member.contact?.phone || 'N/A'}</p> : <RestrictedField />}
+                        {(isSelfView || canViewSensitiveFields || (member.privacy?.shareCardInternationally === true)) ? <p className="text-sm font-bold">{member.contact?.phone || 'N/A'}</p> : <RestrictedField />}
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500"><Phone size={16} className="rotate-90" /></div>
                       <div>
                         <p className="text-xs text-slate-500 uppercase font-medium">Alternate Phone</p>
-                        {(isSelfView || canViewSensitiveFields || (member.privacy?.showAlternatePhone ?? true)) ? <p className="text-sm font-bold">{member.contact?.alternatePhone || 'N/A'}</p> : <RestrictedField />}
+                        {(isSelfView || canViewSensitiveFields) ? <p className="text-sm font-bold">{member.contact?.alternatePhone || 'N/A'}</p> : <RestrictedField />}
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -486,7 +486,7 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                       <p className="text-xs text-slate-500">{member.contact?.emergency?.relationship} • {member.contact?.emergency?.phone}</p>
                     </div>
                     <h4 className="text-xs font-bold text-slate-400 uppercase border-b pb-1 mt-4">Social Media</h4>
-                    {(isSelfView || canViewSensitiveFields || (member.privacy?.showSocials ?? true)) ? (
+                    {(isSelfView || canViewSensitiveFields || (member.privacy?.shareCardInternationally === true)) ? (
                       <div className="flex gap-4 items-center">
                         {member.contact?.socials?.linkedin ? <a href={member.contact?.socials?.linkedin} target="_blank" rel="noreferrer" className="text-[#0077B5]"><Linkedin size={20} /></a> : <Linkedin size={20} className="text-slate-300" />}
                         {member.contact?.socials?.facebook ? <a href={member.contact?.socials?.facebook} target="_blank" rel="noreferrer" className="text-[#1877F2]"><Facebook size={20} /></a> : <Facebook size={20} className="text-slate-300" />}

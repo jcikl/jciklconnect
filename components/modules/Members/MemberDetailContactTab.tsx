@@ -184,7 +184,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                 </div>
                 <div>
                   <p className="text-xs text-slate-500 uppercase font-medium">Primary Phone</p>
-                  {(isSelfView || canViewSensitiveFields || (member.privacy?.showPhone ?? true))
+                  {(isSelfView || canViewSensitiveFields || (member.privacy?.shareCardInternationally === true))
                     ? <p className="text-sm font-bold">{member.contact?.phone || 'N/A'}</p>
                     : <RestrictedField />}
                 </div>
@@ -195,7 +195,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
                 </div>
                 <div>
                   <p className="text-xs text-slate-500 uppercase font-medium">Alternate Phone</p>
-                  {(isSelfView || canViewSensitiveFields || (member.privacy?.showAlternatePhone ?? true))
+                  {(isSelfView || canViewSensitiveFields)
                     ? <p className="text-sm font-bold">{member.contact?.alternatePhone || 'N/A'}</p>
                     : <RestrictedField />}
                 </div>
@@ -230,7 +230,7 @@ const MemberDetailContactTabBase: React.FC<MemberDetailContactTabProps> = ({
               </div>
 
               <h4 className="text-xs font-bold text-slate-400 uppercase border-b pb-1 mt-4">Social Media</h4>
-              {(isSelfView || canViewSensitiveFields || (member.privacy?.showSocials ?? true)) ? (
+              {(isSelfView || canViewSensitiveFields || (member.privacy?.shareCardInternationally === true)) ? (
                 <div className="flex gap-4 items-center">
                   {member.contact?.socials?.linkedin
                     ? <a href={member.contact?.socials?.linkedin} target="_blank" rel="noreferrer" className="text-[#0077B5]"><Linkedin size={20} /></a>

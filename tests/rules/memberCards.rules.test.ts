@@ -148,8 +148,32 @@ describe.skipIf(!HOST)('firestore.rules — buildMemberCard output (emulator)', 
   });
 
   it('card with an extra key is rejected', async () => {
-    const card = { ...(buildMemberCard(aff1) as unknown as Doc), phone: '+65 1234' };
+    const card = { ...(buildMemberCard(aff1) as unknown as Doc), email: 'x@example.test' };
     expect(await commit('aff1', [{ path: 'memberCards/aff1', data: card }])).toBe(DENIED);
+  });
+
+  it('sharing member: card with phone and socials is accepted', async () => {
+    const sharing = { ...klMember, contact: { ...klMember.contact, phone: '+60 12 345', socials: { linkedin: 'https://l.in/a' } }, privacy: { shareCardInternationally: true } };
+    const { id: _id, ...doc } = sharing;
+    expect(await commit('klMember', [{ path: 'members/klMember', data: doc as Doc }])).toBe(OK);
+    const card = buildMemberCard(sharing) as unknown as Doc;
+    expect(card.phone).toBe('+60 12 345');
+    expect(await commit('klMember', [{ path: 'memberCards/klMember', data: card }])).toBe(OK);
+  });
+
+  it('card with an unknown key next to phone is still rejected', async () => {
+    const sharing = { ...klMember, contact: { ...klMember.contact, phone: '+60 12 345' }, privacy: { shareCardInternationally: true } };
+    const card = { ...(buildMemberCard(sharing) as unknown as Doc), email: 'x@example.test' };
+    expect(await commit('klMember', [{ path: 'memberCards/klMember', data: card }])).toBe(DENIED);
+  });
+
+  it('card carrying phone or socials while international is false is rejected', async () => {
+    const { id: _id, ...doc } = { ...klMember, privacy: { shareCardInternationally: false } };
+    expect(await commit('klMember', [{ path: 'members/klMember', data: doc as Doc }])).toBe(OK);
+    const base = buildMemberCard(klMember) as unknown as Doc;
+    expect(base.international).toBe(false);
+    expect(await commit('klMember', [{ path: 'memberCards/klMember', data: { ...base, phone: '+60 12 345' } }])).toBe(DENIED);
+    expect(await commit('klMember', [{ path: 'memberCards/klMember', data: { ...base, socials: { linkedin: 'https://l.in/a' } } }])).toBe(DENIED);
   });
 
   it('GUEST cannot create a card', async () => {
