@@ -24,7 +24,11 @@ export const useEventRegistrationStatus = ({
   }, [event.id, member?.id]);
 
   const isRegisteredFromEvent = !!(member && event.registeredMembers?.includes(member.id));
-  const isRegistered = localRegistered !== null ? localRegistered : isRegisteredFromEvent;
+  // The eventRegistrations doc is authoritative; event.registeredMembers is a denormalised cache that can drift
+  // (e.g. a registration created by the JCI Malaysia back-fill writes the doc but not the array). Treat an existing,
+  // non-cancelled registration as registered so the button matches what the member actually has.
+  const hasActiveRegistration = !!myRegistration && myRegistration.status !== 'cancelled';
+  const isRegistered = localRegistered !== null ? localRegistered : (isRegisteredFromEvent || hasActiveRegistration);
   const isSelfCancelled = myRegistration?.status === 'cancelled' && !isRegistered;
   const canSelfCancel =
     !!isRegistered &&

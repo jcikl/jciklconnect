@@ -1,7 +1,8 @@
-import React from 'react';
-import { Calendar, Info, Users, Building2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Calendar, Info, Users, Building2, Maximize2 } from 'lucide-react';
 import type { Event, EventRegistration } from '../../../types';
 import { RegcodeQr } from '../../ui/RegcodeQr';
+import { Modal } from '../../ui/Common';
 
 interface EventDetailsTabProps {
   event: Event;
@@ -34,15 +35,16 @@ export const EventDetailsTab: React.FC<EventDetailsTabProps> = ({
   formatDayShort,
   formatWeekday,
   myRegistration,
-}) => (
+}) => {
+  const [qrZoom, setQrZoom] = useState(false);
+  const regcode = myRegistration?.status !== 'cancelled' ? myRegistration?.jciMalaysiaRegcode : null;
+
+  return (
   <div className="space-y-3 animate-fade-in">
-    {myRegistration?.jciMalaysiaRegcode && myRegistration.status !== 'cancelled' && (
-      <div className="rounded-2xl border border-slate-100 bg-white px-3.5 py-4">
-        <RegcodeQr regcode={myRegistration.jciMalaysiaRegcode} label="Your JCI Malaysia check-in code" />
-        <p className="mt-2 text-center text-[11px] text-slate-400">Show this at the event to check in.</p>
-      </div>
-    )}
-    <div className="divide-y divide-slate-100 rounded-2xl border border-slate-100 overflow-hidden">
+    {/* Details on the left; the member's own check-in QR sits to the right on wider screens (stacks on mobile),
+        both stretched to the same height. Tap the QR to enlarge it for scanning. */}
+    <div className="flex flex-col sm:flex-row gap-3 items-stretch">
+      <div className="flex-1 min-w-0 divide-y divide-slate-100 rounded-2xl border border-slate-100 overflow-hidden">
       <div className="flex items-center gap-3 px-3.5 py-3 bg-white">
         <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
           <Calendar size={14} className="text-jci-blue" />
@@ -103,6 +105,20 @@ export const EventDetailsTab: React.FC<EventDetailsTabProps> = ({
           </div>
         </div>
       )}
+      </div>
+      {regcode && (
+        <button
+          type="button"
+          onClick={() => setQrZoom(true)}
+          title="Tap to enlarge"
+          className="sm:w-56 shrink-0 flex flex-col items-center justify-center rounded-2xl border border-slate-100 bg-white px-3.5 py-4 cursor-pointer transition-shadow hover:shadow-md hover:border-blue-200 focus:outline-none focus:ring-2 focus:ring-jci-blue"
+        >
+          <RegcodeQr regcode={regcode} label="Your JCI Malaysia check-in code" />
+          <p className="mt-2 flex items-center justify-center gap-1 text-[11px] text-slate-400">
+            <Maximize2 size={11} /> Tap to enlarge · show at the event to check in
+          </p>
+        </button>
+      )}
     </div>
 
     <div className="rounded-2xl bg-slate-50 border border-slate-100 px-3.5 py-3">
@@ -118,5 +134,16 @@ export const EventDetailsTab: React.FC<EventDetailsTabProps> = ({
         </button>
       )}
     </div>
+
+    {/* Enlarged check-in QR for scanning at the gate (reuses RegcodeQr — no extra qrcode.react import site). */}
+    <Modal isOpen={qrZoom} onClose={() => setQrZoom(false)} title="Check-in code">
+      {regcode && (
+        <div className="flex flex-col items-center gap-3 py-2">
+          <RegcodeQr regcode={regcode} label="Your JCI Malaysia check-in code" size={260} maxWidthClass="max-w-[260px]" />
+          <p className="text-xs text-slate-400">Show this at the event to check in.</p>
+        </div>
+      )}
+    </Modal>
   </div>
-);
+  );
+};

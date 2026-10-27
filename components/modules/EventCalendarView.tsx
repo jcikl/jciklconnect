@@ -1,8 +1,13 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Share2, Calendar as CalendarIcon } from 'lucide-react';
 import { Modal, Button, useToast } from '../ui/Common';
 import { Event } from '../../types';
 import { formatTime } from '../../utils/dateUtils';
+import { involvesLo, KL_LO_NAME } from '../../utils/loHosting.mjs';
+import { MalaysiaHolidaysService, type MalaysiaHoliday } from '../../services/malaysiaHolidaysService';
+
+/** Local YYYY-MM-DD (matches the holiday dates, which are calendar dates with no timezone). */
+const toIsoLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 import { EventsService } from '../../services/eventsService';
 import { EventRow } from './Events/EventRow';
 
@@ -16,7 +21,6 @@ interface EventCalendarViewProps {
 }
 
 const MONTH_ABBR = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-const DAY_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 // Monday-first column labels; index 6 = Sunday (red)
 const WEEK_DAY_LABELS = ['M','T','W','T','F','S','S'];
 
@@ -34,17 +38,48 @@ function isSameDay(a: Date, b: Date) {
     && a.getDate() === b.getDate();
 }
 
-// Event type → chip colour (bg + text) and bar colour
-const EVENT_COLORS: Record<string, { chip: string; bar: string }> = {
-  Community:   { chip: 'bg-teal-500 text-white',    bar: 'bg-teal-500' },
-  Training:    { chip: 'bg-blue-500 text-white',     bar: 'bg-blue-500' },
-  Social:      { chip: 'bg-amber-500 text-white',    bar: 'bg-amber-500' },
-  Sports:      { chip: 'bg-orange-500 text-white',   bar: 'bg-orange-500' },
-  Fundraising: { chip: 'bg-purple-500 text-white',   bar: 'bg-purple-500' },
-  Meeting:     { chip: 'bg-indigo-500 text-white',   bar: 'bg-indigo-500' },
+// Events longer than this don't span the grid (a long programme would flood it); they show on their start day
+// only, and the month list always shows their start–end range so the end date is still visible.
+const MAX_SPAN_DAYS = 4;
+const dayOnly = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+/** Start/end (date-only) and inclusive day count for an event (uses `endDate`; falls back to a single day). */
+function eventSpan(e: Event) {
+  const start = dayOnly(new Date(e.date));
+  const endRaw = e.endDate ? new Date(e.endDate) : null;
+  const end = endRaw && !isNaN(endRaw.getTime()) && endRaw > start ? dayOnly(endRaw) : start;
+  const days = Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
+  return { start, end, days };
+}
+
+/** Whether an event occupies `date`: multi-day events up to the cap cover every day start..end; others their start day. */
+function eventCoversDate(e: Event, date: Date) {
+  const { start, end, days } = eventSpan(e);
+  if (days > 1 && days <= MAX_SPAN_DAYS) { const d = dayOnly(date); return d >= start && d <= end; }
+  return isSameDay(new Date(e.date), date);
+}
+
+// Event colour by level / JCI KL involvement (not by activity type): KL host-or-co-host, else national / jci / area.
+type EventCategory = 'kl' | 'national' | 'jci' | 'area' | 'other';
+const CATEGORY_COLORS: Record<EventCategory, { chip: string; bar: string; dot: string }> = {
+  kl:       { chip: 'bg-jci-blue text-white',    bar: 'bg-jci-blue',    dot: 'bg-jci-blue' },
+  national: { chip: 'bg-purple-500 text-white',  bar: 'bg-purple-500',  dot: 'bg-purple-500' },
+  jci:      { chip: 'bg-emerald-500 text-white', bar: 'bg-emerald-500', dot: 'bg-emerald-500' },
+  area:     { chip: 'bg-amber-500 text-white',   bar: 'bg-amber-500',   dot: 'bg-amber-500' },
+  other:    { chip: 'bg-slate-400 text-white',   bar: 'bg-slate-400',   dot: 'bg-slate-400' },
 };
-const DEFAULT_COLOR = { chip: 'bg-jci-blue text-white', bar: 'bg-jci-blue' };
-const getColors = (type: string) => EVENT_COLORS[type] ?? DEFAULT_COLOR;
+const CATEGORY_LABEL: Record<EventCategory, string> = { kl: 'JCI KL', national: 'National', jci: 'JCI', area: 'Area', other: 'Other' };
+const LEGEND_ORDER: EventCategory[] = ['kl', 'national', 'jci', 'area'];
+// JCI KL involvement wins, so any event KL hosts / co-hosts reads as "JCI KL" whatever its level.
+function getCategory(e: Event): EventCategory {
+  if (involvesLo(e as any, KL_LO_NAME)) return 'kl';
+  const level = typeof (e as any).level === 'string' ? (e as any).level.trim().toLowerCase() : '';
+  if (level === 'national') return 'national';
+  if (level === 'jci') return 'jci';
+  if (level === 'area' || level.startsWith('area')) return 'area';
+  return 'other';
+}
+const getColors = (e: Event) => CATEGORY_COLORS[getCategory(e)];
 
 // Build a Monday-first week grid for the given month
 function buildCalendarWeeks(year: number, month: number): Date[][] {
@@ -95,6 +130,41 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
     [currentDate]
   );
 
+  // All events in the month currently shown, sorted by date — listed (scrollable) under the grid.
+  const monthEvents = useMemo(
+    () => events
+      .filter(e => { const d = new Date(e.date); return d.getMonth() === currentDate.getMonth() && d.getFullYear() === currentDate.getFullYear(); })
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+    [events, currentDate]
+  );
+
+  // Malaysia public holidays for every year the grid touches (cached; empty when the API key isn't configured).
+  const [holidays, setHolidays] = useState<MalaysiaHoliday[]>([]);
+  useEffect(() => {
+    let alive = true;
+    const years = new Set<number>([currentDate.getFullYear()]);
+    for (const w of calendarWeeks) for (const d of w) years.add(d.getFullYear());
+    Promise.all([...years].map(y => MalaysiaHolidaysService.getHolidays(y)))
+      .then(lists => { if (alive) setHolidays(lists.flat()); })
+      .catch(() => { /* calendar just shows no holidays */ });
+    return () => { alive = false; };
+  }, [currentDate, calendarWeeks]);
+
+  const holidayByDate = useMemo(() => {
+    const m = new Map<string, MalaysiaHoliday>();
+    for (const h of holidays) if (!m.has(h.date)) m.set(h.date, h);
+    return m;
+  }, [holidays]);
+
+  // Events + public holidays in the shown month, merged and sorted, for the list under the grid.
+  const monthItems = useMemo(() => {
+    const evs = monthEvents.map(e => ({ kind: 'event' as const, at: new Date(e.date), event: e }));
+    const hols = holidays
+      .filter(h => { const [y, mo] = h.date.split('-').map(Number); return y === currentDate.getFullYear() && mo - 1 === currentDate.getMonth(); })
+      .map(h => ({ kind: 'holiday' as const, at: new Date(`${h.date}T00:00:00`), holiday: h }));
+    return [...evs, ...hols].sort((a, b) => a.at.getTime() - b.at.getTime());
+  }, [monthEvents, holidays, currentDate]);
+
   const navigateMonth = (dir: 'prev' | 'next') => {
     setCurrentDate(prev => {
       const d = new Date(prev);
@@ -104,7 +174,39 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
   };
 
   const getEventsForDate = (date: Date) =>
-    events.filter(e => isSameDay(new Date(e.date), date));
+    events.filter(e => eventCoversDate(e, date));
+
+  // Multi-day events (up to the cap) draw as one continuous bar per week instead of a chip in every cell.
+  const isSpanning = (e: Event) => { const { days } = eventSpan(e); return days > 1 && days <= MAX_SPAN_DAYS; };
+  const spanningEvents = useMemo(() => events.filter(isSpanning), [events]);
+
+  /**
+   * Spanning-event bars that intersect one week, each as a single element spanning its columns
+   * (so it reads as one connected band), with a lane per overlapping bar to avoid stacking collisions.
+   * Grid columns: col 1 = week-number gutter; day i (0..6) spans grid lines (i+2)..(i+3).
+   */
+  const buildWeekBars = (week: Date[]) => {
+    const wStart = dayOnly(week[0]);
+    const wEnd   = dayOnly(week[6]);
+    const DAY = 86400000;
+    const laneLastCol: number[] = [];
+    return spanningEvents
+      .map(event => {
+        const { start, end } = eventSpan(event);
+        if (end < wStart || start > wEnd) return null;
+        const i = Math.max(0, Math.round((start.getTime() - wStart.getTime()) / DAY));
+        const j = Math.min(6, Math.round((end.getTime()   - wStart.getTime()) / DAY));
+        return { event, i, j, startsHere: start >= wStart, endsHere: end <= wEnd };
+      })
+      .filter((b): b is NonNullable<typeof b> => b !== null)
+      .sort((a, b) => a.i - b.i || b.j - a.j)
+      .map(b => {
+        let lane = 0;
+        while (lane < laneLastCol.length && laneLastCol[lane] >= b.i) lane++;
+        laneLastCol[lane] = b.j;
+        return { ...b, colStart: b.i + 2, colEnd: b.j + 3, lane };
+      });
+  };
 
   // ── Drag-and-drop ──────────────────────────────────────────────────────────
   const handleDragStart = (e: React.DragEvent, event: Event) => {
@@ -164,9 +266,6 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
       </div>
     );
   }
-
-  // ── Selected date events ───────────────────────────────────────────────────
-  const selectedDateEvents = selectedDate ? getEventsForDate(selectedDate) : [];
 
   // ── Main calendar (Samsung-style) ─────────────────────────────────────────
   return (
@@ -236,7 +335,8 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
       {/* ── Calendar grid ── */}
       <div className="px-2 pt-1 pb-2">
         {calendarWeeks.map((week, wi) => (
-          <div key={wi} className="grid grid-cols-[24px_repeat(7,minmax(0,1fr))] mb-0.5">
+          <div key={wi} className="mb-0.5">
+          <div className="grid grid-cols-[24px_repeat(7,minmax(0,1fr))]">
 
             {/* ISO week number */}
             <div className="flex items-start justify-center pt-2.5">
@@ -247,11 +347,13 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
 
             {/* 7 day cells */}
             {week.map((date, di) => {
-              const dayEvents   = getEventsForDate(date);
+              // Single-day (and over-cap) events only — spanning events are drawn as week-level bars below.
+              const dayEvents   = getEventsForDate(date).filter(e => !isSpanning(e));
               const isToday_    = isSameDay(date, today);
               const isSelected  = !!selectedDate && isSameDay(date, selectedDate);
               const inMonth     = date.getMonth() === currentDate.getMonth();
               const isSunday    = di === 6;
+              const holiday     = holidayByDate.get(toIsoLocal(date));
 
               return (
                 <div
@@ -271,32 +373,40 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
                       ? 'bg-jci-blue text-white'
                       : isSelected
                         ? 'bg-slate-200 text-slate-900'
-                        : isSunday
+                        : holiday
                           ? inMonth
-                            ? 'text-red-400 group-hover:bg-red-50'
-                            : 'text-red-200'
-                          : inMonth
-                            ? 'text-slate-800 group-hover:bg-slate-100'
-                            : 'text-slate-300',
+                            ? 'text-rose-500 group-hover:bg-rose-50'
+                            : 'text-rose-200'
+                          : isSunday
+                            ? inMonth
+                              ? 'text-red-400 group-hover:bg-red-50'
+                              : 'text-red-200'
+                            : inMonth
+                              ? 'text-slate-800 group-hover:bg-slate-100'
+                              : 'text-slate-300',
                   ].join(' ')}>
                     {date.getDate()}
                   </div>
 
-                  {/* Event chips — max 2 visible, then "+N" */}
+                  {/* Holiday tag (not clickable) + up to 2 event chips, then "+N" */}
                   <div className="w-full px-0.5 space-y-0.5">
+                    {holiday && (
+                      <div
+                        className={`w-full text-[8px] font-semibold truncate px-1 py-[1px] rounded-sm leading-tight bg-rose-500 text-white ${!inMonth ? 'opacity-40' : ''}`}
+                        title={`Public holiday: ${holiday.name}`}
+                      >
+                        {holiday.name}
+                      </div>
+                    )}
                     {dayEvents.slice(0, 2).map(event => {
-                      const c = getColors(event.type);
+                      const c = getColors(event);
                       return (
                         <div
                           key={event.id}
                           draggable={!readonly}
                           onDragStart={(e) => handleDragStart(e, event)}
                           onClick={(e) => { e.stopPropagation(); onEventClick?.(event); }}
-                          className={[
-                            'w-full text-[8px] font-semibold truncate px-1 py-[1px] rounded-sm leading-tight cursor-pointer',
-                            c.chip,
-                            !inMonth ? 'opacity-40' : '',
-                          ].join(' ')}
+                          className={['w-full text-[8px] font-semibold truncate px-1 py-[1px] rounded-sm leading-tight cursor-pointer', c.chip, !inMonth ? 'opacity-40' : ''].join(' ')}
                           title={event.title}
                         >
                           {event.title}
@@ -313,65 +423,137 @@ export const EventCalendarView: React.FC<EventCalendarViewProps> = ({
               );
             })}
           </div>
+
+          {/* Multi-day events as continuous bars spanning their days (one element per week segment) */}
+          {(() => {
+            const bars = buildWeekBars(week);
+            if (!bars.length) return null;
+            return (
+              <div className="grid grid-cols-[24px_repeat(7,minmax(0,1fr))] gap-y-[2px] mt-[1px]">
+                {bars.map(b => {
+                  const c = getColors(b.event);
+                  const inMonth = b.event.date ? new Date(b.event.date).getMonth() === currentDate.getMonth() : true;
+                  return (
+                    <button
+                      key={`${b.event.id}-${b.lane}`}
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onEventClick?.(b.event); }}
+                      title={b.event.title}
+                      style={{ gridColumn: `${b.colStart} / ${b.colEnd}`, gridRow: b.lane + 1 }}
+                      className={[
+                        'h-[12px] flex items-center text-[8px] font-semibold text-white leading-none truncate px-1',
+                        c.bar,
+                        b.startsHere ? 'rounded-l-sm ml-0.5' : '',
+                        b.endsHere ? 'rounded-r-sm mr-0.5' : '',
+                        !inMonth ? 'opacity-40' : '',
+                      ].join(' ')}
+                    >
+                      {b.event.title}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
+          </div>
         ))}
       </div>
 
-      {/* ── Selected date panel ── */}
-      {selectedDate && (
-        <div className="border-t border-slate-100">
+      {/* ── This month's events (scrollable) ── selected day (if any) is highlighted ── */}
+      <div className="border-t border-slate-100">
 
-          {/* Day header */}
-          <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-50/70">
-            <span className="text-base font-black text-slate-900">
-              {selectedDate.getDate()}
+        {/* Month header */}
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-50/70">
+          <span className="text-sm font-black text-slate-900">
+            {MONTH_ABBR[currentDate.getMonth()]} {currentDate.getFullYear()}
+          </span>
+          <span className="text-xs font-semibold text-slate-400">
+            {monthEvents.length} event{monthEvents.length === 1 ? '' : 's'}
+          </span>
+          {selectedDate && isSameDay(selectedDate, today) && (
+            <span className="ml-auto text-[10px] font-bold bg-jci-blue/10 text-jci-blue px-2 py-0.5 rounded-full">
+              Today
             </span>
-            <span className="text-sm font-semibold text-slate-400">
-              {DAY_FULL[selectedDate.getDay()]}
-            </span>
-            {isSameDay(selectedDate, today) && (
-              <span className="ml-auto text-[10px] font-bold bg-jci-blue/10 text-jci-blue px-2 py-0.5 rounded-full">
-                Today
-              </span>
-            )}
-          </div>
+          )}
+        </div>
 
-          {/* Event list for selected date */}
-          <div className="max-h-60 overflow-y-auto">
-            {selectedDateEvents.length === 0 ? (
-              <p className="text-center text-sm text-slate-400 py-5">No events on this day</p>
-            ) : (
-              selectedDateEvents.map(event => {
-                const d = new Date(event.date);
-                const c = getColors(event.type);
+        {/* Colour legend — event level / JCI KL involvement */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-1.5 border-b border-slate-50">
+          {LEGEND_ORDER.map(cat => (
+            <span key={cat} className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-500">
+              <span className={`w-2 h-2 rounded-full ${CATEGORY_COLORS[cat].dot}`} />
+              {CATEGORY_LABEL[cat]}
+            </span>
+          ))}
+          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-500">
+            <span className="w-2 h-2 rounded-full bg-rose-500" />
+            Holiday
+          </span>
+        </div>
+
+        {/* Events + public holidays for the whole month */}
+        <div className="max-h-72 overflow-y-auto">
+          {monthItems.length === 0 ? (
+            <p className="text-center text-sm text-slate-400 py-5">No events this month</p>
+          ) : (
+            monthItems.map(item => {
+              const d = item.at;
+              const onSelectedDay = !!selectedDate && isSameDay(d, selectedDate);
+
+              if (item.kind === 'holiday') {
                 return (
                   <div
-                    key={event.id}
-                    className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors"
-                    onClick={() => onEventClick?.(event)}
+                    key={`hol-${item.holiday.date}-${item.holiday.name}`}
+                    className={`flex items-center gap-3 px-4 py-2.5 border-b border-slate-50 last:border-0 ${onSelectedDay ? 'bg-rose-50/60' : ''}`}
                   >
-                    {/* Coloured left bar */}
-                    <div className={`w-1 h-10 rounded-full shrink-0 ${c.bar}`} />
-                    {/* Date badge */}
-                    <div className={`w-10 h-10 rounded-xl shrink-0 flex flex-col items-center justify-center ${c.chip}`}>
-                      <span className="text-[8px] font-bold leading-none uppercase">
-                        {MONTH_ABBR[d.getMonth()]}
-                      </span>
+                    <div className="w-1 h-10 rounded-full shrink-0 bg-rose-500" />
+                    <div className="w-10 h-10 rounded-xl shrink-0 flex flex-col items-center justify-center bg-rose-500 text-white">
+                      <span className="text-[8px] font-bold leading-none uppercase">{MONTH_ABBR[d.getMonth()]}</span>
                       <span className="text-sm font-black leading-tight">{d.getDate()}</span>
                     </div>
-                    {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-slate-900 truncate">{event.title}</p>
-                      <p className="text-xs text-slate-400 truncate">
-                        {formatTime(d)}{event.location ? ` · ${event.location}` : ''}
-                      </p>
+                      <p className="text-sm font-bold text-slate-900 truncate">{item.holiday.name}</p>
+                      <p className="text-xs text-rose-400 truncate">Public holiday</p>
                     </div>
                   </div>
                 );
-              })
-            )}
-          </div>
+              }
+
+              const event = item.event;
+              const c = getColors(event);
+              return (
+                <div
+                  key={event.id}
+                  className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer border-b border-slate-50 last:border-0 transition-colors ${onSelectedDay ? 'bg-blue-50/60' : 'hover:bg-slate-50'}`}
+                  onClick={() => onEventClick?.(event)}
+                >
+                  {/* Coloured left bar */}
+                  <div className={`w-1 h-10 rounded-full shrink-0 ${c.bar}`} />
+                  {/* Date badge */}
+                  <div className={`w-10 h-10 rounded-xl shrink-0 flex flex-col items-center justify-center ${c.chip}`}>
+                    <span className="text-[8px] font-bold leading-none uppercase">
+                      {MONTH_ABBR[d.getMonth()]}
+                    </span>
+                    <span className="text-sm font-black leading-tight">{d.getDate()}</span>
+                  </div>
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-slate-900 truncate">{event.title}</p>
+                    <p className="text-xs text-slate-400 truncate">
+                      {(() => {
+                        const sp = eventSpan(event);
+                        return sp.days > 1
+                          ? `${MONTH_ABBR[sp.start.getMonth()]} ${sp.start.getDate()} – ${MONTH_ABBR[sp.end.getMonth()]} ${sp.end.getDate()} · ${sp.days}d`
+                          : `${formatTime(d)}${event.location ? ` · ${event.location}` : ''}`;
+                      })()}
+                    </p>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
-      )}
+      </div>
 
       {/* ── iCal subscription modal ── */}
       <Modal isOpen={showICalModal} onClose={() => setShowICalModal(false)} title="Subscribe to Calendar">
