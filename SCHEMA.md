@@ -82,6 +82,7 @@
 | business.interestedIndustries | string[] | — | | interestedIndustries | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | Business Directory 匹配与行业筛选 |
 | business.idealReferralTypes | string[] | — | 旧版类型字段；应用内无表单写入，读取时同样经 `normalizeIdealReferrals` | idealReferralTypes | 系统: `normalizeMemberData` 仅透传 `data.business.idealReferralTypes`；`scripts/migrateMemberFields.mjs`（旧平铺迁移）；`scripts/normalizeIdealReferrals.mjs` 清理 | `publicBusinessListings.idealReferralTypes`；`memberCards.idealReferrals`（优先来源，`buildMemberCard` 复制，`syncCards` 自动回写） |
 | business.bookmarkedBusinessIds | string[] | — | 收藏的成员 ID（本地商家 ID 与 `memberCards` ID 都等于成员 ID） | bookmarkedBusinessIds | 角色: 自己(非锁定字段，含外部会员) 或 B+；系统: Business Directory 收藏操作（`useBusinessBookmarks` → `useAuth.updateMemberProfile`） | Business Directory 书签状态与「Bookmarked」标签（本地商家与名片都可收藏） |
+| business.productsAndServices | string[] | — | 会员自填的产品与服务列表，自由文本 | — | 角色: B+（通过 `MemberEditForm` 或 `MemberDetailProfessionalTab` 内联编辑）；自己（非 `MEMBER_SELF_EDITABLE_FIELDS`，须由 B+ 编辑） | 商业档案展示（Professional Tab） |
 | jciCareer | object | — | JCI 会员生涯 nested object |  | 会员、财务、董事会及晋升服务 | 权限判断、会员统计、晋升与会费流程 |
 | jciCareer.membershipType | enum | ✓ | `Guest` \| `Probation` \| `Official` \| `Honorary` \| `Senator` \| `Visiting` \| `Associate` | membershipType | 角色: B+；系统: 注册/审批/晋升/会费同步/导入 | `members.role` 推导；会费记录同步依据 |
 | jciCareer.membershipStatus | enum | ✓ | `paid_due` \| `unpaid_due` \| `terminated` \| `pending` \| `paid` \| `overdue` \| `partial` \| `over paid` |  | 角色: B+；系统: membership/finance sync | 会员状态过滤、权限判断、会费仪表盘 |

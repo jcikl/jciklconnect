@@ -31,6 +31,7 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
   const { showToast } = useToast();
   const [uploadingLogo, setUploadingLogo] = React.useState(false);
   const [uploadingBanner, setUploadingBanner] = React.useState(false);
+  const [pnsDraft, setPnsDraft] = React.useState('');
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [editingIndex, setEditingIndex] = React.useState<number | null>(null);
   const [draftOffer, setDraftOffer] = React.useState<SpecialOffer>({ ...EMPTY_OFFER });
@@ -226,6 +227,29 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
               </div>
 
               <div className="border-t pt-3 space-y-2">
+                <label className="text-slate-500 block text-xs uppercase font-medium">Products &amp; Services</label>
+                <div className="flex flex-wrap gap-1 mb-1">
+                  {(inlineValues?.productsAndServices ?? []).map((item: string, idx: number) => (
+                    <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 text-[11px] font-medium">
+                      {item}
+                      <button type="button" onClick={() => setInlineValues({ ...inlineValues, productsAndServices: (inlineValues.productsAndServices ?? []).filter((_: string, i: number) => i !== idx) })} className="ml-0.5 hover:text-red-500 leading-none">×</button>
+                    </span>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={pnsDraft}
+                    onChange={e => setPnsDraft(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); const v = pnsDraft.trim(); if (v && !(inlineValues?.productsAndServices ?? []).includes(v)) { setInlineValues({ ...inlineValues, productsAndServices: [...(inlineValues?.productsAndServices ?? []), v] }); setPnsDraft(''); } } }}
+                    placeholder="Add product or service…"
+                    className="flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
+                  />
+                  <button type="button" onClick={() => { const v = pnsDraft.trim(); if (v && !(inlineValues?.productsAndServices ?? []).includes(v)) { setInlineValues({ ...inlineValues, productsAndServices: [...(inlineValues?.productsAndServices ?? []), v] }); setPnsDraft(''); } }} className="px-3 py-1.5 rounded-lg bg-jci-blue text-white text-sm font-medium hover:bg-blue-700 transition-colors">Add</button>
+                </div>
+              </div>
+
+              <div className="border-t pt-3 space-y-2">
                 <label className="text-slate-500 block text-xs uppercase font-medium">Special Member Offers</label>
                 <div className="space-y-2">
                   {/* Add offer row — always at top */}
@@ -304,6 +328,18 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                   )}
                 </div>
               </div>
+
+              {/* Products & Services */}
+              {Array.isArray(member.business?.productsAndServices) && member.business.productsAndServices.length > 0 && (
+                <div>
+                  <span className="text-slate-500 text-xs uppercase font-medium">Products &amp; Services</span>
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {member.business.productsAndServices.map((item, idx) => (
+                      <Badge key={idx} variant="neutral" className="text-[10px]">{item}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Divider */}
               <div className="border-t border-slate-100 pt-4 space-y-4">

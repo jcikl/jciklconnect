@@ -245,6 +245,7 @@ export interface Member {
     interestedIndustries?: string[];
     idealReferralTypes?: string[];
     bookmarkedBusinessIds?: string[];
+    productsAndServices?: string[];
   };
   jciCareer?: {
     membershipType: MembershipType;

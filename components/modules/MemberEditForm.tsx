@@ -84,6 +84,7 @@ function initFormValues(member: Member) {
     businessCategory: Array.isArray(member.business?.businessCategory) ? member.business?.businessCategory : (member.business?.businessCategory ? [member.business?.businessCategory] : []),
     industry: member.industry || '',
     interestedIndustries: (() => { const v = member.business?.interestedIndustries; return Array.isArray(v) ? v : (v ? [v as string] : []); })(),
+    productsAndServices: Array.isArray(member.business?.productsAndServices) ? member.business.productsAndServices : [],
 
     // Contact Information
     phone: member.contact?.phone || '',
@@ -117,6 +118,7 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
     initialTab || (selfEditableOnly ? 'contact' : 'basic')
   );
   const [formValues, setFormValues] = useState(() => initFormValues(member));
+  const [pnsDraft, setPnsDraft] = useState('');
   const [membershipRules, setMembershipRules] = useState<Record<MembershipType, MembershipRuleConfig> | null>(null);
   const [allMembers, setAllMembers] = useState<Member[]>([]);
   const [allProjects, setAllProjects] = useState<Project[]>([]);
@@ -273,6 +275,7 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
       'business.departmentAndPosition': formValues.departmentAndPosition || undefined,
       'business.levelOfManagement': formValues.levelOfManagement || undefined,
       'business.interestedIndustries': interestedIndustriesArr.length > 0 ? interestedIndustriesArr : undefined,
+      'business.productsAndServices': (formValues.productsAndServices as string[]).length > 0 ? formValues.productsAndServices : undefined,
       'business.acceptInternationalBusiness': formValues.acceptInternationalBusiness || undefined,
       'others.shirtStyle': formValues.cutStyle || undefined,
       'others.tshirtSize': formValues.tshirtSize || undefined,
@@ -709,6 +712,32 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
                     <span className={`inline-block px-3 py-1.5 rounded-lg text-[10px] md:text-xs font-bold md:font-medium transition-colors border-2 ${formValues.interestedIndustries.includes(opt) ? 'bg-sky-500 text-white border-sky-500 shadow-sm' : 'bg-white text-slate-700 border-slate-300 hover:border-sky-500'}`}>{opt}</span>
                   </label>
                 ))}
+              </div>
+            </div>
+            <div className="col-span-1 md:col-span-2 pt-2">
+              <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Products &amp; Services</label>
+              <div className="flex flex-wrap gap-1 mb-2">
+                {(formValues.productsAndServices as string[]).map((item, idx) => (
+                  <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 text-[11px] font-medium">
+                    {item}
+                    <button type="button" onClick={() => handleChange('productsAndServices', (formValues.productsAndServices as string[]).filter((_, i) => i !== idx))} className="ml-0.5 hover:text-red-500 leading-none">×</button>
+                  </span>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={pnsDraft}
+                  onChange={e => setPnsDraft(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); const v = pnsDraft.trim(); if (v && !(formValues.productsAndServices as string[]).includes(v)) { handleChange('productsAndServices', [...(formValues.productsAndServices as string[]), v]); setPnsDraft(''); } } }}
+                  placeholder="e.g. Web Design, Consulting…"
+                  className="flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
+                />
+                <button
+                  type="button"
+                  onClick={() => { const v = pnsDraft.trim(); if (v && !(formValues.productsAndServices as string[]).includes(v)) { handleChange('productsAndServices', [...(formValues.productsAndServices as string[]), v]); setPnsDraft(''); } }}
+                  className="px-3 py-1.5 rounded-lg bg-jci-blue text-white text-sm font-medium hover:bg-blue-700 transition-colors"
+                >Add</button>
               </div>
             </div>
           </div>

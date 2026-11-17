@@ -1,7 +1,7 @@
 import * as React from 'react';
 import {
   Phone, MessageCircle, MapPin, Linkedin, Facebook, Instagram, Lock,
-  User, Briefcase, Package, Users, ArrowUpRight, Upload,
+  User, Briefcase, Shirt, Volleyball, ArrowUpRight, Upload,
   Plus, Pencil, Trash2,
 } from 'lucide-react';
 import { Badge, Drawer, useToast } from '../../ui/Common';
@@ -78,8 +78,8 @@ const INFO_TABS = [
   { id: 'basic', label: 'Basic Information', icon: User },
   { id: 'contact', label: 'Contact', icon: Phone },
   { id: 'professional', label: 'Professional & Business', icon: Briefcase },
-  { id: 'clubs', label: 'Hobby Clubs', icon: Users },
-  { id: 'apparel', label: 'Apparel & Items', icon: Package },
+  { id: 'clubs', label: 'Hobby Clubs', icon: Volleyball },
+  { id: 'apparel', label: 'Apparel & Items', icon: Shirt },
 ] as const;
 
 type InfoTabId = typeof INFO_TABS[number]['id'];
