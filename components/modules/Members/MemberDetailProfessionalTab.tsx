@@ -120,26 +120,26 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
         <Card title="Professional & Business">
           {isEditMode && inlineValues ? (
             <div className="space-y-4 text-sm">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Company Name</label>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <label className="text-slate-500 text-xs uppercase font-medium shrink-0 w-32">Company Name</label>
                   <input
                     type="text"
                     value={inlineValues.companyName}
                     onChange={e => setInlineValues({ ...inlineValues, companyName: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                    className="flex-1 min-w-0 rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                   />
                 </div>
-                <div>
-                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Company Website</label>
+                <div className="flex items-center gap-3">
+                  <label className="text-slate-500 text-xs uppercase font-medium shrink-0 w-32">Company Website</label>
                   <input
                     type="text"
                     value={inlineValues.companyWebsite ?? ''}
                     onChange={e => setInlineValues({ ...inlineValues, companyWebsite: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                    className="flex-1 min-w-0 rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                   />
                 </div>
-                <div className="col-span-2">
+                <div>
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Company Description</label>
                   <textarea
                     value={inlineValues.companyDescription ?? ''}
@@ -148,21 +148,21 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue resize-y"
                   />
                 </div>
-                <div>
-                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Position / Title</label>
+                <div className="flex items-center gap-3">
+                  <label className="text-slate-500 text-xs uppercase font-medium shrink-0 w-32">Position / Title</label>
                   <input
                     type="text"
                     value={inlineValues.departmentAndPosition ?? ''}
                     onChange={e => setInlineValues({ ...inlineValues, departmentAndPosition: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                    className="flex-1 min-w-0 rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                   />
                 </div>
-                <div>
-                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Level of Mgmt</label>
+                <div className="flex items-center gap-3">
+                  <label className="text-slate-500 text-xs uppercase font-medium shrink-0 w-32">Level of Mgmt</label>
                   <select
                     value={inlineValues.levelOfManagement ?? ''}
                     onChange={e => setInlineValues({ ...inlineValues, levelOfManagement: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
+                    className="flex-1 min-w-0 rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
                   >
                     <option value="">Select Level</option>
                     <option value="Top">Top</option>
@@ -170,23 +170,23 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                     <option value="Frontline">Frontline</option>
                   </select>
                 </div>
-                <div>
-                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Industry</label>
+                <div className="flex items-center gap-3">
+                  <label className="text-slate-500 text-xs uppercase font-medium shrink-0 w-32">Industry</label>
                   <select
                     value={inlineValues.industry}
                     onChange={e => setInlineValues({ ...inlineValues, industry: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
+                    className="flex-1 min-w-0 rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
                   >
                     <option value="">Select Industry</option>
                     {INDUSTRY_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                   </select>
                 </div>
-                <div>
-                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Intl. Business Engagement</label>
+                <div className="flex items-center gap-3">
+                  <label className="text-slate-500 text-xs uppercase font-medium shrink-0 w-32">Intl. Business</label>
                   <select
                     value={inlineValues.acceptInternationalBusiness ?? ''}
                     onChange={e => setInlineValues({ ...inlineValues, acceptInternationalBusiness: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
+                    className="flex-1 min-w-0 rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
                   >
                     <option value="">Select Option</option>
                     <option value="Yes">Yes</option>
@@ -196,8 +196,8 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-3">
-                <div className="col-span-2">
+              <div className="space-y-3 border-t pt-3">
+                <div>
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Business Categories</label>
                   <MultiSelectDropdown
                     options={BUSINESS_CATEGORIES_OPTIONS}
