@@ -290,10 +290,10 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                     {member.business?.companyWebsite}
                   </a>
                 )}
-                {member.business?.companyDescription && (
-                  <p className="text-xs text-slate-500 leading-relaxed mt-1.5">{member.business.companyDescription}</p>
-                )}
               </div>
+              {member.business?.companyDescription && (
+                <p className="text-xs text-slate-500 leading-relaxed">{member.business.companyDescription}</p>
+              )}
 
               {/* 2-col quick-facts grid */}
               <div className="hidden md:grid grid-cols-2 gap-x-4 gap-y-4">
