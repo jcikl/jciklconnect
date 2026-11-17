@@ -595,7 +595,7 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                     {member.business?.companyWebsite && <a href={toExternalWebsiteUrl(member.business?.companyWebsite)} target="_blank" rel="noopener noreferrer" className="text-xs text-jci-blue hover:underline block mt-1">{member.business?.companyWebsite}</a>}
                     {member.business?.companyDescription && <p className="text-xs text-slate-500 leading-relaxed mt-1.5">{member.business.companyDescription}</p>}
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
                     <div><span className="text-slate-500 text-xs uppercase font-medium">Position</span><p className="font-medium text-slate-900 mt-0.5">{member.business?.departmentAndPosition || 'Not provided'}</p></div>
                     <div><span className="text-slate-500 text-xs uppercase font-medium">Level of Mgmt</span><p className="font-medium text-slate-900 mt-0.5">{member.business?.levelOfManagement || 'Not provided'}</p></div>
                     <div><span className="text-slate-500 text-xs uppercase font-medium">Industry</span><p className="font-medium text-slate-900 mt-0.5">{member.industry || 'Not provided'}</p></div>
@@ -610,7 +610,7 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                     </div>
                   </div>
                   <div className="border-t border-slate-100 pt-4 space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <span className="text-slate-500 text-xs uppercase font-medium">Ideal Referral Industry</span>
                         <div className="mt-1 text-slate-700 font-medium leading-snug">
