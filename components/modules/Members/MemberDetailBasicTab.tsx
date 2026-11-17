@@ -507,10 +507,11 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
               <H3>Professional & Business</H3>
               {/* Company header banner (view mode only) */}
               {!isEditMode && (member.companyName || member.industry) && activeInlineEditCard !== 'professional' && (
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 bg-gradient-to-r from-slate-50 to-white rounded-xl border border-slate-200 mb-4">
+                <div className="flex flex-col sm:flex-row items-start gap-4 p-4 bg-gradient-to-r from-slate-50 to-white rounded-xl border border-slate-200 mb-4">
                   <div className="flex-1 min-w-0">
                     <h3 className="text-base font-black text-slate-900 truncate">{member.companyName || '—'}</h3>
                     <p className="text-sm text-slate-500 mt-0.5">{[member.business?.departmentAndPosition, member.industry].filter(Boolean).join(' · ')}</p>
+                    {member.business?.companyDescription && <p className="text-xs text-slate-500 leading-relaxed mt-1.5">{member.business.companyDescription}</p>}
                   </div>
                   <div className="flex flex-wrap gap-2 shrink-0">
                     {member.industry && <span className="px-3 py-1 rounded-full bg-blue-50 text-jci-blue text-xs font-bold border border-blue-100">{member.industry}</span>}
@@ -589,11 +590,10 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                 </div>
               ) : (
                 <div className="space-y-5 text-sm">
-                  <div>
-                    <span className="hidden md:block text-slate-500 text-xs uppercase font-medium">Company Name</span>
-                    <p className="hidden md:block font-bold text-slate-900 leading-tight mt-0.5">{member.companyName || 'Freelance / Not Provided'}</p>
-                    {member.business?.companyWebsite && <a href={toExternalWebsiteUrl(member.business?.companyWebsite)} target="_blank" rel="noopener noreferrer" className="hidden md:block text-xs text-jci-blue hover:underline mt-1">{member.business?.companyWebsite}</a>}
-                    {member.business?.companyDescription && <p className="text-xs text-slate-500 leading-relaxed md:mt-1.5">{member.business.companyDescription}</p>}
+                  <div className="hidden md:block">
+                    <span className="text-slate-500 text-xs uppercase font-medium">Company Name</span>
+                    <p className="font-bold text-slate-900 leading-tight mt-0.5">{member.companyName || 'Freelance / Not Provided'}</p>
+                    {member.business?.companyWebsite && <a href={toExternalWebsiteUrl(member.business?.companyWebsite)} target="_blank" rel="noopener noreferrer" className="text-xs text-jci-blue hover:underline block mt-1">{member.business?.companyWebsite}</a>}
                   </div>
                   <div className="hidden md:grid grid-cols-2 gap-x-4 gap-y-4">
                     <div><span className="text-slate-500 text-xs uppercase font-medium">Position</span><p className="font-medium text-slate-900 mt-0.5">{member.business?.departmentAndPosition || 'Not provided'}</p></div>

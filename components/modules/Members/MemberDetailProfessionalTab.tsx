@@ -96,10 +96,11 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
     <div className="grid lg:grid-cols-3 gap-6">
       <div className="lg:col-span-3 space-y-6">
         {(member.companyName || member.industry) && activeInlineEditCard !== 'professional' && (
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-5 bg-gradient-to-r from-slate-50 to-white rounded-2xl border border-slate-200">
+          <div className="flex flex-col sm:flex-row items-start gap-4 p-5 bg-gradient-to-r from-slate-50 to-white rounded-2xl border border-slate-200">
             <div className="flex-1 min-w-0">
               <h3 className="text-lg font-black text-slate-900 truncate">{member.companyName || '—'}</h3>
               <p className="text-sm text-slate-500 mt-0.5">{[member.business?.departmentAndPosition, member.industry].filter(Boolean).join(' · ')}</p>
+              {member.business?.companyDescription && <p className="text-xs text-slate-500 leading-relaxed mt-1.5">{member.business.companyDescription}</p>}
             </div>
             <div className="flex flex-wrap gap-2 shrink-0">
               {member.industry && (
@@ -282,16 +283,13 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
           ) : (
             <div className="space-y-5 text-sm">
               {/* Company header */}
-              <div>
-                <span className="hidden md:block text-slate-500 text-xs uppercase font-medium">Company Name</span>
-                <p className="hidden md:block font-bold text-slate-900 leading-tight mt-0.5">{member.companyName || 'Freelance / Not Provided'}</p>
+              <div className="hidden md:block">
+                <span className="text-slate-500 text-xs uppercase font-medium">Company Name</span>
+                <p className="font-bold text-slate-900 leading-tight mt-0.5">{member.companyName || 'Freelance / Not Provided'}</p>
                 {member.business?.companyWebsite && (
-                  <a href={toExternalWebsiteUrl(member.business?.companyWebsite)} target="_blank" rel="noopener noreferrer" className="hidden md:block text-xs text-jci-blue hover:underline mt-1">
+                  <a href={toExternalWebsiteUrl(member.business?.companyWebsite)} target="_blank" rel="noopener noreferrer" className="text-xs text-jci-blue hover:underline block mt-1">
                     {member.business?.companyWebsite}
                   </a>
-                )}
-                {member.business?.companyDescription && (
-                  <p className="text-xs text-slate-500 leading-relaxed md:mt-1.5">{member.business.companyDescription}</p>
                 )}
               </div>
 
