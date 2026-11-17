@@ -361,7 +361,7 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
               {/* Divider */}
               <div className="border-t border-slate-100 pt-4 space-y-4">
                 {/* Ideal Referral — 2-col on sm+, stacked on mobile */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-4">
                   <div>
                     <span className="text-slate-500 text-xs uppercase font-medium">Ideal Referral Industry</span>
                     <div className="mt-1 text-slate-700 font-medium leading-snug">
