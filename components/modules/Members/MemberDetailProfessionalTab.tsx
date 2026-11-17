@@ -120,7 +120,7 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
         <Card title="Professional & Business">
           {isEditMode && inlineValues ? (
             <div className="space-y-4 text-sm">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Company Name</label>
                   <input
@@ -196,7 +196,7 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 border-t pt-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t pt-3">
                 <div className="col-span-2">
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Business Categories</label>
                   <MultiSelectDropdown
@@ -296,7 +296,7 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
               </div>
 
               {/* 2-col quick-facts grid */}
-              <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
                 <div>
                   <span className="text-slate-500 text-xs uppercase font-medium">Position</span>
                   <p className="font-medium text-slate-900 mt-0.5">{member.business?.departmentAndPosition || 'Not provided'}</p>
