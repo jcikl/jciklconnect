@@ -27,7 +27,6 @@ import { MembersService } from '../../../services/membersService';
 import { HobbyClubsService } from '../../../services/hobbyClubsService';
 import { deleteFromCloudinary, uploadMemberAvatarToCloudinary } from '../../../services/cloudinaryService';
 import { BoardManagementService } from '../../../services/boardManagementService';
-import { MentorshipService, MentorMatchSuggestion } from '../../../services/mentorshipService';
 import { ProjectsService } from '../../../services/projectsService';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../../config/firebase';
@@ -39,7 +38,6 @@ import { formatDateToDDMMMYYYY } from '../../../utils/dateUtils';
 import { MembershipTypeDisplay } from '../../shared/MembershipTypeDisplay';
 import { PointsSourceRadarChart } from '../../dashboard/Analytics';
 import { getAttendanceDisplay } from './MemberTable';
-import { MentorMatchingModal } from './MentorMatchingModal';
 import { MemberDetailBasicTab } from './MemberDetailBasicTab';
 import { MemberDetailCareerTab } from './MemberDetailCareerTab';
 import { MemberDetailProfessionalTab } from './MemberDetailProfessionalTab';
@@ -73,9 +71,6 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transferLoId, setTransferLoId] = useState('');
   const [isTransferring, setIsTransferring] = useState(false);
-  const [showMentorMatchModal, setShowMentorMatchModal] = useState(false);
-  const [potentialMentors, setPotentialMentors] = useState<MentorMatchSuggestion[]>([]);
-  const [loadingMatches, setLoadingMatches] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -476,15 +471,6 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
   };
   const [commissionDirectorPositions, setCommissionDirectorPositions] = useState<BoardMember[]>([]);
 
-  const mentor = useMemo(
-    () => members.find(m => m.id === member.mentorId),
-    [members, member.mentorId]
-  );
-  const mentees = useMemo(
-    () => members.filter(m => member.menteeIds?.includes(m.id)),
-    [members, member.menteeIds]
-  );
-
   // Load member's hobby clubs
   useEffect(() => {
     const loadMemberClubs = async () => {
@@ -656,31 +642,6 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
       cancelled = true;
     };
   }, [activeDetailTab, member.id]);
-
-  const handleFindMentors = useCallback(async () => {
-    setLoadingMatches(true);
-    try {
-      const matches = await MentorshipService.findPotentialMentors(member.id, {
-        skills: member.skills,
-      });
-      setPotentialMentors(matches);
-      setShowMentorMatchModal(true);
-    } catch (err) {
-      showToast('Failed to find potential mentors', 'error');
-    } finally {
-      setLoadingMatches(false);
-    }
-  }, [member.id, member.skills, showToast]);
-
-  const handleAssignMentor = async (mentorId: string) => {
-    try {
-      await MembersService.assignMentor(member.id, mentorId);
-      showToast('Mentor assigned successfully', 'success');
-      setShowMentorMatchModal(false);
-    } catch (err) {
-      showToast('Failed to assign mentor', 'error');
-    }
-  };
 
   const handleEditProfile = async (updates: Partial<Member>) => {
     try {
@@ -1208,10 +1169,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
             setInlineValues={setInlineValues}
             boardPositions={boardPositions}
             commissionDirectorPositions={commissionDirectorPositions}
-            mentor={mentor}
-            mentees={mentees}
-            handleFindMentors={handleFindMentors}
-            loadingMatches={loadingMatches}
+            mentees={[]}
             setShowPaymentHistoryModal={setShowPaymentHistoryModal}
             canEditRoleType={isDeveloper || effectiveRole === UserRole.SUPER_ADMIN}
             isAdmin={isAdmin || isDeveloper}
@@ -1509,15 +1467,6 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
             </div>
           </div>
         </Modal>
-      )}
-
-      {showMentorMatchModal && (
-        <MentorMatchingModal
-          mentee={member}
-          potentialMentors={potentialMentors}
-          onSelect={handleAssignMentor}
-          onClose={() => setShowMentorMatchModal(false)}
-        />
       )}
 
       {showTransferModal && (

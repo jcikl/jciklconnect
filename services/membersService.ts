@@ -672,11 +672,6 @@ export class MembersService {
         if (!EMAIL_RE.test(updates.contact?.email)) throw new Error('Invalid email format');
       }
 
-      // mentorId must go through assignMentor() to keep menteeIds bidirectionally in sync (N2 fix)
-      if ('mentorId' in updates) {
-        throw new Error('Use assignMentor() to change mentorId — updateMember does not sync menteeIds on mentor documents.');
-      }
-
       if (currentData?.jciCareer?.senatorship?.boardValidated) {
         if (
           'senatorshipId' in updates &&
@@ -1035,11 +1030,8 @@ export class MembersService {
       }
 
       // P1 fix: read ALL dependent docs in parallel BEFORE any writes so the primary write
-      // is a single batch covering soft-delete + mentor cleanup + email release + boardMembers +
+      // is a single batch covering soft-delete + email release + boardMembers +
       // bizListings (was previously 3 sequential batches: delete → cleanup → cascade).
-      const mentorId: string | undefined = targetDoc.exists()
-        ? (targetDoc.data() as Omit<Member, 'id'>).mentorId
-        : undefined;
       const targetEmailRaw: string | undefined = targetDoc.exists()
         ? ((targetDoc.data() as any)?.contact?.email || (targetDoc.data() as any)?.contact?.email)
         : undefined;
@@ -1051,7 +1043,7 @@ export class MembersService {
         getDocs(query(collection(db, COLLECTIONS.NOTIFICATIONS), where('memberId', '==', memberId))),
       ]);
 
-      // Primary batch: soft-delete + mentor cleanup + email release + boardMembers + bizListings
+      // Primary batch: soft-delete + email release + boardMembers + bizListings
       const primaryBatch = writeBatch(db);
       primaryBatch.update(doc(db, COLLECTIONS.MEMBERS, memberId), {
         role: 'INACTIVE',
@@ -1059,12 +1051,6 @@ export class MembersService {
         deletedBy: currentUid,
         updatedAt: Timestamp.now(),
       });
-      if (mentorId) {
-        primaryBatch.update(doc(db, COLLECTIONS.MEMBERS, mentorId), {
-          menteeIds: arrayRemove(memberId),
-          updatedAt: Timestamp.now(),
-        });
-      }
       if (targetEmailRaw) {
         const sanitizedDelEmail = targetEmailRaw.toLowerCase().replace(/[^a-z0-9@.]/g, '_');
         primaryBatch.delete(doc(db, COLLECTIONS.MEMBER_EMAILS, sanitizedDelEmail));
@@ -1329,28 +1315,6 @@ export class MembersService {
     }
   }
 
-  // Assign mentor
-  static async assignMentor(memberId: string, mentorId: string): Promise<void> {
-    try {
-      // P1 Fix: Use arrayUnion instead of read-then-spread so concurrent assignMentor
-      // calls cannot overwrite each other's writes. arrayUnion is idempotent — calling
-      // it twice with the same memberId is safe.
-      const batch = writeBatch(db);
-      batch.update(doc(db, COLLECTIONS.MEMBERS, memberId), {
-        mentorId,
-        updatedAt: Timestamp.now(),
-      });
-      batch.update(doc(db, COLLECTIONS.MEMBERS, mentorId), {
-        menteeIds: arrayUnion(memberId),
-        updatedAt: Timestamp.now(),
-      });
-      await this.commitWithRetry(batch);
-      this.invalidateMembersCache();
-    } catch (error) {
-      errorLoggingService.logError(error instanceof Error ? error : new Error(String(error)), { context: 'MembersService.assignMentor' });
-      throw error;
-    }
-  }
 
   /** Batch update members — uses writeBatch for atomicity (E01) */
   static async batchUpdateMembers(memberIds: string[], updates: Partial<Member>): Promise<void> {
@@ -1359,10 +1323,6 @@ export class MembersService {
       return;
     }
     try {
-      // mentorId changes must go through assignMentor to keep menteeIds in sync (E12 fix)
-      if ('mentorId' in updates) {
-        throw new Error('Use assignMentor() to change mentorId — batchUpdateMembers does not sync menteeIds on mentor documents.');
-      }
       // Email changes must go through updateMember so the memberEmails uniqueness slot
       // and Auth email are updated atomically per-member (each member has a different
       // current email, which a single batch payload cannot handle correctly).
@@ -1555,34 +1515,13 @@ export class MembersService {
         targetDocs.push(...chunkSnaps);
       }
 
-      // Group menteeIds to remove per mentor (skip mentors who are also being deleted)
-      const mentorCleanup = new Map<string, string[]>();
-      const deletingSet = new Set(memberIds);
-      targetDocs.forEach((d, i) => {
-        if (!d.exists()) return;
-        const mentorId = (d.data() as Omit<Member, 'id'>).mentorId;
-        if (mentorId && !deletingSet.has(mentorId)) {
-          if (!mentorCleanup.has(mentorId)) mentorCleanup.set(mentorId, []);
-          mentorCleanup.get(mentorId)!.push(memberIds[i]);
-        }
-      });
-
       const now = Timestamp.now();
 
-      // Build all write ops (soft-deletes + menteeIds cleanup) into a single list so they
-      // are committed in the same batch chunks — if any chunk fails the retry covers both
-      // sides together, preventing members from being deleted while their mentors still list them.
       type UpdateOp = { id: string; data: Record<string, unknown> };
-      const allOps: UpdateOp[] = [
-        ...memberIds.map(id => ({
-          id,
-          data: { role: 'INACTIVE', deletedAt: now, deletedBy: currentUid, updatedAt: now } as Record<string, unknown>,
-        })),
-        ...[...mentorCleanup.entries()].map(([mentorId, ids]) => ({
-          id: mentorId,
-          data: { menteeIds: arrayRemove(...ids), updatedAt: now } as Record<string, unknown>,
-        })),
-      ];
+      const allOps: UpdateOp[] = memberIds.map(id => ({
+        id,
+        data: { role: 'INACTIVE', deletedAt: now, deletedBy: currentUid, updatedAt: now } as Record<string, unknown>,
+      }));
 
       for (let i = 0; i < allOps.length; i += 400) {
         const batch = writeBatch(db);

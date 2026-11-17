@@ -939,34 +939,6 @@
       ]
     },
     {
-      "collectionGroup": "mentorMatches",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "mentorId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "mentorMatches",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "menteeId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
       "collectionGroup": "conversations",
       "queryScope": "COLLECTION",
       "fields": [
