@@ -42,6 +42,7 @@ import { getAttendanceDisplay } from './MemberTable';
 import { MentorMatchingModal } from './MentorMatchingModal';
 import { MemberDetailBasicTab } from './MemberDetailBasicTab';
 import { MemberDetailCareerTab } from './MemberDetailCareerTab';
+import { MemberDetailProfessionalTab } from './MemberDetailProfessionalTab';
 import { MemberDetailActivitiesTab } from './MemberDetailActivitiesTab';
 import { PrivacySettings } from './PrivacySettings';
 import { AccountSecuritySettings } from './AccountSecuritySettings';
@@ -1152,6 +1153,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
         <Tabs
           tabs={[
             { id: 'basic', label: 'Basic Information' },
+            { id: 'professional', label: 'Professional & Business' },
             { id: 'career', label: 'JCI Career' },
             { id: 'activities', label: 'Activities Log' },
             ...(isSelfView ? [{ id: 'privacy', label: 'Privacy & Security' }] : []),
@@ -1186,7 +1188,18 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
           />
         </AsyncErrorBoundary>
       )}
-{activeDetailTab === 'career' && (
+{activeDetailTab === 'professional' && (
+        <AsyncErrorBoundary>
+          <MemberDetailProfessionalTab
+            member={member}
+            isEditMode={isEditMode}
+            inlineValues={inlineValues}
+            setInlineValues={setInlineValues}
+            activeInlineEditCard={activeInlineEditCard}
+          />
+        </AsyncErrorBoundary>
+      )}
+      {activeDetailTab === 'career' && (
         <AsyncErrorBoundary>
           <MemberDetailCareerTab
             member={member}

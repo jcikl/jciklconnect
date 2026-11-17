@@ -95,7 +95,7 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
   return (
     <div className="grid lg:grid-cols-3 gap-6">
       <div className="lg:col-span-3 space-y-6">
-        {(member.companyName || member.industry) && activeInlineEditCard !== 'professional' && (
+        {(member.companyName || member.industry) && !isEditMode && (
           <div className="flex flex-col gap-3 p-5 bg-gradient-to-r from-slate-50 to-white rounded-2xl border border-slate-200">
             <div className="flex flex-col sm:flex-row items-start gap-4">
               <div className="flex-1 min-w-0">
