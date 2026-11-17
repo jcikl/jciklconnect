@@ -589,13 +589,13 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                 </div>
               ) : (
                 <div className="space-y-5 text-sm">
-                  <div>
+                  <div className="hidden md:block">
                     <span className="text-slate-500 text-xs uppercase font-medium">Company Name</span>
                     <p className="font-bold text-slate-900 leading-tight mt-0.5">{member.companyName || 'Freelance / Not Provided'}</p>
                     {member.business?.companyWebsite && <a href={toExternalWebsiteUrl(member.business?.companyWebsite)} target="_blank" rel="noopener noreferrer" className="text-xs text-jci-blue hover:underline block mt-1">{member.business?.companyWebsite}</a>}
                     {member.business?.companyDescription && <p className="text-xs text-slate-500 leading-relaxed mt-1.5">{member.business.companyDescription}</p>}
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
+                  <div className="hidden md:grid grid-cols-2 gap-x-4 gap-y-4">
                     <div><span className="text-slate-500 text-xs uppercase font-medium">Position</span><p className="font-medium text-slate-900 mt-0.5">{member.business?.departmentAndPosition || 'Not provided'}</p></div>
                     <div><span className="text-slate-500 text-xs uppercase font-medium">Level of Mgmt</span><p className="font-medium text-slate-900 mt-0.5">{member.business?.levelOfManagement || 'Not provided'}</p></div>
                     <div><span className="text-slate-500 text-xs uppercase font-medium">Industry</span><p className="font-medium text-slate-900 mt-0.5">{member.industry || 'Not provided'}</p></div>

@@ -282,7 +282,7 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
           ) : (
             <div className="space-y-5 text-sm">
               {/* Company header */}
-              <div>
+              <div className="hidden md:block">
                 <span className="text-slate-500 text-xs uppercase font-medium">Company Name</span>
                 <p className="font-bold text-slate-900 leading-tight mt-0.5">{member.companyName || 'Freelance / Not Provided'}</p>
                 {member.business?.companyWebsite && (
@@ -296,7 +296,7 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
               </div>
 
               {/* 2-col quick-facts grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
+              <div className="hidden md:grid grid-cols-2 gap-x-4 gap-y-4">
                 <div>
                   <span className="text-slate-500 text-xs uppercase font-medium">Position</span>
                   <p className="font-medium text-slate-900 mt-0.5">{member.business?.departmentAndPosition || 'Not provided'}</p>
