@@ -514,7 +514,6 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                     {member.business?.companyDescription && <p className="text-xs text-slate-500 leading-relaxed mt-1.5">{member.business.companyDescription}</p>}
                   </div>
                   <div className="flex flex-wrap gap-2 shrink-0">
-                    {member.industry && <span className="px-3 py-1 rounded-full bg-blue-50 text-jci-blue text-xs font-bold border border-blue-100">{member.industry}</span>}
                     {member.business?.acceptInternationalBusiness && member.business?.acceptInternationalBusiness !== 'No' && <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">🌐 Intl Business</span>}
                     {member.business?.companyWebsite && <a href={toExternalWebsiteUrl(member.business?.companyWebsite)} target="_blank" rel="noreferrer" className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-bold border border-slate-200 hover:bg-slate-200 transition-colors flex items-center gap-1"><ArrowUpRight size={11} /> Website</a>}
                   </div>
