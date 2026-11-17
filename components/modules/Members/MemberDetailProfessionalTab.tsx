@@ -92,11 +92,62 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
     }
   };
 
+  const hasCompanyInfo = !isEditMode && Boolean(member.companyName || member.industry || member.business?.departmentAndPosition || member.business?.levelOfManagement);
+
   return (
     <div className="grid lg:grid-cols-3 gap-6">
-      <div className="lg:col-span-3 space-y-6">
+      {hasCompanyInfo && (
+        <div className="hidden lg:flex lg:flex-col gap-5 lg:col-span-1 p-5 bg-white rounded-2xl border border-slate-200 shadow-sm self-start">
+          <div>
+            <h3 className="text-xl font-black text-slate-900 leading-tight">{member.companyName || '—'}</h3>
+            {(member.business?.departmentAndPosition || member.industry) && (
+              <p className="text-sm text-slate-500 mt-1">{[member.business?.departmentAndPosition, member.industry].filter(Boolean).join(' · ')}</p>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {member.business?.acceptInternationalBusiness && member.business.acceptInternationalBusiness !== 'No' && (
+              <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">🌐 Intl Business</span>
+            )}
+            {member.business?.companyWebsite && (
+              <a href={toExternalWebsiteUrl(member.business.companyWebsite)} target="_blank" rel="noreferrer" className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-bold border border-slate-200 hover:bg-slate-200 transition-colors flex items-center gap-1">
+                <ArrowUpRight size={11} /> Website
+              </a>
+            )}
+          </div>
+          {member.business?.companyDescription && (
+            <p className="text-sm text-slate-500 leading-relaxed">{member.business.companyDescription}</p>
+          )}
+          <div className="border-t border-slate-100 pt-4 space-y-3">
+            {member.business?.departmentAndPosition && (
+              <div>
+                <span className="text-slate-400 text-[11px] uppercase font-medium tracking-wide">Position</span>
+                <p className="font-semibold text-slate-800 text-sm mt-0.5">{member.business.departmentAndPosition}</p>
+              </div>
+            )}
+            {member.business?.levelOfManagement && (
+              <div>
+                <span className="text-slate-400 text-[11px] uppercase font-medium tracking-wide">Level of Mgmt</span>
+                <p className="font-semibold text-slate-800 text-sm mt-0.5">{member.business.levelOfManagement}</p>
+              </div>
+            )}
+            {member.industry && (
+              <div>
+                <span className="text-slate-400 text-[11px] uppercase font-medium tracking-wide">Industry</span>
+                <p className="font-semibold text-slate-800 text-sm mt-0.5">{member.industry}</p>
+              </div>
+            )}
+            {member.business?.acceptInternationalBusiness && (
+              <div>
+                <span className="text-slate-400 text-[11px] uppercase font-medium tracking-wide">Intl. Business</span>
+                <p className="font-semibold text-slate-800 text-sm mt-0.5">{member.business.acceptInternationalBusiness}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      <div className={`space-y-6 ${hasCompanyInfo ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
         {(member.companyName || member.industry) && !isEditMode && (
-          <div className="flex flex-col gap-3 p-5 bg-gradient-to-r from-slate-50 to-white rounded-2xl border border-slate-200">
+          <div className="lg:hidden flex flex-col gap-3 p-5 bg-gradient-to-r from-slate-50 to-white rounded-2xl border border-slate-200">
             <div className="flex flex-col sm:flex-row items-start gap-4">
               <div className="flex-1 min-w-0">
                 <h3 className="text-lg font-black text-slate-900 truncate">{member.companyName || '—'}</h3>
@@ -281,37 +332,6 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
             </div>
           ) : (
             <div className="space-y-5 text-sm">
-              {/* Company header */}
-              <div className="hidden md:block">
-                <span className="text-slate-500 text-xs uppercase font-medium">Company Name</span>
-                <p className="font-bold text-slate-900 leading-tight mt-0.5">{member.companyName || 'Freelance / Not Provided'}</p>
-                {member.business?.companyWebsite && (
-                  <a href={toExternalWebsiteUrl(member.business?.companyWebsite)} target="_blank" rel="noopener noreferrer" className="text-xs text-jci-blue hover:underline block mt-1">
-                    {member.business?.companyWebsite}
-                  </a>
-                )}
-              </div>
-
-              {/* 2-col quick-facts grid */}
-              <div className="hidden md:grid grid-cols-2 gap-x-4 gap-y-4">
-                <div>
-                  <span className="text-slate-500 text-xs uppercase font-medium">Position</span>
-                  <p className="font-medium text-slate-900 mt-0.5">{member.business?.departmentAndPosition || 'Not provided'}</p>
-                </div>
-                <div>
-                  <span className="text-slate-500 text-xs uppercase font-medium">Level of Mgmt</span>
-                  <p className="font-medium text-slate-900 mt-0.5">{member.business?.levelOfManagement || 'Not provided'}</p>
-                </div>
-                <div>
-                  <span className="text-slate-500 text-xs uppercase font-medium">Industry</span>
-                  <p className="font-medium text-slate-900 mt-0.5">{member.industry || 'Not provided'}</p>
-                </div>
-                <div>
-                  <span className="text-slate-500 text-xs uppercase font-medium">Intl. Business</span>
-                  <p className="font-medium text-slate-900 mt-0.5">{member.business?.acceptInternationalBusiness || 'Unknown'}</p>
-                </div>
-              </div>
-
               {/* Business Categories */}
               <div>
                 <span className="text-slate-500 text-xs uppercase font-medium">Business Categories</span>
