@@ -282,18 +282,18 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
           ) : (
             <div className="space-y-5 text-sm">
               {/* Company header */}
-              <div className="hidden md:block">
-                <span className="text-slate-500 text-xs uppercase font-medium">Company Name</span>
-                <p className="font-bold text-slate-900 leading-tight mt-0.5">{member.companyName || 'Freelance / Not Provided'}</p>
+              <div>
+                <span className="hidden md:block text-slate-500 text-xs uppercase font-medium">Company Name</span>
+                <p className="hidden md:block font-bold text-slate-900 leading-tight mt-0.5">{member.companyName || 'Freelance / Not Provided'}</p>
                 {member.business?.companyWebsite && (
-                  <a href={toExternalWebsiteUrl(member.business?.companyWebsite)} target="_blank" rel="noopener noreferrer" className="text-xs text-jci-blue hover:underline block mt-1">
+                  <a href={toExternalWebsiteUrl(member.business?.companyWebsite)} target="_blank" rel="noopener noreferrer" className="hidden md:block text-xs text-jci-blue hover:underline mt-1">
                     {member.business?.companyWebsite}
                   </a>
                 )}
+                {member.business?.companyDescription && (
+                  <p className="text-xs text-slate-500 leading-relaxed md:mt-1.5">{member.business.companyDescription}</p>
+                )}
               </div>
-              {member.business?.companyDescription && (
-                <p className="text-xs text-slate-500 leading-relaxed">{member.business.companyDescription}</p>
-              )}
 
               {/* 2-col quick-facts grid */}
               <div className="hidden md:grid grid-cols-2 gap-x-4 gap-y-4">
