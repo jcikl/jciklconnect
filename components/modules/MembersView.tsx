@@ -7,7 +7,7 @@ import {
   Calendar, Shield, UserCheck, AlertCircle, CheckCircle, MapPin,
   Linkedin, Facebook, Instagram, MessageCircle, CalendarCheck, UserCog,
   Target, Coins, ArrowUpRight, Edit, MoreHorizontal, Star, TrendingDown,
-  BookOpen, Trophy, Network, ChevronRight, LayoutList
+  Trophy, Network, ChevronRight, LayoutList
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button, Card, Badge, ProgressBar, Modal, useToast, Tabs, PageScaffold } from '../ui/Common';
@@ -48,7 +48,6 @@ const getAttendanceDisplay = (m: Member) => {
 };
 import { MEMBER_SELF_EDITABLE_FIELDS, NATIONALITY_OPTIONS, JOIN_US_SURVEY_QUESTIONS, nationalityOptionsForValue } from '../../config/constants';
 import { Combobox } from '../ui/Combobox';
-import { MentorshipService, MentorMatchSuggestion } from '../../services/mentorshipService';
 import { INDUSTRY_OPTIONS, IDEAL_REFERRAL_OPTIONS, BUSINESS_CATEGORIES_OPTIONS } from '../../config/constants';
 import { HobbyClubsService } from '../../services/hobbyClubsService';
 import { getBirthPlaceFromIC, isMalaysianIC, getDateOfBirthFromIC, getGenderFromIC } from '../../utils/malaysianIdUtils';
@@ -63,7 +62,6 @@ import type { EventRegistration } from '../../types';
 import type { Event } from '../../types';
 import { BoardManagementService } from '../../services/boardManagementService';
 import { AIPredictionService, MemberChurnPrediction } from '../../services/aiPredictionService';
-import { MentorMatching } from './MemberManagement/MentorMatching';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { ProjectsService } from '../../services/projectsService';
@@ -86,7 +84,6 @@ import { AsyncErrorBoundary } from '../ui/AsyncErrorBoundary';
 import { BatchActionBar } from './Members/BatchActionBar';
 import { MemberTable } from './Members/MemberTable';
 import { MemberDetail } from './Members/MemberDetail';
-import { MentorMatchingModal } from './Members/MentorMatchingModal';
 import { MemberCreateModal } from './Members/MemberCreateModal';
 import { JciMalaysiaSyncButton } from './Members/JciMalaysiaSyncButton';
 import { useSisterChapters } from '../../hooks/useSisterChapters';
@@ -112,7 +109,7 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [activeTab, setActiveTab] = useState<
-    'directory' | 'guest' | 'statistics' | 'board-of-directors' | 'mentorship' | 'promotion-tracking' | 'senatorship' | 'introducer' | 'duplicates'
+    'directory' | 'guest' | 'statistics' | 'board-of-directors' | 'promotion-tracking' | 'senatorship' | 'introducer' | 'duplicates'
   >('directory');
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -437,7 +434,6 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
     { id: 'guest', label: 'Guests', short: 'Guests', icon: UserCheck },
     { id: 'statistics', label: 'Statistics', short: 'Stats', icon: BarChart3 },
     { id: 'board-of-directors', label: 'Board', short: 'Board', icon: Shield },
-    { id: 'mentorship', label: 'Mentorship', short: 'Mentors', icon: BookOpen },
     { id: 'promotion-tracking', label: 'Foundation Pathway', short: 'Foundation', icon: TrendingUp },
     { id: 'senatorship', label: 'Senatorship', short: 'Senators', icon: Trophy },
     { id: 'introducer', label: 'Introducer', short: 'Introducers', icon: Network },
@@ -595,12 +591,6 @@ export const MembersView: React.FC<{ searchQuery?: string; initialSelectedMember
             {activeTab === 'board-of-directors' && (
               <div className="p-4 md:p-0">
                 <BoardOfDirectorsSection members={members} canManage={canManageMembers} />
-              </div>
-            )}
-
-            {activeTab === 'mentorship' && (
-              <div className="p-4 md:p-0">
-                <MentorMatching searchQuery={searchQuery} />
               </div>
             )}
 

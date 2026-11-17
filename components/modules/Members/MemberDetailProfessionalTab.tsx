@@ -31,6 +31,7 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
   const { showToast } = useToast();
   const [uploadingLogo, setUploadingLogo] = React.useState(false);
   const [uploadingBanner, setUploadingBanner] = React.useState(false);
+  const [pnsDraft, setPnsDraft] = React.useState('');
   const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [editingIndex, setEditingIndex] = React.useState<number | null>(null);
   const [draftOffer, setDraftOffer] = React.useState<SpecialOffer>({ ...EMPTY_OFFER });
@@ -91,54 +92,105 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
     }
   };
 
+  const hasCompanyInfo = !isEditMode && Boolean(member.companyName || member.industry || member.business?.departmentAndPosition || member.business?.levelOfManagement);
+
   return (
     <div className="grid lg:grid-cols-3 gap-6">
-      <div className="lg:col-span-3 space-y-6">
-        {(member.companyName || member.industry) && activeInlineEditCard !== 'professional' && (
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-5 bg-gradient-to-r from-slate-50 to-white rounded-2xl border border-slate-200">
-            <div className="flex-1 min-w-0">
-              <h3 className="text-lg font-black text-slate-900 truncate">{member.companyName || '—'}</h3>
-              <p className="text-sm text-slate-500 mt-0.5">{[member.business?.departmentAndPosition, member.industry].filter(Boolean).join(' · ')}</p>
+      {hasCompanyInfo && (
+        <div className="hidden lg:flex lg:flex-col gap-5 lg:col-span-1 p-5 bg-white rounded-2xl border border-slate-200 shadow-sm self-start">
+          <div>
+            <h3 className="text-xl font-black text-slate-900 leading-tight">{member.companyName || '—'}</h3>
+            {(member.business?.departmentAndPosition || member.industry) && (
+              <p className="text-sm text-slate-500 mt-1">{[member.business?.departmentAndPosition, member.industry].filter(Boolean).join(' · ')}</p>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {member.business?.acceptInternationalBusiness && member.business.acceptInternationalBusiness !== 'No' && (
+              <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">🌐 Intl Business</span>
+            )}
+            {member.business?.companyWebsite && (
+              <a href={toExternalWebsiteUrl(member.business.companyWebsite)} target="_blank" rel="noreferrer" className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-bold border border-slate-200 hover:bg-slate-200 transition-colors flex items-center gap-1">
+                <ArrowUpRight size={11} /> Website
+              </a>
+            )}
+          </div>
+          {member.business?.companyDescription && (
+            <p className="text-sm text-slate-500 leading-relaxed">{member.business.companyDescription}</p>
+          )}
+          <div className="border-t border-slate-100 pt-4 space-y-3">
+            {member.business?.departmentAndPosition && (
+              <div>
+                <span className="text-slate-400 text-[11px] uppercase font-medium tracking-wide">Position</span>
+                <p className="font-semibold text-slate-800 text-sm mt-0.5">{member.business.departmentAndPosition}</p>
+              </div>
+            )}
+            {member.business?.levelOfManagement && (
+              <div>
+                <span className="text-slate-400 text-[11px] uppercase font-medium tracking-wide">Level of Mgmt</span>
+                <p className="font-semibold text-slate-800 text-sm mt-0.5">{member.business.levelOfManagement}</p>
+              </div>
+            )}
+            {member.industry && (
+              <div>
+                <span className="text-slate-400 text-[11px] uppercase font-medium tracking-wide">Industry</span>
+                <p className="font-semibold text-slate-800 text-sm mt-0.5">{member.industry}</p>
+              </div>
+            )}
+            {member.business?.acceptInternationalBusiness && (
+              <div>
+                <span className="text-slate-400 text-[11px] uppercase font-medium tracking-wide">Intl. Business</span>
+                <p className="font-semibold text-slate-800 text-sm mt-0.5">{member.business.acceptInternationalBusiness}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      <div className={`space-y-6 ${hasCompanyInfo ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
+        {(member.companyName || member.industry) && !isEditMode && (
+          <div className="lg:hidden flex flex-col gap-3 p-5 bg-gradient-to-r from-slate-50 to-white rounded-2xl border border-slate-200">
+            <div className="flex flex-col sm:flex-row items-start gap-4">
+              <div className="flex-1 min-w-0">
+                <h3 className="text-lg font-black text-slate-900 truncate">{member.companyName || '—'}</h3>
+                <p className="text-sm text-slate-500 mt-0.5">{[member.business?.departmentAndPosition, member.industry].filter(Boolean).join(' · ')}</p>
+              </div>
+              <div className="flex flex-wrap gap-2 shrink-0">
+                {member.business?.acceptInternationalBusiness && member.business?.acceptInternationalBusiness !== 'No' && (
+                  <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">🌐 Intl Business</span>
+                )}
+                {member.business?.companyWebsite && (
+                  <a href={toExternalWebsiteUrl(member.business?.companyWebsite)} target="_blank" rel="noreferrer" className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-bold border border-slate-200 hover:bg-slate-200 transition-colors flex items-center gap-1">
+                    <ArrowUpRight size={11} /> Website
+                  </a>
+                )}
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2 shrink-0">
-              {member.industry && (
-                <span className="px-3 py-1 rounded-full bg-blue-50 text-jci-blue text-xs font-bold border border-blue-100">{member.industry}</span>
-              )}
-              {member.business?.acceptInternationalBusiness && member.business?.acceptInternationalBusiness !== 'No' && (
-                <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">🌐 Intl Business</span>
-              )}
-              {member.business?.companyWebsite && (
-                <a href={toExternalWebsiteUrl(member.business?.companyWebsite)} target="_blank" rel="noreferrer" className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-bold border border-slate-200 hover:bg-slate-200 transition-colors flex items-center gap-1">
-                  <ArrowUpRight size={11} /> Website
-                </a>
-              )}
-            </div>
+            {member.business?.companyDescription && <p className="text-xs text-slate-500 leading-relaxed">{member.business.companyDescription}</p>}
           </div>
         )}
 
         <Card title="Professional & Business">
           {isEditMode && inlineValues ? (
             <div className="space-y-4 text-sm">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Company Name</label>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <label className="text-slate-500 text-xs uppercase font-medium shrink-0 w-32">Company Name</label>
                   <input
                     type="text"
                     value={inlineValues.companyName}
                     onChange={e => setInlineValues({ ...inlineValues, companyName: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                    className="flex-1 min-w-0 rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                   />
                 </div>
-                <div>
-                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Company Website</label>
+                <div className="flex items-center gap-3">
+                  <label className="text-slate-500 text-xs uppercase font-medium shrink-0 w-32">Company Website</label>
                   <input
                     type="text"
                     value={inlineValues.companyWebsite ?? ''}
                     onChange={e => setInlineValues({ ...inlineValues, companyWebsite: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                    className="flex-1 min-w-0 rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                   />
                 </div>
-                <div className="col-span-2">
+                <div>
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Company Description</label>
                   <textarea
                     value={inlineValues.companyDescription ?? ''}
@@ -147,21 +199,21 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue resize-y"
                   />
                 </div>
-                <div>
-                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Position / Title</label>
+                <div className="flex items-center gap-3">
+                  <label className="text-slate-500 text-xs uppercase font-medium shrink-0 w-32">Position / Title</label>
                   <input
                     type="text"
                     value={inlineValues.departmentAndPosition ?? ''}
                     onChange={e => setInlineValues({ ...inlineValues, departmentAndPosition: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
+                    className="flex-1 min-w-0 rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue"
                   />
                 </div>
-                <div>
-                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Level of Mgmt</label>
+                <div className="flex items-center gap-3">
+                  <label className="text-slate-500 text-xs uppercase font-medium shrink-0 w-32">Level of Mgmt</label>
                   <select
                     value={inlineValues.levelOfManagement ?? ''}
                     onChange={e => setInlineValues({ ...inlineValues, levelOfManagement: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
+                    className="flex-1 min-w-0 rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
                   >
                     <option value="">Select Level</option>
                     <option value="Top">Top</option>
@@ -169,23 +221,23 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                     <option value="Frontline">Frontline</option>
                   </select>
                 </div>
-                <div>
-                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Industry</label>
+                <div className="flex items-center gap-3">
+                  <label className="text-slate-500 text-xs uppercase font-medium shrink-0 w-32">Industry</label>
                   <select
                     value={inlineValues.industry}
                     onChange={e => setInlineValues({ ...inlineValues, industry: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
+                    className="flex-1 min-w-0 rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
                   >
                     <option value="">Select Industry</option>
                     {INDUSTRY_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                   </select>
                 </div>
-                <div>
-                  <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Intl. Business Engagement</label>
+                <div className="flex items-center gap-3">
+                  <label className="text-slate-500 text-xs uppercase font-medium shrink-0 w-32">Intl. Business</label>
                   <select
                     value={inlineValues.acceptInternationalBusiness ?? ''}
                     onChange={e => setInlineValues({ ...inlineValues, acceptInternationalBusiness: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
+                    className="flex-1 min-w-0 rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue bg-white"
                   >
                     <option value="">Select Option</option>
                     <option value="Yes">Yes</option>
@@ -195,8 +247,8 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 border-t pt-3">
-                <div className="col-span-2">
+              <div className="space-y-3 border-t pt-3">
+                <div>
                   <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Business Categories</label>
                   <MultiSelectDropdown
                     options={BUSINESS_CATEGORIES_OPTIONS}
@@ -222,6 +274,29 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                     onChange={selected => setInlineValues({ ...inlineValues, idealReferral: selected })}
                     placeholder="Select referrals..."
                   />
+                </div>
+              </div>
+
+              <div className="border-t pt-3 space-y-2">
+                <label className="text-slate-500 block text-xs uppercase font-medium">Products &amp; Services</label>
+                <div className="flex flex-wrap gap-1 mb-1">
+                  {(inlineValues?.productsAndServices ?? []).map((item: string, idx: number) => (
+                    <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 text-[11px] font-medium">
+                      {item}
+                      <button type="button" onClick={() => setInlineValues({ ...inlineValues, productsAndServices: (inlineValues.productsAndServices ?? []).filter((_: string, i: number) => i !== idx) })} className="ml-0.5 hover:text-red-500 leading-none">×</button>
+                    </span>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={pnsDraft}
+                    onChange={e => setPnsDraft(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); const v = pnsDraft.trim(); if (v && !(inlineValues?.productsAndServices ?? []).includes(v)) { setInlineValues({ ...inlineValues, productsAndServices: [...(inlineValues?.productsAndServices ?? []), v] }); setPnsDraft(''); } } }}
+                    placeholder="Add product or service…"
+                    className="flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue focus:ring-2 focus:ring-jci-blue/20"
+                  />
+                  <button type="button" onClick={() => { const v = pnsDraft.trim(); if (v && !(inlineValues?.productsAndServices ?? []).includes(v)) { setInlineValues({ ...inlineValues, productsAndServices: [...(inlineValues?.productsAndServices ?? []), v] }); setPnsDraft(''); } }} className="px-3 py-1.5 rounded-lg bg-jci-blue text-white text-sm font-medium hover:bg-blue-700 transition-colors">Add</button>
                 </div>
               </div>
 
@@ -257,40 +332,6 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
             </div>
           ) : (
             <div className="space-y-5 text-sm">
-              {/* Company header */}
-              <div>
-                <span className="text-slate-500 text-xs uppercase font-medium">Company Name</span>
-                <p className="font-bold text-slate-900 leading-tight mt-0.5">{member.companyName || 'Freelance / Not Provided'}</p>
-                {member.business?.companyWebsite && (
-                  <a href={toExternalWebsiteUrl(member.business?.companyWebsite)} target="_blank" rel="noopener noreferrer" className="text-xs text-jci-blue hover:underline block mt-1">
-                    {member.business?.companyWebsite}
-                  </a>
-                )}
-                {member.business?.companyDescription && (
-                  <p className="text-xs text-slate-500 leading-relaxed mt-1.5">{member.business.companyDescription}</p>
-                )}
-              </div>
-
-              {/* 2-col quick-facts grid */}
-              <div className="grid grid-cols-2 gap-x-4 gap-y-4">
-                <div>
-                  <span className="text-slate-500 text-xs uppercase font-medium">Position</span>
-                  <p className="font-medium text-slate-900 mt-0.5">{member.business?.departmentAndPosition || 'Not provided'}</p>
-                </div>
-                <div>
-                  <span className="text-slate-500 text-xs uppercase font-medium">Level of Mgmt</span>
-                  <p className="font-medium text-slate-900 mt-0.5">{member.business?.levelOfManagement || 'Not provided'}</p>
-                </div>
-                <div>
-                  <span className="text-slate-500 text-xs uppercase font-medium">Industry</span>
-                  <p className="font-medium text-slate-900 mt-0.5">{member.industry || 'Not provided'}</p>
-                </div>
-                <div>
-                  <span className="text-slate-500 text-xs uppercase font-medium">Intl. Business</span>
-                  <p className="font-medium text-slate-900 mt-0.5">{member.business?.acceptInternationalBusiness || 'Unknown'}</p>
-                </div>
-              </div>
-
               {/* Business Categories */}
               <div>
                 <span className="text-slate-500 text-xs uppercase font-medium">Business Categories</span>
@@ -305,10 +346,22 @@ const MemberDetailProfessionalTabBase: React.FC<MemberDetailProfessionalTabProps
                 </div>
               </div>
 
+              {/* Products & Services */}
+              {Array.isArray(member.business?.productsAndServices) && member.business.productsAndServices.length > 0 && (
+                <div>
+                  <span className="text-slate-500 text-xs uppercase font-medium">Products &amp; Services</span>
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {member.business.productsAndServices.map((item, idx) => (
+                      <Badge key={idx} variant="neutral" className="text-[10px]">{item}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Divider */}
               <div className="border-t border-slate-100 pt-4 space-y-4">
                 {/* Ideal Referral — 2-col on sm+, stacked on mobile */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-4">
                   <div>
                     <span className="text-slate-500 text-xs uppercase font-medium">Ideal Referral Industry</span>
                     <div className="mt-1 text-slate-700 font-medium leading-snug">

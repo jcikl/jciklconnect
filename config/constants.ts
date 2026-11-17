@@ -87,7 +87,6 @@ export const COLLECTIONS = {
   BOARD_MEMBERS: 'boardMembers',
   BOARD_TRANSITIONS: 'boardTransitions',
   BOARD_TERM_SETTINGS: 'boardTermSettings',
-  MENTORSHIP_FEEDBACK: 'mentorshipFeedback',
   ERROR_LOGS: 'errorLogs',
   INQUIRIES: 'inquiries',
   TOYYIB_CATEGORIES: 'toyyibCategories',
@@ -98,8 +97,6 @@ export const COLLECTIONS = {
   SYSTEM_LOGS: 'systemLogs',
   /** Project sub-tasks assigned to committee members */
   TASKS: 'tasks',
-  /** Mentor–mentee pairings */
-  MENTOR_MATCHES: 'mentorMatches',
   /** Member promotion history log — written by promotionService */
   PROMOTION_HISTORY: 'promotionHistory',
   /** Manual promotion requests awaiting board review */

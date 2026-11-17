@@ -149,19 +149,6 @@ export interface BoardTransition {
   updatedAt: string;
 }
 
-export interface MentorMatch {
-  id: string;
-  mentorId: string;
-  menteeId: string;
-  compatibilityScore: number;
-  matchingFactors: string[];
-  status: 'suggested' | 'approved' | 'active' | 'completed';
-  startDate?: string;
-  endDate?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface MemberEngagementRequirementProgress {
   detail?: string;
   date?: string;
@@ -245,6 +232,7 @@ export interface Member {
     interestedIndustries?: string[];
     idealReferralTypes?: string[];
     bookmarkedBusinessIds?: string[];
+    productsAndServices?: string[];
   };
   jciCareer?: {
     membershipType: MembershipType;
@@ -322,8 +310,6 @@ export interface Member {
   tier?: MemberTier | string;
   skills?: string[];
   badges?: Badge[];
-  mentorId?: string;
-  menteeIds?: string[];
   points?: number;
   duesStatus?: string;
   /** @deprecated legacy flat alias; use business.bookmarkedBusinessIds */

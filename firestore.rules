@@ -364,7 +364,7 @@ service cloud.firestore {
            'role', 'loId', 'membership', 'membershipType',
            'senatorCertified', 'senatorshipBoardValidated', 'senatorshipId',
            'senatorshipValidatedAt', 'senatorshipValidatedBy',
-           'jciCareer', 'menteeIds', 'mentorId',
+           'jciCareer',
            'deletedAt', 'deletedBy', 'createdAt', 'createdBy',
            'attendanceCheckins', 'attendanceMonths', 'attendanceYear',
            'leaderboardScore', 'points',
@@ -1311,41 +1311,6 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Mentorship: mentorMatches, mentorshipFeedback (Mentor Matching / stats)
-    match /mentorMatches/{docId} {
-      // FIX 10: restrict read to isMember() — GUEST/INACTIVE should not see mentorship matches.
-      // list rule is safe (no resource.data condition); get for self or board.
-      allow get: if isAuthenticated() && (isBoard() || isAdmin() ||
-                     resource.data.mentorId == request.auth.uid ||
-                     resource.data.menteeId == request.auth.uid);
-      allow list: if isInternalUser();
-      allow create: if isInternalUser() &&
-                     exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                     (getUserRole() in ['BOARD', 'ADMIN', 'SUPER_ADMIN'] ||
-                      request.resource.data.mentorId == request.auth.uid ||
-                      request.resource.data.menteeId == request.auth.uid);
-      // FIX 22: split update/delete; add hasOnly whitelist so mentor/mentee can only change safe fields
-      allow update: if isAuthenticated() &&
-                     (
-                       (exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                        getUserRole() in ['BOARD', 'ADMIN', 'SUPER_ADMIN']) ||
-                       ((resource.data.mentorId == request.auth.uid ||
-                         resource.data.menteeId == request.auth.uid) &&
-                        request.resource.data.diff(resource.data).affectedKeys()
-                          .hasOnly(['status', 'acceptedAt', 'completedAt', 'updatedAt', 'notes']))
-                     );
-      allow delete: if isAuthenticated() &&
-                     exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                     getUserRole() in ['BOARD', 'ADMIN', 'SUPER_ADMIN'];
-    }
-    match /mentorshipFeedback/{docId} {
-      allow read: if isAuthenticated() && 
-                     exists(/databases/$(database)/documents/members/$(request.auth.uid)) &&
-                     getUserRole() in ['BOARD', 'ADMIN', 'SUPER_ADMIN'];
-      allow create: if isInternalUser();
-      allow update, delete: if isAuthenticated() && getUserRole() in ['BOARD', 'ADMIN', 'SUPER_ADMIN'];
-    }
-    
     // Knowledge / Learning: training modules, learning paths, progress, certificates
     match /trainingModules/{docId} {
       allow read: if isAdmin() || (isAuthenticated() && getUserRole() in ['GUEST', 'MEMBER', 'BOARD', 'ADMIN', 'SUPER_ADMIN']);

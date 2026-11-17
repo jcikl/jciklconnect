@@ -1,7 +1,7 @@
 import * as React from 'react';
 import {
-  Zap, Clock, Briefcase, GraduationCap, UserPlus, UserCheck,
-  Award, Shield, UserCog, Heart,
+  Clock, Briefcase, GraduationCap, UserPlus, UserCheck,
+  Award, Shield, UserCog,
 } from 'lucide-react';
 
 // Generate an inline SVG data URI with initials — avoids external requests blocked by CSP
@@ -25,10 +25,7 @@ interface MemberDetailCareerTabProps {
   setInlineValues: React.Dispatch<React.SetStateAction<any>>; // TODO: type InlineCareerValues
   boardPositions: BoardMember[];
   commissionDirectorPositions: BoardMember[];
-  mentor: Member | undefined;
   mentees: Member[];
-  handleFindMentors: () => void;
-  loadingMatches: boolean;
   setShowPaymentHistoryModal: React.Dispatch<React.SetStateAction<boolean>>;
   canEditRoleType?: boolean;
   isAdmin?: boolean;
@@ -39,11 +36,11 @@ const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) 
   const {
     member, isEditMode, inlineValues, setInlineValues,
     boardPositions, commissionDirectorPositions,
-    mentor, mentees, handleFindMentors, loadingMatches,
+    mentees,
     setShowPaymentHistoryModal, canEditRoleType, isAdmin, isSuperAdmin,
   } = props;
 
-  const [activeCareerTab, setActiveCareerTab] = React.useState<'career' | 'trainer' | 'dues' | 'mentorship'>('career');
+  const [activeCareerTab, setActiveCareerTab] = React.useState<'career' | 'trainer' | 'dues'>('career');
   React.useEffect(() => {
     if (isEditMode) {
       const v = member.jciCareer?.joinDate || '';
@@ -57,7 +54,6 @@ const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) 
     { id: 'career' as const, label: 'JCI Career Path', icon: Briefcase },
     { id: 'trainer' as const, label: 'JCI Trainer Pathway', icon: GraduationCap },
     { id: 'dues' as const, label: 'Membership & Dues', icon: Clock },
-    ...(isAdmin ? [{ id: 'mentorship' as const, label: 'Mentorship & Growth', icon: Heart }] : []),
   ];
 
   return (
@@ -314,7 +310,7 @@ const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) 
                   description: 'Pre-requisites: Accumulate 30 training hours, assistant trainer to area academy',
                   status: (member.skills?.includes('JCIM Master Trainer') || member.points >= 2500) ? 'Completed' : (member.points >= 1500 ? 'In Progress' : 'Upcoming'),
                   tone: (member.skills?.includes('JCIM Master Trainer') || member.points >= 2500) ? 'green' : (member.points >= 1500 ? 'blue' : 'slate'),
-                  icon: Zap,
+                  icon: Award,
                 },
               ].map((step) => {
                 const Icon = step.icon;
@@ -550,51 +546,6 @@ const MemberDetailCareerTabBase: React.FC<MemberDetailCareerTabProps> = (props) 
               </div>
             )}
             </div>
-            </div>
-          )}
-
-          {activeCareerTab === 'mentorship' && (
-            <div className="px-5 pb-5">
-              <h3 className="sticky top-0 z-10 bg-white -mx-5 px-5 py-3 mb-1 text-sm font-bold text-slate-800 border-b border-slate-100">Mentorship & Growth</h3>
-              <div className="space-y-4">
-                <div>
-                  <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Current Mentor</h4>
-                  {mentor ? (
-                    <div className="flex items-center gap-3 p-3 border border-slate-100 rounded-lg hover:bg-slate-50 cursor-pointer">
-                      <img src={mentor.general?.avatarUrl || undefined} className="w-10 h-10 rounded-full" alt="" onError={(e) => { e.currentTarget.src = getInitialsSvg(mentor.general?.name, 40); }} />
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900">{mentor.general?.name}</p>
-                        <p className="text-xs text-slate-500">{mentor.role}</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="p-4 border border-dashed border-slate-300 rounded-lg text-center">
-                      <p className="text-sm text-slate-500 mb-2">No mentor assigned</p>
-                      <Button size="sm" variant="outline" onClick={handleFindMentors} isLoading={loadingMatches}>
-                        <Zap size={14} className="mr-2" /> Find Mentor
-                      </Button>
-                    </div>
-                  )}
-                </div>
-
-                {mentees.length > 0 && (
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Mentees</h4>
-                    <div className="space-y-2">
-                      {mentees.map(m => (
-                        <div key={m.id} className="flex items-center gap-3 p-2 bg-slate-50 rounded-lg">
-                          <img src={m.general?.avatarUrl || undefined} className="w-8 h-8 rounded-full" alt="" onError={(e) => { e.currentTarget.src = getInitialsSvg(m.general?.name, 32); }} />
-                          <span className="text-sm font-medium">{m.general?.name}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {mentees.length === 0 && !mentor && (
-                  <p className="text-xs text-slate-400 italic text-center py-4">No mentees assigned yet</p>
-                )}
-              </div>
             </div>
           )}
 
