@@ -521,7 +521,7 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
               )}
               {isEditMode && inlineValues ? (
                 <div className="space-y-4 text-sm">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div><label className="text-slate-500 block text-xs uppercase font-medium mb-1">Company Name</label><input type="text" value={inlineValues.companyName} onChange={e => setInlineValues({ ...inlineValues, companyName: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue" /></div>
                     <div><label className="text-slate-500 block text-xs uppercase font-medium mb-1">Company Website</label><input type="text" value={inlineValues.companyWebsite ?? ''} onChange={e => setInlineValues({ ...inlineValues, companyWebsite: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue" /></div>
                     <div className="col-span-2"><label className="text-slate-500 block text-xs uppercase font-medium mb-1">Company Description</label><textarea value={inlineValues.companyDescription ?? ''} onChange={e => setInlineValues({ ...inlineValues, companyDescription: e.target.value })} rows={2} className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-jci-blue resize-y" /></div>
@@ -552,7 +552,7 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                       </select>
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t pt-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-3">
                     <div className="col-span-2">
                       <label className="text-slate-500 block text-xs uppercase font-medium mb-1">Business Categories</label>
                       <MultiSelectDropdown options={BUSINESS_CATEGORIES_OPTIONS} selected={inlineValues.businessCategory ?? []} onChange={selected => setInlineValues({ ...inlineValues, businessCategory: selected })} placeholder="Select categories..." />
@@ -595,7 +595,7 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                     {member.business?.companyWebsite && <a href={toExternalWebsiteUrl(member.business?.companyWebsite)} target="_blank" rel="noopener noreferrer" className="text-xs text-jci-blue hover:underline block mt-1">{member.business?.companyWebsite}</a>}
                     {member.business?.companyDescription && <p className="text-xs text-slate-500 leading-relaxed mt-1.5">{member.business.companyDescription}</p>}
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-4">
                     <div><span className="text-slate-500 text-xs uppercase font-medium">Position</span><p className="font-medium text-slate-900 mt-0.5">{member.business?.departmentAndPosition || 'Not provided'}</p></div>
                     <div><span className="text-slate-500 text-xs uppercase font-medium">Level of Mgmt</span><p className="font-medium text-slate-900 mt-0.5">{member.business?.levelOfManagement || 'Not provided'}</p></div>
                     <div><span className="text-slate-500 text-xs uppercase font-medium">Industry</span><p className="font-medium text-slate-900 mt-0.5">{member.industry || 'Not provided'}</p></div>
@@ -610,7 +610,7 @@ const MemberDetailBasicTabBase: React.FC<MemberDetailBasicTabProps> = (props) =>
                     </div>
                   </div>
                   <div className="border-t border-slate-100 pt-4 space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <span className="text-slate-500 text-xs uppercase font-medium">Ideal Referral Industry</span>
                         <div className="mt-1 text-slate-700 font-medium leading-snug">
