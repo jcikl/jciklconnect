@@ -54,17 +54,10 @@ body {
   gap: 12px;
 }
 .banner-left { display: flex; align-items: center; gap: 11px; }
-.jci-seal {
-  width: 32px; height: 32px; border-radius: 50%;
-  background: white; display: grid; place-items: center; flex-shrink: 0;
-}
-.banner-hed {
-  font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
-  text-transform: uppercase; color: white; line-height: 1; margin: 0;
-}
+.jci-logo { height: 38px; width: auto; filter: brightness(0) invert(1); flex-shrink: 0; }
 .banner-sub {
   font-size: 10px; color: rgba(255,255,255,0.45); letter-spacing: 0.07em;
-  text-transform: uppercase; margin: 3px 0 0;
+  text-transform: uppercase; margin: 0;
 }
 .banner-year {
   font-size: 22px; font-weight: 700; color: rgba(255,255,255,0.14);
@@ -201,7 +194,7 @@ body {
   <!-- skeleton cards shown while Firestore loads -->
   <div class="wrapper" aria-hidden="true">
     <div class="banner" style="pointer-events:none">
-      <div class="banner-left"><div class="jci-seal" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="10" fill="#0d2a6a"/><text x="11" y="15" font-family="'Plus Jakarta Sans',sans-serif" font-size="7.5" font-weight="800" fill="white" text-anchor="middle" letter-spacing="-0.3">JCI</text></svg></div><div><p class="banner-hed">JCI Kuala Lumpur</p><p class="banner-sub">Business Connect · Member Directory</p></div></div>
+      <div class="banner-left"><img class="jci-logo" src="JCI Kuala Lumpur-transparent.png" alt="JCI Kuala Lumpur" loading="lazy"><p class="banner-sub">Business Connect · Member Directory</p></div>
     </div>
     <div class="card" style="pointer-events:none">
       <div class="identity">
@@ -224,7 +217,7 @@ body {
   </div>
   <div class="wrapper" aria-hidden="true">
     <div class="banner" style="pointer-events:none">
-      <div class="banner-left"><div class="jci-seal" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="10" fill="#0d2a6a"/><text x="11" y="15" font-family="'Plus Jakarta Sans',sans-serif" font-size="7.5" font-weight="800" fill="white" text-anchor="middle" letter-spacing="-0.3">JCI</text></svg></div><div><p class="banner-hed">JCI Kuala Lumpur</p><p class="banner-sub">Business Connect · Member Directory</p></div></div>
+      <div class="banner-left"><img class="jci-logo" src="JCI Kuala Lumpur-transparent.png" alt="JCI Kuala Lumpur" loading="lazy"><p class="banner-sub">Business Connect · Member Directory</p></div>
     </div>
     <div class="card" style="pointer-events:none">
       <div class="identity">
@@ -362,16 +355,8 @@ function renderPage(p, idx, total) {
 <div class="wrapper">
   <div class="banner">
     <div class="banner-left">
-      <div class="jci-seal" aria-hidden="true">
-        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-          <circle cx="11" cy="11" r="10" fill="#0d2a6a"/>
-          <text x="11" y="15" font-family="'Plus Jakarta Sans',sans-serif" font-size="7.5" font-weight="800" fill="white" text-anchor="middle" letter-spacing="-0.3">JCI</text>
-        </svg>
-      </div>
-      <div>
-        <p class="banner-hed">JCI Kuala Lumpur</p>
-        <p class="banner-sub">Business Connect · Member Directory</p>
-      </div>
+      <img class="jci-logo" src="JCI Kuala Lumpur-transparent.png" alt="JCI Kuala Lumpur" loading="lazy">
+      <p class="banner-sub">Business Connect · Member Directory</p>
     </div>
     <div class="banner-year" aria-hidden="true">2025</div>
   </div>
