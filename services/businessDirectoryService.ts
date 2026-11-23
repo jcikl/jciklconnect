@@ -116,10 +116,11 @@ export class BusinessDirectoryService {
       () => {},
       async () => {
         const profile = mapMemberToBusinessProfile(memberId, data);
+        const privacy = (data.privacy ?? {}) as Record<string, unknown>;
         const listingRef = doc(db, COLLECTIONS.PUBLIC_BUSINESS_LISTINGS, memberId);
 
         try {
-          if (!profile) {
+          if (!profile || privacy.shareCardInternationally !== true) {
             try {
               await deleteDoc(listingRef);
             } catch {
