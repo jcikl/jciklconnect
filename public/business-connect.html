@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>JCI KL Business Connect</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<style>
+:root {
+  --navy:       #1F4789;
+  --dark:       #130F2D;
+  --blue:       #0097D7;
+  --blue-lt:    #BFE5F5;
+  --gold-bg:    #fffbeb;
+  --gold-brd:   #fde68a;
+  --gold-txt:   #92400e;
+  --gold-head:  #d97706;
+  --surface:    #ffffff;
+  --surface-2:  #F2FAFD;
+  --border:     rgba(19,15,45,0.1);
+  --text:       #130F2D;
+  --text-soft:  rgba(19,15,45,0.72);
+  --muted:      rgba(19,15,45,0.48);
+  --tag-bg:     rgba(19,15,45,0.07);
+  --tag-fg:     #130F2D;
+  --tag-n-bg:   rgba(19,15,45,0.04);
+  --tag-n-fg:   rgba(19,15,45,0.6);
+  --green-bg:   rgba(0,160,100,0.1);
+  --green-fg:   #0a7a4a;
+  color-scheme: only light;
+}
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--text);
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  padding-left:  max(16px, env(safe-area-inset-left,  0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 36px;
+}
+#pages { display: flex; flex-direction: column; gap: 12px; }
+.wrapper { max-width: 760px; margin: 0 auto; }
+
+.banner {
+  background: var(--navy);
+  border-radius: 20px 20px 0 0;
+  padding: 13px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.banner-left { display: flex; align-items: center; gap: 11px; }
+.jci-seal {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: white; display: grid; place-items: center; flex-shrink: 0;
+}
+.banner-hed {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: white; line-height: 1; margin: 0;
+}
+.banner-sub {
+  font-size: 10px; color: rgba(255,255,255,0.45); letter-spacing: 0.07em;
+  text-transform: uppercase; margin: 3px 0 0;
+}
+.banner-year {
+  font-size: 22px; font-weight: 700; color: rgba(255,255,255,0.14);
+  letter-spacing: -0.02em; user-select: none;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 20px 20px;
+  overflow: hidden;
+}
+.identity { display: grid; grid-template-columns: 188px 1fr; }
+.id-photo-col {
+  background: var(--dark); padding: 28px 20px;
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 14px;
+}
+.avatar {
+  width: 90px; height: 90px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.18); overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,0.1); flex-shrink: 0;
+}
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.avatar-mono {
+  font-size: 26px; font-weight: 800; color: rgba(255,255,255,0.88); letter-spacing: -0.5px;
+}
+.industry-pill {
+  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.14);
+  color: rgba(255,255,255,0.8); font-size: 9px; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 4px 11px; border-radius: 20px; text-align: center;
+}
+.id-info {
+  padding: 26px 24px; display: flex; flex-direction: column;
+  justify-content: center; gap: 5px; min-width: 0;
+  border-left: 1px solid var(--border);
+}
+.id-name { margin: 0; font-size: 20px; font-weight: 800; line-height: 1.15; color: var(--text); text-wrap: balance; }
+.id-company { margin: 0; font-size: 13.5px; font-weight: 600; color: var(--navy); }
+.id-badges { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+.badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 9px; border-radius: 20px; font-size: 10px; font-weight: 600;
+  letter-spacing: 0.02em; line-height: 1.6;
+}
+.b-green { background: var(--green-bg); color: var(--green-fg); }
+
+.sec { padding: 17px 24px; border-top: 1px solid var(--border); }
+.eyebrow {
+  font-size: 8.5px; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--muted); margin: 0 0 10px;
+}
+.about-p { font-size: 13px; line-height: 1.68; color: var(--text-soft); margin: 0; }
+
+.two-col { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--border); }
+.two-col .col { padding: 17px 24px; min-width: 0; }
+.two-col .col + .col { border-left: 1px solid var(--border); }
+
+.tags { display: flex; flex-wrap: wrap; gap: 5px; margin: 0; padding: 0; list-style: none; }
+.tag {
+  background: var(--navy); color: rgba(255,255,255,0.92);
+  font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 999px; line-height: 1.6;
+}
+.tag-n {
+  background: var(--tag-n-bg); color: var(--tag-n-fg);
+  font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 999px; line-height: 1.6;
+}
+
+.offer {
+  padding: 17px 24px; border-top: 2px solid var(--gold-brd); background: var(--gold-bg);
+}
+.offer-row { display: flex; align-items: flex-start; gap: 14px; }
+.offer-icon {
+  flex-shrink: 0; width: 38px; height: 38px; border-radius: 10px;
+  background: rgba(217,119,6,0.12); display: grid; place-items: center;
+}
+.offer-body { flex: 1; min-width: 0; }
+.offer-eye {
+  font-size: 8.5px; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--gold-head); margin: 0 0 5px;
+}
+.offer-title { font-size: 13px; font-weight: 700; color: var(--gold-txt); margin: 0 0 5px; line-height: 1.35; }
+.offer-tc { font-size: 11px; color: var(--gold-txt); opacity: 0.75; margin: 0; line-height: 1.55; }
+.offer-exp {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10px; font-weight: 600; color: var(--gold-head);
+  letter-spacing: 0.03em; margin-top: 7px;
+}
+
+.card-footer {
+  padding: 13px 24px; border-top: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; background: var(--surface);
+}
+.footer-left { min-width: 0; }
+.footer-web-lbl {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 2px;
+}
+.footer-web {
+  font-size: 12.5px; color: var(--blue); font-weight: 500;
+  display: flex; align-items: center; gap: 5px;
+  word-break: break-all; text-decoration: none;
+}
+.footer-web:hover { text-decoration: underline; }
+.footer-pg { font-size: 10px; color: var(--muted); letter-spacing: 0.04em; margin-top: 5px; }
+.qr-box { flex-shrink: 0; }
+
+@media (max-width: 540px) {
+  .identity          { grid-template-columns: 1fr; }
+  .id-photo-col      { flex-direction: row; padding: 18px; justify-content: flex-start; }
+  .id-info           { border-left: none; border-top: 1px solid var(--border); }
+  .two-col           { grid-template-columns: 1fr; }
+  .two-col .col+.col { border-left: none; border-top: 1px solid var(--border); }
+  .card-footer       { flex-direction: column; align-items: flex-start; }
+}
+</style>
+</head>
+<body>
+<div id="pages">
+  <div style="text-align:center;padding:60px 20px;color:var(--muted);font-size:13px">Loading directory…</div>
+</div>
+
+<script>
+const FIREBASE_PROJECT = 'jci-lo-management-app';
+const FIREBASE_API_KEY = 'AIzaSyCVjUeVrU_OJFrP0eR416EVuUOixmHmY0Q';
+
+function fv(field) {
+  if (!field) return null;
+  if ('stringValue'  in field) return field.stringValue;
+  if ('booleanValue' in field) return field.booleanValue;
+  if ('integerValue' in field) return parseInt(field.integerValue, 10);
+  if ('arrayValue'   in field) return (field.arrayValue.values || []).map(fv);
+  return null;
+}
+
+function mapDoc(doc) {
+  const f = doc.fields || {};
+  const raw = fv(f.acceptsInternationalBusiness);
+  return {
+    ownerName:        fv(f.ownerName)        || 'Unknown',
+    companyName:      fv(f.companyName)      || '',
+    industry:         fv(f.industry)         || '',
+    description:      fv(f.description)      || '',
+    website:          fv(f.website)          || '',
+    offer:            fv(f.offer)            || '',
+    offerTerms:       fv(f.offerTerms)       || '',
+    offerExpiry:      fv(f.offerExpiry)      || '',
+    logo:             fv(f.logo)             || '',
+    businessCategory: fv(f.businessCategory) || '',
+    openToIntl:       raw === true || raw === 'Yes',
+    referralTypes:    Array.isArray(fv(f.idealReferralTypes)) ? fv(f.idealReferralTypes) : [],
+  };
+}
+
+async function fetchAll() {
+  const base = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/(default)/documents/publicBusinessListings`;
+  let docs = [], pageToken = '';
+  do {
+    const url = `${base}?pageSize=200&key=${FIREBASE_API_KEY}${pageToken ? '&pageToken=' + pageToken : ''}`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`Firestore ${r.status}`);
+    const data = await r.json();
+    if (data.documents) docs = docs.concat(data.documents);
+    pageToken = data.nextPageToken || '';
+  } while (pageToken);
+  return docs;
+}
+
+function mkInitials(name) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0][0] || '?';
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+const QR_DOTS = `
+  <rect x="24" y="2"  width="4" height="4"/><rect x="30" y="2"  width="4" height="4"/><rect x="38" y="2"  width="4" height="4"/>
+  <rect x="24" y="8"  width="4" height="4"/><rect x="36" y="8"  width="4" height="4"/>
+  <rect x="28" y="14" width="4" height="4"/><rect x="36" y="14" width="4" height="4"/>
+  <rect x="24" y="20" width="4" height="4"/><rect x="32" y="20" width="4" height="4"/>
+  <rect x="2"  y="24" width="4" height="4"/><rect x="10" y="24" width="4" height="4"/><rect x="18" y="24" width="4" height="4"/>
+  <rect x="26" y="24" width="4" height="4"/><rect x="34" y="24" width="4" height="4"/><rect x="42" y="24" width="4" height="4"/>
+  <rect x="50" y="24" width="4" height="4"/><rect x="60" y="24" width="4" height="4"/>
+  <rect x="4"  y="30" width="4" height="4"/><rect x="14" y="30" width="4" height="4"/>
+  <rect x="24" y="30" width="4" height="4"/><rect x="36" y="30" width="4" height="4"/>
+  <rect x="46" y="30" width="4" height="4"/><rect x="58" y="30" width="4" height="4"/>
+  <rect x="2"  y="36" width="4" height="4"/><rect x="16" y="36" width="4" height="4"/>
+  <rect x="28" y="36" width="4" height="4"/><rect x="40" y="36" width="4" height="4"/>
+  <rect x="52" y="36" width="4" height="4"/><rect x="62" y="36" width="4" height="4"/>
+  <rect x="24" y="44" width="4" height="4"/><rect x="32" y="44" width="4" height="4"/>
+  <rect x="44" y="44" width="4" height="4"/><rect x="56" y="44" width="4" height="4"/>
+  <rect x="24" y="50" width="4" height="4"/><rect x="36" y="50" width="4" height="4"/><rect x="48" y="50" width="4" height="4"/>
+  <rect x="28" y="56" width="4" height="4"/><rect x="40" y="56" width="4" height="4"/><rect x="58" y="56" width="4" height="4"/>
+  <rect x="24" y="62" width="4" height="4"/><rect x="34" y="62" width="4" height="4"/><rect x="44" y="62" width="4" height="4"/>
+`;
+
+function renderPage(p, idx, total) {
+  const ini = mkInitials(p.ownerName);
+  const cats = p.businessCategory.split(',').map(c => c.trim()).filter(Boolean);
+  const catHtml = cats.map(c => `<li class="tag">${esc(c)}</li>`).join('') || '<li class="tag-n" style="font-style:italic">—</li>';
+  const refHtml = p.referralTypes.map(r => `<li class="tag-n">${esc(r)}</li>`).join('') || '<li class="tag-n" style="font-style:italic">—</li>';
+  const avatarHtml = p.logo
+    ? `<img src="${esc(p.logo)}" alt="${esc(p.ownerName)}" loading="lazy">`
+    : `<span class="avatar-mono">${esc(ini)}</span>`;
+  const webDisplay = p.website.replace(/^https?:\/\//, '').replace(/\/$/, '');
+  const webHref = p.website.startsWith('http') ? p.website : (p.website ? `https://${p.website}` : '#');
+
+  const offerSection = p.offer ? `
+    <div class="offer">
+      <div class="offer-row">
+        <div class="offer-icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/>
+            <line x1="12" y1="22" x2="12" y2="7"/>
+            <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/>
+            <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
+          </svg>
+        </div>
+        <div class="offer-body">
+          <p class="offer-eye">Exclusive JCI KL Member Offer · Active</p>
+          <p class="offer-title">${esc(p.offer)}</p>
+          ${p.offerTerms ? `<p class="offer-tc">T&amp;C: ${esc(p.offerTerms)}</p>` : ''}
+          ${p.offerExpiry ? `<div class="offer-exp">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Valid until ${esc(p.offerExpiry)}
+          </div>` : ''}
+        </div>
+      </div>
+    </div>` : '';
+
+  return `
+<div class="wrapper">
+  <div class="banner">
+    <div class="banner-left">
+      <div class="jci-seal" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <circle cx="11" cy="11" r="10" fill="#0d2a6a"/>
+          <text x="11" y="15" font-family="'Plus Jakarta Sans',sans-serif" font-size="7.5" font-weight="800" fill="white" text-anchor="middle" letter-spacing="-0.3">JCI</text>
+        </svg>
+      </div>
+      <div>
+        <p class="banner-hed">JCI Kuala Lumpur</p>
+        <p class="banner-sub">Business Connect · Member Directory</p>
+      </div>
+    </div>
+    <div class="banner-year" aria-hidden="true">2025</div>
+  </div>
+  <div class="card">
+    <div class="identity">
+      <div class="id-photo-col">
+        <div class="avatar" aria-label="${esc(p.ownerName)}">${avatarHtml}</div>
+        <span class="industry-pill">${esc(p.industry)}</span>
+      </div>
+      <div class="id-info">
+        <h2 class="id-name">${esc(p.ownerName)}</h2>
+        <p class="id-company">${esc(p.companyName)}</p>
+        <div class="id-badges">${p.openToIntl ? '<span class="badge b-green">Open to International</span>' : ''}</div>
+      </div>
+    </div>
+    ${p.description ? `<div class="sec"><p class="eyebrow">About</p><p class="about-p">${esc(p.description)}</p></div>` : ''}
+    <div class="two-col">
+      <div class="col"><p class="eyebrow">Business Categories</p><ul class="tags">${catHtml}</ul></div>
+      <div class="col"><p class="eyebrow">Looking For</p><ul class="tags">${refHtml}</ul></div>
+    </div>
+    ${offerSection}
+    <div class="card-footer">
+      <div class="footer-left">
+        ${webDisplay ? `
+        <span class="footer-web-lbl">Website</span>
+        <a class="footer-web" href="${esc(webHref)}" target="_blank" rel="noopener noreferrer">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          ${esc(webDisplay)}
+        </a>` : ''}
+        <p class="footer-pg">Member ${idx + 1} of ${total}</p>
+      </div>
+      <div class="qr-box" aria-label="QR code placeholder">
+        <svg width="66" height="66" viewBox="0 0 66 66" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
+          <rect x="2" y="2" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+          <rect x="6" y="6" width="10" height="10" rx="1"/>
+          <rect x="46" y="2" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+          <rect x="50" y="6" width="10" height="10" rx="1"/>
+          <rect x="2" y="46" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+          <rect x="6" y="50" width="10" height="10" rx="1"/>
+          ${QR_DOTS}
+        </svg>
+      </div>
+    </div>
+  </div>
+</div>`;
+}
+
+async function loadDirectory() {
+  const pagesEl = document.getElementById('pages');
+  const timer = setTimeout(() => {
+    pagesEl.innerHTML = '<p style="text-align:center;padding:60px 20px;color:var(--muted);font-size:13px">Timed out. Please refresh.</p>';
+  }, 15000);
+  try {
+    const docs = await fetchAll();
+    clearTimeout(timer);
+    const profiles = docs.map(mapDoc).filter(p => p.companyName.trim()).sort((a, b) => a.companyName.localeCompare(b.companyName));
+    if (!profiles.length) {
+      pagesEl.innerHTML = '<p style="text-align:center;padding:60px 20px;color:var(--muted);font-size:13px">No Business Connect members found.</p>';
+      return;
+    }
+    pagesEl.innerHTML = profiles.map((p, i) => renderPage(p, i, profiles.length)).join('');
+  } catch (e) {
+    clearTimeout(timer);
+    pagesEl.innerHTML = `<p style="text-align:center;padding:60px 20px;color:var(--muted);font-size:13px">Failed to load directory. Please refresh.</p>`;
+  }
+}
+
+loadDirectory();
+</script>
+</body>
+</html>
