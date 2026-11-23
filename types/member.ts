@@ -456,6 +456,7 @@ export interface BusinessProfile {
   globalNetworkEnabled?: boolean;
   acceptsInternationalBusiness?: 'Yes' | 'No' | 'Willing to Explore' | boolean;
   idealReferralTypes?: string[];
+  productsAndServices?: string[];
   interestedIndustries?: string[];
   jciChapters?: string[];
 }

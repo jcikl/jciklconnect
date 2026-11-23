@@ -414,7 +414,10 @@ export class MembersService {
     else if (data['business.levelOfManagement'] !== undefined) business.levelOfManagement = data['business.levelOfManagement'];
     else if (data.levelOfManagement !== undefined) business.levelOfManagement = data.levelOfManagement;
     if (data.business?.interestedIndustries !== undefined) business.interestedIndustries = data.business?.interestedIndustries;
-    if (data.business?.idealReferralTypes !== undefined) business.idealReferralTypes = data.business?.idealReferralTypes;
+    if (data.business?.idealReferralTypes !== undefined) business.idealReferralTypes = normalizeIdealReferrals(data.business?.idealReferralTypes);
+    else if (data['business.idealReferralTypes'] !== undefined) business.idealReferralTypes = normalizeIdealReferrals(data['business.idealReferralTypes']);
+    if (data.business?.productsAndServices !== undefined) business.productsAndServices = data.business?.productsAndServices;
+    else if (data['business.productsAndServices'] !== undefined) business.productsAndServices = data['business.productsAndServices'];
     if (data.business?.bookmarkedBusinessIds !== undefined) business.bookmarkedBusinessIds = data.business?.bookmarkedBusinessIds;
     else if (data.bookmarkedBusinessIds !== undefined) business.bookmarkedBusinessIds = data.bookmarkedBusinessIds;
 
@@ -1456,12 +1459,15 @@ export class MembersService {
       if (Object.keys(normalized).some(k => DISPLAY_FIELDS.has(k))) {
         const { BusinessDirectoryService } = await import('./businessDirectoryService');
         await Promise.allSettled(
-          memberIds.map(id =>
-            Promise.allSettled([
-              BusinessDirectoryService.syncPublicListing(id, { ...normalized, id }),
+          memberIds.map(id => {
+            // Merge full existing data so syncPublicListing sees privacy.shareCardInternationally
+            // (passing only the delta would cause listings to be erroneously deleted).
+            const existing = existingByIds.get(id) ?? {};
+            return Promise.allSettled([
+              BusinessDirectoryService.syncPublicListing(id, { ...existing, ...normalized, id }),
               this.syncBoardMemberDisplayFields(id, { ...normalized, id } as Member),
-            ])
-          )
+            ]);
+          })
         );
       }
 

@@ -767,9 +767,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // MembersService.updateMember does. Runs after the member write; syncCards never throws
       // (failures are logged) and does nothing when no card-relevant field changed.
       if (member.id === user.uid) {
+        const mergedMember = applyMergeUpdates(member, updates) as Member;
         await MemberCardsService.syncCards([
-          { memberId: user.uid, before: member, after: applyMergeUpdates(member, updates) as Member },
+          { memberId: user.uid, before: member, after: mergedMember },
         ]);
+        // Keep publicBusinessListings in sync (share card privacy).
+        try {
+          const { BusinessDirectoryService } = await import('../services/businessDirectoryService');
+          await BusinessDirectoryService.syncPublicListing(user.uid, mergedMember as unknown as Record<string, unknown>);
+        } catch (syncErr) {
+          errorLoggingService.logError(syncErr instanceof Error ? syncErr : new Error(String(syncErr)), { context: 'useAuth.updateMemberProfile', additionalInfo: 'syncPublicListing failed — profile was saved successfully' });
+        }
       }
     }
   }, [user, member, isDevMode]);
