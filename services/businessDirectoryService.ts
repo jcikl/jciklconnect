@@ -88,6 +88,7 @@ export function mapMemberToBusinessProfile(id: string, data: Record<string, unkn
       false,
     globalNetworkEnabled: (data.globalNetworkEnabled as boolean | undefined) || false,
     idealReferralTypes,
+    productsAndServices: (business.productsAndServices as string[] | undefined) || [],
   };
 }
 
@@ -107,6 +108,7 @@ function mapListingDoc(id: string, data: Record<string, unknown>): BusinessProfi
     acceptsInternationalBusiness: (data.acceptsInternationalBusiness as boolean | undefined) || false,
     globalNetworkEnabled: (data.globalNetworkEnabled as boolean | undefined) || false,
     idealReferralTypes: normalizeIdealReferrals(data.idealReferralTypes ?? data.idealReferrals ?? data.idealReferral),
+    productsAndServices: (data.productsAndServices as string[] | undefined) || [],
   };
 }
 

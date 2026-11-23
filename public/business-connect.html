@@ -114,6 +114,8 @@ body {
   text-transform: uppercase; color: var(--muted); margin: 0 0 10px;
 }
 .about-p { font-size: 13px; line-height: 1.68; color: var(--text-soft); margin: 0; }
+.pns-list { margin: 0; padding: 0 0 0 16px; display: flex; flex-direction: column; gap: 4px; }
+.pns-list li { font-size: 13px; line-height: 1.6; color: var(--text-soft); }
 
 .two-col { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--border); }
 .two-col .col { padding: 17px 24px; min-width: 0; }
@@ -266,9 +268,10 @@ function mapDoc(doc) {
     offerTerms:       fv(f.offerTerms)       || '',
     offerExpiry:      fv(f.offerExpiry)      || '',
     logo:             fv(f.logo)             || '',
-    businessCategory: fv(f.businessCategory) || '',
-    openToIntl:       raw === true || raw === 'Yes',
-    referralTypes:    Array.isArray(fv(f.idealReferralTypes)) ? fv(f.idealReferralTypes) : [],
+    businessCategory:    fv(f.businessCategory) || '',
+    openToIntl:          raw === true || raw === 'Yes',
+    referralTypes:       Array.isArray(fv(f.idealReferralTypes)) ? fv(f.idealReferralTypes) : [],
+    productsAndServices: Array.isArray(fv(f.productsAndServices)) ? fv(f.productsAndServices) : [],
   };
 }
 
@@ -373,6 +376,7 @@ function renderPage(p, idx, total) {
       </div>
     </div>
     ${p.description ? `<div class="sec"><p class="eyebrow">About</p><p class="about-p">${esc(p.description)}</p></div>` : ''}
+    ${p.productsAndServices.length ? `<div class="sec"><p class="eyebrow">Products &amp; Services</p><ul class="pns-list">${p.productsAndServices.map(s => `<li>${esc(s)}</li>`).join('')}</ul></div>` : ''}
     <div class="two-col">
       <div class="col"><p class="eyebrow">Business Categories</p><ul class="tags">${catHtml}</ul></div>
       <div class="col"><p class="eyebrow">Looking For</p><ul class="tags">${refHtml}</ul></div>
