@@ -384,11 +384,9 @@ export class MembersService {
     else if (data.business?.companyDescription !== undefined) business.introduction = data.business?.companyDescription;
     if (data.business?.companyDescription !== undefined) business.companyDescription = data.business?.companyDescription;
     else if (data.companyDescription !== undefined) { business.introduction = data.companyDescription; business.companyDescription = data.companyDescription; }
-    if (data.business?.position !== undefined) business.position = data.business?.position;
-    else if (data.business?.departmentAndPosition !== undefined) business.position = data.business?.departmentAndPosition;
-    else if (data.departmentAndPosition !== undefined) business.position = data.departmentAndPosition;
     if (data.business?.departmentAndPosition !== undefined) business.departmentAndPosition = data.business?.departmentAndPosition;
     else if (data.departmentAndPosition !== undefined) business.departmentAndPosition = data.departmentAndPosition;
+    else if (data.business?.position !== undefined) business.departmentAndPosition = data.business?.position;
     if (data.industry !== undefined) business.industry = data.industry;
     if (data.business?.businessCategory !== undefined) business.businessCategory = data.business?.businessCategory;
     else if (data.businessCategory !== undefined) business.businessCategory = data.businessCategory;
@@ -939,8 +937,8 @@ export class MembersService {
         companyName: firstText(
           memberAny.business?.companyName,
           memberAny.companyName,
-          memberAny.business?.position,
-          memberAny.business?.departmentAndPosition
+          memberAny.business?.departmentAndPosition,
+          memberAny.business?.position
         ),
       };
 

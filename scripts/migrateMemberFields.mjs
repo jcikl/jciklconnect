@@ -114,8 +114,8 @@ const MIGRATIONS = [
   { flatField: 'idealReferralTypes',    nestedPath: 'business.idealReferralTypes',    existsFn: (d) => d.business?.idealReferralTypes != null,    deleteFlat: true  },
   {
     flatField: 'profession',
-    nestedPath: 'business.position',
-    existsFn: (d) => d.business?.position != null && d.business.position !== '',
+    nestedPath: 'business.departmentAndPosition',
+    existsFn: (d) => d.business?.departmentAndPosition != null && d.business.departmentAndPosition !== '',
     deleteFlat: true,
   },
 
@@ -163,9 +163,9 @@ const MIGRATIONS = [
 function buildUpdate(data) {
   const update = {};
 
-  // Special case: rename business.title → business.position (nested field rename)
-  if (data.business != null && 'title' in data.business && !('position' in data.business)) {
-    update['business.position'] = data.business.title;
+  // Special case: rename business.title → business.departmentAndPosition (nested field rename)
+  if (data.business != null && 'title' in data.business && !('departmentAndPosition' in data.business)) {
+    update['business.departmentAndPosition'] = data.business.title;
     update['business.title'] = FieldValue.delete();
   }
 

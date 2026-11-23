@@ -455,8 +455,8 @@ export const SisterChaptersConfig: React.FC<{ canEditChapters?: boolean }> = ({ 
                         )}
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-semibold text-slate-800 truncate">{m.general?.name ?? '—'}</p>
-                          {(m.companyName || m.business?.position) && (
-                            <p className="text-[10px] text-slate-400 truncate">{[m.business?.position, m.companyName ?? m.business?.companyName].filter(Boolean).join(' · ')}</p>
+                          {(m.companyName || m.business?.departmentAndPosition || m.business?.position) && (
+                            <p className="text-[10px] text-slate-400 truncate">{[m.business?.departmentAndPosition || m.business?.position, m.companyName ?? m.business?.companyName].filter(Boolean).join(' · ')}</p>
                           )}
                         </div>
                         {isExternalDoc(m) ? (

@@ -204,7 +204,7 @@ export const JCIKLApp: React.FC = () => {
       // Commission Director set: all member IDs listed as commission directors
       const commissionDirectorSet = new Set<string>();
       boardMembers.forEach(b => {
-        boardPositionMap.set(b.memberId, b.business?.position || 'Board');
+        boardPositionMap.set(b.memberId, b.business?.departmentAndPosition || b.business?.position || 'Board');
         (b.commissionDirectorIds || []).forEach(id => commissionDirectorSet.add(id));
       });
 

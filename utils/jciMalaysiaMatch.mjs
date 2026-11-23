@@ -125,7 +125,7 @@ export const FIELD_CATALOG = [
   // these; `source` is a dot-path into the row. All fill-a-blank only, like the other core fields.
   { key: 'company',        label: 'Company',          source: 'profileDetails.employment.companyName', target: 'business.companyName',     core: true, fillIfEmpty: true, freetext: true },
   { key: 'industry',       label: 'Industry',         source: 'profileDetails.employment.industry',    target: 'business.industry',        core: true, fillIfEmpty: true },
-  { key: 'position',       label: 'Position / title', source: 'profileDetails.employment.title',       target: 'business.position',        core: true, fillIfEmpty: true, freetext: true },
+  { key: 'position',       label: 'Position / title', source: 'profileDetails.employment.title',       target: 'business.departmentAndPosition', core: true, fillIfEmpty: true, freetext: true },
   { key: 'companyWebsite', label: 'Company website',  source: 'profileDetails.employment.website',     target: 'business.companyWebsite',  core: true, fillIfEmpty: true },
   { key: 'facebook',       label: 'Facebook',         source: 'profileDetails.employment.facebook',    target: 'contact.socials.facebook', core: true, fillIfEmpty: true },
   { key: 'instagram',      label: 'Instagram',        source: 'profileDetails.employment.instagram',   target: 'contact.socials.instagram',core: true, fillIfEmpty: true },

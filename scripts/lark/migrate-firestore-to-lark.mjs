@@ -79,7 +79,7 @@ const MAPPERS = {
     'Membership Tier': asText(d.tier), 'Dues Status': asText(first(d.duesStatus, d.membership?.duesStatus)),
     'Join Date': asDate(first(d.joinDate, d.membership?.joinDate)), Points: asNumber(d.points),
     Company: asText(first(d.companyName, d.business?.companyName)),
-    Position: asText(first(d.departmentAndPosition, d.business?.position, d.business?.title)),
+    Position: asText(first(d.business?.departmentAndPosition, d.business?.position, d.business?.title)),
     Industry: asText(first(d.industry, d.business?.industry)), Address: asText(first(d.address, d.contact?.address)),
     'Current Board Position': asText(d.currentBoardPosition), Active: first(d.status === 'active' ? true : undefined, d.active),
   }),

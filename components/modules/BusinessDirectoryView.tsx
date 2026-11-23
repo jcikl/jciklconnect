@@ -89,7 +89,7 @@ export const BusinessDirectoryView: React.FC<BusinessDirectoryViewProps> = ({ se
       return businessToDirectoryItem(biz, {
         avatarUrl: owner?.general?.avatarUrl || getInitialsSvg(biz.ownerName || ''),
         chineseName: owner?.general?.chineseName,
-        position: owner?.business?.position || 'Representative',
+        position: owner?.business?.departmentAndPosition || owner?.business?.position || 'Representative',
       });
     });
     const sister = showSister ? rawIntlMembers.map(card => cardToDirectoryItem(card, name => getInitialsSvg(name))) : [];

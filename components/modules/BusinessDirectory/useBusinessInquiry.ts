@@ -21,7 +21,7 @@ interface UseBusinessInquiryParams {
 
 const createPrefilledInquiryForm = (currentUser: Member | null): BusinessInquiryForm => ({
   name: currentUser?.general?.name || '',
-  jobTitle: currentUser?.business?.position || '',
+  jobTitle: currentUser?.business?.departmentAndPosition || currentUser?.business?.position || '',
   company: currentUser?.companyName || '',
   phone: currentUser?.contact?.phone || '',
   requirements: '',

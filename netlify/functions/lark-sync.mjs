@@ -83,7 +83,7 @@ function memberFields(id, data) {
     'Join Date': asDate(first(data.jciCareer?.joinDate, data.membership?.joinDate, data.joinDate)),
     Points: asNumber(data.points),
     Company: asText(first(data.business?.companyName, data.companyName)),
-    Position: asText(first(data.business?.position, data.business?.title, data.departmentAndPosition)),
+    Position: asText(first(data.business?.departmentAndPosition, data.business?.position, data.business?.title)),
     Industry: asText(first(data.business?.industry, data.industry)),
     Address: asText(first(data.contact?.address, data.address)),
     'Current Board Position': asText(data.currentBoardPosition),

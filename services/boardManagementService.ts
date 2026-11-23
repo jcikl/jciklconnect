@@ -524,8 +524,8 @@ export class BoardManagementService {
         companyName: firstText(
           member.business?.companyName,
           member.companyName,
-          member.business?.position,
-          member.business?.departmentAndPosition
+          member.business?.departmentAndPosition,
+          member.business?.position
         ),
       };
 
