@@ -46,11 +46,7 @@ export function mapMemberToBusinessProfile(id: string, data: Record<string, unkn
   }
 
   const businessCategory = data.businessCategory ?? business.businessCategory;
-  const referralTypes = normalizeIdealReferrals(business.idealReferralTypes);
-  const idealReferralTypes =
-    referralTypes.length > 0
-      ? referralTypes
-      : normalizeIdealReferrals(business.idealReferrals ?? data.idealReferral ?? data.idealReferrals);
+  const idealReferralTypes = normalizeIdealReferrals(business.idealReferralTypes);
   // First live (active, not expired) offer across both formats (business.specialOffers / legacy specialOffer).
   const liveOffer = getLiveOffers(data, todayIso())[0];
 
@@ -107,7 +103,7 @@ function mapListingDoc(id: string, data: Record<string, unknown>): BusinessProfi
     businessCategory: (data.businessCategory as string | undefined) || '',
     acceptsInternationalBusiness: (data.acceptsInternationalBusiness as boolean | undefined) || false,
     globalNetworkEnabled: (data.globalNetworkEnabled as boolean | undefined) || false,
-    idealReferralTypes: normalizeIdealReferrals(data.idealReferralTypes ?? data.idealReferrals ?? data.idealReferral),
+    idealReferralTypes: normalizeIdealReferrals(data.idealReferralTypes as string[] | undefined),
     productsAndServices: (data.productsAndServices as string[] | undefined) || [],
   };
 }

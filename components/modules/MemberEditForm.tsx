@@ -79,7 +79,7 @@ function initFormValues(member: Member) {
     departmentAndPosition: member.business?.departmentAndPosition ?? '',
     levelOfManagement: member.business?.levelOfManagement ?? '',
     idealReferralIndustry: member.idealReferralIndustry || '',
-    idealReferral: member.business?.idealReferrals || (Array.isArray(member.business?.idealReferrals) ? member.business?.idealReferrals.join(', ') : ''),
+    idealReferral: member.business?.idealReferralTypes || [],
     acceptInternationalBusiness: member.business?.acceptInternationalBusiness || '',
     businessCategory: Array.isArray(member.business?.businessCategory) ? member.business?.businessCategory : (member.business?.businessCategory ? [member.business?.businessCategory] : []),
     industry: member.industry || '',

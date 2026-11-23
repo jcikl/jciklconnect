@@ -397,15 +397,6 @@ export class MembersService {
     if (data.business?.acceptInternationalBusiness !== undefined) business.acceptInternationalBusiness = data.business?.acceptInternationalBusiness;
     else if (data.acceptInternationalBusiness !== undefined) business.acceptInternationalBusiness = data.acceptInternationalBusiness;
     
-    // Ideal referral TYPES → business.idealReferrals (string[]). Industries never go here: they stay in
-    // the flat idealReferralIndustry ('||'-joined, see utils/idealReferrals.mjs).
-    if (data.business?.idealReferrals !== undefined) {
-      business.idealReferrals = normalizeIdealReferrals(data.business?.idealReferrals);
-    } else if (data.idealReferral !== undefined) {
-      business.idealReferrals = normalizeIdealReferrals(data.idealReferral);
-    } else if (data.idealReferrals !== undefined) {
-      business.idealReferrals = normalizeIdealReferrals(data.idealReferrals);
-    }
     if (data.idealReferralIndustry !== undefined) {
       result.idealReferralIndustry = joinIdealReferralIndustries(data.idealReferralIndustry);
     }
