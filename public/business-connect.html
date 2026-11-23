@@ -4,242 +4,326 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>JCI KL Business Connect</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
 <style>
+/* JCI KL brand tokens — from tailwind.config.js */
 :root {
-  --navy:       #1F4789;
-  --dark:       #130F2D;
-  --blue:       #0097D7;
-  --blue-lt:    #BFE5F5;
-  --gold-bg:    #fffbeb;
-  --gold-brd:   #fde68a;
-  --gold-txt:   #92400e;
-  --gold-head:  #d97706;
-  --surface:    #ffffff;
-  --surface-2:  #F2FAFD;
-  --border:     rgba(19,15,45,0.1);
-  --text:       #130F2D;
-  --text-soft:  rgba(19,15,45,0.72);
-  --muted:      rgba(19,15,45,0.48);
-  --tag-bg:     rgba(19,15,45,0.07);
-  --tag-fg:     #130F2D;
-  --tag-n-bg:   rgba(19,15,45,0.04);
-  --tag-n-fg:   rgba(19,15,45,0.6);
-  --green-bg:   rgba(0,160,100,0.1);
-  --green-fg:   #0a7a4a;
+  --navy:        #1C3F94;
+  --blue:        #0097D7;
+  --teal:        #00B5B5;
+  --lightblue:   #6EC4E8;
+
+  /* Slate text scale */
+  --fg-900: #0F172A;
+  --fg-700: #334155;
+  --fg-500: #64748B;
+  --fg-400: #94A3B8;
+
+  /* Surfaces */
+  --bg:        #F1F5F9;
+  --surface:   #FFFFFF;
+  --surface-2: #F8FAFC;
+  --border:    #E2E8F0;
+  --border-lt: #F1F5F9;
+
+  /* Chips */
+  --chip-sky-bg:#F0F9FF; --chip-sky-fg:#0369A1; --chip-sky-bd:#BAE6FD;
+  --chip-teal-bg:#F0FDF9;--chip-teal-fg:#0F766E;--chip-teal-bd:#99F6E4;
+  --chip-blue-bg:#EFF6FF;--chip-blue-fg:#1D4ED8;--chip-blue-bd:#BFDBFE;
+  --chip-ind-bg:#EEF2FF; --chip-ind-fg:#3730A3; --chip-ind-bd:#C7D2FE;
+  --chip-sl-bg:#F1F5F9;  --chip-sl-fg:#475569;  --chip-sl-bd:#CBD5E1;
+  --chip-amb-bg:#FFFBEB; --chip-amb-fg:#92400E;  --chip-amb-bd:#FDE68A;
+  --chip-amb-eye:#B45309;
+
   color-scheme: only light;
 }
+
 *, *::before, *::after { box-sizing: border-box; }
 body {
   margin: 0;
-  background: var(--surface);
-  color: var(--text);
+  background: var(--bg);
+  color: var(--fg-900);
   font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
   font-size: 14px;
   line-height: 1.5;
+}
+
+/* ── PAGE HEADER ───────────────────────────────── */
+#page-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+.hdr-inner {
+  max-width: 760px;
+  margin: 0 auto;
   padding-left:  max(16px, env(safe-area-inset-left,  0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-block: 36px;
-}
-#pages { display: flex; flex-direction: column; gap: 12px; }
-.wrapper { max-width: 760px; margin: 0 auto; width: 100%; }
-
-.banner {
-  background: var(--navy);
-  border-radius: 20px 20px 0 0;
-  padding: 13px 24px;
+  padding-block: 10px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
 }
-.banner-left { display: flex; align-items: center; gap: 11px; }
-.jci-logo { height: 38px; width: auto; filter: brightness(0) invert(1); flex-shrink: 0; }
-.banner-sub {
-  font-size: 10px; color: rgba(255,255,255,0.45); letter-spacing: 0.07em;
-  text-transform: uppercase; margin: 0;
+.hdr-brand { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.hdr-logo  { height: 34px; width: auto; flex-shrink: 0; }
+.hdr-title { display: block; font-size: 13.5px; font-weight: 800; color: var(--navy); letter-spacing: -.01em; }
+.hdr-sub   { display: block; font-size: 11px; color: var(--fg-500); font-weight: 500; }
+
+.hdr-search { flex: 1; position: relative; max-width: 280px; margin-left: auto; }
+.hdr-search svg {
+  position: absolute; left: 10px; top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none; color: var(--fg-400);
 }
-.banner-year {
-  font-size: 22px; font-weight: 700; color: rgba(255,255,255,0.14);
-  letter-spacing: -0.02em; user-select: none;
+#search {
+  width: 100%;
+  padding: 7px 12px 7px 34px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  background: var(--bg);
+  color: var(--fg-900);
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+#search:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0,151,215,.12); background: #fff; }
+#search::placeholder { color: var(--fg-400); }
+
+/* ── MAIN CONTENT ──────────────────────────────── */
+#main {
+  padding-left:  max(16px, env(safe-area-inset-left,  0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 36px;
+}
+#pages {
+  max-width: 760px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
+/* ── CARD ──────────────────────────────────────── */
 .card {
   background: var(--surface);
+  border-radius: 16px;
   border: 1px solid var(--border);
-  border-top: none;
-  border-radius: 0 0 20px 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
   overflow: hidden;
 }
-.identity { display: grid; grid-template-columns: 188px 1fr; }
-.id-photo-col {
-  background: var(--dark); padding: 28px 20px;
-  display: flex; flex-direction: column; align-items: center;
-  justify-content: center; gap: 14px;
+/* Navy→blue 3px accent bar */
+.card::before {
+  content: "";
+  display: block;
+  height: 3px;
+  background: linear-gradient(90deg, var(--navy) 0%, var(--blue) 100%);
 }
-.avatar {
-  width: 90px; height: 90px; border-radius: 50%;
-  border: 2px solid rgba(255,255,255,0.18); overflow: hidden;
+
+/* ── CARD IDENTITY ─────────────────────────────── */
+.card-identity {
+  padding: 18px 20px 15px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  background: linear-gradient(135deg, #F8FBFF 0%, #EFF6FF 100%);
+  border-bottom: 1px solid var(--border-lt);
+}
+.avatar-wrap {
+  flex-shrink: 0;
+  width: 66px; height: 66px;
+  border-radius: 50%;
+  border: 2px solid var(--lightblue);
+  overflow: hidden;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(255,255,255,0.1); flex-shrink: 0;
+  background: linear-gradient(135deg, var(--navy) 0%, var(--blue) 100%);
+  box-shadow: 0 2px 6px rgba(28,63,148,.18);
 }
-.avatar img { width: 100%; height: 100%; object-fit: cover; }
-.avatar-mono {
-  font-size: 26px; font-weight: 800; color: rgba(255,255,255,0.88); letter-spacing: -0.5px;
-}
-.industry-pill {
-  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.14);
-  color: rgba(255,255,255,0.8); font-size: 9px; font-weight: 600;
-  letter-spacing: 0.08em; text-transform: uppercase;
-  padding: 4px 11px; border-radius: 20px; text-align: center;
-}
-.id-info {
-  padding: 26px 24px; display: flex; flex-direction: column;
-  justify-content: center; gap: 5px; min-width: 0;
-  border-left: 1px solid var(--border);
-}
-.id-name { margin: 0; font-size: 20px; font-weight: 800; line-height: 1.15; color: var(--text); text-wrap: balance; }
-.id-company { margin: 0; font-size: 13.5px; font-weight: 600; color: var(--navy); }
-.id-position { margin: 0; font-size: 11.5px; color: var(--muted); }
-.id-badges { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
-.badge {
-  display: inline-flex; align-items: center; gap: 3px;
-  padding: 2px 9px; border-radius: 20px; font-size: 10px; font-weight: 600;
-  letter-spacing: 0.02em; line-height: 1.6;
-}
-.b-green { background: var(--green-bg); color: var(--green-fg); }
-.b-mgmt  { background: var(--blue-lt);  color: var(--navy); }
+.avatar-wrap img { width: 100%; height: 100%; object-fit: cover; }
+.avatar-mono { font-size: 20px; font-weight: 800; color: rgba(255,255,255,.9); letter-spacing: -.5px; }
 
-.sec { padding: 17px 24px; border-top: 1px solid var(--border); }
+.id-info { flex: 1; min-width: 0; }
+.id-name   { margin: 0; font-size: 16.5px; font-weight: 800; line-height: 1.2; color: var(--fg-900); text-wrap: balance; }
+.id-company{ margin: 2px 0 0; font-size: 12.5px; font-weight: 700; color: var(--navy); }
+.id-pos    { margin: 2px 0 0; font-size: 11.5px; color: var(--fg-500); }
+.id-badges { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
+
+/* ── CHIPS ─────────────────────────────────────── */
+.chip {
+  display: inline-flex; align-items: center;
+  padding: 2px 9px; border-radius: 999px;
+  font-size: 10px; font-weight: 700; letter-spacing: .01em; line-height: 1.6;
+  border: 1px solid;
+}
+.chip-sky  { background:var(--chip-sky-bg);  color:var(--chip-sky-fg);  border-color:var(--chip-sky-bd); }
+.chip-teal { background:var(--chip-teal-bg); color:var(--chip-teal-fg); border-color:var(--chip-teal-bd); }
+.chip-blue { background:var(--chip-blue-bg); color:var(--chip-blue-fg); border-color:var(--chip-blue-bd); }
+.chip-amb  { background:var(--chip-amb-bg);  color:var(--chip-amb-fg);  border-color:var(--chip-amb-bd); }
+
+/* ── CARD SECTIONS ─────────────────────────────── */
+.sec { padding: 13px 20px; border-top: 1px solid var(--border-lt); }
 .eyebrow {
-  font-size: 8.5px; font-weight: 700; letter-spacing: 0.14em;
-  text-transform: uppercase; color: var(--muted); margin: 0 0 10px;
+  margin: 0 0 7px;
+  font-size: 9px; font-weight: 800;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--fg-400);
 }
-.about-p { font-size: 13px; line-height: 1.68; color: var(--text-soft); margin: 0; }
-.pns-list { margin: 0; padding: 0 0 0 16px; display: flex; flex-direction: column; gap: 4px; }
-.pns-list li { font-size: 13px; line-height: 1.6; color: var(--text-soft); }
+.about-p { margin: 0; font-size: 13px; line-height: 1.65; color: var(--fg-700); }
 
-.two-col { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--border); }
-.two-col .col { padding: 17px 24px; min-width: 0; }
-.two-col .col + .col { border-left: 1px solid var(--border); }
+.pns-list { margin: 0; padding: 0 0 0 1.1rem; list-style: disc; }
+.pns-list li { font-size: 12px; font-weight: 500; color: var(--fg-700); padding: 1px 0; line-height: 1.5; }
+
+.two-col { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--border-lt); }
+.two-col .col { padding: 13px 20px; min-width: 0; }
+.two-col .col + .col { border-left: 1px solid var(--border-lt); }
 
 .tags { display: flex; flex-wrap: wrap; gap: 5px; margin: 0; padding: 0; list-style: none; }
-.tag {
-  background: var(--navy); color: rgba(255,255,255,0.92);
-  font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 999px; line-height: 1.6;
+.tag-cat {
+  display: inline-flex; padding: 2px 9px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 700;
+  background: var(--navy); color: rgba(255,255,255,.92);
 }
-.tag-n {
-  background: var(--tag-n-bg); color: var(--tag-n-fg);
-  font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 999px; line-height: 1.6;
+.tag-ref {
+  display: inline-flex; padding: 2px 9px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 600;
+  background: var(--chip-sl-bg); color: var(--chip-sl-fg); border: 1px solid var(--chip-sl-bd);
+}
+.tag-ind {
+  display: inline-flex; padding: 2px 9px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 600;
+  background: var(--chip-ind-bg); color: var(--chip-ind-fg); border: 1px solid var(--chip-ind-bd);
 }
 
-.offer {
-  padding: 17px 24px; border-top: 2px solid var(--gold-brd); background: var(--gold-bg);
+/* ── OFFER ─────────────────────────────────────── */
+.offer-sec {
+  padding: 13px 20px;
+  border-top: 1px solid var(--chip-amb-bd);
+  background: var(--chip-amb-bg);
 }
-.offer-row { display: flex; align-items: flex-start; gap: 14px; }
+.offer-row { display: flex; align-items: flex-start; gap: 12px; }
 .offer-icon {
-  flex-shrink: 0; width: 38px; height: 38px; border-radius: 10px;
-  background: rgba(217,119,6,0.12); display: grid; place-items: center;
+  flex-shrink: 0; width: 34px; height: 34px; border-radius: 8px;
+  background: rgba(180,83,9,.1); display: grid; place-items: center;
 }
 .offer-body { flex: 1; min-width: 0; }
-.offer-eye {
-  font-size: 8.5px; font-weight: 700; letter-spacing: 0.12em;
-  text-transform: uppercase; color: var(--gold-head); margin: 0 0 5px;
-}
-.offer-title { font-size: 13px; font-weight: 700; color: var(--gold-txt); margin: 0 0 5px; line-height: 1.35; }
-.offer-tc { font-size: 11px; color: var(--gold-txt); opacity: 0.75; margin: 0; line-height: 1.55; }
-.offer-exp {
-  display: inline-flex; align-items: center; gap: 4px;
-  font-size: 10px; font-weight: 600; color: var(--gold-head);
-  letter-spacing: 0.03em; margin-top: 7px;
-}
+.offer-eye  { margin: 0 0 3px; font-size: 8.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--chip-amb-eye); }
+.offer-title{ margin: 0 0 4px; font-size: 13px; font-weight: 700; color: var(--chip-amb-fg); line-height: 1.35; }
+.offer-tc   { margin: 0; font-size: 11px; color: var(--chip-amb-fg); opacity: .72; line-height: 1.55; }
+.offer-exp  { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 600; color: var(--chip-amb-eye); margin-top: 5px; }
 
+/* ── CARD FOOTER ───────────────────────────────── */
 .card-footer {
-  padding: 13px 24px; border-top: 1px solid var(--border);
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 16px; background: var(--surface);
+  padding: 11px 20px;
+  border-top: 1px solid var(--border-lt);
+  background: var(--surface-2);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
 }
-.footer-left { min-width: 0; }
-.footer-web-lbl {
-  font-size: 9px; font-weight: 700; letter-spacing: 0.1em;
-  text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 2px;
-}
+.footer-left { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.footer-web-lbl { font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--fg-400); }
 .footer-web {
-  font-size: 12.5px; color: var(--blue); font-weight: 500;
+  font-size: 11.5px; color: var(--blue); font-weight: 600;
   display: flex; align-items: center; gap: 5px;
   word-break: break-all; text-decoration: none;
 }
 .footer-web:hover { text-decoration: underline; }
-.footer-pg { font-size: 10px; color: var(--muted); letter-spacing: 0.04em; margin-top: 5px; }
-.qr-box { flex-shrink: 0; }
+.footer-pg  { font-size: 10px; color: var(--fg-400); }
+.qr-box     { flex-shrink: 0; color: var(--fg-300); }
 
-@media (max-width: 540px) {
-  .identity          { grid-template-columns: 1fr; }
-  .id-photo-col      { flex-direction: row; padding: 18px; justify-content: flex-start; }
-  .id-info           { border-left: none; border-top: 1px solid var(--border); }
-  .two-col           { grid-template-columns: 1fr; }
-  .two-col .col+.col { border-left: none; border-top: 1px solid var(--border); }
-  .card-footer       { flex-direction: column; align-items: flex-start; }
-}
+/* ── SKELETON ──────────────────────────────────── */
 @keyframes skel-shine { to { background-position: 200% 0; } }
 .skel {
-  background: linear-gradient(90deg,var(--border) 25%,color-mix(in srgb,var(--border) 50%,var(--bg)) 50%,var(--border) 75%);
+  background: linear-gradient(90deg, var(--border) 25%, #F8FAFC 50%, var(--border) 75%);
   background-size: 200% 100%;
-  animation: skel-shine 1.5s linear infinite;
+  animation: skel-shine 1.4s linear infinite;
   border-radius: 4px;
 }
-.empty-state { text-align:center; padding:80px 20px; color:var(--muted); }
-.empty-state svg { opacity:.35; margin-bottom:16px; }
-.empty-state p { font-size:14px; margin:0; }
+
+/* ── EMPTY / ERROR ─────────────────────────────── */
+.empty-state { text-align: center; padding: 80px 20px; color: var(--fg-400); }
+.empty-state svg { opacity: .35; margin-bottom: 14px; display: block; margin-inline: auto; }
+.empty-state p { font-size: 14px; margin: 0; }
+
+/* ── LOAD MORE ─────────────────────────────────── */
+#load-more {
+  display: block; width: 100%;
+  padding: 13px;
+  background: var(--surface);
+  border: 1.5px dashed var(--border);
+  border-radius: 12px;
+  font-family: inherit; font-size: 13px; font-weight: 600;
+  color: var(--fg-500); cursor: pointer;
+  transition: border-color .15s, color .15s, background .15s;
+}
+#load-more:hover { border-color: var(--blue); color: var(--blue); background: #F0F9FF; }
+
+/* ── RESPONSIVE ────────────────────────────────── */
+@media (max-width: 540px) {
+  .hdr-sub { display: none; }
+  .two-col { grid-template-columns: 1fr; }
+  .two-col .col + .col { border-left: none; border-top: 1px solid var(--border-lt); }
+  .card-footer { flex-direction: column; align-items: flex-start; }
+}
 </style>
 </head>
 <body>
-<div id="pages">
-  <!-- skeleton cards shown while Firestore loads -->
-  <div class="wrapper" aria-hidden="true">
-    <div class="banner" style="pointer-events:none">
-      <div class="banner-left"><img class="jci-logo" src="JCI Kuala Lumpur-transparent.png" alt="JCI Kuala Lumpur" loading="lazy"><p class="banner-sub">Business Connect · Member Directory</p></div>
+
+<!-- Sticky page header -->
+<div id="page-header">
+  <div class="hdr-inner">
+    <div class="hdr-brand">
+      <img class="hdr-logo" src="JCI Kuala Lumpur-transparent.png" alt="JCI Kuala Lumpur">
+      <div>
+        <span class="hdr-title">Business Connect</span>
+        <span class="hdr-sub" id="hdr-count">Loading…</span>
+      </div>
     </div>
-    <div class="card" style="pointer-events:none">
-      <div class="identity">
-        <div class="id-photo-col" style="gap:12px">
-          <div class="skel" style="width:72px;height:72px;border-radius:50%;flex-shrink:0"></div>
-          <div class="skel" style="width:90px;height:22px;border-radius:12px"></div>
-        </div>
-        <div class="id-info" style="gap:10px;display:flex;flex-direction:column;justify-content:center">
-          <div class="skel" style="width:55%;height:20px"></div>
-          <div class="skel" style="width:40%;height:14px"></div>
-        </div>
-      </div>
-      <div class="sec"><div class="skel" style="width:40px;height:11px;margin-bottom:8px"></div><div class="skel" style="width:100%;height:13px;margin-bottom:6px"></div><div class="skel" style="width:75%;height:13px"></div></div>
-      <div class="two-col">
-        <div class="col"><div class="skel" style="width:50px;height:11px;margin-bottom:8px"></div><div style="display:flex;gap:6px;flex-wrap:wrap"><div class="skel" style="width:70px;height:24px;border-radius:12px"></div><div class="skel" style="width:55px;height:24px;border-radius:12px"></div></div></div>
-        <div class="col"><div class="skel" style="width:50px;height:11px;margin-bottom:8px"></div><div style="display:flex;gap:6px;flex-wrap:wrap"><div class="skel" style="width:80px;height:24px;border-radius:12px"></div></div></div>
-      </div>
-      <div class="card-footer"><div class="skel" style="width:120px;height:12px"></div></div>
+    <div class="hdr-search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input id="search" type="search" placeholder="Search members…" aria-label="Search members" disabled>
     </div>
   </div>
-  <div class="wrapper" aria-hidden="true">
-    <div class="banner" style="pointer-events:none">
-      <div class="banner-left"><img class="jci-logo" src="JCI Kuala Lumpur-transparent.png" alt="JCI Kuala Lumpur" loading="lazy"><p class="banner-sub">Business Connect · Member Directory</p></div>
-    </div>
-    <div class="card" style="pointer-events:none">
-      <div class="identity">
-        <div class="id-photo-col" style="gap:12px">
-          <div class="skel" style="width:72px;height:72px;border-radius:50%;flex-shrink:0"></div>
-          <div class="skel" style="width:75px;height:22px;border-radius:12px"></div>
-        </div>
-        <div class="id-info" style="gap:10px;display:flex;flex-direction:column;justify-content:center">
-          <div class="skel" style="width:45%;height:20px"></div>
-          <div class="skel" style="width:60%;height:14px"></div>
+</div>
+
+<div id="main">
+  <div id="pages">
+    <!-- skeleton -->
+    <div class="card" aria-hidden="true">
+      <div class="card-identity" style="gap:14px">
+        <div class="skel" style="width:66px;height:66px;border-radius:50%;flex-shrink:0"></div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:8px;padding-top:4px">
+          <div class="skel" style="width:50%;height:18px"></div>
+          <div class="skel" style="width:35%;height:13px"></div>
+          <div style="display:flex;gap:5px;margin-top:2px"><div class="skel" style="width:72px;height:20px;border-radius:12px"></div><div class="skel" style="width:56px;height:20px;border-radius:12px"></div></div>
         </div>
       </div>
-      <div class="sec"><div class="skel" style="width:40px;height:11px;margin-bottom:8px"></div><div class="skel" style="width:100%;height:13px;margin-bottom:6px"></div><div class="skel" style="width:60%;height:13px"></div></div>
+      <div class="sec"><div class="skel" style="width:36px;height:10px;margin-bottom:8px"></div><div class="skel" style="width:100%;height:13px;margin-bottom:5px"></div><div class="skel" style="width:70%;height:13px"></div></div>
       <div class="two-col">
-        <div class="col"><div class="skel" style="width:50px;height:11px;margin-bottom:8px"></div><div style="display:flex;gap:6px;flex-wrap:wrap"><div class="skel" style="width:60px;height:24px;border-radius:12px"></div><div class="skel" style="width:90px;height:24px;border-radius:12px"></div></div></div>
-        <div class="col"><div class="skel" style="width:50px;height:11px;margin-bottom:8px"></div><div style="display:flex;gap:6px;flex-wrap:wrap"><div class="skel" style="width:65px;height:24px;border-radius:12px"></div><div class="skel" style="width:50px;height:24px;border-radius:12px"></div></div></div>
+        <div class="col"><div class="skel" style="width:48px;height:10px;margin-bottom:8px"></div><div style="display:flex;gap:5px"><div class="skel" style="width:60px;height:22px;border-radius:12px"></div><div class="skel" style="width:48px;height:22px;border-radius:12px"></div></div></div>
+        <div class="col"><div class="skel" style="width:48px;height:10px;margin-bottom:8px"></div><div style="display:flex;gap:5px"><div class="skel" style="width:72px;height:22px;border-radius:12px"></div></div></div>
       </div>
-      <div class="card-footer"><div class="skel" style="width:100px;height:12px"></div></div>
+      <div class="card-footer"><div class="skel" style="width:110px;height:11px"></div></div>
+    </div>
+    <div class="card" aria-hidden="true">
+      <div class="card-identity" style="gap:14px">
+        <div class="skel" style="width:66px;height:66px;border-radius:50%;flex-shrink:0"></div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:8px;padding-top:4px">
+          <div class="skel" style="width:42%;height:18px"></div>
+          <div class="skel" style="width:55%;height:13px"></div>
+          <div style="display:flex;gap:5px;margin-top:2px"><div class="skel" style="width:88px;height:20px;border-radius:12px"></div></div>
+        </div>
+      </div>
+      <div class="sec"><div class="skel" style="width:36px;height:10px;margin-bottom:8px"></div><div class="skel" style="width:100%;height:13px;margin-bottom:5px"></div><div class="skel" style="width:55%;height:13px"></div></div>
+      <div class="two-col">
+        <div class="col"><div class="skel" style="width:48px;height:10px;margin-bottom:8px"></div><div style="display:flex;gap:5px"><div class="skel" style="width:50px;height:22px;border-radius:12px"></div><div class="skel" style="width:80px;height:22px;border-radius:12px"></div></div></div>
+        <div class="col"><div class="skel" style="width:48px;height:10px;margin-bottom:8px"></div><div style="display:flex;gap:5px"><div class="skel" style="width:60px;height:22px;border-radius:12px"></div><div class="skel" style="width:44px;height:22px;border-radius:12px"></div></div></div>
+      </div>
+      <div class="card-footer"><div class="skel" style="width:90px;height:11px"></div></div>
     </div>
   </div>
 </div>
@@ -261,22 +345,22 @@ function mapDoc(doc) {
   const f = doc.fields || {};
   const raw = fv(f.acceptsInternationalBusiness);
   return {
-    ownerName:        fv(f.ownerName)        || 'Unknown',
-    companyName:      fv(f.companyName)      || '',
-    industry:         fv(f.industry)         || '',
-    description:      fv(f.description)      || '',
-    website:          fv(f.website)          || '',
-    offer:            fv(f.offer)            || '',
-    offerTerms:       fv(f.offerTerms)       || '',
-    offerExpiry:      fv(f.offerExpiry)      || '',
-    logo:             fv(f.logo)             || '',
-    businessCategory:       fv(f.businessCategory)       || '',
-    openToIntl:             raw === true || raw === 'Yes',
-    referralTypes:          Array.isArray(fv(f.idealReferralTypes))    ? fv(f.idealReferralTypes)    : [],
-    productsAndServices:    Array.isArray(fv(f.productsAndServices))   ? fv(f.productsAndServices)   : [],
-    levelOfManagement:      fv(f.levelOfManagement)      || '',
-    departmentAndPosition:  fv(f.departmentAndPosition)  || '',
-    interestedIndustries:   Array.isArray(fv(f.interestedIndustries))  ? fv(f.interestedIndustries)  : [],
+    ownerName:               fv(f.ownerName)               || 'Unknown',
+    companyName:             fv(f.companyName)             || '',
+    industry:                fv(f.industry)                || '',
+    description:             fv(f.description)             || '',
+    website:                 fv(f.website)                 || '',
+    offer:                   fv(f.offer)                   || '',
+    offerTerms:              fv(f.offerTerms)              || '',
+    offerExpiry:             fv(f.offerExpiry)             || '',
+    logo:                    fv(f.logo)                    || '',
+    businessCategory:        fv(f.businessCategory)        || '',
+    openToIntl:              raw === true ? 'Yes' : (typeof raw === 'string' ? raw : ''),
+    referralTypes:           Array.isArray(fv(f.idealReferralTypes))   ? fv(f.idealReferralTypes)   : [],
+    productsAndServices:     Array.isArray(fv(f.productsAndServices))  ? fv(f.productsAndServices)  : [],
+    levelOfManagement:       fv(f.levelOfManagement)       || '',
+    departmentAndPosition:   fv(f.departmentAndPosition)   || '',
+    interestedIndustries:    Array.isArray(fv(f.interestedIndustries)) ? fv(f.interestedIndustries) : [],
   };
 }
 
@@ -327,20 +411,24 @@ const QR_DOTS = `
 
 function renderPage(p, idx, total) {
   const ini = mkInitials(p.ownerName);
-  const cats = p.businessCategory.split(',').map(c => c.trim()).filter(Boolean);
-  const catHtml = cats.map(c => `<li class="tag">${esc(c)}</li>`).join('') || '<li class="tag-n" style="font-style:italic">—</li>';
-  const refHtml = p.referralTypes.map(r => `<li class="tag-n">${esc(r)}</li>`).join('') || '<li class="tag-n" style="font-style:italic">—</li>';
   const avatarHtml = p.logo
     ? `<img src="${esc(p.logo)}" alt="${esc(p.ownerName)}" loading="lazy">`
     : `<span class="avatar-mono">${esc(ini)}</span>`;
+
+  const cats       = p.businessCategory.split(',').map(c => c.trim()).filter(Boolean);
+  const catHtml    = cats.map(c => `<li class="tag-cat">${esc(c)}</li>`).join('');
+  const refHtml    = p.referralTypes.map(r => `<li class="tag-ref">${esc(r)}</li>`).join('');
+  const catSection = cats.length ? `<div class="col"><p class="eyebrow">Business Categories</p><ul class="tags">${catHtml}</ul></div>` : '';
+  const refSection = p.referralTypes.length ? `<div class="col"><p class="eyebrow">Looking For</p><ul class="tags">${refHtml}</ul></div>` : '';
+
   const webDisplay = p.website.replace(/^https?:\/\//, '').replace(/\/$/, '');
-  const webHref = p.website.startsWith('http') ? p.website : (p.website ? `https://${p.website}` : '#');
+  const webHref    = p.website.startsWith('http') ? p.website : (p.website ? `https://${p.website}` : '#');
 
   const offerSection = p.offer ? `
-    <div class="offer">
+    <div class="offer-sec">
       <div class="offer-row">
         <div class="offer-icon" aria-hidden="true">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#b45309" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/>
             <line x1="12" y1="22" x2="12" y2="7"/>
             <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/>
@@ -348,9 +436,9 @@ function renderPage(p, idx, total) {
           </svg>
         </div>
         <div class="offer-body">
-          <p class="offer-eye">Exclusive JCI KL Member Offer · Active</p>
+          <p class="offer-eye">JCI KL Member Offer · Active</p>
           <p class="offer-title">${esc(p.offer)}</p>
-          ${p.offerTerms ? `<p class="offer-tc">T&amp;C: ${esc(p.offerTerms)}</p>` : ''}
+          ${p.offerTerms  ? `<p class="offer-tc">T&amp;C: ${esc(p.offerTerms)}</p>` : ''}
           ${p.offerExpiry ? `<div class="offer-exp">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             Valid until ${esc(p.offerExpiry)}
@@ -360,81 +448,132 @@ function renderPage(p, idx, total) {
     </div>` : '';
 
   return `
-<div class="wrapper">
-  <div class="banner">
-    <div class="banner-left">
-      <img class="jci-logo" src="JCI Kuala Lumpur-transparent.png" alt="JCI Kuala Lumpur" loading="lazy">
-      <p class="banner-sub">Business Connect · Member Directory</p>
+<div class="card">
+  <div class="card-identity">
+    <div class="avatar-wrap" aria-label="${esc(p.ownerName)}">${avatarHtml}</div>
+    <div class="id-info">
+      <h2 class="id-name">${esc(p.ownerName)}</h2>
+      <p class="id-company">${esc(p.companyName)}</p>
+      ${p.departmentAndPosition ? `<p class="id-pos">${esc(p.departmentAndPosition)}</p>` : ''}
+      <div class="id-badges">
+        ${p.industry          ? `<span class="chip chip-sky">${esc(p.industry)}</span>` : ''}
+        ${p.openToIntl === 'Yes'               ? `<span class="chip chip-teal">Open to International</span>` : ''}
+        ${p.openToIntl === 'Willing to Explore' ? `<span class="chip chip-amb">Exploring International</span>` : ''}
+        ${p.levelOfManagement ? `<span class="chip chip-blue">${esc(p.levelOfManagement)} management</span>` : ''}
+      </div>
     </div>
-    <div class="banner-year" aria-hidden="true">2025</div>
   </div>
-  <div class="card">
-    <div class="identity">
-      <div class="id-photo-col">
-        <div class="avatar" aria-label="${esc(p.ownerName)}">${avatarHtml}</div>
-        <span class="industry-pill">${esc(p.industry)}</span>
-      </div>
-      <div class="id-info">
-        <h2 class="id-name">${esc(p.ownerName)}</h2>
-        <p class="id-company">${esc(p.companyName)}</p>
-        ${p.departmentAndPosition ? `<p class="id-position">${esc(p.departmentAndPosition)}</p>` : ''}
-        <div class="id-badges">
-          ${p.openToIntl ? '<span class="badge b-green">Open to International</span>' : ''}
-          ${p.levelOfManagement ? `<span class="badge b-mgmt">${esc(p.levelOfManagement)}</span>` : ''}
-        </div>
-      </div>
+  ${p.description ? `<div class="sec"><p class="eyebrow">About</p><p class="about-p">${esc(p.description)}</p></div>` : ''}
+  ${p.productsAndServices.length ? `<div class="sec"><p class="eyebrow">Products &amp; Services</p><ul class="pns-list">${p.productsAndServices.map(s => `<li>${esc(s)}</li>`).join('')}</ul></div>` : ''}
+  ${(catSection || refSection) ? `<div class="two-col">${catSection}${refSection}</div>` : ''}
+  ${p.interestedIndustries.length ? `<div class="sec"><p class="eyebrow">Interested Industries</p><ul class="tags">${p.interestedIndustries.map(i => `<li class="tag-ind">${esc(i)}</li>`).join('')}</ul></div>` : ''}
+  ${offerSection}
+  <div class="card-footer">
+    <div class="footer-left">
+      ${webDisplay ? `
+      <span class="footer-web-lbl">Website</span>
+      <a class="footer-web" href="${esc(webHref)}" target="_blank" rel="noopener noreferrer">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        ${esc(webDisplay)}
+      </a>` : ''}
+      <p class="footer-pg">Member ${idx + 1} of ${total}</p>
     </div>
-    ${p.description ? `<div class="sec"><p class="eyebrow">About</p><p class="about-p">${esc(p.description)}</p></div>` : ''}
-    ${p.productsAndServices.length ? `<div class="sec"><p class="eyebrow">Products &amp; Services</p><ul class="pns-list">${p.productsAndServices.map(s => `<li>${esc(s)}</li>`).join('')}</ul></div>` : ''}
-    <div class="two-col">
-      <div class="col"><p class="eyebrow">Business Categories</p><ul class="tags">${catHtml}</ul></div>
-      <div class="col"><p class="eyebrow">Looking For</p><ul class="tags">${refHtml}</ul></div>
-    </div>
-    ${p.interestedIndustries.length ? `<div class="sec"><p class="eyebrow">Interested Industries</p><ul class="tags">${p.interestedIndustries.map(i => `<li class="tag-n">${esc(i)}</li>`).join('')}</ul></div>` : ''}
-    ${offerSection}
-    <div class="card-footer">
-      <div class="footer-left">
-        ${webDisplay ? `
-        <span class="footer-web-lbl">Website</span>
-        <a class="footer-web" href="${esc(webHref)}" target="_blank" rel="noopener noreferrer">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-          ${esc(webDisplay)}
-        </a>` : ''}
-        <p class="footer-pg">Member ${idx + 1} of ${total}</p>
-      </div>
-      <div class="qr-box" aria-label="QR code placeholder">
-        <svg width="66" height="66" viewBox="0 0 66 66" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
-          <rect x="2" y="2" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
-          <rect x="6" y="6" width="10" height="10" rx="1"/>
-          <rect x="46" y="2" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
-          <rect x="50" y="6" width="10" height="10" rx="1"/>
-          <rect x="2" y="46" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
-          <rect x="6" y="50" width="10" height="10" rx="1"/>
-          ${QR_DOTS}
-        </svg>
-      </div>
+    <div class="qr-box" aria-label="QR code placeholder">
+      <svg width="62" height="62" viewBox="0 0 66 66" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
+        <rect x="2" y="2" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+        <rect x="6" y="6" width="10" height="10" rx="1"/>
+        <rect x="46" y="2" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+        <rect x="50" y="6" width="10" height="10" rx="1"/>
+        <rect x="2" y="46" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+        <rect x="6" y="50" width="10" height="10" rx="1"/>
+        ${QR_DOTS}
+      </svg>
     </div>
   </div>
 </div>`;
 }
 
+let _profiles = [];
+const PAGE_SIZE = 50;
+let _visibleCount = 0;
+let _currentList  = [];
+
+function renderAll(list) {
+  _currentList  = list;
+  _visibleCount = Math.min(PAGE_SIZE, list.length);
+  const pagesEl = document.getElementById('pages');
+  const countEl = document.getElementById('hdr-count');
+  const total   = _profiles.length;
+  if (!list.length) {
+    pagesEl.innerHTML = `<div class="empty-state">
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>
+      <p>${total ? 'No results for that search.' : 'No Business Connect members yet.'}</p>
+    </div>`;
+  } else {
+    pagesEl.innerHTML = list.slice(0, _visibleCount).map((p, i) => renderPage(p, i, list.length)).join('');
+    if (_visibleCount < list.length) appendLoadMore(pagesEl, list.length);
+  }
+  if (countEl) {
+    countEl.textContent = list.length === total
+      ? `${total} Members`
+      : `${list.length} of ${total} Members`;
+  }
+}
+
+function appendLoadMore(pagesEl, listLength) {
+  const remaining = listLength - _visibleCount;
+  const btn = document.createElement('button');
+  btn.id = 'load-more';
+  btn.textContent = `Show ${Math.min(PAGE_SIZE, remaining)} more  ·  ${remaining} remaining`;
+  btn.onclick = () => {
+    btn.remove();
+    const newEnd = Math.min(_visibleCount + PAGE_SIZE, _currentList.length);
+    pagesEl.insertAdjacentHTML('beforeend',
+      _currentList.slice(_visibleCount, newEnd).map((p, i) => renderPage(p, _visibleCount + i, _currentList.length)).join('')
+    );
+    _visibleCount = newEnd;
+    if (_visibleCount < _currentList.length) appendLoadMore(pagesEl, _currentList.length);
+  };
+  pagesEl.appendChild(btn);
+}
+
 async function loadDirectory() {
   const pagesEl = document.getElementById('pages');
+  const countEl = document.getElementById('hdr-count');
+  const searchEl = document.getElementById('search');
+
   const timer = setTimeout(() => {
-    pagesEl.innerHTML = `<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg><p>Timed out. Please refresh.</p></div>`;
+    pagesEl.innerHTML = `<div class="empty-state">
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+      <p>Timed out. Please refresh.</p>
+    </div>`;
+    if (countEl) countEl.textContent = 'Error';
   }, 15000);
+
   try {
     const docs = await fetchAll();
     clearTimeout(timer);
-    const profiles = docs.map(mapDoc).filter(p => p.companyName.trim()).sort((a, b) => a.companyName.localeCompare(b.companyName));
-    if (!profiles.length) {
-      pagesEl.innerHTML = `<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg><p>No Business Connect members yet.</p></div>`;
-      return;
-    }
-    pagesEl.innerHTML = profiles.map((p, i) => renderPage(p, i, profiles.length)).join('');
-  } catch (e) {
+    _profiles = docs.map(mapDoc).filter(p => p.companyName.trim()).sort((a, b) => a.companyName.localeCompare(b.companyName));
+    renderAll(_profiles);
+
+    searchEl.disabled = false;
+    searchEl.addEventListener('input', e => {
+      const q = e.target.value.trim().toLowerCase();
+      if (!q) { renderAll(_profiles); return; }
+      renderAll(_profiles.filter(p =>
+        p.ownerName.toLowerCase().includes(q) ||
+        p.companyName.toLowerCase().includes(q) ||
+        p.industry.toLowerCase().includes(q) ||
+        p.description.toLowerCase().includes(q)
+      ));
+    });
+  } catch (err) {
     clearTimeout(timer);
-    pagesEl.innerHTML = `<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg><p>Failed to load directory. Please refresh.</p></div>`;
+    pagesEl.innerHTML = `<div class="empty-state">
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+      <p>Failed to load directory. Please refresh.</p>
+    </div>`;
+    if (countEl) countEl.textContent = 'Error';
   }
 }
 
