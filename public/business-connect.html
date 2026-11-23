@@ -409,9 +409,13 @@ const QR_DOTS = `
   <rect x="24" y="62" width="4" height="4"/><rect x="34" y="62" width="4" height="4"/><rect x="44" y="62" width="4" height="4"/>
 `;
 
+const IMG_URL = /\.(jpe?g|png|gif|webp|svg|avif)(\?|$)/i;
+const IMG_CDN = /^https?:\/\/(res\.cloudinary\.com|firebasestorage\.googleapis\.com|lh\d+\.googleusercontent\.com)/i;
+const isImgUrl = u => IMG_URL.test(u) || IMG_CDN.test(u);
+
 function renderPage(p, idx, total) {
   const ini = mkInitials(p.ownerName);
-  const avatarHtml = p.logo
+  const avatarHtml = (p.logo && isImgUrl(p.logo))
     ? `<img src="${esc(p.logo)}" alt="${esc(p.ownerName)}" loading="lazy">`
     : `<span class="avatar-mono">${esc(ini)}</span>`;
 
