@@ -30,10 +30,7 @@ function mapMember(id, data) {
   if (!companyName?.trim()) return null;
 
   const businessCategory = data.businessCategory ?? business.businessCategory;
-  const referralTypes = normalizeIdealReferrals(business.idealReferralTypes);
-  const idealReferralTypes = referralTypes.length > 0
-    ? referralTypes
-    : normalizeIdealReferrals(business.idealReferrals ?? data.idealReferral ?? data.idealReferrals);
+  const idealReferralTypes = normalizeIdealReferrals(business.idealReferralTypes);
   const liveOffer = getLiveOffers(data, todayIso())[0];
 
   return {
