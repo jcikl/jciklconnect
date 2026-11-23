@@ -1458,12 +1458,15 @@ export class MembersService {
       if (Object.keys(normalized).some(k => DISPLAY_FIELDS.has(k))) {
         const { BusinessDirectoryService } = await import('./businessDirectoryService');
         await Promise.allSettled(
-          memberIds.map(id =>
-            Promise.allSettled([
-              BusinessDirectoryService.syncPublicListing(id, { ...normalized, id }),
+          memberIds.map(id => {
+            // Merge full existing data so syncPublicListing sees privacy.shareCardInternationally
+            // (passing only the delta would cause listings to be erroneously deleted).
+            const existing = existingByIds.get(id) ?? {};
+            return Promise.allSettled([
+              BusinessDirectoryService.syncPublicListing(id, { ...existing, ...normalized, id }),
               this.syncBoardMemberDisplayFields(id, { ...normalized, id } as Member),
-            ])
-          )
+            ]);
+          })
         );
       }
 
