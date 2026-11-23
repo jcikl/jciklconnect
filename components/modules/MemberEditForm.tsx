@@ -242,7 +242,7 @@ export const MemberEditForm: React.FC<MemberEditFormProps> = ({ member, onSubmit
       departmentAndPosition: formValues.departmentAndPosition || undefined,
       levelOfManagement: formValues.levelOfManagement || undefined,
       idealReferralIndustry: formValues.idealReferralIndustry || undefined,
-      idealReferral: formValues.idealReferral || undefined,
+      'business.idealReferralTypes': formValues.idealReferral || undefined,
       businessCategory: formValues.businessCategory.length > 0 ? formValues.businessCategory : undefined,
       industry: formValues.industry || undefined,
       interestedIndustries: interestedIndustriesArr.length > 0 ? interestedIndustriesArr : undefined,

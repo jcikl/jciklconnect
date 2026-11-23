@@ -334,7 +334,7 @@ export const MemberDetail: React.FC<{ member: Member, onBack: () => void, isSelf
         levelOfManagement: inlineValues.levelOfManagement,
         'business.levelOfManagement': inlineValues.levelOfManagement || undefined,
         idealReferralIndustry: inlineValues.idealReferralIndustry,
-        idealReferral: inlineValues.idealReferral,
+        'business.idealReferralTypes': inlineValues.idealReferral || undefined,
         specialOffers: inlineValues.specialOffers ?? [],
         specialOffer: (inlineValues.specialOffers ?? [])[0] ?? inlineValues.specialOffer,
         phone: inlineValues.phone, alternatePhone: inlineValues.alternatePhone, email: inlineValues.email,

@@ -414,7 +414,8 @@ export class MembersService {
     else if (data['business.levelOfManagement'] !== undefined) business.levelOfManagement = data['business.levelOfManagement'];
     else if (data.levelOfManagement !== undefined) business.levelOfManagement = data.levelOfManagement;
     if (data.business?.interestedIndustries !== undefined) business.interestedIndustries = data.business?.interestedIndustries;
-    if (data.business?.idealReferralTypes !== undefined) business.idealReferralTypes = data.business?.idealReferralTypes;
+    if (data.business?.idealReferralTypes !== undefined) business.idealReferralTypes = normalizeIdealReferrals(data.business?.idealReferralTypes);
+    else if (data['business.idealReferralTypes'] !== undefined) business.idealReferralTypes = normalizeIdealReferrals(data['business.idealReferralTypes']);
     if (data.business?.productsAndServices !== undefined) business.productsAndServices = data.business?.productsAndServices;
     else if (data['business.productsAndServices'] !== undefined) business.productsAndServices = data['business.productsAndServices'];
     if (data.business?.bookmarkedBusinessIds !== undefined) business.bookmarkedBusinessIds = data.business?.bookmarkedBusinessIds;
