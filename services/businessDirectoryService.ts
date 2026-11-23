@@ -45,7 +45,7 @@ export function mapMemberToBusinessProfile(id: string, data: Record<string, unkn
     return null;
   }
 
-  const businessCategory = data.businessCategory ?? business.businessCategory;
+  const businessCategory = business.businessCategory;
   const idealReferralTypes = normalizeIdealReferrals(business.idealReferralTypes);
   // First live (active, not expired) offer across both formats (business.specialOffers / legacy specialOffer).
   const liveOffer = getLiveOffers(data, todayIso())[0];
@@ -54,34 +54,23 @@ export function mapMemberToBusinessProfile(id: string, data: Record<string, unkn
     id,
     memberId: id,
     ownerName:
-      (data.name as string | undefined) ||
       (general.name as string | undefined) ||
       (general.fullName as string | undefined) ||
       'Unknown',
     companyName,
     industry: (data.industry as string | undefined) || (business.industry as string | undefined) || 'Other',
     description:
-      ((data.business as Record<string, unknown> | undefined)?.companyDescription as string | undefined) ||
-      (data.companyDescription as string | undefined) ||
+      (business.companyDescription as string | undefined) ||
       (business.introduction as string | undefined) ||
       '',
-    website:
-      (data.companyWebsite as string | undefined) ||
-      (business.companyWebsite as string | undefined) ||
-      '',
+    website: (business.companyWebsite as string | undefined) || '',
     offer: liveOffer?.description ?? '',
     offerTerms: liveOffer?.terms ?? '',
     offerExpiry: liveOffer?.expiryDate ?? '',
-    logo:
-      (data.companyLogoUrl as string | undefined) ||
-      (business.companyLogoUrl as string | undefined) ||
-      '',
+    logo: (business.companyLogoUrl as string | undefined) || '',
     internationalConnections: (data.internationalConnections as BusinessProfile['internationalConnections']) || [],
     businessCategory: Array.isArray(businessCategory) ? businessCategory.join(', ') : ((businessCategory as string) || ''),
-    acceptsInternationalBusiness:
-      (data.acceptInternationalBusiness as boolean | undefined) ??
-      (business.acceptInternationalBusiness as boolean | undefined) ??
-      false,
+    acceptsInternationalBusiness: (business.acceptInternationalBusiness as boolean | undefined) ?? false,
     globalNetworkEnabled: (data.globalNetworkEnabled as boolean | undefined) || false,
     idealReferralTypes,
     productsAndServices: (business.productsAndServices as string[] | undefined) || [],
