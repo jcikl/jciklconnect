@@ -459,6 +459,8 @@ export interface BusinessProfile {
   productsAndServices?: string[];
   interestedIndustries?: string[];
   jciChapters?: string[];
+  levelOfManagement?: string;
+  departmentAndPosition?: string;
 }
 
 /** @deprecated Use getTargetDuesForMembershipType() from membershipConfigService instead */

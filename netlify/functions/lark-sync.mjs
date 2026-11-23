@@ -84,7 +84,7 @@ function memberFields(id, data) {
     Points: asNumber(data.points),
     Company: asText(first(data.business?.companyName, data.companyName)),
     Position: asText(first(data.business?.departmentAndPosition, data.business?.position, data.business?.title)),
-    Industry: asText(first(data.business?.industry, data.industry)),
+    Industry: asText(first(data.industry, data.business?.industry)),
     Address: asText(first(data.contact?.address, data.address)),
     'Current Board Position': asText(data.currentBoardPosition),
     Active: data.deletedAt ? false : first(data.status === 'active' ? true : undefined, data.active),

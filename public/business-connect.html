@@ -100,6 +100,7 @@ body {
 }
 .id-name { margin: 0; font-size: 20px; font-weight: 800; line-height: 1.15; color: var(--text); text-wrap: balance; }
 .id-company { margin: 0; font-size: 13.5px; font-weight: 600; color: var(--navy); }
+.id-position { margin: 0; font-size: 11.5px; color: var(--muted); }
 .id-badges { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
 .badge {
   display: inline-flex; align-items: center; gap: 3px;
@@ -107,6 +108,7 @@ body {
   letter-spacing: 0.02em; line-height: 1.6;
 }
 .b-green { background: var(--green-bg); color: var(--green-fg); }
+.b-mgmt  { background: var(--blue-lt);  color: var(--navy); }
 
 .sec { padding: 17px 24px; border-top: 1px solid var(--border); }
 .eyebrow {
@@ -268,10 +270,13 @@ function mapDoc(doc) {
     offerTerms:       fv(f.offerTerms)       || '',
     offerExpiry:      fv(f.offerExpiry)      || '',
     logo:             fv(f.logo)             || '',
-    businessCategory:    fv(f.businessCategory) || '',
-    openToIntl:          raw === true || raw === 'Yes',
-    referralTypes:       Array.isArray(fv(f.idealReferralTypes)) ? fv(f.idealReferralTypes) : [],
-    productsAndServices: Array.isArray(fv(f.productsAndServices)) ? fv(f.productsAndServices) : [],
+    businessCategory:       fv(f.businessCategory)       || '',
+    openToIntl:             raw === true || raw === 'Yes',
+    referralTypes:          Array.isArray(fv(f.idealReferralTypes))    ? fv(f.idealReferralTypes)    : [],
+    productsAndServices:    Array.isArray(fv(f.productsAndServices))   ? fv(f.productsAndServices)   : [],
+    levelOfManagement:      fv(f.levelOfManagement)      || '',
+    departmentAndPosition:  fv(f.departmentAndPosition)  || '',
+    interestedIndustries:   Array.isArray(fv(f.interestedIndustries))  ? fv(f.interestedIndustries)  : [],
   };
 }
 
@@ -372,7 +377,11 @@ function renderPage(p, idx, total) {
       <div class="id-info">
         <h2 class="id-name">${esc(p.ownerName)}</h2>
         <p class="id-company">${esc(p.companyName)}</p>
-        <div class="id-badges">${p.openToIntl ? '<span class="badge b-green">Open to International</span>' : ''}</div>
+        ${p.departmentAndPosition ? `<p class="id-position">${esc(p.departmentAndPosition)}</p>` : ''}
+        <div class="id-badges">
+          ${p.openToIntl ? '<span class="badge b-green">Open to International</span>' : ''}
+          ${p.levelOfManagement ? `<span class="badge b-mgmt">${esc(p.levelOfManagement)}</span>` : ''}
+        </div>
       </div>
     </div>
     ${p.description ? `<div class="sec"><p class="eyebrow">About</p><p class="about-p">${esc(p.description)}</p></div>` : ''}
@@ -381,6 +390,7 @@ function renderPage(p, idx, total) {
       <div class="col"><p class="eyebrow">Business Categories</p><ul class="tags">${catHtml}</ul></div>
       <div class="col"><p class="eyebrow">Looking For</p><ul class="tags">${refHtml}</ul></div>
     </div>
+    ${p.interestedIndustries.length ? `<div class="sec"><p class="eyebrow">Interested Industries</p><ul class="tags">${p.interestedIndustries.map(i => `<li class="tag-n">${esc(i)}</li>`).join('')}</ul></div>` : ''}
     ${offerSection}
     <div class="card-footer">
       <div class="footer-left">

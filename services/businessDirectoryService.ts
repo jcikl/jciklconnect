@@ -74,6 +74,9 @@ export function mapMemberToBusinessProfile(id: string, data: Record<string, unkn
     globalNetworkEnabled: (data.globalNetworkEnabled as boolean | undefined) || false,
     idealReferralTypes,
     productsAndServices: (business.productsAndServices as string[] | undefined) || [],
+    levelOfManagement: (business.levelOfManagement as string | undefined) || '',
+    departmentAndPosition: (business.departmentAndPosition as string | undefined) || (business.position as string | undefined) || '',
+    interestedIndustries: (business.interestedIndustries as string[] | undefined) || [],
   };
 }
 
@@ -94,6 +97,9 @@ function mapListingDoc(id: string, data: Record<string, unknown>): BusinessProfi
     globalNetworkEnabled: (data.globalNetworkEnabled as boolean | undefined) || false,
     idealReferralTypes: normalizeIdealReferrals(data.idealReferralTypes as string[] | undefined),
     productsAndServices: (data.productsAndServices as string[] | undefined) || [],
+    levelOfManagement: (data.levelOfManagement as string | undefined) || '',
+    departmentAndPosition: (data.departmentAndPosition as string | undefined) || '',
+    interestedIndustries: (data.interestedIndustries as string[] | undefined) || [],
   };
 }
 

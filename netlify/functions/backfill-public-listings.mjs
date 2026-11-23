@@ -50,6 +50,9 @@ function mapMember(id, data) {
     globalNetworkEnabled: data.globalNetworkEnabled || false,
     idealReferralTypes,
     productsAndServices: Array.isArray(business.productsAndServices) ? business.productsAndServices : [],
+    levelOfManagement: business.levelOfManagement || '',
+    departmentAndPosition: business.departmentAndPosition || business.position || '',
+    interestedIndustries: Array.isArray(business.interestedIndustries) ? business.interestedIndustries : [],
   };
 }
 
