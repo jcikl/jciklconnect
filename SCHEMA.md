@@ -3,6 +3,8 @@
 > 自动生成自 `types.ts`。每个集合列出 TypeScript 接口、所有字段路径、类型和枚举值。
 > 更新时重新运行 workflow `generate-schema-md`。
 
+> Business Connect 联系二维码（2026-11-25）：`members.contact.phone` → 服务端 `public-directory-photo?mode=whatsapp&id=...`；沿用公开名片授权与会员资格检查，号码规范化后用 `qrcode.react` 编码 `https://wa.me/<国际区号及数字>`，不带 `+`。二维码在本站生成；不向第三方二维码服务发送号码，不在公开条目新增冗余电话。无有效号码或撤回分享时返回 404，页面隐藏二维码。
+
 > Business Connect 头像（2026-11-25）：公开页面通过 `public-directory-photo?mode=profile&id=...` 读取 `members.general.avatarUrl` 对应的图片，不再要求另行发布。接口读取前后均检查 `members.privacy.shareCardInternationally === true`、会员角色 / 分会 / 删除状态与有效 `publicBusinessListings`；仅返回允许来源的图片字节，不复制或公开原始头像地址。无头像或读取失败回退到公司 Logo / 姓名缩写，不需要批量回写现有记录。
 > **“来 / 往”字段流规则：** `来` 记录实际写入或维护来源（角色填写、管理员操作、系统计算、服务同步、导入流程或其他字段引用）；`往` 记录实际使用目标（页面展示、权限判断、统计计算、业务流程、服务读取或其他集合/字段）。跨集合关系使用 `` `collection.field` ``；涉及权限时以 `SCHEMA-PERMISSIONS.md` 的角色为准；只有代码或明确流程能够证明时才标记系统自动操作。它们是文档化的数据流，不是 Firestore 自动触发器；无法从代码、权限或文档确认的关系才留空，不得臆测。
 > **补充规则（2026-10-11 自 `CLAUDE.md` 迁入）：** 冗余展示字段必须说明复制来源及是否会自动回写；不能把"角色允许更新"误写成系统自动同步。新增、重命名、删除字段或修改服务联动时，必须同时更新本文件的"来 / 往"列，并运行 Markdown/diff 校验。

@@ -1,5 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { readOwnProfilePhoto } from '../../utils/publicDirectoryPhotoSource.mjs';
+import { normalizeMyPhone } from '../../utils/phoneNumber.mjs';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { QRCodeSVG } from 'qrcode.react';
 
 const MAX_BYTES = 120 * 1024;
 const VALID_ID = /^[A-Za-z0-9_-]{1,128}$/;
@@ -108,19 +112,34 @@ export function makePublicDirectoryPhotoHandler({ auth, db, deleteField, fetchIm
   return async req => {
     const params = new URL(req.url).searchParams;
     const operation = params.get('mode');
-    if (req.method === 'GET' && operation === 'profile') {
+    if (req.method === 'GET' && (operation === 'profile' || operation === 'whatsapp')) {
       const id = params.get('id');
       if (!db || !VALID_ID.test(id || '')) return missing();
       try {
         const [member, listing] = refs(id);
         const readSource = () => db.runTransaction(async tx => {
           const [m, l] = await Promise.all([
-            tx.getAll(member, { fieldMask: ['role', 'loId', 'deletedAt', 'privacy.shareCardInternationally', 'general.avatarUrl'] }).then(rows => rows[0]),
+            tx.getAll(member, { fieldMask: ['role', 'loId', 'deletedAt', 'privacy.shareCardInternationally', operation === 'whatsapp' ? 'contact.phone' : 'general.avatarUrl'] }).then(rows => rows[0]),
             tx.get(listing),
           ]);
-          return listingEligible(m, l, id) ? m.data()?.general?.avatarUrl : null;
+          return listingEligible(m, l, id)
+            ? (operation === 'whatsapp' ? m.data()?.contact?.phone : m.data()?.general?.avatarUrl)
+            : null;
         }, { readOnly: true });
         const source = await readSource();
+        if (operation === 'whatsapp') {
+          const phone = normalizeMyPhone(source);
+          if (!phone) return missing();
+          const svg = renderToStaticMarkup(createElement(QRCodeSVG, {
+            value: 'https://wa.me/' + phone.slice(1), size: 96,
+            level: 'M', marginSize: 4, bgColor: '#ffffff', fgColor: '#111827',
+          }));
+          if (await readSource() !== source) return missing();
+          return new Response(svg, { headers: {
+            ...safeHeaders, 'Content-Type': 'image/svg+xml',
+            'Content-Security-Policy': "default-src 'none'; sandbox",
+          } });
+        }
         if (typeof source !== 'string' || !source) return missing();
         const photo = await readOwnProfilePhoto(source, AbortSignal.timeout(8000), fetchImage);
         // Consent or the profile photo may change while the upstream image loads.

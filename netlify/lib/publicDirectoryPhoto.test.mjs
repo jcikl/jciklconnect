@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import vm from 'node:vm';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { QRCodeSVG } from 'qrcode.react';
 import { approvedPhotoBytes, isCurrentPhotoDraft, MAX_PHOTO_SOURCE_BYTES, readOwnProfilePhoto } from '../../utils/publicDirectoryPhotoSource.mjs';
 import { makePublicDirectoryPhotoHandler } from './publicDirectoryPhoto.mjs';
 
@@ -35,7 +38,8 @@ function fixture(fetchImage) {
           const snap = await get(path);
           if (path.startsWith('members/')) assert.ok(
             JSON.stringify(fieldMask) === JSON.stringify(['role', 'loId', 'deletedAt', 'privacy.shareCardInternationally']) ||
-            JSON.stringify(fieldMask) === JSON.stringify(['role', 'loId', 'deletedAt', 'privacy.shareCardInternationally', 'general.avatarUrl']));
+            JSON.stringify(fieldMask) === JSON.stringify(['role', 'loId', 'deletedAt', 'privacy.shareCardInternationally', 'general.avatarUrl']) ||
+            JSON.stringify(fieldMask) === JSON.stringify(['role', 'loId', 'deletedAt', 'privacy.shareCardInternationally', 'contact.phone']));
           else assert.deepEqual(fieldMask, ['key']);
           const data = snap.data();
           if (!data) return [snap];
@@ -74,6 +78,35 @@ function fixture(fetchImage) {
   const link = () => '?id=' + owner + '&key=' + (records.get(listing)?.publicDirectoryPhotoKey || '0'.repeat(32));
   return { records, request, link, publish };
 }
+
+test('WhatsApp QR encodes the shared contact phone and rejects absent consent or invalid phones', async () => {
+  const f = fixture();
+  const path = '?mode=whatsapp&id=' + owner;
+  for (const raw of ['012-345 6789', '+60 12 345 6789', '0060123456789']) {
+    f.records.get(member).contact = { phone: raw };
+    const response = await f.request(path);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('content-type'), 'image/svg+xml');
+    assert.match(response.headers.get('cache-control'), /no-store/);
+    assert.equal(await response.text(), renderToStaticMarkup(createElement(QRCodeSVG, {
+      value: 'https://wa.me/60123456789', size: 96, level: 'M', marginSize: 4,
+      bgColor: '#ffffff', fgColor: '#111827',
+    })));
+  }
+  f.records.get(member).privacy.shareCardInternationally = false;
+  assert.equal((await f.request(path)).status, 404);
+  f.records.get(member).privacy.shareCardInternationally = true;
+  for (const phone of [undefined, '', 'N/A', 'javascript:alert(1)', '0123456789 ext 2']) {
+    f.records.get(member).contact = { phone };
+    assert.equal((await f.request(path)).status, 404);
+  }
+  f.records.get(member).contact = { phone: '+60123456789' };
+  f.records.get(member).role = 'GUEST';
+  assert.equal((await f.request(path)).status, 404);
+  f.records.get(member).role = 'MEMBER';
+  f.records.delete(listing);
+  assert.equal((await f.request(path)).status, 404);
+});
 
 test('shared cards serve the current profile photo without a separate upload', async () => {
   let reads = 0;
@@ -238,6 +271,9 @@ test('guest renderer: automatic profile photo, retry company logo, then initials
   }
   assert.match(published, /data-avatar-logo="https:\/\/res\.cloudinary\.com\/fixture\/logo"/);
   const old = render({ name, fields });
+  assert.ok(old.includes('mode=whatsapp&amp;id=member-a'));
+  assert.ok(old.includes('data-contact-qr'));
+  assert.doesNotMatch(old, /QR code placeholder/);
   assert.doesNotMatch(old, /private\.jpg/);
   assert.ok(old.includes(automaticPath));
   assert.match(render({ name, fields: { ...fields, logo: undefined } }), /avatar-mono" hidden>PY<\/span>/);

@@ -17,7 +17,7 @@
 
 | 層 | 檔案數 | 位置 |
 |---|---|---|
-| Service（業務邏輯與資料存取） | 77 | `services/` |
+| Service（業務邏輯與資料存取） | 76 | `services/` |
 | Hook（React 資料綁定） | 46 | `hooks/` |
 | Util（純函數工具） | 27 | `utils/` |
 | UI 元件（通用） | 34 | `components/ui/` |
@@ -34,14 +34,14 @@
 | `formatCurrency` | `utils/formatUtils.ts` | `components/modules/SponsorshipView.tsx:10`<br>`components/modules/ProjectManagement/ProjectReportGenerator.tsx:181` |
 | `formatDate` | `utils/dateUtils.ts` | `components/modules/Finance/BankMatchingModal.tsx:27`<br>`components/modules/MemberManagement/BoardTransitionTools.tsx:161` |
 | `formatDateTime` | `utils/dateUtils.ts` | `components/modules/ZoomBookingView.tsx:59` |
-| `getInitialsSvg` | `utils/avatarUtils.ts` | `components/layout/SearchDropdown.tsx:5`<br>`components/modules/CommunicationView.tsx:16`<br>`components/modules/HobbyClubsView.tsx:4`<br>`components/modules/BusinessDirectory/businessDirectoryUtils.ts:2`<br>`components/modules/Members/MemberCreateModal.tsx:4`<br>`components/modules/Members/MemberDetail.tsx:51`<br>`components/modules/Members/MemberDetailCareerTab.tsx:8`<br>`components/modules/Members/MemberTable.tsx:10`<br>`components/modules/Members/MentorMatchingModal.tsx:9` |
+| `getInitialsSvg` | `utils/avatarUtils.ts` | `components/layout/SearchDropdown.tsx:5`<br>`components/modules/CommunicationView.tsx:16`<br>`components/modules/HobbyClubsView.tsx:4`<br>`components/modules/BusinessDirectory/businessDirectoryUtils.ts:2`<br>`components/modules/Members/MemberCreateModal.tsx:4`<br>`components/modules/Members/MemberDetail.tsx:50`<br>`components/modules/Members/MemberDetailCareerTab.tsx:8`<br>`components/modules/Members/MemberTable.tsx:10` |
 | `isFuture` | `utils/dateUtils.ts` | `components/modules/ZoomBookingView.tsx:65` |
 
 ### 1.2 同一函數在多個元件各寫一份（應抽出到 utils）
 
 | 函數 | 出現次數 | 位置 |
 |---|---|---|
-| `getInitialsSvg` | 8 | `components/layout/SearchDropdown.tsx`<br>`components/modules/CommunicationView.tsx`<br>`components/modules/HobbyClubsView.tsx`<br>`components/modules/Members/MemberCreateModal.tsx`<br>`components/modules/Members/MemberDetail.tsx`<br>`components/modules/Members/MemberDetailCareerTab.tsx`<br>`components/modules/Members/MemberTable.tsx`<br>`components/modules/Members/MentorMatchingModal.tsx` |
+| `getInitialsSvg` | 7 | `components/layout/SearchDropdown.tsx`<br>`components/modules/CommunicationView.tsx`<br>`components/modules/HobbyClubsView.tsx`<br>`components/modules/Members/MemberCreateModal.tsx`<br>`components/modules/Members/MemberDetail.tsx`<br>`components/modules/Members/MemberDetailCareerTab.tsx`<br>`components/modules/Members/MemberTable.tsx` |
 
 ### 1.3 元件直接存取 Firestore（繞過 service 層）
 
@@ -76,7 +76,7 @@
 |---|---|
 | `services/financeService.ts` | 5,325 |
 | `services/pointsService.ts` | 2,492 |
-| `services/membersService.ts` | 2,334 |
+| `services/membersService.ts` | 2,268 |
 | `hooks/useFinanceData.ts` | 2,034 |
 | `services/inventoryService.ts` | 1,638 |
 
@@ -95,9 +95,8 @@
 | `memberCardsService.ts` | 136 | 9 | Member Cards Service — keeps `memberCards/{memberId}` (the public directory card, Phase 0 WP2) in sync with `members`. The card is written A… | MEMBER_CARDS |
 | `memberJourneyService.ts` | 155 | 2 | Leadership Journey + Trainer Pathway derivation (dashboard journey card for pre-2025 members) | — |
 | `memberStatsService.ts` | 319 | 2 | Member Statistics Service - Generates comprehensive member statistics and reports | — |
-| `membersService.ts` | 2,334 | 45 | Members Service - CRUD Operations | BOARD_MEMBERS, EVENT_REGISTRATIONS, MEMBERS, MEMBER_EMAILS, NOTIFICATIONS, PAYMENT_REQUESTS … |
+| `membersService.ts` | 2,268 | 43 | Members Service - CRUD Operations | BOARD_MEMBERS, EVENT_REGISTRATIONS, MEMBERS, MEMBER_EMAILS, NOTIFICATIONS, PAYMENT_REQUESTS … |
 | `membershipConfigService.ts` | 373 | 17 | ⚠️ 無說明 | SYSTEM_SETTINGS |
-| `mentorshipService.ts` | 638 | 4 | Mentorship Matching Service | MEMBERS, MENTORSHIP_FEEDBACK, MENTOR_MATCHES |
 | `promotionService.ts` | 1,191 | 4 | ⚠️ 無說明 | MANUAL_PROMOTION_REQUESTS, MEMBERS, PROMOTION_HISTORY, SYSTEM |
 | `senatorshipSyncService.ts` | 88 | 2 | Developer-only back-fill of JCI Malaysia senator numbers onto members. Runs in the Netlify function jci-malaysia-regcode (Admin SDK) so the … | — |
 
@@ -182,7 +181,7 @@
 
 </details>
 
-<details><summary><code>services/membersService.ts</code> — 32 個方法</summary>
+<details><summary><code>services/membersService.ts</code> — 31 個方法</summary>
 
 | 方法 | 行 | 說明 |
 |---|---|---|
@@ -192,32 +191,31 @@
 | `getMemberById` | 181 | Get member by ID |
 | `recalculateIntroducerStats` | 203 | Helper to recalculate radar stats for an introducer (dynamic import to avoid circular dependency) |
 | `normalizeMemberData` | 250 | Helper to map flat properties to standard nested sub-objects (general, contact, etc.) for database consistency… |
-| `createMember` | 566 | Create new member. Caller should pass loId (or use DEFAULT_LO_ID for single-LO). |
-| `updateMember` | 647 | Update member. Sets updatedAt and optionally updatedBy (audit). |
-| `validateSenatorshipByBoard` | 873 | Board of Directors validates a member's senatorship number (locks future edits). |
-| `revokeSenatorshipValidation` | 899 | Revoke board validation (admin / board only). Clears certification. |
-| `deleteMember` | 993 | Delete member |
-| `searchMembers` | 1106 | Search members |
-| `getMembersByRole` | 1125 | Get members by role |
-| `getMemberByEmail` | 1156 | Get member by email (for account linking) |
-| `getMembersAtRisk` | 1197 | Get members at risk (churn prediction) |
-| `computeAttendanceMonths` | 1218 | 当年应计月份数：入会年份从入会月起算，否则从 1 月起算 |
-| `recalculateAttendance` | 1232 | 按当年 checked_in 记录重算出席对比（签到次数 vs 已过月份），写回会员档案 |
-| `updateMemberRole` | 1264 |  |
-| `assignMentor` | 1333 | Assign mentor |
-| `batchUpdateMembers` | 1356 | Batch update members — uses writeBatch for atomicity (E01) |
-| `batchDeleteMembers` | 1529 | Batch delete members — uses writeBatch for atomicity (E02) |
-| `getFirstMembershipYearKey` | 1697 | Earliest year key on member.jciCareer?.membershipDuesHistory (e.g. "2024"). |
-| `statusFromMembershipAmount` | 1710 |  |
-| `fixFirstMembershipDuesTo350` | 1728 | Set dues on each member's first membership year to RM350 and recalculate status from paid amount. SYNC-004 NOT… |
-| `getEffectiveJoinYear` | 1835 | Effective membership start year (calendar Oct rollover or first payment year). |
-| `inferMembershipType` | 1866 | Infer membershipType from role, senatorship, and membership[year].dues (Config rules). |
-| `batchSyncMembershipTypes` | 1889 | Batch-sync members.jciCareer?.membershipType from membership dues + role + Config. Does not modify members.jci… |
-| `batchSyncMembershipRecords` | 2001 | Batch-sync members.jciCareer?.membershipDuesHistory[year] from each member's membershipType + Membership Confi… |
-| `syncMembershipFromMembershipType` | 2217 |  |
-| `migrateMembershipTypeFullToOfficial` | 2224 | TEMP MIGRATION: membershipType 'Full' → 'Official' |
-| `migrateDobToGeneralDob` | 2259 | TEMP MIGRATION: copy root-level dateOfBirth/dob into general.dob for members missing it |
-| `getMembersPaginated` | 2301 | Cursor-based paginated member fetch (ordered by name). Pass `lastDoc` from the previous page's result to advan… |
+| `createMember` | 558 | Create new member. Caller should pass loId (or use DEFAULT_LO_ID for single-LO). |
+| `updateMember` | 639 | Update member. Sets updatedAt and optionally updatedBy (audit). |
+| `validateSenatorshipByBoard` | 860 | Board of Directors validates a member's senatorship number (locks future edits). |
+| `revokeSenatorshipValidation` | 886 | Revoke board validation (admin / board only). Clears certification. |
+| `deleteMember` | 980 | Delete member |
+| `searchMembers` | 1084 | Search members |
+| `getMembersByRole` | 1103 | Get members by role |
+| `getMemberByEmail` | 1134 | Get member by email (for account linking) |
+| `getMembersAtRisk` | 1175 | Get members at risk (churn prediction) |
+| `computeAttendanceMonths` | 1196 | 当年应计月份数：入会年份从入会月起算，否则从 1 月起算 |
+| `recalculateAttendance` | 1210 | 按当年 checked_in 记录重算出席对比（签到次数 vs 已过月份），写回会员档案 |
+| `updateMemberRole` | 1242 |  |
+| `batchUpdateMembers` | 1312 | Batch update members — uses writeBatch for atomicity (E01) |
+| `batchDeleteMembers` | 1484 | Batch delete members — uses writeBatch for atomicity (E02) |
+| `getFirstMembershipYearKey` | 1631 | Earliest year key on member.jciCareer?.membershipDuesHistory (e.g. "2024"). |
+| `statusFromMembershipAmount` | 1644 |  |
+| `fixFirstMembershipDuesTo350` | 1662 | Set dues on each member's first membership year to RM350 and recalculate status from paid amount. SYNC-004 NOT… |
+| `getEffectiveJoinYear` | 1769 | Effective membership start year (calendar Oct rollover or first payment year). |
+| `inferMembershipType` | 1800 | Infer membershipType from role, senatorship, and membership[year].dues (Config rules). |
+| `batchSyncMembershipTypes` | 1823 | Batch-sync members.jciCareer?.membershipType from membership dues + role + Config. Does not modify members.jci… |
+| `batchSyncMembershipRecords` | 1935 | Batch-sync members.jciCareer?.membershipDuesHistory[year] from each member's membershipType + Membership Confi… |
+| `syncMembershipFromMembershipType` | 2151 |  |
+| `migrateMembershipTypeFullToOfficial` | 2158 | TEMP MIGRATION: membershipType 'Full' → 'Official' |
+| `migrateDobToGeneralDob` | 2193 | TEMP MIGRATION: copy root-level dateOfBirth/dob into general.dob for members missing it |
+| `getMembersPaginated` | 2235 | Cursor-based paginated member fetch (ordered by name). Pass `lastDoc` from the previous page's result to advan… |
 
 </details>
 
@@ -225,26 +223,6 @@
 
 
 **其他 export：** `getMemberAge` (L17), `isMalaysianNationality` (L32), `validateMembershipTypeEligibility` (L42), `suggestMembershipTypeForMember` (L86), `resolveEligibleMembershipType` (L117), `roleForMembershipType` (L135), `computeMembershipTypeFromMember` (L170), `getTargetDuesForMembershipType` (L220), `resolveMembershipTypeFromDues` (L235), `DEFAULT_MEMBERSHIP_RULES` (L257), `MembershipConfigService` (L269), `resolveMembershipPurpose` (L311), `getMembershipPurpose` (L339), `getPendingWhatsAppCampaign` (L355), `dismissWhatsAppCampaign` (L367)
-
-</details>
-
-<details><summary><code>services/mentorshipService.ts</code> — 13 個方法</summary>
-
-| 方法 | 行 | 說明 |
-|---|---|---|
-| `invalidateMentorMatchesCache` | 57 | Invalidate all mentorMatches cache entries after any write. |
-| `findPotentialMentors` | 63 | Enhanced mentor matching with sophisticated algorithm |
-| `createMentorMatch` | 209 | Create a formal mentor match record |
-| `approveMentorMatch` | 258 | Approve a mentor match and make it active |
-| `autoMatchMentors` | 326 | Auto-match mentees with mentors based on criteria |
-| `getMentorMatches` | 358 | Get mentor matches for a member |
-| `getMenteeMatches` | 384 | Get mentee matches for a member |
-| `completeMentorship` | 410 | Complete a mentorship relationship |
-| `getMentorshipStats` | 449 | Get enhanced mentorship statistics |
-| `logSession` | 496 | P1-C: Log a mentoring session and increment sessionCount / totalHours on the match doc |
-| `cancelMentorship` | 520 | P1-D: Cancel an active or pending mentorship and remove member cross-references atomically |
-| `deleteMentorMatch` | 570 | P1 fix: Delete a mentor match document and clean up member cross-references atomically. Firestore rules allow … |
-| `collectFeedback` | 609 | Collect feedback on mentorship relationship |
 
 </details>
 
@@ -921,8 +899,8 @@
 | Service | 行數 | 引用 | 用途 | 集合 |
 |---|---|---|---|---|
 | `advertisementService.ts` | 422 | 11 | Advertisement & Promotions Service | ADVERTISEMENTS, BENEFIT_USAGE, PROMOTION_PACKAGES |
-| `businessDirectoryService.ts` | 248 | 1 | Business Directory Service - CRUD Operations | MEMBERS, PUBLIC_BUSINESS_LISTINGS |
-| `communicationService.ts` | 651 | 9 | Communication Service - CRUD Operations | COMMUNICATION, NOTIFICATIONS, SYSTEM_CONFIG |
+| `businessDirectoryService.ts` | 242 | 1 | Business Directory Service - CRUD Operations | MEMBERS, PUBLIC_BUSINESS_LISTINGS |
+| `communicationService.ts` | 651 | 8 | Communication Service - CRUD Operations | COMMUNICATION, NOTIFICATIONS, SYSTEM_CONFIG |
 | `emailService.ts` | 442 | 2 | Email Service - Email Integration Service | EMAIL_LOGS |
 | `guestAnalyticsService.ts` | 142 | 4 | ⚠️ 無說明 | GUEST_PAGE_STATS |
 | `inquiryService.ts` | 232 | 1 | ⚠️ 無說明 | INQUIRIES |
@@ -959,11 +937,11 @@
 
 | 方法 | 行 | 說明 |
 |---|---|---|
-| `syncPublicListing` | 114 |  |
-| `getAllBusinesses` | 147 |  |
-| `getBusinessById` | 193 |  |
-| `searchBusinesses` | 223 |  |
-| `getBusinessesByIndustry` | 233 |  |
+| `syncPublicListing` | 107 |  |
+| `getAllBusinesses` | 141 |  |
+| `getBusinessById` | 187 |  |
+| `searchBusinesses` | 217 |  |
+| `getBusinessesByIndustry` | 227 |  |
 
 **其他 export：** `mapMemberToBusinessProfile` (L37)
 
@@ -1163,10 +1141,10 @@
 | Service | 行數 | 引用 | 用途 | 集合 |
 |---|---|---|---|---|
 | `aiPredictionService.ts` | 949 | 3 | AI Prediction Service - Advanced AI predictions for events, projects, and sponsors | — |
-| `cacheService.ts` | 314 | 35 | 缓存服务 - 提供内存缓存和本地存储缓存功能 Cache Service - Provides in-memory and localStorage caching capabilities | — |
-| `cloudinaryService.ts` | 337 | 14 | Cloudinary Upload Service | — |
+| `cacheService.ts` | 314 | 34 | 缓存服务 - 提供内存缓存和本地存储缓存功能 Cache Service - Provides in-memory and localStorage caching capabilities | — |
+| `cloudinaryService.ts` | 337 | 13 | Cloudinary Upload Service | — |
 | `dataImportExportService.ts` | 913 | 3 | ⚠️ 無說明 | EVENTS, MEMBERS, MEMBER_EMAILS |
-| `errorLoggingService.ts` | 354 | 74 | ⚠️ 無說明 | ERROR_LOGS |
+| `errorLoggingService.ts` | 354 | 73 | ⚠️ 無說明 | ERROR_LOGS |
 | `firestoreLogger.ts` | 197 | 3 | System Logger — Firestore ops + Performance monitoring Fire-and-forget buffered logger. Buffers events for 3 seconds then writes one batched… | SYSTEM_LOGS |
 | `inventoryService.ts` | 1,638 | 3 | Inventory Service - CRUD Operations | INVENTORY, INVENTORY_ALERTS, MAINTENANCE_SCHEDULES, STOCK_MOVEMENTS, TRANSACTIONS |
 | `mockData.ts` | 689 | 17 | ⚠️ 無說明 | — |
@@ -1298,7 +1276,7 @@
 | `chapterBirthdaysService.ts` | 46 | 1 | Own-chapter birthdays for external users: calls the Netlify function chapter-birthdays (read-only). | — |
 | `externalAccountsService.ts` | 162 | 3 | External (sister-chapter) accounts. Writes go through the Netlify function external-accounts (uid = member doc id); reads (chapter roster, K… | MEMBERS |
 | `jciMalaysiaSyncService.ts` | 168 | 2 | In-app JCI Malaysia sync (developer accounts only). Everything runs in the Netlify function jci-malaysia-sync: the source key, the overrides… | — |
-| `malaysiaHolidaysService.ts` | 48 | 1 | Malaysia public holidays for the calendar. Fetched from the Netlify function `malaysia-holidays` (which proxies Calendarific with a server-s… | — |
+| `malaysiaHolidaysService.ts` | 42 | 1 | Malaysia public holidays for the calendar. Fetched from the Netlify function `malaysia-holidays`, which serves them from Firestore and only … | — |
 | `reportService.ts` | 615 | 2 | ⚠️ 無說明 | — |
 
 <details><summary><code>services/chapterBirthdaysService.ts</code> — 1 個方法</summary>
@@ -1368,7 +1346,7 @@
 | `useActivityPlans.ts` | 130 | 1 | `useActivityPlans` | activityPlansService | ⚠️ 無說明 |
 | `useAdvertisements.ts` | 111 | 2 | `useAdvertisements` | advertisementService, errorLoggingService | Advertisements Data Hook |
 | `useAppNavigation.ts` | 239 | 1 | `useAppNavigation` | — | ⚠️ 無說明 |
-| `useAuth.tsx` | 880 | 63 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, memberCardsService, membersService, mockData | Authentication Hook |
+| `useAuth.tsx` | 888 | 63 | `AuthProvider`, `useAuth` | boardManagementService, errorLoggingService, memberCardsService, membersService, mockData | Authentication Hook |
 | `useAutomation.ts` | 149 | 3 | `useAutomation` | automationService | useAutomation Hook - Manage automation workflows and rules |
 | `useBusinessDirectory.ts` | 51 | 4 | `useBusinessDirectory` | businessDirectoryService | ⚠️ 無說明 |
 | `useChapterBirthdays.ts` | 23 | 1 | `useChapterBirthdays` | chapterBirthdaysService | Own-chapter birthdays for an active external user (dashboard birthday widget). `month` null → nothing loads. |
@@ -1521,7 +1499,7 @@
 | `getStartOfYear` | 163 |  |
 | `getEndOfYear` | 170 |  |
 
-### `utils/devMode.ts` （36 行，77 處引用）
+### `utils/devMode.ts` （36 行，76 處引用）
 > Developer Mode Utility This utility helps services detect if the app is running in developer mode and return mock data instead of accessing …
 
 | 函數 | 行 | 說明 |
@@ -1662,7 +1640,7 @@
 | `Card.tsx` | 77 | 1 | `Card`, `StatCardsContainer` |
 | `ColumnFilterHeader.tsx` | 118 | 2 | `ColumnFilterHeader` |
 | `Combobox.tsx` | 255 | 11 | `Combobox` |
-| `Common.tsx` | 26 | 239 | — |
+| `Common.tsx` | 26 | 238 | — |
 | `ConfirmDialog.tsx` | 100 | 5 | `ConfirmDialog`, `CONFIRM_CLOSED` |
 | `DataTable.tsx` | 172 | 0 | `DataTable` |
 | `Drawer.tsx` | 139 | 2 | `Drawer` |
@@ -1670,7 +1648,7 @@
 | `ErrorBoundary.tsx` | 261 | 3 | `ErrorFallback`, `SectionErrorFallback`, `ErrorBoundary`, `AsyncErrorBoundary`, `withErrorBoundary`, `useErrorHandler` |
 | `FilterDrawer.tsx` | 65 | 1 | `FilterDrawer` |
 | `FirstUseBanner.tsx` | 82 | 2 | `FirstUseBanner` |
-| `Form.tsx` | 502 | 99 | `Input`, `Select`, `Textarea`, `Checkbox`, `RadioGroup`, `ButtonGroup` |
+| `Form.tsx` | 502 | 98 | `Input`, `Select`, `Textarea`, `Checkbox`, `RadioGroup`, `ButtonGroup` |
 | `IntroducerSelector.tsx` | 338 | 6 | `IntroducerSelector` |
 | `LedgerTable.tsx` | 183 | 1 | `LedgerTable` |
 | `Loading.tsx` | 47 | 34 | `LoadingSpinner`, `LoadingOverlay` |
@@ -1679,7 +1657,7 @@
 | `MembersOnlyOverlay.tsx` | 42 | 3 | `MembersOnlyOverlay` |
 | `Modal.tsx` | 204 | 1 | `Modal` |
 | `ModuleToolbar.tsx` | 76 | 1 | `ModuleToolbar` |
-| `MultiSelectDropdown.tsx` | 204 | 6 | `MultiSelectDropdown` |
+| `MultiSelectDropdown.tsx` | 204 | 5 | `MultiSelectDropdown` |
 | `PageHeader.tsx` | 25 | 2 | `PageHeader` |
 | `PageScaffold.tsx` | 89 | 1 | `PageScaffold` |
 | `Pagination.tsx` | 201 | 5 | `Pagination` |

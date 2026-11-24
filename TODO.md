@@ -63,6 +63,8 @@
 
 ## 后续任务
 
+- [ ] Business Connect WhatsApp 二维码浏览器验收（2026-11-25）：固定占位图已替换为基于 `members.contact.phone` 的真实 `https://wa.me/<国际号码>` 二维码，复用公开名片授权；无授权或无效号码时隐藏。验证：二维码 / 头像测试 12 项、现有会员认证测试 20 项、电话规范化回归 16 项通过；typecheck、build、diff 校验通过。当前本地 Netlify Functions 8888 未运行，3001 代理请求返回 500；待后端可用后验证实际会员扫码结果与撤回授权后的隐藏效果。代码随本条记录提交；部署结果待验证。
+
 - [ ] Business Connect 自动会员头像的本地 / 部署验收（2026-11-25，用户已授权）：沿用 `privacy.shareCardInternationally`，公开页面自动读取会员当前头像，不需单独发布。代码和授权检查已完成，头像测试 11/11 通过；本地 3001 的头像请求返回 500，因为代理目标 Netlify Functions 8888 未运行。完成标准：具备后端运行环境后验证真实头像加载、关闭分享后新请求 404；部署另按用户授权。类型检查当前失败，包含 SearchDropdown、AutomationStudio、useFinanceData 等错误，不能宣称全项目验证通过。
 
 <!-- 批次分析发现的范围外问题登记于此 -->

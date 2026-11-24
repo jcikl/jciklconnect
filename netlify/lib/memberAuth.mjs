@@ -3,22 +3,11 @@
 // directly and no profile copy is needed (copying is rejected by firestore.rules anyway).
 import { FieldValue } from 'firebase-admin/firestore';
 import { db, auth } from './firebaseAdmin.mjs';
+import { normalizeMyPhone } from '../../utils/phoneNumber.mjs';
+export { normalizeMyPhone } from '../../utils/phoneNumber.mjs';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const E164_RE = /^\+[1-9]\d{7,14}$/;
 
-/** Malaysian-first phone normalisation to E.164. Returns null when the result is not a valid E.164 number. */
-export function normalizeMyPhone(raw) {
-  if (raw == null) return null;
-  let p = String(raw).replace(/[\s\-().]/g, '');
-  if (!p) return null;
-  if (p.startsWith('00')) p = '+' + p.slice(2);
-  else if (p.startsWith('0')) p = '+60' + p.slice(1);
-  else if (p.startsWith('60')) p = '+' + p;
-  else if (/^1\d{7,9}$/.test(p)) p = '+60' + p; // Malaysian mobile typed without the leading 0
-  else if (!p.startsWith('+')) return null;   // unknown country without +: do not guess
-  return E164_RE.test(p) ? p : null;
-}
 
 export function memberEmail(m) {
   const e = (m?.contact?.email ?? m?.email ?? '').trim().toLowerCase();

@@ -391,26 +391,6 @@ function esc(s) {
   return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-const QR_DOTS = `
-  <rect x="24" y="2"  width="4" height="4"/><rect x="30" y="2"  width="4" height="4"/><rect x="38" y="2"  width="4" height="4"/>
-  <rect x="24" y="8"  width="4" height="4"/><rect x="36" y="8"  width="4" height="4"/>
-  <rect x="28" y="14" width="4" height="4"/><rect x="36" y="14" width="4" height="4"/>
-  <rect x="24" y="20" width="4" height="4"/><rect x="32" y="20" width="4" height="4"/>
-  <rect x="2"  y="24" width="4" height="4"/><rect x="10" y="24" width="4" height="4"/><rect x="18" y="24" width="4" height="4"/>
-  <rect x="26" y="24" width="4" height="4"/><rect x="34" y="24" width="4" height="4"/><rect x="42" y="24" width="4" height="4"/>
-  <rect x="50" y="24" width="4" height="4"/><rect x="60" y="24" width="4" height="4"/>
-  <rect x="4"  y="30" width="4" height="4"/><rect x="14" y="30" width="4" height="4"/>
-  <rect x="24" y="30" width="4" height="4"/><rect x="36" y="30" width="4" height="4"/>
-  <rect x="46" y="30" width="4" height="4"/><rect x="58" y="30" width="4" height="4"/>
-  <rect x="2"  y="36" width="4" height="4"/><rect x="16" y="36" width="4" height="4"/>
-  <rect x="28" y="36" width="4" height="4"/><rect x="40" y="36" width="4" height="4"/>
-  <rect x="52" y="36" width="4" height="4"/><rect x="62" y="36" width="4" height="4"/>
-  <rect x="24" y="44" width="4" height="4"/><rect x="32" y="44" width="4" height="4"/>
-  <rect x="44" y="44" width="4" height="4"/><rect x="56" y="44" width="4" height="4"/>
-  <rect x="24" y="50" width="4" height="4"/><rect x="36" y="50" width="4" height="4"/><rect x="48" y="50" width="4" height="4"/>
-  <rect x="28" y="56" width="4" height="4"/><rect x="40" y="56" width="4" height="4"/><rect x="58" y="56" width="4" height="4"/>
-  <rect x="24" y="62" width="4" height="4"/><rect x="34" y="62" width="4" height="4"/><rect x="44" y="62" width="4" height="4"/>
-`;
 
 const IMG_EXT = /\.(jpe?g|png|gif|webp|svg|avif)$/i;
 const IMG_CDN = /^(?:res\.cloudinary\.com|firebasestorage\.googleapis\.com|lh\d+\.googleusercontent\.com)$/;
@@ -510,17 +490,7 @@ function renderPage(p, idx, total) {
       </a>` : ''}
       <p class="footer-pg">Member ${idx + 1} of ${total}</p>
     </div>
-    <div class="qr-box" aria-label="QR code placeholder">
-      <svg width="62" height="62" viewBox="0 0 66 66" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
-        <rect x="2" y="2" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
-        <rect x="6" y="6" width="10" height="10" rx="1"/>
-        <rect x="46" y="2" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
-        <rect x="50" y="6" width="10" height="10" rx="1"/>
-        <rect x="2" y="46" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
-        <rect x="6" y="50" width="10" height="10" rx="1"/>
-        ${QR_DOTS}
-      </svg>
-    </div>
+    ${/^[A-Za-z0-9_-]{1,128}$/.test(p.listingId) ? `<div class="qr-box" aria-label="Scan to contact on WhatsApp"><img src="/.netlify/functions/public-directory-photo?mode=whatsapp&amp;id=${esc(p.listingId)}" alt="WhatsApp contact QR code" width="96" height="96" loading="lazy" data-contact-qr></div>` : ''}
   </div>
 </div>`;
 }
@@ -612,6 +582,10 @@ async function loadDirectory() {
 // Image errors do not bubble; capture them for both initial and paginated cards.
 document.getElementById('pages').addEventListener('error', (event) => {
   const image = event.target;
+  if (image instanceof HTMLImageElement && image.hasAttribute('data-contact-qr')) {
+    image.parentElement.hidden = true;
+    return;
+  }
   if (!(image instanceof HTMLImageElement) || !image.hasAttribute('data-avatar-image')) return;
   const logo = image.getAttribute('data-avatar-logo');
   if (logo) {
