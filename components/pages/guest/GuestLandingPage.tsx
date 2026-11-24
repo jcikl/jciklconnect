@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Users, ChevronRight, FolderKanban } from 'lucide-react';
+import { ArrowUpRight, ChevronRight, Users } from 'lucide-react';
 import { Button } from '@/components/ui/Common';
 import { useEvents } from '@/hooks/useEvents';
 import { EventRow } from '@/components/modules/Events/EventRow';
@@ -10,6 +10,7 @@ import { BoardManagementService } from '@/services/boardManagementService';
 import { trimCloudinaryImage } from '@/services/cloudinaryService';
 import { GuestHeader } from '@/components/layout/GuestHeader';
 import { GuestFooter } from '@/components/layout/GuestFooter';
+import './GuestLandingPage.css';
 
 export const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
   onLogin: () => void;
@@ -17,27 +18,27 @@ export const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
   onPageChange: (page: 'home' | 'events' | 'projects' | 'about' | 'enewsletters' | 'partnerships') => void;
 }) => {
   const currentYear = String(new Date().getFullYear());
+  const chapterYears = Number(currentYear) - 1954;
+  const numbersSection = useRef<HTMLParagraphElement>(null);
+  const [chapterNumbers, setChapterNumbers] = useState({ years: chapterYears, countries: 100, communities: 5000 });
+  const [activePillar, setActivePillar] = useState(0);
+  const pillarSection = useRef<HTMLElement>(null);
+  const pillarRail = useRef<HTMLDivElement>(null);
   const [president, setPresident] = useState<{ name: string; avatar: string; company: string } | null>(null);
   const [termSettings, setTermSettings] = useState<{ presidentTheme?: string; tagline?: string; shortDescription?: string; logoUrl?: string; memberGroupPhotoUrl?: string } | null>(null);
-  // Today-and-later only (not every event, ~5 MB) — this is the first page a visitor sees.
+  // Retain the existing public, upcoming-only query and KL relevance rules.
   const { events } = useEvents({ publicMode: true, scope: 'upcoming' });
-
   const navigate = useNavigate();
-  // Opens the event's detail + registration window on the guest events page (?event=<id>).
   const openEvent = (eventId: string) => {
     window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
     navigate(`/events?event=${encodeURIComponent(eventId)}`);
   };
-
   const upcomingEvents = useMemo(() => {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     return events
-      // Same rule as the member home / guest events page: KL host or co-host, or national / area / JCI.
       .filter(e => e.date && new Date(e.date) >= today && isKlRelevantEvent(e as any))
-      // All upcoming KL-relevant events, same list as the guest events page (was capped at 3).
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [events]);
-
   useEffect(() => {
     Promise.all([
       BoardManagementService.getBoardMembersByYear(currentYear),
@@ -48,22 +49,121 @@ export const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
       if (ts) setTermSettings(ts);
     }).catch(() => { });
   }, [currentYear]);
-
   const pillars = [
-    { image: '/pillars/business-portrait.webp', title: 'Business', description: 'Connect with entrepreneurs, grow your network, and sharpen your professional edge.', accent: 'from-jci-navy/80 to-jci-blue/60' },
-    { image: '/pillars/community-portrait.webp', title: 'Community', description: 'Lead meaningful service projects that create lasting impact in Kuala Lumpur.', accent: 'from-rose-900/70 to-rose-600/50' },
-    { image: '/pillars/international-portrait.webp', title: 'International', description: 'Join a worldwide network spanning 124 countries and 200,000 active members.', accent: 'from-emerald-900/70 to-emerald-600/50' },
-    { image: '/pillars/individual-portrait.webp', title: 'Individual', description: 'Unlock your leadership potential through training, mentorship, and real experiences.', accent: 'from-amber-900/70 to-amber-600/50' },
+    { image: '/pillars/business-portrait.webp', title: 'Business', label: 'Business & Entrepreneurship', description: 'Connect with entrepreneurs, grow your network, and sharpen your professional edge.' },
+    { image: '/pillars/community-portrait.webp', title: 'Community', label: 'Community Impact', description: 'Lead meaningful service projects that create lasting impact in Kuala Lumpur.' },
+    { image: '/pillars/international-portrait.webp', title: 'International', label: 'International Cooperation', description: 'Join a worldwide network spanning 124 countries and 200,000 active members.' },
+    { image: '/pillars/individual-portrait.webp', title: 'Individual', label: 'Individual Development', description: 'Unlock your leadership potential through training, mentorship, and real experiences.' },
   ];
-
+  useEffect(() => {
+    const sections = document.querySelectorAll('.connect-home .home-section, .connect-home .home-organization, .connect-home .home-legacy');
+    if (!('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const observer = new IntersectionObserver(entries => {
+      for (const entry of entries) if (entry.isIntersecting) {
+        entry.target.classList.add('home-in-view');
+        observer.unobserve(entry.target);
+      }
+    }, { threshold: 0, rootMargin: '0px 0px -40px 0px' });
+    sections.forEach(section => { section.classList.add('home-reveal'); observer.observe(section); });
+    const words = document.querySelectorAll('.connect-home .home-organization-values li');
+    const wordObserver = new IntersectionObserver(entries => {
+      entries.forEach(entry => entry.target.classList.toggle('home-word-on', entry.isIntersecting));
+    }, { rootMargin: '-35% 0px -35% 0px', threshold: 0 });
+    words.forEach(word => wordObserver.observe(word));
+    return () => {
+      observer.disconnect(); wordObserver.disconnect();
+      sections.forEach(section => section.classList.remove('home-reveal', 'home-in-view'));
+      words.forEach(word => word.classList.remove('home-word-on'));
+    };
+  }, [upcomingEvents.length, president]);
+  useEffect(() => {
+    const section = numbersSection.current;
+    if (!section) return;
+    const preference = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const finalNumbers = { years: chapterYears, countries: 100, communities: 5000 };
+    let frame = 0;
+    const finish = () => { cancelAnimationFrame(frame); setChapterNumbers(finalNumbers); };
+    const onPreferenceChange = () => { if (preference.matches) finish(); };
+    if (preference.matches || !('IntersectionObserver' in window)) { finish(); return; }
+    const observer = new IntersectionObserver(entries => {
+      if (!entries.some(entry => entry.isIntersecting)) return;
+      observer.disconnect();
+      if (preference.matches) { finish(); return; }
+      section.classList.add('home-numbers-entered');
+      const start = performance.now();
+      const tick = (now: number) => {
+        const progress = Math.min(1, (now - start) / 1400);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        setChapterNumbers({ years: Math.round(chapterYears * eased), countries: Math.round(100 * eased), communities: Math.round(5000 * eased) });
+        if (progress < 1) frame = requestAnimationFrame(tick);
+      };
+      frame = requestAnimationFrame(tick);
+    }, { threshold: .2 });
+    observer.observe(section);
+    preference.addEventListener('change', onPreferenceChange);
+    return () => { observer.disconnect(); cancelAnimationFrame(frame); preference.removeEventListener('change', onPreferenceChange); };
+  }, [chapterYears]);
+  // Vertical page progress moves the native horizontal rail; no wheel/touch cancellation.
+  useEffect(() => {
+    const section = pillarSection.current, rail = pillarRail.current;
+    const sticky = section?.querySelector<HTMLElement>('.home-pillar-sticky');
+    if (!section || !rail || !sticky) return;
+    const preference = window.matchMedia('(prefers-reduced-motion: reduce)');
+    let frame = 0;
+    const sync = () => {
+      frame = 0;
+      if (preference.matches || section.dataset.scrollLinked !== 'true') return;
+      const top = parseFloat(getComputedStyle(sticky).top) || 0;
+      const distance = section.offsetHeight - sticky.offsetHeight;
+      const progress = Math.max(0, Math.min(1, (top - section.getBoundingClientRect().top) / Math.max(1, distance)));
+      rail.scrollLeft = progress * (rail.scrollWidth - rail.clientWidth);
+      setActivePillar(Math.round(progress * 3));
+    };
+    const schedule = () => { if (!frame) frame = requestAnimationFrame(sync); };
+    const configure = () => {
+      section.dataset.scrollLinked = String(!preference.matches);
+      const stickyTop = window.innerWidth < 768 ? 64 : 80;
+      section.dataset.scrollLinked = String(!preference.matches && window.innerHeight >= sticky.offsetHeight + stickyTop);
+      schedule();
+    };
+    configure();
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', configure);
+    preference.addEventListener('change', configure);
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(schedule) : null;
+    observer?.observe(sticky);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', configure);
+      preference.removeEventListener('change', configure);
+      observer?.disconnect();
+      delete section.dataset.scrollLinked;
+    };
+  }, []);
+  const selectPillar = (index: number) => {
+    setActivePillar(index);
+    const section = pillarSection.current, rail = pillarRail.current;
+    const sticky = section?.querySelector<HTMLElement>('.home-pillar-sticky');
+    if (!section || !rail || !sticky) return;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!reduced && section.dataset.scrollLinked === 'true') {
+      const top = parseFloat(getComputedStyle(sticky).top) || 0;
+      window.scrollTo({ top: window.scrollY + section.getBoundingClientRect().top - top + (section.offsetHeight - sticky.offsetHeight) * index / 3, behavior: 'smooth' });
+    } else {
+      rail.scrollTo({ left: (rail.scrollWidth - rail.clientWidth) * index / 3, behavior: reduced ? 'instant' : 'smooth' });
+    }
+  };
   const ogImage = termSettings?.memberGroupPhotoUrl || '/JCI%20Kuala%20Lumpur-transparent.png';
-
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="connect-home">
       <Helmet>
         <title>JCI Kuala Lumpur — Be Better. Do Better.</title>
         <meta name="description" content="JCI Kuala Lumpur is the first Malaysia Junior Chamber Chapter — a global network of young active citizens creating positive change since 1954." />
         <link rel="canonical" href="https://jcikl.cc/" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300..800&display=swap" />
         <meta property="og:title" content="JCI Kuala Lumpur — Be Better. Do Better." />
         <meta property="og:description" content="JCI Kuala Lumpur is the first Malaysia Junior Chamber Chapter — a global network of young active citizens creating positive change since 1954." />
         <meta property="og:image" content={ogImage} />
@@ -71,130 +171,83 @@ export const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
         <meta property="og:type" content="website" />
         <meta name="twitter:card" content="summary_large_image" />
         <script type="application/ld+json">{JSON.stringify({
-          "@context": "https://schema.org",
-          "@type": "Organization",
-          "name": "JCI Kuala Lumpur",
-          "url": "https://jcikl.cc",
-          "logo": "https://jcikl.cc/JCI%20Kuala%20Lumpur-transparent.png",
-          "foundingDate": "1954",
-          "address": { "@type": "PostalAddress", "addressLocality": "Kuala Lumpur", "addressCountry": "MY" },
-          "sameAs": ["https://jci.cc"]
+          '@context': 'https://schema.org', '@type': 'Organization', name: 'JCI Kuala Lumpur',
+          url: 'https://jcikl.cc', logo: 'https://jcikl.cc/JCI%20Kuala%20Lumpur-transparent.png',
+          foundingDate: '1954', address: { '@type': 'PostalAddress', addressLocality: 'Kuala Lumpur', addressCountry: 'MY' }, sameAs: ['https://jci.cc'],
         })}</script>
       </Helmet>
       <GuestHeader currentPage="home" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
-
       <main id="main-content">
-        {/* Hero */}
-        <section className="relative bg-jci-navy overflow-hidden min-h-[580px] md:min-h-[680px] flex items-center" aria-label="Hero">
-          {/* Geometric background pattern */}
-          <div className="absolute inset-0 pointer-events-none select-none opacity-[0.06]"
-            style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
-          <div className="absolute inset-0 bg-gradient-to-br from-jci-navy via-jci-navy to-[#0a2a6e] pointer-events-none" />
-          {/* Glow orbs */}
-          <div className="absolute top-0 right-1/4 w-[600px] h-[600px] bg-jci-blue/20 rounded-full -translate-y-1/2 blur-3xl pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-sky-600/10 rounded-full translate-y-1/2 -translate-x-1/4 blur-3xl pointer-events-none" />
-
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 w-full py-16 md:py-20">
-            <div className="flex flex-col md:flex-row items-center gap-10 md:gap-20 lg:gap-24">
-              {/* Left: text */}
-              <div className="flex-1 text-center md:text-left relative z-10">
-                <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-white/70 mb-7">
-                  <span>JCI Kuala Lumpur</span>
-                  <span className="w-1 h-1 rounded-full bg-white/40" />
-                  <span>Est. 1954</span>
-                </div>
-                <h1 className="text-5xl md:text-6xl lg:text-7xl font-black text-white mb-5 leading-[0.92] tracking-tight">
-                  Be Better.<br /><span className="text-sky-300">Do Better.</span>
-                </h1>
-                <p className="text-base md:text-lg text-slate-300/80 max-w-lg mb-9 leading-relaxed">
-                  The first Malaysia Junior Chamber Chapter — a global network of young active citizens creating positive change since 1954.
-                </p>
-                {/* Mobile-only group photo */}
-                {termSettings?.memberGroupPhotoUrl && (
-                  <div className="relative block md:hidden mb-7" style={{ zIndex: 0 }}>
-                    {[0, 1, 2, 3].map(i => (
-                      <div key={i} className="absolute rounded-2xl pointer-events-none"
-                        style={{
-                          inset: '-8px',
-                          border: '1px solid rgba(255,255,255,0.5)',
-                          animation: `ring-ripple-out 4s ease-out ${i}s infinite backwards`,
-                        }} />
-                    ))}
-                    <div className="relative w-full rounded-2xl overflow-hidden border border-white/[0.12] shadow-xl shadow-black/30" style={{ aspectRatio: '16/9' }}>
-                      <img src={termSettings.memberGroupPhotoUrl} alt="JCI KL Members" className="w-full h-full object-cover" />
-                      <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-jci-navy/70 to-transparent pt-8 pb-3 px-4">
-                        <p className="text-white text-xs font-black tracking-wide">JCI Kuala Lumpur</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex flex-row gap-3 justify-center md:justify-start relative z-10">
-                  <Button size="lg" onClick={onRegister} className="shadow-xl shadow-jci-blue/30 font-black px-7">
-                    Become a Member
-                  </Button>
-                  <Button size="lg" variant="outline"
-                    className="border-2 border-white/40 text-white bg-transparent hover:bg-white hover:text-jci-navy font-black px-7"
-                    onClick={() => onPageChange('events')}>
-                    View Activity Calendar
-                  </Button>
-                </div>
-                {/* Stats strip */}
-                <div className="flex items-center gap-6 md:gap-10 mt-12 pt-8 border-t border-white/[0.12] justify-center md:justify-start flex-wrap">
-                  {[{ v: '1954', l: 'Founded' }, { v: '200+', l: 'Members' }, { v: '50+', l: 'Events / Year' }, { v: '70+', l: 'Years Active' }].map((s, i) => (
-                    <div key={i} className="text-center md:text-left">
-                      <p className="text-3xl font-black text-white leading-none tracking-tight">{s.v}</p>
-                      <p className="text-[9px] text-sky-300/70 uppercase tracking-widest mt-1 font-black">{s.l}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Right: photo */}
-              <div className="shrink-0 hidden md:flex items-center justify-center">
-                <div className="relative">
-                  {/* Ripple rings — 1 per second sonar */}
-                  <style>{`
-                    @keyframes ring-ripple-out {
-                      0%   { transform: scale(1);   opacity: 0;    }
-                      5%   { transform: scale(1);   opacity: 0.45; }
-                      100% { transform: scale(1.6); opacity: 0;    }
-                    }
-                  `}</style>
-                  {[0, 1, 2, 3].map(i => (
-                    <div key={i} className="absolute rounded-[2.5rem] pointer-events-none"
-                      style={{
-                        inset: '-20px',
-                        border: '1px solid rgba(255,255,255,0.5)',
-                        animation: `ring-ripple-out 4s ease-out ${i}s infinite backwards`,
-                      }} />
-                  ))}
-                  {/* Outer glow ring */}
-                  <div className="absolute -inset-3 rounded-[2rem] bg-gradient-to-br from-sky-400/20 to-jci-blue/10 blur-xl" />
-                  {/* Decorative corner accents */}
-                  <div className="absolute -top-2 -left-2 w-8 h-8 border-t-2 border-l-2 border-sky-400/40 rounded-tl-xl pointer-events-none" />
-                  <div className="absolute -bottom-2 -right-2 w-8 h-8 border-b-2 border-r-2 border-sky-400/40 rounded-br-xl pointer-events-none" />
-                  <div className="relative w-[400px] h-[260px] lg:w-[480px] lg:h-[300px] rounded-[1.75rem] overflow-hidden shadow-2xl shadow-black/40 border border-white/[0.12]">
-                    {termSettings?.memberGroupPhotoUrl ? (
-                      <img src={termSettings.memberGroupPhotoUrl} alt="JCI KL Members" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full bg-white/5 backdrop-blur-sm flex items-center justify-center p-10">
-                        <img src="/JCI Kuala Lumpur-transparent.png" alt="JCI KL" width="400" height="400" className="w-full h-full object-contain drop-shadow-lg" />
-                      </div>
-                    )}
-                    {/* Photo overlay label */}
-                    <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-jci-navy/80 to-transparent pt-10 pb-4 px-5">
-                      <p className="text-white text-xs font-black tracking-wide">JCI Kuala Lumpur</p>
-                      <p className="text-white/50 text-[10px]">Young Active Citizens</p>
-                    </div>
-                  </div>
-                </div>
+        <section className="home-hero home-container" aria-labelledby="home-title">
+          <div className="home-hero-copy">
+            <p className="home-context">JCI Kuala Lumpur · Since 1954</p>
+            <h1 id="home-title"><span className="home-title-line">Be Better.</span>{' '}<span className="home-title-line">Do Better.</span></h1>
+            <p className="sr-only">Since 1954, Malaysia’s first Junior Chamber chapter has spent {chapterYears} years developing young leaders, as part of a JCI network active in over 100 countries and more than 5,000 communities.</p>
+            <p ref={numbersSection} className="home-intro home-numbers-copy" aria-hidden="true">Since <strong>1954</strong>, Malaysia’s first Junior Chamber chapter has spent <strong className="home-number-accent">{chapterNumbers.years}</strong> years developing young leaders, as part of a JCI network active in over <strong>{chapterNumbers.countries}</strong> countries and more than <strong>{chapterNumbers.communities.toLocaleString('en-US')}</strong> communities.</p>
+            <div className="home-actions">
+              <button type="button" onClick={onRegister} className="home-primary">Become a Member <ArrowUpRight size={18} aria-hidden="true" /></button>
+              <button onClick={() => onPageChange('events')} className="home-text-link">View activities <ChevronRight size={17} aria-hidden="true" /></button>
+            </div>
+            <div className="home-hero-note"><span>Malaysia’s first Junior Chamber chapter.</span><span>A local community. A global network.</span></div>
+          </div>
+          <figure className="home-hero-photo">
+            <div className="home-photo-stage">
+              <span className="home-photo-ring home-photo-ring-outer" aria-hidden="true" />
+              <span className="home-photo-ring home-photo-ring-inner" aria-hidden="true" />
+              <div className="home-photo-window">
+                <img key={termSettings?.memberGroupPhotoUrl || 'fallback'} src={termSettings?.memberGroupPhotoUrl || '/pillars/community-portrait.webp'} alt="JCI Kuala Lumpur members together" fetchPriority="high" />
+                {termSettings?.memberGroupPhotoUrl && <img className="home-photo-alternate" src="/pillars/community-portrait.webp" alt="JCI community participation" aria-hidden="true" />}
               </div>
             </div>
+            <figcaption><span>People. Possibilities. Purpose.</span></figcaption>
+            <p className="home-photo-location">Kuala Lumpur, Malaysia</p>
+          </figure>
+        </section>
+        {upcomingEvents.length > 0 && (
+          <section className="home-section home-container" aria-labelledby="home-events-title">
+            <div className="home-section-heading">
+              <div><p className="home-context">Make your next connection</p><h2 id="home-events-title">Coming up at JCI KL.</h2></div>
+              <button onClick={() => onPageChange('events')} className="home-text-link">All activities <ArrowUpRight size={17} aria-hidden="true" /></button>
+            </div>
+            <div className="home-events-list">{upcomingEvents.map(event => <EventRow key={event.id} event={event} horizontal onClick={() => openEvent(event.id)} onRegister={() => openEvent(event.id)} />)}</div>
+          </section>
+        )}
+        <section className="home-organization" aria-labelledby="home-organization-title">
+          <div className="home-container">
+            <h2 id="home-organization-title"><span>Not just a network.</span><strong>A place to lead.</strong></h2>
+            <div className="home-organization-columns">
+              <p>At JCI Kuala Lumpur, leadership isn’t something you study from the sidelines. You practise it. Members plan real projects, run real teams, work with real partners and solve real problems in the city they live in.</p>
+              <div>
+                <p>Some people arrive to meet new people. They stay because someone handed them the microphone, the timeline and the responsibility. Since 1954, Malaysia’s first Junior Chamber chapter has been a training ground for people aged 18 to 40 who would rather build than wait.</p>
+                <button type="button" onClick={() => onPageChange('about')} className="home-story-link">Read our story <span aria-hidden="true"><ChevronRight size={20} /></span></button>
+              </div>
+            </div>
+            <ul className="home-organization-values">
+              <li><h3>Learn.</h3><p>Training, coaching and feedback you use the same month.</p></li>
+              <li><h3>Lead.</h3><p>Chair a project, run a team, own the outcome.</p></li>
+              <li><h3>Connect.</h3><p>Meet founders, professionals and changemakers outside your usual circle.</p></li>
+              <li><h3>Impact.</h3><p>Leave Kuala Lumpur a little better than you found it.</p></li>
+            </ul>
           </div>
         </section>
-
-        {/* President Spotlight */}
+        <section ref={pillarSection} className="home-pillar-scroll home-container" aria-labelledby="home-pillars-title">
+          <div className="home-pillar-sticky">
+          <div className="home-section-heading"><div><p className="home-context">The four pillars of JCI</p><h2 id="home-pillars-title">Find your way to grow.</h2></div><p>Real experiences. New perspectives.<br />A place to put your ideas into practice.</p></div>
+          <div ref={pillarRail} className="home-pillars home-pillars-interactive" tabIndex={0} role="group" aria-label="Four areas of opportunity" onKeyDown={event => {
+            if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+            event.preventDefault();
+            const next = event.key === 'Home' ? 0 : event.key === 'End' ? pillars.length - 1 : (activePillar + (['ArrowRight', 'ArrowDown'].includes(event.key) ? 1 : -1) + pillars.length) % pillars.length;
+            selectPillar(next);
+            (pillarRail.current?.children[next] as HTMLElement | undefined)?.focus({ preventScroll: true });
+          }}>{pillars.map((pillar, index) => <article key={pillar.title} id={`home-pillar-panel-${index}`} role="region" aria-label={pillar.label} className={activePillar === index ? 'is-active' : ''} tabIndex={0} onKeyDown={event => { if (event.target === event.currentTarget && ['Enter', ' '].includes(event.key)) { event.preventDefault(); selectPillar(index); } }}>
+            <button type="button" className="home-pillar-collapsed" aria-label={`Expand ${pillar.label}`} aria-expanded={activePillar === index} onClick={() => selectPillar(index)}><span>{pillar.label}</span><span className="home-pillar-mark" aria-hidden="true" /></button>
+            <h3>{pillar.label}</h3><img src={pillar.image} alt={pillar.title} loading="lazy" width="400" height="533" /><p>{pillar.description}</p>
+          </article>)}</div>
+          <button onClick={() => onPageChange('projects')} className="home-text-link home-project-link">Explore flagship projects <ArrowUpRight size={18} aria-hidden="true" /></button>
+          </div>
+        </section>
+        <div className="home-legacy">
+{/* President Spotlight */}
         {president && (
           <section className="relative bg-jci-navy overflow-hidden">
 
@@ -434,108 +487,17 @@ export const GuestLandingPage = ({ onLogin, onRegister, onPageChange }: {
             </div>
           </section>
         )}
-
-        {/* JCI 4 Pillars */}
-        <section className="py-16 md:py-20 bg-white">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-8 md:mb-12">
-              <span className="text-[10px] font-black uppercase tracking-widest text-jci-blue">What We Stand For</span>
-              <h2 className="text-2xl md:text-3xl font-black text-slate-900 mt-2 mb-2">The Four Pillars of JCI</h2>
-              <p className="text-slate-500 text-sm max-w-xl mx-auto">Everything we do is guided by four areas that empower young active citizens.</p>
-            </div>
-            {/* Mobile: 2-col short landscape | Desktop: 4-col taller portrait */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-5">
-              {pillars.map((p) => (
-                <div
-                  key={p.title}
-                  className="group relative rounded-2xl overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 cursor-default
-                    aspect-[3/2] sm:aspect-[4/3] lg:aspect-[3/4]"
-                >
-                  <img
-                    src={p.image}
-                    alt={p.title}
-                    width="400"
-                    height="533"
-                    className="absolute inset-0 w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
-                  />
-                  {/* Colour tint overlay */}
-                  <div className={`absolute inset-0 bg-gradient-to-t ${p.accent} via-transparent opacity-60`} />
-                  {/* Dark legibility gradient */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-black/10" />
-                  {/* Text */}
-                  <div className="absolute bottom-0 left-0 right-0 p-3 md:p-5">
-                    <h3 className="text-sm md:text-lg font-black text-white mb-0.5 md:mb-1 leading-tight">{p.title}</h3>
-                    <p className="text-white/75 text-[10px] md:text-xs leading-relaxed hidden sm:block">{p.description}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Upcoming Events */}
-        {upcomingEvents.length > 0 && (
-          <section className="py-16 bg-slate-50/80">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex items-end justify-between mb-8">
-                <div>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-jci-blue">What's Coming</span>
-                  <h2 className="text-2xl font-black text-slate-900 mt-1">Upcoming Events</h2>
-                </div>
-                <button onClick={() => onPageChange('events')} className="flex items-center gap-1 text-sm font-bold text-jci-blue hover:text-sky-600 transition-colors">
-                  View All <ChevronRight size={15} />
-                </button>
-              </div>
-              {/* Same cards and grid as the guest events page (EventRow); a card or Register opens
-                  that event's detail + registration on /events. */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {upcomingEvents.map(event => (
-                  <EventRow
-                    key={event.id}
-                    event={event}
-                    horizontal
-                    onClick={() => openEvent(event.id)}
-                    onRegister={() => openEvent(event.id)}
-                  />
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* Dual CTA */}
-        <section className="py-16 bg-gradient-to-br from-jci-navy to-jci-blue overflow-hidden relative">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/3 pointer-events-none" />
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-            <div className="grid md:grid-cols-2 gap-10 items-center">
-              <div>
-                <h2 className="text-3xl font-black text-white mb-3 leading-tight">Ready to Make an Impact?</h2>
-                <p className="text-blue-200 text-base mb-6 leading-relaxed">Join a community of young leaders creating positive change across Malaysia and the world.</p>
-                <Button size="lg" variant="outline" onClick={onRegister} className="bg-white !text-jci-navy border-white hover:bg-sky-50 hover:!text-jci-navy font-black shadow-lg">
-                  Get Started Today
-                </Button>
-              </div>
-              <div className="hidden md:flex flex-col gap-3">
-                {[
-                  { icon: <FolderKanban size={18} className="text-white" />, title: 'Explore Flagship Projects', sub: 'See the initiatives making a difference', page: 'projects' as const },
-                  { icon: <Users size={18} className="text-white" />, title: 'Meet the Board of Directors', sub: 'Leadership driving JCI Kuala Lumpur forward', page: 'about' as const },
-                ].map(item => (
-                  <button key={item.page} onClick={() => onPageChange(item.page)}
-                    className="flex items-center gap-4 bg-white/10 hover:bg-white/15 border border-white/20 rounded-2xl p-4 transition-all group text-left">
-                    <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center shrink-0 group-hover:bg-white/20 transition-colors">{item.icon}</div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-white text-sm">{item.title}</p>
-                      <p className="text-blue-200/70 text-xs">{item.sub}</p>
-                    </div>
-                    <ChevronRight size={15} className="text-white/40 shrink-0" />
-                  </button>
-                ))}
-              </div>
-            </div>
+        </div>
+        <section className="home-section home-container home-join" aria-labelledby="home-join-title">
+          <div><p className="home-context">Your next chapter</p><h2 id="home-join-title">Take your place.</h2><p>Join a community of young leaders creating positive change across Malaysia and the world.</p><Button size="lg" onClick={onRegister}>Become a Member <ArrowUpRight size={18} aria-hidden="true" /></Button></div>
+          <div className="home-next-links">
+            <button onClick={() => onPageChange('partnerships')}><span><strong>Build impact together</strong><span>Discover partnerships and opportunities to collaborate.</span></span><ArrowUpRight size={21} aria-hidden="true" /></button>
+            <button onClick={() => onPageChange('projects')}><span><strong>Explore flagship projects</strong><span>See the initiatives making a difference.</span></span><ArrowUpRight size={21} aria-hidden="true" /></button>
+            <button onClick={() => onPageChange('about')}><span><strong>Meet our leadership</strong><span>The people helping our chapter move forward.</span></span><ArrowUpRight size={21} aria-hidden="true" /></button>
           </div>
         </section>
       </main>
-      <GuestFooter />
+      <GuestFooter whiteLogo />
     </div>
   );
 };

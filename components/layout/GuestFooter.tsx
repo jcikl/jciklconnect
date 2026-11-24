@@ -1,12 +1,12 @@
 import React from 'react';
 
-export const GuestFooter: React.FC = () => (
+export const GuestFooter: React.FC<{ whiteLogo?: boolean }> = ({ whiteLogo = false }) => (
   <footer className="bg-slate-900 text-slate-400 py-12">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="grid md:grid-cols-4 gap-8">
         <div>
           <div className="flex flex-col items-start mb-4">
-            <img src="/JCI Kuala Lumpur-transparent.png" alt="JCI Kuala Lumpur Logo" width="120" height="32" className="h-8 w-auto object-contain mb-2" />
+            <img src={whiteLogo ? '/jci-kl-white.png' : '/JCI Kuala Lumpur-transparent.png'} alt="JCI Kuala Lumpur Logo" width={whiteLogo ? 160 : 120} height={whiteLogo ? 96 : 32} className={whiteLogo ? 'w-40 h-24 object-contain mb-2' : 'h-8 w-auto object-contain mb-2'} />
           </div>
           <p className="text-sm">Empowering young active citizens to create positive change.</p>
         </div>
