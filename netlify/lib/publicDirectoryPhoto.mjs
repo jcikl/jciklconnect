@@ -131,6 +131,7 @@ export function makePublicDirectoryPhotoHandler({ auth, db, deleteField, fetchIm
           const phone = normalizeMyPhone(source);
           if (!phone) return missing();
           const svg = renderToStaticMarkup(createElement(QRCodeSVG, {
+            xmlns: 'http://www.w3.org/2000/svg',
             value: 'https://wa.me/' + phone.slice(1), size: 96,
             level: 'M', marginSize: 4, bgColor: '#ffffff', fgColor: '#111827',
           }));

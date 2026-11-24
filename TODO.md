@@ -63,6 +63,9 @@
 
 ## 后续任务
 
+- [ ] 线上 WhatsApp 二维码 SVG 修复部署验收（2026-11-25）：已复现 SSR 缺少 `xmlns` 导致独立 SVG 图片加载失败，并补充命名空间及回归断言；14 项二维码 / 头像 / 手册测试、生产构建通过。提交推送后仍须验证线上图片解码与目标编码，不以 HTTP 200 代替实际加载验收；记录不保存会员号码。
+- [x] 线上会员头像 404 原因核实（2026-11-25）：只读抽查 30 个已公开名片会员，均无 `general.avatarUrl` 或旧版 `avatarUrl` / `avatar`，包含先前两个 404 样本。另查两个确有当前头像且已公开名片的样本，线上接口分别返回 200 / JPEG（172175 字节）及 PNG（81229 字节）。结论仅针对抽查：缺头像资料时回退缩写是预期行为；未改数据库、来源限制或公开授权，部署后继续检查浏览器加载。
+
 - [ ] 转介测试字段与服务实现不一致（2026-11-25，行业选项更新时发现）：`tests/unit/idealReferrals.test.ts` 和 `idealReferralsParity.test.ts` 合计 7 项失败；测试以 `idealReferral` / `business.idealReferrals` 为输入，`MembersService.normalizeMemberData` 及 `mapMemberToBusinessProfile` 当前使用 `business.idealReferralTypes`。来源：行业更新相关测试；完成标准：确认字段契约并统一实现或测试。本次未修改服务层，不扩大到转介逻辑重构。
 
 - [ ] Business Connect WhatsApp 二维码浏览器验收（2026-11-25）：固定占位图已替换为基于 `members.contact.phone` 的真实 `https://wa.me/<国际号码>` 二维码，复用公开名片授权；无授权或无效号码时隐藏。验证：二维码 / 头像测试 12 项、现有会员认证测试 20 项、电话规范化回归 16 项通过；typecheck、build、diff 校验通过。当前本地 Netlify Functions 8888 未运行，3001 代理请求返回 500；待后端可用后验证实际会员扫码结果与撤回授权后的隐藏效果。代码随本条记录提交；部署结果待验证。
@@ -111,6 +114,8 @@
 ---
 
 ## 已完成
+
+- [x] 线上手册页面验收（2026-11-25）：实际站点 `https://jciklconnect.netlify.app/business-connect.html` 已显示完整 285 位会员、20 个行业组，无折叠或加载更多，排序 / 打印按钮已移除；实测吸顶位置与导航底边一致，跨行业切换正常。线上 HTML 含 Netlify 注入的托管注释，与 Git 文件不是逐字相同。头像和二维码尚未通过验收，问题另行登记；本次未修改或部署业务代码。
 
 - [x] 更新 26 项行业选项（2026-11-25）：`config/referralOptions.mjs` 按用户提供的顺序和名称更新；下拉只提供新选项，解析器保留旧标签读取兼容以避免逗号名称被拆散，不批量改写会员数据。schema 已同步；新选项识别及解析检查、typecheck、build、diff 校验通过；扩大验证的 7 项转介字段测试失败另行登记。未提交、未部署。
 

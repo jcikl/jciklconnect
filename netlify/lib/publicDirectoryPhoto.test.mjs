@@ -88,7 +88,10 @@ test('WhatsApp QR encodes the shared contact phone and rejects absent consent or
     assert.equal(response.status, 200);
     assert.equal(response.headers.get('content-type'), 'image/svg+xml');
     assert.match(response.headers.get('cache-control'), /no-store/);
-    assert.equal(await response.text(), renderToStaticMarkup(createElement(QRCodeSVG, {
+    const svg = await response.text();
+    assert.match(svg, /<svg\b[^>]*\bxmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
+    assert.equal(svg, renderToStaticMarkup(createElement(QRCodeSVG, {
+      xmlns: 'http://www.w3.org/2000/svg',
       value: 'https://wa.me/60123456789', size: 96, level: 'M', marginSize: 4,
       bgColor: '#ffffff', fgColor: '#111827',
     })));
