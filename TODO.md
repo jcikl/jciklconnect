@@ -63,14 +63,14 @@
 
 ## 后续任务
 
-- [ ] 线上 WhatsApp 二维码 SVG 修复部署验收（2026-11-25）：已复现 SSR 缺少 `xmlns` 导致独立 SVG 图片加载失败，并补充命名空间及回归断言；14 项二维码 / 头像 / 手册测试、生产构建通过。提交推送后仍须验证线上图片解码与目标编码，不以 HTTP 200 代替实际加载验收；记录不保存会员号码。
-- [x] 线上会员头像 404 原因核实（2026-11-25）：只读抽查 30 个已公开名片会员，均无 `general.avatarUrl` 或旧版 `avatarUrl` / `avatar`，包含先前两个 404 样本。另查两个确有当前头像且已公开名片的样本，线上接口分别返回 200 / JPEG（172175 字节）及 PNG（81229 字节）。结论仅针对抽查：缺头像资料时回退缩写是预期行为；未改数据库、来源限制或公开授权，部署后继续检查浏览器加载。
+- [x] 线上 WhatsApp 二维码 SVG 修复部署验收（2026-11-25）：已复现 SSR 缺少 `xmlns` 导致独立 SVG 图片加载失败，并补充命名空间及回归断言。修复 `be0ffb5` 已推送，Netlify 显示 Published；14 项二维码 / 头像 / 手册测试、typecheck、build、diff 校验通过（构建仍有既有分块警告）。部署后两个抽查二维码均为 200 / SVG，浏览器 naturalWidth=96 且未隐藏；线上 SVG 与按当前联系号码生成的预期 WhatsApp 二维码逐字一致。未执行实体手机扫码，不保存号码。
+- [x] 线上会员头像 404 原因核实（2026-11-25）：只读抽查 30 个已公开名片会员，均无 `general.avatarUrl` 或旧版 `avatarUrl` / `avatar`，包含先前两个 404 样本。另查两个确有当前头像且已公开名片的样本，线上接口分别返回 200 / JPEG（172175 字节）及 PNG（81229 字节）；部署后浏览器确认自动头像代理图片 naturalWidth=1024，缺资料样本显示姓名缩写。结论仅针对抽查：缺头像资料时回退缩写是预期行为；未改数据库、来源限制或公开授权。
 
 - [ ] 转介测试字段与服务实现不一致（2026-11-25，行业选项更新时发现）：`tests/unit/idealReferrals.test.ts` 和 `idealReferralsParity.test.ts` 合计 7 项失败；测试以 `idealReferral` / `business.idealReferrals` 为输入，`MembersService.normalizeMemberData` 及 `mapMemberToBusinessProfile` 当前使用 `business.idealReferralTypes`。来源：行业更新相关测试；完成标准：确认字段契约并统一实现或测试。本次未修改服务层，不扩大到转介逻辑重构。
 
-- [ ] Business Connect WhatsApp 二维码浏览器验收（2026-11-25）：固定占位图已替换为基于 `members.contact.phone` 的真实 `https://wa.me/<国际号码>` 二维码，复用公开名片授权；无授权或无效号码时隐藏。验证：二维码 / 头像测试 12 项、现有会员认证测试 20 项、电话规范化回归 16 项通过；typecheck、build、diff 校验通过。当前本地 Netlify Functions 8888 未运行，3001 代理请求返回 500；待后端可用后验证实际会员扫码结果与撤回授权后的隐藏效果。代码随本条记录提交；部署结果待验证。
+- [x] Business Connect WhatsApp 二维码浏览器验收（2026-11-25）：占位图已替换为当前 `members.contact.phone` 的 WhatsApp 二维码，复用公开名片授权；补充 SVG 命名空间后线上两个样本实际加载及目标编码比对通过，见上方验收。无授权 / 无效号码的拒绝由自动化测试覆盖；未修改生产会员授权进行破坏性验收，未执行实体手机扫码。
 
-- [ ] Business Connect 自动会员头像的本地 / 部署验收（2026-11-25，用户已授权）：沿用 `privacy.shareCardInternationally`，公开页面自动读取会员当前头像，不需单独发布。代码和授权检查已完成，头像测试 11/11 通过；本地 3001 的头像请求返回 500，因为代理目标 Netlify Functions 8888 未运行。完成标准：具备后端运行环境后验证真实头像加载、关闭分享后新请求 404；部署另按用户授权。类型检查当前失败，包含 SearchDropdown、AutomationStudio、useFinanceData 等错误，不能宣称全项目验证通过。
+- [x] Business Connect 自动会员头像部署验收（2026-11-25，用户已授权）：沿用 `privacy.shareCardInternationally`，公开页面自动读取当前头像，不需单独发布；线上有头像样本的接口及浏览器加载通过，缺资料样本回退缩写，见上方调查。关闭分享后的 404 及抓取期间撤回授权由自动化测试覆盖，未修改生产会员授权；本次 14 项相关测试、typecheck、build 通过，不代表全量测试通过。
 
 <!-- 批次分析发现的范围外问题登记于此 -->
 
