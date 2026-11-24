@@ -7,326 +7,123 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
 <style>
-/* JCI KL brand tokens — from tailwind.config.js */
-:root {
-  --navy:        #1C3F94;
-  --blue:        #0097D7;
-  --teal:        #00B5B5;
-  --lightblue:   #6EC4E8;
-
-  /* Slate text scale */
-  --fg-900: #0F172A;
-  --fg-700: #334155;
-  --fg-500: #64748B;
-  --fg-400: #94A3B8;
-
-  /* Surfaces */
-  --bg:        #F1F5F9;
-  --surface:   #FFFFFF;
-  --surface-2: #F8FAFC;
-  --border:    #E2E8F0;
-  --border-lt: #F1F5F9;
-
-  /* Chips */
-  --chip-sky-bg:#F0F9FF; --chip-sky-fg:#0369A1; --chip-sky-bd:#BAE6FD;
-  --chip-teal-bg:#F0FDF9;--chip-teal-fg:#0F766E;--chip-teal-bd:#99F6E4;
-  --chip-blue-bg:#EFF6FF;--chip-blue-fg:#1D4ED8;--chip-blue-bd:#BFDBFE;
-  --chip-ind-bg:#EEF2FF; --chip-ind-fg:#3730A3; --chip-ind-bd:#C7D2FE;
-  --chip-sl-bg:#F1F5F9;  --chip-sl-fg:#475569;  --chip-sl-bd:#CBD5E1;
-  --chip-amb-bg:#FFFBEB; --chip-amb-fg:#92400E;  --chip-amb-bd:#FDE68A;
-  --chip-amb-eye:#B45309;
-
-  color-scheme: only light;
-}
-
-*, *::before, *::after { box-sizing: border-box; }
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--fg-900);
-  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-/* ── PAGE HEADER ───────────────────────────────── */
-#page-header {
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  box-shadow: 0 1px 4px rgba(0,0,0,.06);
-}
-.hdr-inner {
-  max-width: 760px;
-  margin: 0 auto;
-  padding-left:  max(16px, env(safe-area-inset-left,  0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-block: 10px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.hdr-brand { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-.hdr-logo  { height: 34px; width: auto; flex-shrink: 0; }
-.hdr-title { display: block; font-size: 13.5px; font-weight: 800; color: var(--navy); letter-spacing: -.01em; }
-.hdr-sub   { display: block; font-size: 11px; color: var(--fg-500); font-weight: 500; }
-
-.hdr-search { flex: 1; position: relative; max-width: 280px; margin-left: auto; }
-.hdr-search svg {
-  position: absolute; left: 10px; top: 50%;
-  transform: translateY(-50%);
-  pointer-events: none; color: var(--fg-400);
-}
-#search {
-  width: 100%;
-  padding: 7px 12px 7px 34px;
-  border: 1.5px solid var(--border);
-  border-radius: 8px;
-  font-size: 13px;
-  font-family: inherit;
-  background: var(--bg);
-  color: var(--fg-900);
-  outline: none;
-  transition: border-color .15s, box-shadow .15s;
-}
-#search:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0,151,215,.12); background: #fff; }
-#search::placeholder { color: var(--fg-400); }
-
-/* ── MAIN CONTENT ──────────────────────────────── */
-#main {
-  padding-left:  max(16px, env(safe-area-inset-left,  0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-block: 20px 36px;
-}
-#pages {
-  max-width: 760px;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-/* ── CARD ──────────────────────────────────────── */
-.card {
-  background: var(--surface);
-  border-radius: 16px;
-  border: 1px solid var(--border);
-  box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
-  overflow: hidden;
-}
-/* Navy→blue 3px accent bar */
-.card::before {
-  content: "";
-  display: block;
-  height: 3px;
-  background: linear-gradient(90deg, var(--navy) 0%, var(--blue) 100%);
-}
-
-/* ── CARD IDENTITY ─────────────────────────────── */
-.card-identity {
-  padding: 18px 20px 15px;
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  background: linear-gradient(135deg, #F8FBFF 0%, #EFF6FF 100%);
-  border-bottom: 1px solid var(--border-lt);
-}
-.avatar-wrap {
-  flex-shrink: 0;
-  width: 66px; height: 66px;
-  border-radius: 50%;
-  border: 2px solid var(--lightblue);
-  overflow: hidden;
-  display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(135deg, var(--navy) 0%, var(--blue) 100%);
-  box-shadow: 0 2px 6px rgba(28,63,148,.18);
-}
-.avatar-wrap img { width: 100%; height: 100%; object-fit: cover; }
-.avatar-mono { font-size: 20px; font-weight: 800; color: rgba(255,255,255,.9); letter-spacing: -.5px; }
-
-.id-info { flex: 1; min-width: 0; }
-.id-name   { margin: 0; font-size: 16.5px; font-weight: 800; line-height: 1.2; color: var(--fg-900); text-wrap: balance; }
-.id-company{ margin: 2px 0 0; font-size: 12.5px; font-weight: 700; color: var(--navy); }
-.id-pos    { margin: 2px 0 0; font-size: 11.5px; color: var(--fg-500); }
-.id-badges { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
-
-/* ── CHIPS ─────────────────────────────────────── */
-.chip {
-  display: inline-flex; align-items: center;
-  padding: 2px 9px; border-radius: 999px;
-  font-size: 10px; font-weight: 700; letter-spacing: .01em; line-height: 1.6;
-  border: 1px solid;
-}
-.chip-sky  { background:var(--chip-sky-bg);  color:var(--chip-sky-fg);  border-color:var(--chip-sky-bd); }
-.chip-teal { background:var(--chip-teal-bg); color:var(--chip-teal-fg); border-color:var(--chip-teal-bd); }
-.chip-blue { background:var(--chip-blue-bg); color:var(--chip-blue-fg); border-color:var(--chip-blue-bd); }
-.chip-amb  { background:var(--chip-amb-bg);  color:var(--chip-amb-fg);  border-color:var(--chip-amb-bd); }
-
-/* ── CARD SECTIONS ─────────────────────────────── */
-.sec { padding: 13px 20px; border-top: 1px solid var(--border-lt); }
-.eyebrow {
-  margin: 0 0 7px;
-  font-size: 9px; font-weight: 800;
-  letter-spacing: .12em; text-transform: uppercase;
-  color: var(--fg-400);
-}
-.about-p { margin: 0; font-size: 13px; line-height: 1.65; color: var(--fg-700); }
-
-.pns-list { margin: 0; padding: 0 0 0 1.1rem; list-style: disc; }
-.pns-list li { font-size: 12px; font-weight: 500; color: var(--fg-700); padding: 1px 0; line-height: 1.5; }
-
-.two-col { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--border-lt); }
-.two-col .col { padding: 13px 20px; min-width: 0; }
-.two-col .col + .col { border-left: 1px solid var(--border-lt); }
-
-.tags { display: flex; flex-wrap: wrap; gap: 5px; margin: 0; padding: 0; list-style: none; }
-.tag-cat {
-  display: inline-flex; padding: 2px 9px; border-radius: 999px;
-  font-size: 10.5px; font-weight: 700;
-  background: var(--navy); color: rgba(255,255,255,.92);
-}
-.tag-ref {
-  display: inline-flex; padding: 2px 9px; border-radius: 999px;
-  font-size: 10.5px; font-weight: 600;
-  background: var(--chip-sl-bg); color: var(--chip-sl-fg); border: 1px solid var(--chip-sl-bd);
-}
-.tag-ind {
-  display: inline-flex; padding: 2px 9px; border-radius: 999px;
-  font-size: 10.5px; font-weight: 600;
-  background: var(--chip-ind-bg); color: var(--chip-ind-fg); border: 1px solid var(--chip-ind-bd);
-}
-
-/* ── OFFER ─────────────────────────────────────── */
-.offer-sec {
-  padding: 13px 20px;
-  border-top: 1px solid var(--chip-amb-bd);
-  background: var(--chip-amb-bg);
-}
-.offer-row { display: flex; align-items: flex-start; gap: 12px; }
-.offer-icon {
-  flex-shrink: 0; width: 34px; height: 34px; border-radius: 8px;
-  background: rgba(180,83,9,.1); display: grid; place-items: center;
-}
-.offer-body { flex: 1; min-width: 0; }
-.offer-eye  { margin: 0 0 3px; font-size: 8.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--chip-amb-eye); }
-.offer-title{ margin: 0 0 4px; font-size: 13px; font-weight: 700; color: var(--chip-amb-fg); line-height: 1.35; }
-.offer-tc   { margin: 0; font-size: 11px; color: var(--chip-amb-fg); opacity: .72; line-height: 1.55; }
-.offer-exp  { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 600; color: var(--chip-amb-eye); margin-top: 5px; }
-
-/* ── CARD FOOTER ───────────────────────────────── */
-.card-footer {
-  padding: 11px 20px;
-  border-top: 1px solid var(--border-lt);
-  background: var(--surface-2);
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-}
-.footer-left { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.footer-web-lbl { font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--fg-400); }
-.footer-web {
-  font-size: 11.5px; color: var(--blue); font-weight: 600;
-  display: flex; align-items: center; gap: 5px;
-  word-break: break-all; text-decoration: none;
-}
-.footer-web:hover { text-decoration: underline; }
-.footer-pg  { font-size: 10px; color: var(--fg-400); }
-.qr-box     { flex-shrink: 0; color: var(--fg-300); }
-
-/* ── SKELETON ──────────────────────────────────── */
-@keyframes skel-shine { to { background-position: 200% 0; } }
-.skel {
-  background: linear-gradient(90deg, var(--border) 25%, #F8FAFC 50%, var(--border) 75%);
-  background-size: 200% 100%;
-  animation: skel-shine 1.4s linear infinite;
-  border-radius: 4px;
-}
-
-/* ── EMPTY / ERROR ─────────────────────────────── */
-.empty-state { text-align: center; padding: 80px 20px; color: var(--fg-400); }
-.empty-state svg { opacity: .35; margin-bottom: 14px; display: block; margin-inline: auto; }
-.empty-state p { font-size: 14px; margin: 0; }
-
-/* ── LOAD MORE ─────────────────────────────────── */
-#load-more {
-  display: block; width: 100%;
-  padding: 13px;
-  background: var(--surface);
-  border: 1.5px dashed var(--border);
-  border-radius: 12px;
-  font-family: inherit; font-size: 13px; font-weight: 600;
-  color: var(--fg-500); cursor: pointer;
-  transition: border-color .15s, color .15s, background .15s;
-}
-#load-more:hover { border-color: var(--blue); color: var(--blue); background: #F0F9FF; }
-
-/* ── RESPONSIVE ────────────────────────────────── */
-@media (max-width: 540px) {
-  .hdr-sub { display: none; }
-  .two-col { grid-template-columns: 1fr; }
-  .two-col .col + .col { border-left: none; border-top: 1px solid var(--border-lt); }
-  .card-footer { flex-direction: column; align-items: flex-start; }
-}
+:root{--ink:#130f2d;--muted:#626474;--blue:#0097d7;--navy:#1f4789;--line:#e1e6eb;--pale:#f2fafd;--paper:#fff;color-scheme:light}
+*{box-sizing:border-box;letter-spacing:0}
+[hidden]{display:none!important}
+body{margin:0;background:#edf1f4;color:var(--ink);font:15px/1.7 'Plus Jakarta Sans',system-ui,sans-serif}
+button,input,select{font:inherit}a{color:var(--navy);text-decoration:none}a:hover{text-decoration:underline}
+button,select{cursor:pointer}:focus-visible{outline:3px solid var(--blue);outline-offset:4px}
+#page-header{position:sticky;top:0;z-index:50;background:#fff;border-bottom:1px solid var(--line)}
+.hdr-inner{max-width:1060px;margin:auto;min-height:78px;padding:14px 32px;display:flex;align-items:center;justify-content:space-between;gap:20px}
+.hdr-brand{display:flex;align-items:center;gap:22px}.hdr-logo{width:96px;height:48px;object-fit:contain}.hdr-title{border-left:1px solid var(--line);padding-left:22px;font-size:13px;font-weight:600}
+.hdr-return{font-size:13px}.hdr-return span{margin-left:8px}
+#main{max-width:1060px;margin:auto;padding:40px 32px 64px}
+.directory-heading{display:flex;align-items:end;justify-content:space-between;gap:20px;margin-bottom:30px}
+.context{margin:0 0 7px;font-size:13px;color:var(--navy);font-weight:600}h1{font-size:36px;line-height:1.2;margin:0;font-weight:800}
+.handbook-subtitle{margin:9px 0 0;color:var(--muted);font-size:15px}
+.directory-total{font-size:13px;color:var(--muted);margin:0}
+.search-strip{display:block;margin-bottom:18px}
+.hdr-search{position:relative}.hdr-search svg{position:absolute;left:15px;top:16px;color:var(--muted)}
+#search{height:50px;width:100%;border:1px solid #c7cfd7;border-radius:5px;padding:11px 14px 11px 43px;background:#fff;color:var(--ink)}
+#search::placeholder{color:#737684}select{height:50px;width:100%;border:1px solid #c7cfd7;border-radius:5px;padding:9px 30px 9px 12px;background:#fff;color:var(--ink);font-size:13px}
+.directory-layout{display:block}
+.filters{display:flex;align-items:center;flex-wrap:wrap;gap:16px 24px;margin-bottom:20px}.filters h2,.filter-note{display:none}
+.filter-wrap{width:240px}.filter-wrap label{display:none}
+.filter-wrap select{height:40px;background:transparent;font-size:12px}
+.filter-check{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);cursor:pointer}
+.filter-check input{accent-color:var(--navy);margin:0}
+.reset{border:0;padding:0;background:transparent;font-size:12px;color:var(--navy);text-decoration:underline}
+.results-toolbar{display:flex;justify-content:space-between;gap:20px;color:var(--muted);font-size:12px;margin:0 0 15px}.results-toolbar p{margin:0}
+#pages{display:flex;flex-direction:column;gap:32px}
+.industry-group{display:flex;flex-direction:column;gap:24px;min-width:0}
+.industry-heading{position:sticky;top:var(--header-height,79px);z-index:20;background:#edf1f4;display:flex;justify-content:space-between;align-items:baseline;gap:18px;border-bottom:2px solid var(--navy);padding:10px 0 14px;margin-top:8px}
+.industry-heading h2{font-size:20px;line-height:1.4;margin:0;font-weight:700;overflow-wrap:anywhere}
+.industry-heading span{font-size:12px;color:var(--muted);white-space:nowrap;flex-shrink:0}
+@media(max-width:540px){.industry-heading h2{font-size:17px}.industry-group{gap:20px}.industry-heading{gap:12px}}
+@media print{.industry-group{display:block}.industry-group+.industry-group{break-before:page}.industry-heading{position:static;margin:0 0 14pt;break-after:avoid-page}.industry-heading h2{font-size:15pt}}
+.card{position:relative;background:#fff;border:1px solid #dce2e7;border-radius:4px;overflow-wrap:anywhere;min-width:0}
+.member-masthead{display:flex;justify-content:space-between;gap:16px;margin:0 40px;padding:20px 0 15px;border-bottom:1px solid var(--line);font-size:11px;font-weight:600;color:var(--navy)}
+.member-masthead span:last-child{font-variant-numeric:tabular-nums;color:var(--muted)}
+.card-identity{display:flex;gap:26px;align-items:center;padding:30px 40px;background:var(--paper)}
+.avatar-wrap{width:106px;height:120px;flex:0 0 106px;background:#e7f3f8;border-radius:5px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.avatar-wrap img{width:100%;height:100%;object-fit:cover}.avatar-mono{font-size:34px;font-weight:700;color:var(--navy)}
+.id-info{flex:1;min-width:0}.id-name{margin:0 0 5px;font-size:30px;line-height:1.25;font-weight:800;overflow-wrap:anywhere}
+.id-pos{margin:0 0 6px;font-size:14px;line-height:1.5;color:var(--muted)}
+.id-company{font-size:19px;line-height:1.5;font-weight:600;margin:0;color:var(--navy)}
+.item-meta{display:flex;gap:6px 16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:12px}
+.industry-label{color:var(--muted)}.intl-label{color:#37665e}
+.profile-content{padding:0 40px}
+.handbook-columns{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:36px;padding:28px 0 4px;border-top:1px solid var(--line)}
+.handbook-column{min-width:0}.sec{margin-bottom:26px}
+.handbook-column:empty{display:none}.handbook-columns.single-column{grid-template-columns:1fr}
+.eyebrow{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:700;margin:0 0 10px;color:var(--navy)}
+.eyebrow::before{content:'';height:12px;width:2px;background:var(--blue);flex-shrink:0}
+.about-p{font-size:14px;line-height:1.85;color:#505464;white-space:pre-line;margin:0}
+.pns-list{margin:0;padding-left:18px;font-size:14px;color:#505464}.pns-list li{padding:2px 0}
+.two-col{display:grid;grid-template-columns:1fr;gap:24px;margin-bottom:26px}
+.tags{list-style:none;padding:0;margin:0;display:flex;flex-wrap:wrap;gap:6px}
+.tag-cat,.tag-ref,.tag-ind{font-size:12px;padding:3px 9px;border:1px solid var(--line);border-radius:3px;max-width:100%;color:#505464;background:#fafbfc}
+.offer-sec{margin:0 0 28px;border-left:3px solid var(--blue);background:var(--pale);padding:18px 20px}
+.offer-row{display:flex;gap:14px}.offer-icon{color:var(--navy);padding-top:3px}.offer-icon svg{stroke:currentColor}
+.offer-eye{font-size:11px;font-weight:600;color:var(--navy);margin:0 0 5px}.offer-title{font-size:15px;line-height:1.5;font-weight:600;margin:0}
+.offer-tc,.offer-exp{font-size:12px;color:var(--muted);margin:5px 0 0}.offer-exp svg{vertical-align:middle}
+.card-footer{display:flex;align-items:center;justify-content:space-between;gap:28px;border-top:1px solid var(--line);padding:23px 0 27px}
+.footer-left{min-width:0}.footer-web-lbl{font-size:11px;color:var(--muted);display:block;margin-bottom:4px}
+.footer-web{font-size:14px;font-weight:600;overflow-wrap:anywhere}.footer-web svg{margin-right:5px}
+.footer-pg{font-size:11px;color:var(--muted);margin:12px 0 0}
+.qr-box{flex-shrink:0;display:flex;align-items:center;gap:12px;min-width:96px}
+.qr-box img{width:96px;height:96px;display:block}.qr-caption{font-size:11px;color:var(--muted);max-width:90px;line-height:1.6}
+.empty-state{padding:60px 24px;text-align:center;color:var(--muted);background:#fff}
+.empty-state svg{display:block;margin:0 auto 14px}.empty-state p{margin:0}
+.retry-button{margin-top:18px;border:1px solid var(--line);background:white;padding:9px 18px;border-radius:4px;color:var(--navy)}
+.skel{height:16px;background:#edf0f3;border-radius:3px}
+.page-footer{margin-top:32px;display:flex;justify-content:space-between;gap:16px;color:var(--muted);font-size:11px}
+@media(max-width:760px){.search-strip{grid-template-columns:1fr 180px}.hdr-search{grid-column:1/-1}.card-identity{padding:25px 28px;gap:20px}.member-masthead{margin:0 28px}.profile-content{padding:0 28px}.handbook-columns{gap:25px}.id-name{font-size:26px}.id-company{font-size:17px}.avatar-wrap{width:88px;height:102px;flex-basis:88px}}
+@media(max-width:540px){.hdr-inner{padding:12px 18px;min-height:68px;gap:12px}.hdr-logo{width:78px;height:40px}.hdr-brand{gap:12px}.hdr-title{padding-left:12px;font-size:11px}.hdr-return{font-size:12px}.hdr-return span{display:none}#main{padding:28px 14px 36px}.directory-heading{align-items:start;margin-bottom:22px;gap:10px}h1{font-size:28px}.context{font-size:12px}.handbook-subtitle{font-size:13px}.directory-total{font-size:11px;white-space:nowrap;padding-top:6px}.search-strip{grid-template-columns:1fr auto;gap:10px}.filter-wrap{width:100%}.filter-check{font-size:11px}#search{font-size:14px}.filters{gap:12px;margin-bottom:16px}#pages{gap:22px}.member-masthead{margin:0 20px;font-size:10px;padding:14px 0}.card-identity{padding:23px 20px;gap:15px;align-items:flex-start}.avatar-wrap{width:74px;height:88px;flex-basis:74px}.avatar-mono{font-size:26px}.id-name{font-size:23px}.id-company{font-size:15px}.id-pos{font-size:12px}.item-meta{font-size:11px;margin-top:8px;gap:4px 10px}.profile-content{padding:0 20px}.handbook-columns{grid-template-columns:1fr;gap:0;padding-top:23px}.sec{margin-bottom:24px}.two-col{gap:22px}.about-p,.pns-list{font-size:14px}.eyebrow{font-size:12px}.card-footer{gap:16px;align-items:flex-end}.qr-box{flex-direction:column;gap:4px;align-items:center}.qr-caption{text-align:center;font-size:10px}.footer-web{font-size:12px}.page-footer{flex-direction:column;gap:5px}}
+@page{size:A4;margin:14mm}
+@media print{body{background:white;font-size:10pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}#page-header,.directory-heading,.search-strip,.filters,.results-toolbar,.page-footer,.empty-state{display:none!important}#main{padding:0;max-width:none}.directory-layout{display:block}#pages{display:block}.card{border:0;border-radius:0;break-after:page;margin:0;overflow:visible}.card:last-child{break-after:auto}.member-masthead{margin:0;padding:0 0 10pt}.card-identity{padding:18pt 0}.avatar-wrap{width:68pt;height:78pt;flex-basis:68pt}.id-name{font-size:23pt}.id-company{font-size:15pt}.id-pos{font-size:10pt}.profile-content{padding:0}.handbook-columns{display:block;padding-top:16pt}.sec,.col,.offer-sec,.card-identity,.member-masthead,.card-footer{break-inside:avoid-page}.two-col{grid-template-columns:1fr 1fr;gap:18pt}.about-p,.pns-list{font-size:10pt;line-height:1.6}.sec{margin-bottom:13pt}.eyebrow{font-size:10pt;break-after:avoid-page}.offer-sec{margin-bottom:16pt;padding:12pt}.card-footer{padding:13pt 0}.footer-web{font-size:10pt}.qr-box img{width:72pt;height:72pt}a{text-decoration:none}}
 </style>
 </head>
 <body>
 
-<!-- Sticky page header -->
-<div id="page-header">
+<header id="page-header">
   <div class="hdr-inner">
     <div class="hdr-brand">
-      <img class="hdr-logo" src="JCI Kuala Lumpur-transparent.png" alt="JCI Kuala Lumpur">
-      <div>
-        <span class="hdr-title">Business Connect</span>
-        <span class="hdr-sub" id="hdr-count">Loading…</span>
-      </div>
+      <a href="https://jcikl.cc" aria-label="JCI Kuala Lumpur home"><img class="hdr-logo" src="JCI Kuala Lumpur-transparent.png" alt="JCI Kuala Lumpur"></a>
+      <span class="hdr-title">Member handbook</span>
     </div>
+    <a class="hdr-return" href="https://jcikl.cc">JCI KL<span aria-hidden="true"> &#8599;</span></a>
+  </div>
+</header>
+<main id="main">
+  <div class="directory-heading">
+    <div><p class="context">JCI Kuala Lumpur</p><h1>Business Connect</h1><p class="handbook-subtitle">Member profile handbook</p></div>
+    <p class="directory-total" id="hdr-count" role="status">Loading members...</p>
+  </div>
+  <div class="search-strip">
     <div class="hdr-search">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
-        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-      </svg>
-      <input id="search" type="search" placeholder="Search members…" aria-label="Search members" disabled>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4-4"/></svg>
+      <input id="search" type="search" placeholder="Search companies, members or services" aria-label="Search companies, members or services" disabled>
     </div>
   </div>
-</div>
-
-<div id="main">
-  <div id="pages">
-    <!-- skeleton -->
-    <div class="card" aria-hidden="true">
-      <div class="card-identity" style="gap:14px">
-        <div class="skel" style="width:66px;height:66px;border-radius:50%;flex-shrink:0"></div>
-        <div style="flex:1;display:flex;flex-direction:column;gap:8px;padding-top:4px">
-          <div class="skel" style="width:50%;height:18px"></div>
-          <div class="skel" style="width:35%;height:13px"></div>
-          <div style="display:flex;gap:5px;margin-top:2px"><div class="skel" style="width:72px;height:20px;border-radius:12px"></div><div class="skel" style="width:56px;height:20px;border-radius:12px"></div></div>
-        </div>
+  <div class="directory-layout">
+    <aside class="filters" aria-label="Directory filters">
+      <h2>Refine your search</h2>
+      <div class="filter-wrap"><label for="industry">Industry</label><select id="industry" disabled><option value="">All industries</option></select></div>
+      <label class="filter-check"><input id="international" type="checkbox" disabled><span>Open to international business</span></label>
+      <button class="reset" id="reset-filters" type="button" hidden>Clear filters</button>
+      <p class="filter-note">JCI Kuala Lumpur<br>Business &amp; Entrepreneurship</p>
+    </aside>
+    <section aria-label="Member businesses">
+      <div class="results-toolbar"><p id="results-count" role="status">Loading profiles...</p><p>Member profiles</p></div>
+      <div id="pages" aria-busy="true">
+        <div class="card" aria-hidden="true"><div class="card-identity"><div class="avatar-wrap skel"></div><div class="id-info"><div class="skel" style="width:65%;margin-bottom:12px"></div><div class="skel" style="width:40%"></div></div></div></div>
+        <div class="card" aria-hidden="true"><div class="card-identity"><div class="avatar-wrap skel"></div><div class="id-info"><div class="skel" style="width:55%;margin-bottom:12px"></div><div class="skel" style="width:45%"></div></div></div></div>
       </div>
-      <div class="sec"><div class="skel" style="width:36px;height:10px;margin-bottom:8px"></div><div class="skel" style="width:100%;height:13px;margin-bottom:5px"></div><div class="skel" style="width:70%;height:13px"></div></div>
-      <div class="two-col">
-        <div class="col"><div class="skel" style="width:48px;height:10px;margin-bottom:8px"></div><div style="display:flex;gap:5px"><div class="skel" style="width:60px;height:22px;border-radius:12px"></div><div class="skel" style="width:48px;height:22px;border-radius:12px"></div></div></div>
-        <div class="col"><div class="skel" style="width:48px;height:10px;margin-bottom:8px"></div><div style="display:flex;gap:5px"><div class="skel" style="width:72px;height:22px;border-radius:12px"></div></div></div>
-      </div>
-      <div class="card-footer"><div class="skel" style="width:110px;height:11px"></div></div>
-    </div>
-    <div class="card" aria-hidden="true">
-      <div class="card-identity" style="gap:14px">
-        <div class="skel" style="width:66px;height:66px;border-radius:50%;flex-shrink:0"></div>
-        <div style="flex:1;display:flex;flex-direction:column;gap:8px;padding-top:4px">
-          <div class="skel" style="width:42%;height:18px"></div>
-          <div class="skel" style="width:55%;height:13px"></div>
-          <div style="display:flex;gap:5px;margin-top:2px"><div class="skel" style="width:88px;height:20px;border-radius:12px"></div></div>
-        </div>
-      </div>
-      <div class="sec"><div class="skel" style="width:36px;height:10px;margin-bottom:8px"></div><div class="skel" style="width:100%;height:13px;margin-bottom:5px"></div><div class="skel" style="width:55%;height:13px"></div></div>
-      <div class="two-col">
-        <div class="col"><div class="skel" style="width:48px;height:10px;margin-bottom:8px"></div><div style="display:flex;gap:5px"><div class="skel" style="width:50px;height:22px;border-radius:12px"></div><div class="skel" style="width:80px;height:22px;border-radius:12px"></div></div></div>
-        <div class="col"><div class="skel" style="width:48px;height:10px;margin-bottom:8px"></div><div style="display:flex;gap:5px"><div class="skel" style="width:60px;height:22px;border-radius:12px"></div><div class="skel" style="width:44px;height:22px;border-radius:12px"></div></div></div>
-      </div>
-      <div class="card-footer"><div class="skel" style="width:90px;height:11px"></div></div>
-    </div>
+    </section>
   </div>
-</div>
+  <footer class="page-footer"><span>JCI Kuala Lumpur &middot; Est. 1954</span><a href="https://jcikl.cc">Part of a global network. Rooted in Kuala Lumpur. &#8599;</a></footer>
+</main>
 
 <script>
 const FIREBASE_PROJECT = 'jci-lo-management-app';
@@ -367,12 +164,12 @@ function mapDoc(doc) {
   };
 }
 
-async function fetchAll() {
+async function fetchAll(signal) {
   const base = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/(default)/documents/publicBusinessListings`;
   let docs = [], pageToken = '';
   do {
     const url = `${base}?pageSize=200&key=${FIREBASE_API_KEY}${pageToken ? '&pageToken=' + pageToken : ''}`;
-    const r = await fetch(url);
+    const r = await fetch(url, { signal });
     if (!r.ok) throw new Error(`Firestore ${r.status}`);
     const data = await r.json();
     if (data.documents) docs = docs.concat(data.documents);
@@ -434,7 +231,11 @@ function renderPage(p, idx, total) {
   const refSection = p.referralTypes.length ? `<div class="col"><p class="eyebrow">Looking For</p><ul class="tags">${refHtml}</ul></div>` : '';
 
   const webDisplay = p.website.replace(/^https?:\/\//, '').replace(/\/$/, '');
-  const webHref    = p.website.startsWith('http') ? p.website : (p.website ? `https://${p.website}` : '#');
+  let webHref = '';
+  try {
+    const url = new URL(/^https?:\/\//i.test(p.website) ? p.website : `https://${p.website}`);
+    if (['https:', 'http:'].includes(url.protocol) && !url.username && !url.password) webHref = url.href;
+  } catch { /* Keep invalid stored website text without making it a link. */ }
 
   const offerSection = p.offer ? `
     <div class="offer-sec">
@@ -459,50 +260,70 @@ function renderPage(p, idx, total) {
       </div>
     </div>` : '';
 
+  const primarySections = [
+    p.description ? `<div class="sec"><p class="eyebrow">About the business</p><p class="about-p">${esc(p.description)}</p></div>` : '',
+    p.productsAndServices.length ? `<div class="sec"><p class="eyebrow">Products &amp; Services</p><ul class="pns-list">${p.productsAndServices.map(s => `<li>${esc(s)}</li>`).join('')}</ul></div>` : '',
+  ].join('');
+  const secondarySections = [
+    catSection || refSection ? `<div class="two-col">${catSection}${refSection}</div>` : '',
+    p.interestedIndustries.length ? `<div class="sec"><p class="eyebrow">Interested Industries</p><ul class="tags">${p.interestedIndustries.map(i => `<li class="tag-ind">${esc(i)}</li>`).join('')}</ul></div>` : '',
+    p.levelOfManagement ? `<div class="sec"><p class="eyebrow">Management level</p><p class="about-p">${esc(p.levelOfManagement)}</p></div>` : '',
+  ].join('');
   return `
-<div class="card">
+<article class="card" aria-labelledby="member-heading-${idx}">
+  <div class="member-masthead"><span>JCI Kuala Lumpur &middot; Business Connect</span><span>${String(idx + 1).padStart(3, '0')} / ${total}</span></div>
   <div class="card-identity">
     <div class="avatar-wrap" aria-label="${esc(p.ownerName)}">${avatarHtml}</div>
     <div class="id-info">
-      <h2 class="id-name">${esc(p.ownerName)}</h2>
-      <p class="id-company">${esc(p.companyName)}</p>
+      <h3 class="id-name" id="member-heading-${idx}">${esc(p.ownerName)}</h3>
       ${p.departmentAndPosition ? `<p class="id-pos">${esc(p.departmentAndPosition)}</p>` : ''}
-      <div class="id-badges">
-        ${p.industry          ? `<span class="chip chip-sky">${esc(p.industry)}</span>` : ''}
-        ${p.openToIntl === 'Yes'               ? `<span class="chip chip-teal">Open to International</span>` : ''}
-        ${p.openToIntl === 'Willing to Explore' ? `<span class="chip chip-amb">Exploring International</span>` : ''}
-        ${p.levelOfManagement ? `<span class="chip chip-blue">${esc(p.levelOfManagement)} management</span>` : ''}
+      <p class="id-company">${esc(p.companyName)}</p>
+      <div class="item-meta">
+        ${p.industry ? `<span class="industry-label">${esc(p.industry)}</span>` : ''}
+        ${p.openToIntl === 'Yes' ? '<span class="intl-label">International business</span>' : ''}
+        ${p.openToIntl === 'Willing to Explore' ? '<span>Exploring international business</span>' : ''}
       </div>
     </div>
   </div>
-  ${p.description ? `<div class="sec"><p class="eyebrow">About</p><p class="about-p">${esc(p.description)}</p></div>` : ''}
-  ${p.productsAndServices.length ? `<div class="sec"><p class="eyebrow">Products &amp; Services</p><ul class="pns-list">${p.productsAndServices.map(s => `<li>${esc(s)}</li>`).join('')}</ul></div>` : ''}
-  ${(catSection || refSection) ? `<div class="two-col">${catSection}${refSection}</div>` : ''}
-  ${p.interestedIndustries.length ? `<div class="sec"><p class="eyebrow">Interested Industries</p><ul class="tags">${p.interestedIndustries.map(i => `<li class="tag-ind">${esc(i)}</li>`).join('')}</ul></div>` : ''}
+  <div class="profile-content">
+  ${primarySections || secondarySections ? `<div class="handbook-columns${primarySections && secondarySections ? '' : ' single-column'}">
+  <div class="handbook-column">${primarySections}</div>
+  <div class="handbook-column">${secondarySections}</div>
+  </div>` : ''}
   ${offerSection}
   <div class="card-footer">
     <div class="footer-left">
-      ${webDisplay ? `
+      ${webDisplay && webHref ? `
       <span class="footer-web-lbl">Website</span>
       <a class="footer-web" href="${esc(webHref)}" target="_blank" rel="noopener noreferrer">
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
         ${esc(webDisplay)}
       </a>` : ''}
+      ${webDisplay && !webHref ? `<p class="about-p">${esc(webDisplay)}</p>` : ''}
       <p class="footer-pg">Member ${idx + 1} of ${total}</p>
     </div>
-    ${/^[A-Za-z0-9_-]{1,128}$/.test(p.listingId) ? `<div class="qr-box" aria-label="Scan to contact on WhatsApp"><img src="/.netlify/functions/public-directory-photo?mode=whatsapp&amp;id=${esc(p.listingId)}" alt="WhatsApp contact QR code" width="96" height="96" loading="lazy" data-contact-qr></div>` : ''}
+    ${/^[A-Za-z0-9_-]{1,128}$/.test(p.listingId) ? `<div class="qr-box" aria-label="Scan to contact on WhatsApp"><img src="/.netlify/functions/public-directory-photo?mode=whatsapp&amp;id=${esc(p.listingId)}" alt="WhatsApp contact QR code" width="96" height="96" loading="lazy" data-contact-qr><span class="qr-caption">Scan to connect on WhatsApp</span></div>` : ''}
   </div>
-</div>`;
+  </div>
+</article>`;
 }
 
 let _profiles = [];
-const PAGE_SIZE = 50;
-let _visibleCount = 0;
 let _currentList  = [];
+let _headerObserver;
+
+function groupProfiles(profiles) {
+  const groups = new Map();
+  for (const profile of profiles) {
+    const industry = (profile.industry || '').trim() || 'Other';
+    if (!groups.has(industry)) groups.set(industry, []);
+    groups.get(industry).push(profile);
+  }
+  return [...groups.entries()].sort(([a], [b]) => a === b ? 0 : a === 'Other' ? 1 : b === 'Other' ? -1 : a.localeCompare(b));
+}
 
 function renderAll(list) {
   _currentList  = list;
-  _visibleCount = Math.min(PAGE_SIZE, list.length);
   const pagesEl = document.getElementById('pages');
   const countEl = document.getElementById('hdr-count');
   const total   = _profiles.length;
@@ -512,70 +333,94 @@ function renderAll(list) {
       <p>${total ? 'No results for that search.' : 'No Business Connect members yet.'}</p>
     </div>`;
   } else {
-    pagesEl.innerHTML = list.slice(0, _visibleCount).map((p, i) => renderPage(p, i, list.length)).join('');
-    if (_visibleCount < list.length) appendLoadMore(pagesEl, list.length);
+    let memberIndex = 0;
+    pagesEl.innerHTML = groupProfiles(list).map(([industry, members], groupIndex) => `
+      <section class="industry-group" aria-labelledby="industry-heading-${groupIndex}">
+        <header class="industry-heading"><h2 id="industry-heading-${groupIndex}">${esc(industry)}</h2><span>${members.length} ${members.length === 1 ? 'member' : 'members'}</span></header>
+        ${members.map(p => renderPage(p, memberIndex++, list.length)).join('')}
+      </section>`).join('');
   }
   if (countEl) {
-    countEl.textContent = list.length === total
-      ? `${total} Members`
-      : `${list.length} of ${total} Members`;
+    countEl.textContent = `${total} members`;
   }
+  updateResultsCount();
 }
 
-function appendLoadMore(pagesEl, listLength) {
-  const remaining = listLength - _visibleCount;
-  const btn = document.createElement('button');
-  btn.id = 'load-more';
-  btn.textContent = `Show ${Math.min(PAGE_SIZE, remaining)} more  ·  ${remaining} remaining`;
-  btn.onclick = () => {
-    btn.remove();
-    const newEnd = Math.min(_visibleCount + PAGE_SIZE, _currentList.length);
-    pagesEl.insertAdjacentHTML('beforeend',
-      _currentList.slice(_visibleCount, newEnd).map((p, i) => renderPage(p, _visibleCount + i, _currentList.length)).join('')
-    );
-    _visibleCount = newEnd;
-    if (_visibleCount < _currentList.length) appendLoadMore(pagesEl, _currentList.length);
-  };
-  pagesEl.appendChild(btn);
+function updateResultsCount() {
+  const count = document.getElementById('results-count');
+  const industryCount = groupProfiles(_currentList).length;
+  if (count) count.textContent = _currentList.length
+    ? `${_currentList.length} member ${_currentList.length === 1 ? 'profile' : 'profiles'} · ${industryCount} ${industryCount === 1 ? 'industry' : 'industries'}`
+    : '0 member profiles';
 }
+
+function filterProfiles(profiles, query, industry, international, sort) {
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  return profiles.filter(p => {
+    const text = [p.ownerName, p.companyName, p.industry, p.description,
+      p.departmentAndPosition, ...p.productsAndServices, ...p.referralTypes].join(' ').toLowerCase();
+    return terms.every(term => text.includes(term)) && (!industry || p.industry === industry)
+      && (!international || p.openToIntl === 'Yes');
+  }).sort((a, b) => (sort === 'member' ? a.ownerName.localeCompare(b.ownerName) : a.companyName.localeCompare(b.companyName))
+    || a.ownerName.localeCompare(b.ownerName));
+}
+
+function applyFilters() {
+  const query = document.getElementById('search').value;
+  const industry = document.getElementById('industry').value;
+  const international = document.getElementById('international').checked;
+  document.getElementById('reset-filters').hidden = !query && !industry && !international;
+  renderAll(filterProfiles(_profiles, query, industry, international, 'member'));
+}
+
 
 async function loadDirectory() {
   const pagesEl = document.getElementById('pages');
   const countEl = document.getElementById('hdr-count');
   const searchEl = document.getElementById('search');
-
-  const timer = setTimeout(() => {
-    pagesEl.innerHTML = `<div class="empty-state">
-      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
-      <p>Timed out. Please refresh.</p>
-    </div>`;
-    if (countEl) countEl.textContent = 'Error';
-  }, 15000);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  pagesEl.setAttribute('aria-busy', 'true');
+  if (!_headerObserver && typeof ResizeObserver !== 'undefined') {
+    const header = document.getElementById('page-header');
+    const syncHeaderHeight = () => document.documentElement.style.setProperty('--header-height', `${header.getBoundingClientRect().height}px`);
+    _headerObserver = new ResizeObserver(syncHeaderHeight);
+    _headerObserver.observe(header);
+    syncHeaderHeight();
+  }
+  for (const id of ['search', 'industry', 'international']) document.getElementById(id).disabled = true;
 
   try {
-    const docs = await fetchAll();
+    const docs = await fetchAll(controller.signal);
     clearTimeout(timer);
     _profiles = docs.map(mapDoc).filter(p => p.companyName.trim()).sort((a, b) => a.companyName.localeCompare(b.companyName));
-    renderAll(_profiles);
-
-    searchEl.disabled = false;
-    searchEl.addEventListener('input', e => {
-      const q = e.target.value.trim().toLowerCase();
-      if (!q) { renderAll(_profiles); return; }
-      renderAll(_profiles.filter(p =>
-        p.ownerName.toLowerCase().includes(q) ||
-        p.companyName.toLowerCase().includes(q) ||
-        p.industry.toLowerCase().includes(q) ||
-        p.description.toLowerCase().includes(q)
-      ));
-    });
+    const industryEl = document.getElementById('industry');
+    const selectedIndustry = industryEl.value;
+    industryEl.innerHTML = '<option value="">All industries</option>' + [...new Set(_profiles.map(p => p.industry).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b)).map(value => `<option value="${esc(value)}">${esc(value)}</option>`).join('');
+    industryEl.value = selectedIndustry;
+    for (const id of ['search', 'industry', 'international']) document.getElementById(id).disabled = false;
+    searchEl.oninput = applyFilters;
+    for (const id of ['industry', 'international']) document.getElementById(id).onchange = applyFilters;
+    document.getElementById('reset-filters').onclick = () => {
+      searchEl.value = ''; industryEl.value = '';
+      document.getElementById('international').checked = false;
+      applyFilters();
+    };
+    applyFilters();
   } catch (err) {
     clearTimeout(timer);
     pagesEl.innerHTML = `<div class="empty-state">
       <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
-      <p>Failed to load directory. Please refresh.</p>
+      <p>${controller.signal.aborted ? 'The directory took too long to load.' : 'The directory could not be loaded.'}</p>
+      <button class="retry-button" id="retry" type="button">Try again</button>
     </div>`;
     if (countEl) countEl.textContent = 'Error';
+    document.getElementById('results-count').textContent = 'Directory unavailable';
+    document.getElementById('retry').onclick = loadDirectory;
+  } finally {
+    clearTimeout(timer);
+    pagesEl.setAttribute('aria-busy', 'false');
   }
 }
 

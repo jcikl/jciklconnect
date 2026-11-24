@@ -4,25 +4,31 @@
 /** Industries: the options for `industry` and `idealReferralIndustry`. Some names contain commas. */
 export const INDUSTRY_OPTIONS = /** @type {const} */ ([
   'Advertising, Marketing & Media',
-  'Agriculture & Animals',
+  'Agriculture, Forestry, Fisheries & Animals',
   'Architecture, Engineering & Construction',
-  'Art, Entertainment & Design',
+  'Arts, Entertainment & Creative Design',
   'Automotive & Accessories',
   'Food & Beverages',
-  'Telecom, AI, Computers & IT',
-  'Consulting & Professional Services',
+  'Technology, AI & Telecommunications',
+  'Business & Management Consulting',
   'Education & Training',
-  'Event & Hospitality',
-  'Crypto, Blockchain, Finance & Insurance',
-  'Health & Wellness',
-  'Legal, HR, Accounting & Tax',
-  'Manufacturing & Supply Chain',
+  'Events, Exhibitions & Hospitality',
+  'Banking, Finance, Investment & Insurance',
+  'Healthcare & Medical Services',
+  'Wellness, Fitness & Sports',
+  'Legal, Accounting & Tax Services',
+  'Human Resources & Recruitment',
+  'Manufacturing & Industrial',
   'Wholesale, Retail & E-Commerce',
-  'Personal, Beauty & Sports',
+  'Beauty, Personal Care & Lifestyle',
   'Real Estate & Property Services',
-  'Transport & Logistics',
+  'Transportation, Logistics & Warehousing',
   'Travel & Tourism',
-  'Other'
+  'Energy, Oil & Gas & Utilities',
+  'Environmental, Waste Management & Cleaning',
+  'Security & Safety Services',
+  'Government, NGOs & Associations',
+  'Other / Unclassified'
 ]);
 
 /** Ideal referral TYPES: the options for `business.idealReferrals`. */

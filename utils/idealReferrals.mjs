@@ -14,10 +14,20 @@ export const IDEAL_REFERRAL_INDUSTRY_SEPARATOR = '||';
 /** @param {string} s */
 const key = s => s.replace(/\s+/g, ' ').trim().toLowerCase();
 
-const INDUSTRY_KEYS = new Set(INDUSTRY_OPTIONS.map(key));
+// Read old stored labels without offering them as new choices or guessing a
+// migration for categories that have since been split into separate industries.
+const LEGACY_INDUSTRIES = [
+  'Agriculture & Animals', 'Art, Entertainment & Design',
+  'Telecom, AI, Computers & IT', 'Consulting & Professional Services',
+  'Event & Hospitality', 'Crypto, Blockchain, Finance & Insurance',
+  'Health & Wellness', 'Legal, HR, Accounting & Tax',
+  'Manufacturing & Supply Chain', 'Personal, Beauty & Sports',
+  'Transport & Logistics', 'Other',
+];
+const INDUSTRY_KEYS = new Set([...INDUSTRY_OPTIONS, ...LEGACY_INDUSTRIES].map(key));
 const TYPE_KEYS = new Set(IDEAL_REFERRAL_OPTIONS.map(o => key(o.label)));
 /** lower-cased option -> its exact label */
-const KNOWN = new Map([...INDUSTRY_OPTIONS, ...IDEAL_REFERRAL_OPTIONS.map(o => o.label)].map(o => [key(o), o]));
+const KNOWN = new Map([...INDUSTRY_OPTIONS, ...LEGACY_INDUSTRIES, ...IDEAL_REFERRAL_OPTIONS.map(o => o.label)].map(o => [key(o), o]));
 /** The most comma-separated pieces in any known option. */
 const MAX_PIECES = Math.max(...[...KNOWN.values()].map(o => o.split(',').length));
 
@@ -79,7 +89,7 @@ export function joinIdealReferralIndustries(value) {
   return normalizeIdealReferrals(value).join(IDEAL_REFERRAL_INDUSTRY_SEPARATOR);
 }
 
-/** @param {string} v @returns {boolean} an INDUSTRY_OPTIONS value */
+/** @param {string} v @returns {boolean} a current or legacy industry value */
 export function isIndustryOption(v) {
   return INDUSTRY_KEYS.has(key(v));
 }

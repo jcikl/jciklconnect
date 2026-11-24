@@ -63,6 +63,8 @@
 
 ## 后续任务
 
+- [ ] 转介测试字段与服务实现不一致（2026-11-25，行业选项更新时发现）：`tests/unit/idealReferrals.test.ts` 和 `idealReferralsParity.test.ts` 合计 7 项失败；测试以 `idealReferral` / `business.idealReferrals` 为输入，`MembersService.normalizeMemberData` 及 `mapMemberToBusinessProfile` 当前使用 `business.idealReferralTypes`。来源：行业更新相关测试；完成标准：确认字段契约并统一实现或测试。本次未修改服务层，不扩大到转介逻辑重构。
+
 - [ ] Business Connect WhatsApp 二维码浏览器验收（2026-11-25）：固定占位图已替换为基于 `members.contact.phone` 的真实 `https://wa.me/<国际号码>` 二维码，复用公开名片授权；无授权或无效号码时隐藏。验证：二维码 / 头像测试 12 项、现有会员认证测试 20 项、电话规范化回归 16 项通过；typecheck、build、diff 校验通过。当前本地 Netlify Functions 8888 未运行，3001 代理请求返回 500；待后端可用后验证实际会员扫码结果与撤回授权后的隐藏效果。代码随本条记录提交；部署结果待验证。
 
 - [ ] Business Connect 自动会员头像的本地 / 部署验收（2026-11-25，用户已授权）：沿用 `privacy.shareCardInternationally`，公开页面自动读取会员当前头像，不需单独发布。代码和授权检查已完成，头像测试 11/11 通过；本地 3001 的头像请求返回 500，因为代理目标 Netlify Functions 8888 未运行。完成标准：具备后端运行环境后验证真实头像加载、关闭分享后新请求 404；部署另按用户授权。类型检查当前失败，包含 SearchDropdown、AutomationStudio、useFinanceData 等错误，不能宣称全项目验证通过。
@@ -109,6 +111,16 @@
 ---
 
 ## 已完成
+
+- [x] 更新 26 项行业选项（2026-11-25）：`config/referralOptions.mjs` 按用户提供的顺序和名称更新；下拉只提供新选项，解析器保留旧标签读取兼容以避免逗号名称被拆散，不批量改写会员数据。schema 已同步；新选项识别及解析检查、typecheck、build、diff 校验通过；扩大验证的 7 项转介字段测试失败另行登记。未提交、未部署。
+
+- [x] 手册控件精简与行业吸顶（2026-11-25）：按用户批注移除排序选择器和打印按钮及事件逻辑；固定组内姓名排序。当前行业标题在顶部导航下吸顶，并随下一行业进入替换；通过 ResizeObserver 同步实际导航高度，打印样式恢复静态定位。浏览器核对控件移除、桌面标题与导航对齐、行业切换、390px 吸顶偏移及无溢出；14 项测试、typecheck、build、diff 校验通过。未提交、未部署。
+
+- [x] 会员手册按行业分组（2026-11-25）：行业标题与人数、行业字母排序、空行业归入末尾 Other；组内保留姓名 / 公司排序和完整简介，搜索 / 筛选联动更新分组，打印保留行业章节并分页。浏览器核对 285 位会员归入 20 组、行业筛选及手机无溢出；14 项测试、typecheck、build、diff 校验通过。未提交、未部署。
+
+- [x] Business Connect 改为会员简介手册（2026-11-25，替代上一版折叠目录）：以会员姓名、头像、职位和公司为主，所有匹配会员及业务 / 合作 / 优惠资料完整展开，取消加载更多；保留搜索、筛选、排序、头像与 WhatsApp 二维码，加入 A4 打印样式及打印前图片准备。真实 285 位会员检查通过；390 / 768 / 1440px 无横向溢出；14 项相关测试、typecheck、build、diff 校验通过。打印样式已加入，尚未执行实际 PDF 导出验收。预览：`http://localhost:3001/business-connect.html`；未提交、未部署。
+
+- [x] Business Connect 商业名录重新设计（2026-11-25）：沿用 JCI 蓝白与 Plus Jakarta Sans，改为公司优先的紧凑列表及完整资料展开；保留现有目录数据、搜索、分页、头像与 WhatsApp 二维码，增加行业 / 国际合作筛选及公司 / 姓名排序。13 项相关测试、typecheck、build、diff 校验通过；真实 285 条记录下检查筛选、空结果、排序、加载更多及展开，390 / 768 / 1440px 响应式检查完成。本地预览：`http://localhost:3001/business-connect.html`。未提交、未部署。
 
 - [x] CLAUDE.md 重整（2026-10-11；约 680 行 → 194 行、全中文、9 章结构；历史表格迁至 `docs/ANALYSIS-HISTORY.md`；旧版六步分析模板删除，已由 `/analyze-collection` v3 取代；"来 / 往"规则补充至 `SCHEMA.md`；统一"新依赖须先问""顺手改进仅限同文件低风险"两处矛盾；`AGENT-EXECUTION.md` 补充部署须确认；旧版原文备份于 `docs/CLAUDE.md.bak-2026-10-11`，668 行，仅供对照，不作为规则读取）
 

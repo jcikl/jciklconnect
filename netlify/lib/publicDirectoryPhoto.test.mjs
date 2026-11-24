@@ -234,6 +234,61 @@ test('replacement invalidates prior link; removing consent and recreating listin
   assert.equal((await f.request(second)).status, 404);
 });
 
+test('directory filters combine industry, services, sharing preference and stable member ordering', async () => {
+  const html = await readFile(new URL('../../public/business-connect.html', import.meta.url), 'utf8');
+  const script = html.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/\nloadDirectory\(\);\s*$/, '');
+  const filter = vm.runInNewContext(script + '\nfilterProfiles', {
+    URL, document: { getElementById() { return { addEventListener() {} }; } },
+  });
+  const profiles = [
+    { companyName: 'Northline Systems', ownerName: 'Pat Yu', industry: 'Technology', description: 'Operations software', departmentAndPosition: 'Director', productsAndServices: ['Inventory consulting'], referralTypes: ['Distributors'], openToIntl: 'Yes' },
+    { companyName: 'Cedar Studio', ownerName: 'Ari Tan', industry: 'Design', description: 'Brand strategy', departmentAndPosition: 'Founder', productsAndServices: ['Packaging'], referralTypes: [], openToIntl: 'Willing to Explore' },
+  ];
+  assert.equal(filter(profiles, 'inventory pat', 'Technology', true, 'company')[0], profiles[0]);
+  assert.equal(filter(profiles, 'packaging', '', false, 'company')[0], profiles[1]);
+  assert.equal(filter(profiles, '', 'Design', true, 'company').length, 0);
+  assert.equal(filter(profiles, 'not-a-service', '', false, 'company').length, 0);
+  assert.equal(filter(profiles, '', '', false, 'member')[0], profiles[1]);
+  assert.equal(profiles[0].ownerName, 'Pat Yu');
+});
+
+test('handbook renders every matching member and full profile without collapsed sections', async () => {
+  const html = await readFile(new URL('../../public/business-connect.html', import.meta.url), 'utf8');
+  const script = html.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/\nloadDirectory\(\);\s*$/, '');
+  const nodes = new Map();
+  const render = vm.runInNewContext(script + `\n(count) => {
+    _profiles = Array.from({length: count}, (_, i) => mapDoc({name: 'listings/member-' + i, fields: {
+      ownerName: {stringValue: 'Member ' + i}, companyName: {stringValue: 'Studio ' + i},
+      industry: {stringValue: i === 50 ? '' : i % 2 ? 'Technology' : 'Design'},
+      description: {stringValue: 'Full company introduction with no excerpt.'},
+      offer: {stringValue: 'Member consultation'}, offerTerms: {stringValue: 'Appointment required'},
+      offerExpiry: {stringValue: '2099-12-31'}, levelOfManagement: {stringValue: 'Senior'},
+      productsAndServices: {arrayValue: {values: [{stringValue: 'Business advisory'}]}},
+      businessCategory: {stringValue: 'Service Provider'},
+      idealReferralTypes: {arrayValue: {values: [{stringValue: 'Distributors'}]}},
+      interestedIndustries: {arrayValue: {values: [{stringValue: 'Manufacturing'}]}},
+    }}));
+    renderAll(_profiles);
+    return document.getElementById('pages').innerHTML;
+  }`, { URL, document: { getElementById(id) {
+    if (!nodes.has(id)) nodes.set(id, { addEventListener() {}, innerHTML: '', textContent: '' });
+    return nodes.get(id);
+  } } });
+  const output = render(51);
+  assert.equal((output.match(/<article /g) || []).length, 51);
+  assert.equal((output.match(/class="industry-group"/g) || []).length, 3);
+  assert.ok(output.indexOf('>Design</h2>') < output.indexOf('>Technology</h2>'));
+  assert.ok(output.indexOf('>Technology</h2>') < output.indexOf('>Other</h2>'));
+  assert.match(output, /25 members/);
+  assert.match(output, /1 member<\/span>/);
+  assert.doesNotMatch(output, /<details|<summary|load-more/);
+  for (const value of ['Full company introduction with no excerpt.', 'Business advisory', 'Distributors',
+    'Manufacturing', 'Member consultation', 'Appointment required', '2099-12-31', 'Senior']) assert.ok(output.includes(value));
+  assert.ok(output.includes('member-heading-50'));
+  assert.match(html, /@page\{size:A4/);
+  assert.doesNotMatch(html, /id="sort"|id="print-handbook"/);
+});
+
 test('guest renderer: automatic profile photo, retry company logo, then initials', async () => {
   const html = await readFile(new URL('../../public/business-connect.html', import.meta.url), 'utf8');
   const script = html.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/\nloadDirectory\(\);\s*$/, '');

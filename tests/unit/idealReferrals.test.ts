@@ -17,6 +17,7 @@ import {
   isReferralTypeOption,
 } from '../../utils/idealReferrals.mjs';
 import { MembersService } from '../../services/membersService';
+import { INDUSTRY_OPTIONS } from '../../config/referralOptions.mjs';
 
 const PETER_YU = [
   'Event & Hospitality||Crypto||Blockchain||Finance & Insurance||Real Estate & Property Services||Travel & Tourism||Architecture',
@@ -31,6 +32,16 @@ const PETER_YU_CLEAN = [
 ];
 
 describe('normalizeIdealReferrals', () => {
+  it('recognizes all 26 current industries, including comma-separated labels', () => {
+    expect(INDUSTRY_OPTIONS).toHaveLength(26);
+    expect(new Set(INDUSTRY_OPTIONS).size).toBe(26);
+    expect(INDUSTRY_OPTIONS[25]).toBe('Other / Unclassified');
+    expect(INDUSTRY_OPTIONS).not.toContain('Health & Wellness');
+    for (const industry of INDUSTRY_OPTIONS) {
+      expect(isIndustryOption(industry)).toBe(true);
+      expect(normalizeIdealReferrals(industry.split(',').map(s => s.trim()))).toEqual([industry]);
+    }
+  });
   it('PETER YU: splits on ||, rejoins fragments of comma names across elements', () => {
     expect(normalizeIdealReferrals(PETER_YU)).toEqual(PETER_YU_CLEAN);
   });
