@@ -63,6 +63,8 @@
 
 ## 后续任务
 
+- [ ] Business Connect 自动会员头像的本地 / 部署验收（2026-11-25，用户已授权）：沿用 `privacy.shareCardInternationally`，公开页面自动读取会员当前头像，不需单独发布。代码和授权检查已完成，头像测试 11/11 通过；本地 3001 的头像请求返回 500，因为代理目标 Netlify Functions 8888 未运行。完成标准：具备后端运行环境后验证真实头像加载、关闭分享后新请求 404；部署另按用户授权。类型检查当前失败，包含 SearchDropdown、AutomationStudio、useFinanceData 等错误，不能宣称全项目验证通过。
+
 <!-- 批次分析发现的范围外问题登记于此 -->
 
 - [ ] **重建蓝图第一轮核实的修复（需要确认）**（2026-10-18 登记）。来源：第一轮核实（权限与规则），详情见 `RISK_REGISTER.md` R-028～R-037。影响：数据外泄、记录可伪造、对账 / 注册 / 推送可能失效。涉及文件：`firestore.rules`、`storage.rules`、`hooks/useAuth.tsx`、`services/{financeService,toyyibService,notificationService,paymentRequestService}.ts`、`components/modules/AccessConfigView.tsx`。完成标准：先确认线上规则版本；每项先在模拟器复现，再按极高风险流程提计划、等用户批准后修复，并补规则测试。
@@ -95,6 +97,8 @@
 ---
 
 ## 文档创建记录
+
+- `AGENTS.md`（2026-11-17）：基于当前 `CLAUDE.md` 建立 Codex 项目入口，引用共享规则并补充 Codex 任务恢复、验证和命令适配；入口为仓库根目录 `AGENTS.md`。独立文件用于提供 Codex 入口，避免复制整套长期规则。
 
 <!-- 新建 Markdown 文档时记录：文档、创建原因、所属主题、入口链接 -->
 

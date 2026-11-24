@@ -2,6 +2,8 @@
 
 > 数据来源：irestore.rules（1414 行）
 > 更新时重读规则文件并重跑本文档生成。
+
+> Business Connect 头像接口（2026-11-25）：`GET /.netlify/functions/public-directory-photo?mode=profile&id=...` 可由访客访问，但服务端仅在会员当前同意公开名片、角色为 MEMBER / BOARD / ADMIN / SUPER_ADMIN、未删除、loId 缺省或为 jcikl、且有效公开条目属于该会员时返回头像。图片读取后再次验证授权及头像源，响应禁止缓存；不开放访客读取 `members`，不修改 Firestore 规则。关闭公开名片后新请求返回 404；已经被访客保存的图片不能远程撤回。
 >
 > 2026-10-18（R-034）：此前 `canReadOrgMembers()` 和 11 处写死的 `['BOARD','ADMIN']` 漏掉了 SUPER_ADMIN，本表写作 B+ 的 eventRegistrations、notifications、inquiries、benefitUsage、webhooks、mentorMatches、mentorshipFeedback、memberEmails、nonMemberLeads 实际上不含 SUPER_ADMIN；规则已修正，现与本表一致。
 >

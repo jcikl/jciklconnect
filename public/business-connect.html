@@ -354,6 +354,9 @@ function mapDoc(doc) {
     offerTerms:              fv(f.offerTerms)              || '',
     offerExpiry:             fv(f.offerExpiry)             || '',
     logo:                    fv(f.logo)                    || '',
+    publicPhotoKey:          fv(f.publicDirectoryPhotoKey) || '',
+    publicAvatarUrl:         Object.hasOwn(f, 'avatarUrl') ? fv(f.avatarUrl) : undefined,
+    listingId:               (doc.name || '').split('/').at(-1) || '',
     businessCategory:        fv(f.businessCategory)        || '',
     openToIntl:              raw === true ? 'Yes' : (typeof raw === 'string' ? raw : ''),
     referralTypes:           Array.isArray(fv(f.idealReferralTypes))   ? fv(f.idealReferralTypes)   : [],
@@ -409,14 +412,39 @@ const QR_DOTS = `
   <rect x="24" y="62" width="4" height="4"/><rect x="34" y="62" width="4" height="4"/><rect x="44" y="62" width="4" height="4"/>
 `;
 
-const IMG_URL = /\.(jpe?g|png|gif|webp|svg|avif)(\?|$)/i;
-const IMG_CDN = /^https?:\/\/(res\.cloudinary\.com|firebasestorage\.googleapis\.com|lh\d+\.googleusercontent\.com)/i;
-const isImgUrl = u => IMG_URL.test(u) || IMG_CDN.test(u);
+const IMG_EXT = /\.(jpe?g|png|gif|webp|svg|avif)$/i;
+const IMG_CDN = /^(?:res\.cloudinary\.com|firebasestorage\.googleapis\.com|lh\d+\.googleusercontent\.com)$/;
+
+function getAvatarUrl(value) {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  try {
+    const url = new URL(value, document.baseURI);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+    if (url.username || url.password) return null;
+    return IMG_EXT.test(url.pathname) || IMG_CDN.test(url.hostname) ? url.href : null;
+  } catch {
+    return null;
+  }
+}
 
 function renderPage(p, idx, total) {
   const ini = mkInitials(p.ownerName);
-  const avatarHtml = (p.logo && isImgUrl(p.logo))
-    ? `<img src="${esc(p.logo)}" alt="${esc(p.ownerName)}" loading="lazy">`
+  const logoUrl = getAvatarUrl(p.logo);
+  const expectedPhotoUrl = /^[a-f0-9]{32}$/.test(p.publicPhotoKey) && /^[A-Za-z0-9_-]{1,128}$/.test(p.listingId)
+    ? `/.netlify/functions/public-directory-photo?id=${p.listingId}&key=${p.publicPhotoKey}`
+    : null;
+  // Marker-only rows from the first release keep working. Never follow a stored
+  // URL unless it exactly matches this listing's same-origin copy endpoint.
+  const publicPhotoUrl = expectedPhotoUrl && (p.publicAvatarUrl === undefined || p.publicAvatarUrl === expectedPhotoUrl)
+    ? expectedPhotoUrl
+    : null;
+  const profilePhotoUrl = /^[A-Za-z0-9_-]{1,128}$/.test(p.listingId)
+    ? `/.netlify/functions/public-directory-photo?mode=profile&id=${p.listingId}`
+    : null;
+  const avatarUrl = profilePhotoUrl || publicPhotoUrl || logoUrl;
+  const logoFallback = (profilePhotoUrl || publicPhotoUrl) && logoUrl ? ` data-avatar-logo="${esc(logoUrl)}"` : '';
+  const avatarHtml = avatarUrl
+    ? `<img src="${esc(avatarUrl)}" alt="${esc(p.ownerName)}" loading="lazy" data-avatar-image${logoFallback}><span class="avatar-mono" hidden>${esc(ini)}</span>`
     : `<span class="avatar-mono">${esc(ini)}</span>`;
 
   const cats       = p.businessCategory.split(',').map(c => c.trim()).filter(Boolean);
@@ -580,6 +608,22 @@ async function loadDirectory() {
     if (countEl) countEl.textContent = 'Error';
   }
 }
+
+// Image errors do not bubble; capture them for both initial and paginated cards.
+document.getElementById('pages').addEventListener('error', (event) => {
+  const image = event.target;
+  if (!(image instanceof HTMLImageElement) || !image.hasAttribute('data-avatar-image')) return;
+  const logo = image.getAttribute('data-avatar-logo');
+  if (logo) {
+    image.removeAttribute('data-avatar-logo');
+    image.src = logo;
+    return;
+  }
+  const fallback = image.nextElementSibling;
+  if (!fallback) return;
+  image.remove();
+  fallback.hidden = false;
+}, true);
 
 loadDirectory();
 </script>

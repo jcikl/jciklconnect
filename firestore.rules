@@ -1501,9 +1501,20 @@ service cloud.firestore {
     match /publicBusinessListings/{listingId} {
       allow read: if true;
       // External users may not publish themselves on the KL public (guest) directory.
-      allow create, update, delete: if isInternalUser() && (
-        request.auth.uid == listingId || isBoard()
-      );
+      // The owner's explicit publish/remove action runs in the photo function.
+      // Regular listing sync/backfill must never mint or overwrite the public photo fields.
+      allow create: if isInternalUser() &&
+        (request.auth.uid == listingId || isBoard()) &&
+        !request.resource.data.keys().hasAny(['publicDirectoryPhotoKey', 'avatarUrl']);
+      allow update: if isInternalUser() &&
+        (request.auth.uid == listingId || isBoard()) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['publicDirectoryPhotoKey', 'avatarUrl']);
+      allow delete: if isInternalUser() && (request.auth.uid == listingId || isBoard());
+    }
+
+    // The function, not Firestore clients, serves the JPEG when consent is still current.
+    match /publicDirectoryPhotoAssets/{memberId} {
+      allow read, write: if false;
     }
     
     // Client crash reports (web + APK) — authenticated users may create; Board reads; Admin deletes.
