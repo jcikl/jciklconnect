@@ -5,6 +5,7 @@ import { Button, Modal, useToast } from '@/components/ui/Common';
 import { PublicationService, toGoogleDrivePreviewUrl, extractGoogleDriveFileId } from '@/services/publicationService';
 import { GuestHeader } from '@/components/layout/GuestHeader';
 import { GuestFooter } from '@/components/layout/GuestFooter';
+import { GuestPageFrame, GuestContentSkeleton } from '@/components/layout/GuestPageFrame';
 
 // Newsletter thumbnail component with error fallback — not exported
 const NewsletterThumbnail = ({ src, alt }: { src: string | null | undefined; alt: string }) => {
@@ -157,7 +158,7 @@ export const GuestEnewslettersPage = ({ onLogin, onRegister, onPageChange }: {
   const totalIssues = newsletters.reduce((sum, g) => sum + g.items.length, 0);
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <GuestPageFrame page="enewsletters">
       <Helmet>
         <title>E-Newsletters — JCI Kuala Lumpur</title>
         <meta name="description" content="Read JCI Kuala Lumpur's latest e-newsletters covering chapter news, events, member highlights, and community updates." />
@@ -173,25 +174,23 @@ export const GuestEnewslettersPage = ({ onLogin, onRegister, onPageChange }: {
 
       <main id="main-content">
         {/* Hero */}
-        <section className="relative py-14 md:py-20 bg-gradient-to-br from-jci-navy via-[#1a3d7c] to-jci-blue overflow-hidden">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-jci-blue/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-amber-400/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
-          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <p className="text-amber-400 text-[10px] font-black uppercase tracking-widest mb-3">Publications</p>
-            <h1 className="text-3xl md:text-5xl font-black text-white leading-tight mb-4">E-Newsletters</h1>
-            <p className="text-blue-200 text-sm md:text-base max-w-2xl mx-auto leading-relaxed">
+        <section className="gp-hero">
+          <div className="gp-container">
+            <p className="gp-kicker">Publications</p>
+            <h1 className="gp-title"><span>E-</span><strong>Newsletters</strong></h1>
+            <p className="gp-description">
               Stories, projects, achievements and impact from JCI Kuala Lumpur — curated every term.
             </p>
             {!loadingPubs && totalIssues > 0 && (
-              <div className="flex items-center justify-center gap-6 md:gap-10 mt-8">
+              <div className="gp-hero-meta">
                 <div className="text-center">
-                  <p className="text-2xl md:text-3xl font-black text-white">{totalIssues}</p>
-                  <p className="text-blue-300 text-[10px] font-semibold uppercase tracking-wider mt-0.5">Issue{totalIssues !== 1 ? 's' : ''}</p>
+                  <p className="gp-meta-number">{totalIssues}</p>
+                  <p className="gp-meta-label">Issue{totalIssues !== 1 ? 's' : ''}</p>
                 </div>
                 <div className="w-px h-8 bg-white/15" />
                 <div className="text-center">
-                  <p className="text-2xl md:text-3xl font-black text-white">{newsletters.length}</p>
-                  <p className="text-blue-300 text-[10px] font-semibold uppercase tracking-wider mt-0.5">Year{newsletters.length !== 1 ? 's' : ''}</p>
+                  <p className="gp-meta-number">{newsletters.length}</p>
+                  <p className="gp-meta-label">Year{newsletters.length !== 1 ? 's' : ''}</p>
                 </div>
               </div>
             )}
@@ -201,10 +200,7 @@ export const GuestEnewslettersPage = ({ onLogin, onRegister, onPageChange }: {
         <section className="py-14">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             {loadingPubs ? (
-              <div className="text-center py-20">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-jci-blue mx-auto mb-4" />
-                <p className="text-slate-500 text-sm">Loading publications...</p>
-              </div>
+              <GuestContentSkeleton variant="publications" label="Loading publications" />
             ) : newsletters.length === 0 ? (
               <div className="text-center py-20 bg-white rounded-2xl border border-slate-100 shadow-sm max-w-xl mx-auto p-10">
                 <BookOpen size={44} className="text-slate-200 mx-auto mb-4" />
@@ -244,12 +240,14 @@ export const GuestEnewslettersPage = ({ onLogin, onRegister, onPageChange }: {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-5">
+                    <div className="gp-publication-grid">
                       {yearGroup.items.map((item, index) => (
                         <div
                           key={index}
+                          role="button" tabIndex={0}
+                          onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedNewsletter({ ...item, year: yearGroup.year }); } }}
                           onClick={() => setSelectedNewsletter({ ...item, year: yearGroup.year })}
-                          className="group cursor-pointer flex flex-col bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
+                          data-guest-reveal className="gp-card group cursor-pointer flex flex-col bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
                         >
                           {/* Thumbnail */}
                           <div className="relative overflow-hidden bg-slate-100 border-b border-slate-100" style={{ aspectRatio: '210/297' }}>
@@ -287,7 +285,7 @@ export const GuestEnewslettersPage = ({ onLogin, onRegister, onPageChange }: {
         </section>
 
         {/* CTA */}
-        <section className="py-16 bg-gradient-to-br from-jci-navy to-jci-blue overflow-hidden relative">
+        <section className="gp-cta py-16 bg-gradient-to-br from-jci-navy to-jci-blue overflow-hidden relative">
           <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/3 pointer-events-none" />
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 flex flex-col md:flex-row items-center gap-8 md:gap-12">
             <div className="shrink-0 w-16 h-16 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center">
@@ -307,7 +305,7 @@ export const GuestEnewslettersPage = ({ onLogin, onRegister, onPageChange }: {
         </section>
       </main>
 
-      <GuestFooter />
+      <GuestFooter whiteLogo />
 
       {/* PDF Viewer Interactive Modal */}
       {selectedNewsletter && (
@@ -462,6 +460,6 @@ export const GuestEnewslettersPage = ({ onLogin, onRegister, onPageChange }: {
           </div>
         </Modal>
       )}
-    </div>
+    </GuestPageFrame>
   );
 };

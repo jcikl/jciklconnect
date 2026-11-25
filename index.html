@@ -38,7 +38,7 @@
 
       /* Desktop nav pills */
       #sh .dn{display:none;gap:2rem;align-items:center}
-      @media(min-width:768px){#sh .dn{display:flex}}
+      @media(min-width:1024px){#sh .dn{display:flex}}
       .np{height:.875rem;border-radius:4px;background:#e2e8f0;animation:sh 1.6s ease-in-out infinite}
 
       /* Login button skeleton */
@@ -47,20 +47,50 @@
 
       /* Mobile hamburger */
       .hb{width:2.5rem;height:2.5rem;background:#f1f5f9;border-radius:.625rem;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-      @media(min-width:768px){.hb{display:none}}
+      @media(min-width:1024px){.hb{display:none}}
 
-      /* Hero — matches bg-gradient-to-br from-jci-navy via-[#1a3d7c] to-jci-blue */
-      #hro{background:linear-gradient(135deg,#130f2d 0%,#1a3d7c 55%,#1e56c4 100%);padding:3.5rem 1rem 4rem;text-align:center;overflow:hidden}
-      @media(min-width:768px){#hro{padding:5rem 1.5rem 5.5rem}}
-      .hl{background:rgba(255,255,255,.15);border-radius:6px;margin:0 auto;animation:sh 1.6s ease-in-out infinite}
-
-      /* Content area */
-      #sc{padding:1.5rem 1rem;max-width:80rem;margin:0 auto}
-      @media(min-width:640px){#sc{padding:2rem 1.5rem}}
-      .slbl{height:1rem;width:7rem;border-radius:4px;background:#cbd5e1;animation:sh 1.6s ease-in-out infinite;margin-bottom:.75rem}
-      .sg{display:grid;grid-template-columns:repeat(2,1fr);gap:.75rem}
-      @media(min-width:768px){.sg{grid-template-columns:repeat(4,1fr)}}
-      .sc{background:#e2e8f0;border-radius:1rem;animation:sh 1.6s ease-in-out infinite}
+      /* Guest bootstrap shell: match the current public pages before React/auth is ready. */
+      #gsh{background:#fff;color:#130f2d}
+      #sh{box-shadow:none;border-bottom:1px solid #dce3e9;gap:1.5rem}
+      #hro{background:#f6f9fd;padding:40px 0;border-bottom:1px solid #dce3e9}
+      .gh-inner,#sc{width:min(1180px,calc(100% - 80px));margin:0 auto}
+      .hl{background:#e3edf4;border-radius:6px;animation:sh 1.8s ease-in-out infinite}
+      #hro .shell-kicker{height:13px;width:180px;margin-bottom:22px}
+      #hro .shell-title{height:72px;width:70%;margin-bottom:24px;background:#dce6f1}
+      #hro .shell-description{height:18px;width:60%;margin-bottom:12px}
+      #hro .shell-description:last-child{width:45%;margin-bottom:0}
+      #sc{padding:40px 0}
+      .slbl{height:28px;width:210px;border-radius:4px;background:#e3edf4;animation:sh 1.8s ease-in-out infinite;margin-bottom:24px}
+      .sg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px}
+      .sc{min-width:0;border:1px solid #dce3e9;border-radius:18px;overflow:hidden;background:#fff}
+      .shell-image{height:192px;background:#e3edf4;animation:sh 1.8s ease-in-out infinite}
+      .shell-copy{padding:20px}
+      .shell-copy .hl{height:14px;margin-bottom:14px;width:90%}
+      .shell-copy .hl:last-child{width:65%;margin:0}
+      html[data-guest-shell-page=projects] .sg{grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}
+      html[data-guest-shell-page=projects] .sc:nth-child(n+3){display:none}
+      html[data-guest-shell-page=enewsletters] .shell-image{height:auto;aspect-ratio:210/297}
+      html[data-guest-shell-page=partnerships] .sg{grid-template-columns:repeat(4,minmax(0,1fr));gap:24px}
+      html[data-guest-shell-page=partnerships] .shell-image{height:144px}
+      html[data-guest-shell-page=events] .sg{gap:12px}
+      html[data-guest-shell-page=events] .sc{display:grid;grid-template-columns:120px minmax(0,1fr)}
+      html[data-guest-shell-page=events] .sc:nth-child(n+4){display:none}
+      html[data-guest-shell-page=events] .shell-image{height:150px}
+      html[data-guest-shell-page=events] .shell-copy{padding:12px}
+      html[data-guest-shell-page=about] .sg{grid-template-columns:1fr 1fr;align-items:center;gap:48px}
+      html[data-guest-shell-page=about] .sc:nth-child(n+3){display:none}
+      html[data-guest-shell-page=about] .sc{border:0}
+      html[data-guest-shell-page=about] .sc:first-child .shell-image{height:40px;width:70%;border-radius:6px}
+      html[data-guest-shell-page=about] .sc:first-child .shell-copy{padding:24px 0}
+      html[data-guest-shell-page=about] .sc:nth-child(2) .shell-image{height:384px;border-radius:24px}
+      html[data-guest-shell-page=about] .sc:nth-child(2) .shell-copy{display:none}
+      .shell-status{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+      @media(max-width:1050px){.gh-inner,#sc{width:calc(100% - 56px)}}
+      @media(width < 1024px){html[data-guest-shell-page=events] .sg{grid-template-columns:repeat(2,minmax(0,1fr))}html[data-guest-shell-page=partnerships] .sg{grid-template-columns:repeat(3,minmax(0,1fr))}html[data-guest-shell-page=about] .sg{grid-template-columns:1fr}}
+      @media(width < 768px){html[data-guest-shell-page=projects] .sg{grid-template-columns:1fr}}
+      @media(max-width:760px){.gh-inner,#sc{width:calc(100% - 40px)}#hro,#sc{padding-block:30px}#hro .shell-title{height:42px;width:90%}#hro .shell-description{width:95%;height:16px}#hro .shell-description:last-child{width:75%}}
+      @media(width < 640px){.sg,html[data-guest-shell-page=partnerships] .sg{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}html[data-guest-shell-page=events] .sg{grid-template-columns:1fr}}
+      @media(prefers-reduced-motion:reduce){#gsh *,#gsh *::before,#gsh *::after{animation:none!important;transition:none!important}}
 
       @keyframes sh{0%,100%{opacity:1}50%{opacity:.45}}
 
@@ -86,6 +116,10 @@
       #msh .mn i{width:1.5rem;height:1.5rem;border-radius:.375rem;background:rgba(255,255,255,.15)}
     </style>
     <script>
+      // Select only a public route name; no account or URL query data enters the guest shell.
+      var publicPath = window.location.pathname.replace(/\/+$/, '') || '/';
+      var publicPages = ['/events', '/projects', '/about', '/enewsletters', '/partnerships'];
+      document.documentElement.dataset.guestShellPage = publicPages.indexOf(publicPath) >= 0 ? publicPath.slice(1) : 'home';
       // Pick the member or guest shell before first paint. Only a yes/no hint — no account data.
       try { if (localStorage.getItem('jci_signed_in') === '1') document.documentElement.classList.add('si'); } catch (e) {}
     </script>
@@ -118,7 +152,7 @@
         </div>
         <div class="mn"><i></i><i></i><i></i><i></i></div>
       </div>
-      <div id="gsh">
+      <div id="gsh" role="status"><span class="shell-status">Loading page</span>
         <!-- Header matches GuestHeader: white, sticky, h-16 mobile / h-20 desktop -->
         <header id="sh">
           <img src="/JCI Kuala Lumpur-transparent.png" alt="JCI Kuala Lumpur" />
@@ -130,7 +164,6 @@
             <div class="np" style="width:2.75rem"></div>
             <div class="np" style="width:5.25rem"></div>
             <div class="np" style="width:4rem"></div>
-            <div class="np" style="width:5rem"></div>
           </nav>
           <div class="sb" aria-hidden="true"></div>
           <div class="hb" aria-hidden="true">
@@ -141,32 +174,18 @@
         </header>
 
         <main aria-hidden="true">
-          <!-- Hero skeleton -->
-          <div id="hro">
-            <div class="hl" style="height:.7rem;width:28%;margin-bottom:1.25rem"></div>
-            <div class="hl" style="height:2.25rem;width:72%;margin-bottom:.625rem"></div>
-            <div class="hl" style="height:2.25rem;width:52%;margin-bottom:1.5rem"></div>
-            <div class="hl" style="height:.8rem;width:58%;margin-bottom:.5rem"></div>
-            <div class="hl" style="height:.8rem;width:42%"></div>
-          </div>
-
-          <!-- Content skeleton -->
-          <div id="sc">
-            <div class="slbl"></div>
-            <div class="sg">
-              <div class="sc" style="height:80px"></div>
-              <div class="sc" style="height:80px"></div>
-              <div class="sc" style="height:80px"></div>
-              <div class="sc" style="height:80px"></div>
-            </div>
-            <div class="slbl" style="margin-top:1.5rem"></div>
-            <div class="sg">
-              <div class="sc" style="height:200px"></div>
-              <div class="sc" style="height:200px"></div>
-              <div class="sc" style="height:200px"></div>
-              <div class="sc" style="height:200px"></div>
-            </div>
-          </div>
+          <div id="hro"><div class="gh-inner">
+            <div class="hl shell-kicker"></div>
+            <div class="hl shell-title"></div>
+            <div class="hl shell-description"></div>
+            <div class="hl shell-description"></div>
+          </div></div>
+          <div id="sc"><div class="slbl"></div><div class="sg">
+            <div class="sc"><div class="shell-image"></div><div class="shell-copy"><div class="hl"></div><div class="hl"></div><div class="hl"></div></div></div>
+            <div class="sc"><div class="shell-image"></div><div class="shell-copy"><div class="hl"></div><div class="hl"></div><div class="hl"></div></div></div>
+            <div class="sc"><div class="shell-image"></div><div class="shell-copy"><div class="hl"></div><div class="hl"></div><div class="hl"></div></div></div>
+            <div class="sc"><div class="shell-image"></div><div class="shell-copy"><div class="hl"></div><div class="hl"></div><div class="hl"></div></div></div>
+          </div></div>
         </main>
       </div>
     </div>

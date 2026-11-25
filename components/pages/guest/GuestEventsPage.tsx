@@ -7,6 +7,7 @@ import * as Forms from '@/components/ui/Form';
 import { useEvents } from '@/hooks/useEvents';
 import { GuestHeader } from '@/components/layout/GuestHeader';
 import { GuestFooter } from '@/components/layout/GuestFooter';
+import { GuestPageFrame, GuestContentSkeleton } from '@/components/layout/GuestPageFrame';
 import { Event } from '@/types';
 import { isKlRelevantEvent } from '../../../utils/loHosting.mjs';
 
@@ -65,7 +66,7 @@ export const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
   const allPublishedEvents = events.filter(isKLRelevant);
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <GuestPageFrame page="events">
       <Helmet>
         <title>Events — JCI Kuala Lumpur</title>
         <meta name="description" content="Browse upcoming JCI Kuala Lumpur events — networking sessions, training workshops, community projects, and international exchanges." />
@@ -80,13 +81,11 @@ export const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
       <GuestHeader currentPage="events" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
 
       <main id="main-content">
-        <section className="relative py-14 md:py-20 bg-gradient-to-br from-jci-navy via-[#1a3d7c] to-jci-blue overflow-hidden" aria-label="Page header">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-jci-blue/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-amber-400/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
-          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <p className="text-amber-400 text-[10px] font-black uppercase tracking-widest mb-3">JCI Kuala Lumpur Events</p>
-            <h1 className="text-3xl md:text-5xl font-black text-white leading-tight mb-4">Upcoming Events</h1>
-            <p className="text-blue-200 text-sm md:text-base max-w-2xl mx-auto leading-relaxed">
+        <section className="gp-hero" aria-label="Page header">
+          <div className="gp-container">
+            <p className="gp-kicker">JCI Kuala Lumpur Events</p>
+            <h1 className="gp-title"><span>Upcoming</span> <strong>Events</strong></h1>
+            <p className="gp-description">
               Join us for exciting events, trainings, and networking opportunities.
             </p>
           </div>
@@ -102,7 +101,8 @@ export const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
               </div>
             </div>
             <div className="mt-8">
-              <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-jci-blue" /></div>}>
+              {loading ? <GuestContentSkeleton variant="events" label="Loading events" /> : (
+              <Suspense fallback={<GuestContentSkeleton variant="events" label="Loading events" />}>
                 <EventCalendarView
                   events={allPublishedEvents}
                   readonly={true}
@@ -120,6 +120,7 @@ export const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
                   }}
                 />
               </Suspense>
+              )}
             </div>
           </div>
         </section>
@@ -427,7 +428,7 @@ export const GuestEventsPage = ({ onLogin, onRegister, onPageChange }: {
         );
       })()}
 
-      <GuestFooter />
-    </div>
+      <GuestFooter whiteLogo />
+    </GuestPageFrame>
   );
 };

@@ -8,6 +8,7 @@ import { PartnershipsService } from '@/services/partnershipsService';
 import { AdvertisementService } from '@/services/advertisementService';
 import { GuestHeader } from '@/components/layout/GuestHeader';
 import { GuestFooter } from '@/components/layout/GuestFooter';
+import { GuestPageFrame, GuestContentSkeleton } from '@/components/layout/GuestPageFrame';
 import { Partnership } from '@/types';
 
 export const GuestPartnershipPage = ({ onLogin, onRegister, onPageChange }: {
@@ -77,7 +78,7 @@ export const GuestPartnershipPage = ({ onLogin, onRegister, onPageChange }: {
   const redeemStatus = selectedPartner ? checkRedeemPermission(selectedPartner) : { allowed: false, reason: 'login' };
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <GuestPageFrame page="partnerships">
       <Helmet>
         <title>Partnerships & Member Benefits — JCI Kuala Lumpur</title>
         <meta name="description" content="Explore exclusive partnership deals and member benefits available to JCI Kuala Lumpur members. Unlock discounts, perks, and business opportunities." />
@@ -93,20 +94,18 @@ export const GuestPartnershipPage = ({ onLogin, onRegister, onPageChange }: {
 
       <main id="main-content">
         {/* Hero */}
-        <section className="relative py-14 md:py-20 bg-gradient-to-br from-jci-navy via-[#1a3d7c] to-jci-blue overflow-hidden">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-jci-blue/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-amber-400/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
-          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <p className="text-amber-400 text-[10px] font-black uppercase tracking-widest mb-3">Member Benefits</p>
-            <h1 className="text-3xl md:text-5xl font-black text-white leading-tight mb-4">Member Perks</h1>
-            <p className="text-blue-200 text-sm md:text-base max-w-2xl mx-auto leading-relaxed">
+        <section className="gp-hero">
+          <div className="gp-container">
+            <p className="gp-kicker">Member Benefits</p>
+            <h1 className="gp-title"><span>Member</span> <strong>Perks</strong></h1>
+            <p className="gp-description">
               Exclusive discounts and rewards from our merchant partners — curated for JCI Kuala Lumpur members.
             </p>
             {!loading && partnerships.length > 0 && (
-              <div className="flex items-center justify-center gap-6 md:gap-10 mt-8">
+              <div className="gp-hero-meta">
                 <div className="text-center">
-                  <p className="text-2xl md:text-3xl font-black text-white">{partnerships.length}</p>
-                  <p className="text-blue-300 text-[10px] font-semibold uppercase tracking-wider mt-0.5">Active Partner{partnerships.length !== 1 ? 's' : ''}</p>
+                  <p className="gp-meta-number">{partnerships.length}</p>
+                  <p className="gp-meta-label">Active Partner{partnerships.length !== 1 ? 's' : ''}</p>
                 </div>
               </div>
             )}
@@ -117,10 +116,7 @@ export const GuestPartnershipPage = ({ onLogin, onRegister, onPageChange }: {
         <section className="py-14">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             {loading ? (
-              <div className="text-center py-20">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-jci-blue mx-auto mb-4" />
-                <p className="text-slate-500 text-sm">Loading partnerships...</p>
-              </div>
+              <GuestContentSkeleton variant="partners" label="Loading partnerships" />
             ) : partnerships.length === 0 ? (
               <div className="text-center py-20 bg-white rounded-2xl border border-slate-100 shadow-sm max-w-xl mx-auto p-10">
                 <Gift size={44} className="text-slate-200 mx-auto mb-4" />
@@ -130,12 +126,14 @@ export const GuestPartnershipPage = ({ onLogin, onRegister, onPageChange }: {
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-5">
+              <div className="gp-partner-grid">
                 {partnerships.map(partner => {
                   return (
                     <div
                       key={partner.id}
-                      className="group flex flex-col bg-white rounded-2xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 cursor-pointer overflow-hidden border border-slate-100/80"
+                      data-guest-reveal className="gp-card group flex flex-col bg-white rounded-2xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 cursor-pointer overflow-hidden border border-slate-100/80"
+                      role="button" tabIndex={0}
+                      onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); handleCardClick(partner); } }}
                       onClick={() => handleCardClick(partner)}
                     >
                       {/* Logo area */}
@@ -189,7 +187,7 @@ export const GuestPartnershipPage = ({ onLogin, onRegister, onPageChange }: {
         </section>
 
         {/* Merchant CTA */}
-        <section className="py-16 bg-gradient-to-br from-jci-navy to-jci-blue overflow-hidden relative">
+        <section className="gp-cta py-16 bg-gradient-to-br from-jci-navy to-jci-blue overflow-hidden relative">
           <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/3 pointer-events-none" />
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 flex flex-col md:flex-row items-center gap-8 md:gap-12">
             <div className="shrink-0 w-16 h-16 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center">
@@ -209,7 +207,7 @@ export const GuestPartnershipPage = ({ onLogin, onRegister, onPageChange }: {
         </section>
       </main>
 
-      <GuestFooter />
+      <GuestFooter whiteLogo />
 
       {/* Benefit Shielding Modal */}
       {selectedPartner && (
@@ -292,6 +290,6 @@ export const GuestPartnershipPage = ({ onLogin, onRegister, onPageChange }: {
           </div>
         </Modal>
       )}
-    </div>
+    </GuestPageFrame>
   );
 };

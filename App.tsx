@@ -11,6 +11,7 @@ import {
   Download, Printer, Share2, Copy, ExternalLink, Eye, Upload, Info, Zap, Activity, DollarSign, Lock, Unlock, SlidersHorizontal, Handshake, Video
 } from 'lucide-react';
 import { Button, Card, Badge, StatCard, Modal, Drawer, ToastProvider, useToast, ProgressBar, Spinner } from './components/ui/Common';
+import { GuestRouteSkeleton } from './components/layout/GuestPageFrame';
 import { PerfMonitor } from './components/ui/PerfMonitor';
 import * as Forms from './components/ui/Form';
 import { LoginModal } from './components/auth/LoginModal';
@@ -377,7 +378,7 @@ export const JCIKLApp: React.FC = () => {
     return (
       <>
         <GuestAnalyticsTracker />
-        <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><Spinner size="lg" /></div>}>
+        <Suspense fallback={<GuestRouteSkeleton {...guestPageProps} page={view === 'GUEST_EVENTS' ? 'events' : view === 'FLAGSHIP_PROJECTS' ? 'projects' : view === 'GUEST_ABOUT' ? 'about' : view === 'GUEST_ENEWSLETTERS' ? 'enewsletters' : view === 'GUEST_PARTNERSHIPS' ? 'partnerships' : 'home'} />}>
           <Routes>
             <Route path="/" element={<GuestLandingPage {...guestPageProps} />} />
             <Route path="/events" element={<GuestEventsPage {...guestPageProps} />} />

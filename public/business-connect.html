@@ -83,6 +83,12 @@ button,select{cursor:pointer}:focus-visible{outline:3px solid var(--blue);outlin
 @page{size:A4;margin:14mm}
 @media print{body{background:white;font-size:10pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}#page-header,.directory-heading,.search-strip,.filters,.results-toolbar,.page-footer,.empty-state{display:none!important}#main{padding:0;max-width:none}.directory-layout{display:block}#pages{display:block}.card{border:0;border-radius:0;break-after:page;margin:0;overflow:visible}.card:last-child{break-after:auto}.member-masthead{margin:0;padding:0 0 10pt}.card-identity{padding:18pt 0}.avatar-wrap{width:68pt;height:78pt;flex-basis:68pt}.id-name{font-size:23pt}.id-company{font-size:15pt}.id-pos{font-size:10pt}.profile-content{padding:0}.handbook-columns{display:block;padding-top:16pt}.sec,.col,.offer-sec,.card-identity,.member-masthead,.card-footer{break-inside:avoid-page}.two-col{grid-template-columns:1fr 1fr;gap:18pt}.about-p,.pns-list{font-size:10pt;line-height:1.6}.sec{margin-bottom:13pt}.eyebrow{font-size:10pt;break-after:avoid-page}.offer-sec{margin-bottom:16pt;padding:12pt}.card-footer{padding:13pt 0}.footer-web{font-size:10pt}.qr-box img{width:72pt;height:72pt}a{text-decoration:none}}
 </style>
+<style>
+.back-to-top{position:fixed;right:max(20px,env(safe-area-inset-right));bottom:max(20px,env(safe-area-inset-bottom));z-index:40;display:grid;place-items:center;width:48px;height:48px;border:0;border-radius:50%;background:var(--navy);color:#fff;box-shadow:0 4px 16px #130f2d26}
+.back-to-top:hover{background:var(--blue)}
+@media(max-width:540px){.back-to-top{right:max(16px,env(safe-area-inset-right));bottom:max(16px,env(safe-area-inset-bottom))}}
+@media print{.back-to-top{display:none!important}}
+</style>
 </head>
 <body>
 
@@ -97,7 +103,7 @@ button,select{cursor:pointer}:focus-visible{outline:3px solid var(--blue);outlin
 </header>
 <main id="main">
   <div class="directory-heading">
-    <div><p class="context">JCI Kuala Lumpur</p><h1>Business Connect</h1><p class="handbook-subtitle">Member profile handbook</p></div>
+    <div><p class="context">JCI Kuala Lumpur</p><h1 id="directory-title" tabindex="-1">Business Connect</h1><p class="handbook-subtitle">Member profile handbook</p></div>
     <p class="directory-total" id="hdr-count" role="status">Loading members...</p>
   </div>
   <div class="search-strip">
@@ -124,6 +130,9 @@ button,select{cursor:pointer}:focus-visible{outline:3px solid var(--blue);outlin
   </div>
   <footer class="page-footer"><span>JCI Kuala Lumpur &middot; Est. 1954</span><a href="https://jcikl.cc">Part of a global network. Rooted in Kuala Lumpur. &#8599;</a></footer>
 </main>
+<button id="back-to-top" class="back-to-top" type="button" aria-label="Back to top" title="Back to top" hidden>
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5m-7 7 7-7 7 7"/></svg>
+</button>
 
 <script>
 const FIREBASE_PROJECT = 'jci-lo-management-app';
@@ -444,6 +453,14 @@ document.getElementById('pages').addEventListener('error', (event) => {
   fallback.hidden = false;
 }, true);
 
+const backToTop = document.getElementById('back-to-top');
+function updateBackToTop() { backToTop.hidden = window.scrollY < 400; }
+window.addEventListener('scroll', updateBackToTop, { passive: true });
+backToTop.addEventListener('click', () => {
+  document.getElementById('directory-title').focus({ preventScroll: true });
+  window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+});
+updateBackToTop();
 loadDirectory();
 </script>
 </body>

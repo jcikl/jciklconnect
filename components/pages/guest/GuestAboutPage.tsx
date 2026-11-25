@@ -5,6 +5,7 @@ import { Button, Card } from '@/components/ui/Common';
 import { BoardManagementService } from '@/services/boardManagementService';
 import { GuestHeader } from '@/components/layout/GuestHeader';
 import { GuestFooter } from '@/components/layout/GuestFooter';
+import { GuestPageFrame, GuestContentSkeleton } from '@/components/layout/GuestPageFrame';
 
 export const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
   onLogin: () => void;
@@ -341,7 +342,7 @@ export const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <GuestPageFrame page="about">
       <Helmet>
         <title>About Us — JCI Kuala Lumpur</title>
         <meta name="description" content="Learn about JCI Kuala Lumpur — Malaysia's first Junior Chamber chapter founded in 1954, developing young leaders through business, community, and international opportunities." />
@@ -356,13 +357,11 @@ export const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
       <GuestHeader currentPage="about" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
 
       <main id="main-content">
-        <section className="relative py-14 md:py-20 bg-gradient-to-br from-jci-navy via-[#1a3d7c] to-jci-blue overflow-hidden" aria-label="Page header">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-jci-blue/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-amber-400/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
-          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <p className="text-amber-400 text-[10px] font-black uppercase tracking-widest mb-3">Est. 1954 · Kuala Lumpur</p>
-            <h1 className="text-3xl md:text-5xl font-black text-white leading-tight mb-4">About JCI Kuala Lumpur</h1>
-            <p className="text-blue-200 text-sm md:text-base max-w-2xl mx-auto leading-relaxed">
+        <section className="gp-hero" aria-label="Page header">
+          <div className="gp-container">
+            <p className="gp-kicker">Est. 1954 · Kuala Lumpur</p>
+            <h1 className="gp-title"><span>About</span> <strong>JCI Kuala Lumpur</strong></h1>
+            <p className="gp-description">
               The first Malaysia Junior Chamber Chapter, empowering young active citizens to create positive change since 1954.
             </p>
           </div>
@@ -388,7 +387,7 @@ export const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
                   Contact Us
                 </Button>
               </div>
-              <div className="rounded-2xl h-96 overflow-hidden">
+              <div className="gp-photo-frame rounded-2xl h-96 overflow-hidden">
                 {currentTermGroupPhoto ? (
                   <img
                     src={currentTermGroupPhoto}
@@ -499,10 +498,7 @@ export const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
             </div>
 
             {loadingBoard ? (
-              <div className="flex flex-col items-center justify-center py-20 bg-slate-50 rounded-3xl border border-slate-100">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-jci-blue mb-4"></div>
-                <p className="text-slate-500 text-sm font-semibold">Loading Board Directory...</p>
-              </div>
+              <GuestContentSkeleton variant="board" label="Loading board directory" />
             ) : (
               <div className="space-y-10">
                 {/* Level 1: President + IPP */}
@@ -652,7 +648,7 @@ export const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
         </section>
 
         {/* CTA Section */}
-        <section className="py-16 bg-gradient-to-r from-jci-blue to-jci-lightblue">
+        <section className="gp-cta py-16 bg-gradient-to-r from-jci-blue to-jci-lightblue">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-white">
             <h2 className="text-3xl font-bold mb-4">Ready to Join Us?</h2>
             <p className="text-xl text-blue-100 mb-8">
@@ -671,7 +667,7 @@ export const GuestAboutPage = ({ onLogin, onRegister, onPageChange }: {
         </section>
 
       </main>
-      <GuestFooter />
-    </div>
+      <GuestFooter whiteLogo />
+    </GuestPageFrame>
   );
 };

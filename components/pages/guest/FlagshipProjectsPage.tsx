@@ -5,6 +5,7 @@ import { Button, Modal } from '@/components/ui/Common';
 import { FlagshipProjectsService } from '@/services/flagshipProjectsService';
 import { GuestHeader } from '@/components/layout/GuestHeader';
 import { GuestFooter } from '@/components/layout/GuestFooter';
+import { GuestPageFrame, GuestContentSkeleton } from '@/components/layout/GuestPageFrame';
 import { FlagshipProject } from '@/types';
 
 export const FlagshipProjectsPage = ({ onLogin, onRegister, onPageChange }: {
@@ -45,7 +46,7 @@ export const FlagshipProjectsPage = ({ onLogin, onRegister, onPageChange }: {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <GuestPageFrame page="projects">
       <Helmet>
         <title>Flagship Projects — JCI Kuala Lumpur</title>
         <meta name="description" content="Discover JCI Kuala Lumpur's flagship community and development projects creating positive change across Kuala Lumpur." />
@@ -60,13 +61,11 @@ export const FlagshipProjectsPage = ({ onLogin, onRegister, onPageChange }: {
       <GuestHeader currentPage="projects" onPageChange={onPageChange} onLogin={onLogin} onRegister={onRegister} />
 
       <main id="main-content">
-        <section className="relative py-14 md:py-20 bg-gradient-to-br from-jci-navy via-[#1a3d7c] to-jci-blue overflow-hidden" aria-label="Page header">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-jci-blue/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-amber-400/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
-          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <p className="text-amber-400 text-[10px] font-black uppercase tracking-widest mb-3">Impact & Community</p>
-            <h1 className="text-3xl md:text-5xl font-black text-white leading-tight mb-4">Flagship Projects</h1>
-            <p className="text-blue-200 text-sm md:text-base max-w-2xl mx-auto leading-relaxed">
+        <section className="gp-hero" aria-label="Page header">
+          <div className="gp-container">
+            <p className="gp-kicker">Impact & Community</p>
+            <h1 className="gp-title"><span>Flagship</span> <strong>Projects</strong></h1>
+            <p className="gp-description">
               Discover the impactful initiatives driving positive change in our community and beyond.
             </p>
           </div>
@@ -79,10 +78,7 @@ export const FlagshipProjectsPage = ({ onLogin, onRegister, onPageChange }: {
               .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
             `}</style>
             {loading ? (
-              <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border border-slate-100">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-jci-blue mb-4"></div>
-                <p className="text-slate-500 text-sm font-semibold">Loading projects...</p>
-              </div>
+              <GuestContentSkeleton variant="projects" label="Loading projects" />
             ) : activeProjects.length === 0 ? (
               <div className="text-center py-20">
                 <Briefcase size={48} className="mx-auto mb-4 text-slate-300" />
@@ -101,7 +97,7 @@ export const FlagshipProjectsPage = ({ onLogin, onRegister, onPageChange }: {
                   const extraCount = allPhotos.length - 5;
 
                   return (
-                    <div key={project.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-slate-200/60 transition-all duration-300 overflow-hidden flex flex-col group">
+                    <div key={project.id} data-guest-reveal className="gp-card bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-slate-200/60 transition-all duration-300 overflow-hidden flex flex-col group">
                       {/* Cover */}
                       <div className="relative h-48 bg-gradient-to-br from-jci-navy to-jci-blue overflow-hidden shrink-0">
                         {coverPhoto ? (
@@ -405,7 +401,7 @@ export const FlagshipProjectsPage = ({ onLogin, onRegister, onPageChange }: {
           </Modal>
         )}
       </main>
-      <GuestFooter />
-    </div>
+      <GuestFooter whiteLogo />
+    </GuestPageFrame>
   );
 };

@@ -1635,7 +1635,7 @@
 |---|---|---|---|
 | `AsyncErrorBoundary.tsx` | 4 | 9 | — |
 | `AvatarUploader.tsx` | 97 | 1 | `AvatarUploader` |
-| `Badge.tsx` | 86 | 1 | `Badge`, `ProgressBar`, `AvatarGroup`, `Skeleton` |
+| `Badge.tsx` | 86 | 2 | `Badge`, `ProgressBar`, `AvatarGroup`, `Skeleton` |
 | `Button.tsx` | 50 | 5 | `Button` |
 | `Card.tsx` | 77 | 1 | `Card`, `StatCardsContainer` |
 | `ColumnFilterHeader.tsx` | 118 | 2 | `ColumnFilterHeader` |
