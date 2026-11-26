@@ -36,8 +36,8 @@
 | general.age | number | — | | age | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | 会员资料详情展示 |
 | general.dietaryPreference | enum | — | `vegetarian` \| `halal` \| `normal` \| null | dietaryPreference | 角色: 自己(非锁定字段) 或 B+ | 活动餐饮安排、会员资料展示 |
 | contact | object | — | 联系信息 nested object |  | 会员资料表单 / 导入 normalize | 联系信息展示、隐私筛选 |
-| contact.email | string | ✓ | | email | 角色: 自注册GUEST / 自己(非锁定字段) / B+；系统: 导入 normalize | `memberEmails/{sanitizedEmail}` 唯一索引；Auth email sync |
-| contact.phone | string | ✓ | | phone | 角色: 自己(非锁定字段) 或 B+ | 联系信息展示（受隐私设置控制）|
+| contact.email | string | ✓ | | email | 角色: 自注册GUEST / 自己(非锁定字段) / B+；系统: 导入 normalize | `memberEmails/{sanitizedEmail}` 唯一索引；Auth email sync；Business Connect `mode=contact` 授权后按需读取并显示电邮链接 |
+| contact.phone | string | ✓ | | phone | 角色: 自己(非锁定字段) 或 B+ | 联系信息展示（受隐私设置控制）；Business Connect `mode=contact` 授权后显示号码，有效号码支持拨号链接；`mode=whatsapp` 生成二维码 |
 | contact.alternatePhone | string | — | | alternatePhone | 角色: 自己(非锁定字段) 或 B+ | 联系信息展示（受隐私设置控制）|
 | contact.address | string | ✓ | | address | 角色: 自己(非锁定字段) 或 B+；系统: 导入 normalize | `PostcodeService` 解析生成 `contact.area/state` |
 | contact.area | string | — | |  | 系统: `contact.address` 解析 | 地区筛选/展示 |
@@ -224,6 +224,7 @@
 ---
 
 ## `boardMembers`
+
 > **TS Interface:** `BoardMember` | **Constants key:** `COLLECTIONS.BOARD_MEMBERS`
 
 | 字段路径 | 类型 | 必填 | 枚举值 / 说明 | 来 | 往 |
@@ -1940,6 +1941,8 @@
 ## `documents`
 > **TS Interface:** `Document` (`types/misc.ts`) | **Constants key:** `COLLECTIONS.DOCUMENTS`
 
+Documents 资料库通过 `useKnowledge` → `DocumentsService.getAllDocuments()` 读取主记录，并关联 `documentVersions` 的当前版本提供打开链接；`purpose` 显示为 Category，`name` 用于搜索及 A–Z 列表排序。不新增字段或修改权限，缺失 / 无效版本链接显示 No link。
+
 | 字段路径 | 类型 | 必填 | 枚举值 / 说明 | 来 | 往 |
 |--------|------|:----:|------------|----|----|
 | id | string | ✓ | Firestore doc ID | 系统: Firestore doc id | `documentVersions.documentId` |
@@ -2168,6 +2171,8 @@
 > **注意：** 此集合是 `members` 集合 business 字段的公开去标准化副本，由 `businessDirectoryService.syncPublicListing` 维护。字段结构与 `businessProfiles` 完全相同，doc ID = memberId。外部账号被 `netlify/functions/external-accounts` `deleteAccount` 永久删除时，同 id 的文档随成员文档同批删除（不存在时无操作）。
 
 字段同 `businessProfiles`，见上方。
+
+Business Connect 的电话与电邮不写入此公开副本：页面可视范围内的会员卡通过 `public-directory-photo?mode=contact&id=...` 读取当前 `members.contact.phone` / `contact.email`。服务端复用头像 / 二维码的会员角色、分会、删除状态、`privacy.shareCardInternationally === true` 与有效名片检查，响应禁止缓存；不返回备用电话或其他联系字段。无授权返回 404；无资料隐藏对应项目，无效电话仅展示文本，不生成拨号链接。
 
 ---
 

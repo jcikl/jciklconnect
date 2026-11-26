@@ -69,6 +69,7 @@ button,select{cursor:pointer}:focus-visible{outline:3px solid var(--blue);outlin
 .offer-tc,.offer-exp{font-size:12px;color:var(--muted);margin:5px 0 0}.offer-exp svg{vertical-align:middle}
 .card-footer{display:flex;align-items:center;justify-content:space-between;gap:28px;border-top:1px solid var(--line);padding:23px 0 27px}
 .footer-left{min-width:0}.footer-web-lbl{font-size:11px;color:var(--muted);display:block;margin-bottom:4px}
+.contact-details{display:grid;gap:10px;margin-bottom:12px}.contact-details:empty{display:none}.contact-details p{margin:0}.contact-details a{overflow-wrap:anywhere;font-size:14px}.contact-status{font-size:12px;color:var(--muted)}
 .footer-web{font-size:14px;font-weight:600;overflow-wrap:anywhere}.footer-web svg{margin-right:5px}
 .footer-pg{font-size:11px;color:var(--muted);margin:12px 0 0}
 .qr-box{flex-shrink:0;display:flex;align-items:center;gap:12px;min-width:96px}
@@ -89,6 +90,30 @@ button,select{cursor:pointer}:focus-visible{outline:3px solid var(--blue);outlin
 @media(max-width:540px){.back-to-top{right:max(16px,env(safe-area-inset-right));bottom:max(16px,env(safe-area-inset-bottom))}}
 @media print{.back-to-top{display:none!important}}
 </style>
+<style>
+.connect-console{position:relative;isolation:isolate;background:#101d35;color:#f5faff;border:1px solid #253e5a;border-radius:12px;padding:30px 32px 0;margin-bottom:28px;overflow:hidden}
+.console-top{display:grid;grid-template-columns:minmax(0,1fr) 260px;align-items:center;gap:28px;margin-bottom:22px}
+.connect-console .directory-heading{display:block;margin:0}.connect-console .context{color:#81d9f5;font-size:12px;margin-bottom:14px}
+.connect-console h1{font-size:clamp(30px,4vw,43px);letter-spacing:-1.5px}.connect-console .handbook-subtitle{color:#b6c8db;max-width:390px;font-size:14px;margin-top:14px;line-height:1.8}
+.network-dial{position:relative;width:260px;height:202px;display:grid;place-items:center}.network-dial svg{position:absolute;width:100%;height:100%;overflow:visible}
+.dial-rings{fill:none;stroke:#35536f;stroke-width:1}.dial-rings .dial-ticks{stroke:#6192ad;stroke-dasharray:1 8;stroke-width:5}
+.dial-links{fill:none;stroke:#49c9ef;stroke-width:1.3;filter:drop-shadow(0 0 4px #29bdf7)}.dial-signal{stroke:#b2f0ff;stroke-width:2;stroke-dasharray:4 85;animation:network-flow 8s linear infinite}
+.dial-nodes{fill:#90e5ff;stroke:#183f5a;stroke-width:5}.dial-core{background:#142e49;border:1px solid #5aa3c1;border-radius:50%;width:88px;height:88px;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1;line-height:1.5}.dial-core strong{font-size:15px;letter-spacing:1px}.dial-core span{font-size:11px;color:#9ecbdf}
+.connect-console .search-strip{margin:0 0 18px}.connect-console #search{background:#f8fcff;border:1px solid #a8cadd;height:52px;color:#14253a;border-radius:6px}.connect-console .hdr-search svg{top:17px;color:#476179}
+.connect-console .filters{margin:0 0 24px;gap:16px 22px}.connect-console .filter-wrap{width:260px}.connect-console .filter-wrap label{display:block;font-size:11px;color:#b6c8db;margin-bottom:6px}.connect-console .filter-wrap select{background:#192c44;border-color:#4b637d;color:#f5faff;font-size:13px;height:42px;color-scheme:dark}.connect-console .filter-check{color:#d2e0ed;font-size:12px;margin-top:22px;min-height:42px}.connect-console .filter-check input{accent-color:#52cafa;width:16px;height:16px}.connect-console .reset{color:#92e1fa;margin-top:22px;min-height:42px}
+.console-stats{display:flex;align-items:center;justify-content:space-between;gap:18px;border-top:1px solid #334960;padding:18px 0}.connect-console .directory-total{color:#e2edf8;font-size:13px;font-variant-numeric:tabular-nums}.connect-console .results-toolbar{margin:0;color:#9edbf0;font-size:12px;text-align:right}.console-status{display:flex;align-items:center;gap:8px;color:#b6c8db;font-size:11px}.console-status::before{content:'';width:5px;height:5px;border-radius:50%;background:#66d5f5;box-shadow:0 0 8px #49c9ef}
+.connect-console .filters{display:grid;grid-template-columns:minmax(0,1fr) 190px auto;align-items:end;gap:14px}.connect-console .search-strip{min-width:0;margin:0}.connect-console .filter-wrap{width:auto;min-width:0}.connect-console .filter-wrap select{height:52px}.connect-console .filter-check{margin:0;min-height:52px;white-space:nowrap}.connect-console .reset{grid-column:1/-1;justify-self:end;margin:0;min-height:28px}
+@media(max-width:760px){.connect-console .filters{grid-template-columns:minmax(0,1fr) auto}.connect-console .search-strip{grid-column:1/-1}}
+@media(max-width:540px){.connect-console .filters{grid-template-columns:minmax(0,1fr)}.connect-console .filter-check{white-space:normal}.connect-console .reset{margin:0}.connect-console .filter-wrap{width:auto}}
+@keyframes network-flow{to{stroke-dashoffset:-178}}
+@media(max-width:760px){.connect-console{padding:24px 24px 0}.console-top{grid-template-columns:minmax(0,1fr) 190px;gap:12px}.network-dial{width:190px;height:176px}.dial-core{width:70px;height:70px}.dial-core strong{font-size:12px}.dial-core span{font-size:10px}.console-status{display:none}}
+@media(max-width:540px){.connect-console{padding:23px 18px 0;margin-bottom:22px;border-radius:8px}.console-top{grid-template-columns:1fr;gap:0;margin-bottom:20px;padding-right:0}.network-dial{position:absolute;right:-65px;top:-18px;width:200px;height:190px;opacity:.25;z-index:-1}.dial-core{display:none}.connect-console .directory-heading{max-width:100%}.connect-console .context{margin-bottom:10px}.connect-console h1{font-size:30px;letter-spacing:-1px}.connect-console .handbook-subtitle{font-size:13px;max-width:260px;margin-top:10px}.connect-console .filters{gap:8px;margin-bottom:16px}.connect-console .filter-wrap{width:100%}.connect-console .filter-check{margin-top:0;min-height:40px}.connect-console .reset{margin-top:0;margin-left:auto}.console-stats{align-items:flex-start;gap:10px;padding:16px 0;flex-direction:column}.connect-console .directory-total{padding:0;font-size:12px}.connect-console .results-toolbar{text-align:left;font-size:11px}}
+@media(prefers-reduced-motion:reduce){.dial-signal{animation:none}}
+#filter-slot{display:flow-root}.header-filter-dock.connect-console{max-width:1060px;margin:0 auto;padding:12px 32px;border:0;border-radius:0;overflow:visible}.header-filter-dock.connect-console .filters{margin:0}.header-filter-dock .filter-wrap label{display:none}.header-filter-dock.connect-console #search,.header-filter-dock.connect-console .filter-wrap select{height:42px}.header-filter-dock.connect-console .hdr-search svg{top:12px}.header-filter-dock.connect-console .filter-check{min-height:42px}
+@media(max-width:760px){.header-filter-dock.connect-console{padding:10px 24px}.header-filter-dock.connect-console .filters{gap:8px 14px;grid-template-columns:minmax(0,1fr) auto}}
+@media(max-width:540px){.header-filter-dock.connect-console{padding:10px 18px}.header-filter-dock.connect-console .filter-check{font-size:11px;max-width:155px}.header-filter-dock.connect-console .filter-wrap select{font-size:12px}.header-filter-dock.connect-console .reset{min-height:24px}}
+@media print{.connect-console{display:none!important}}
+</style>
 </head>
 <body>
 
@@ -100,28 +125,46 @@ button,select{cursor:pointer}:focus-visible{outline:3px solid var(--blue);outlin
     </div>
     <a class="hdr-return" href="https://jcikl.cc">JCI KL<span aria-hidden="true"> &#8599;</span></a>
   </div>
+  <div class="connect-console header-filter-dock" id="header-filter-dock" hidden></div>
 </header>
 <main id="main">
+ <section class="connect-console" aria-labelledby="directory-title">
+  <div class="console-top">
   <div class="directory-heading">
-    <div><p class="context">JCI Kuala Lumpur</p><h1 id="directory-title" tabindex="-1">Business Connect</h1><p class="handbook-subtitle">Member profile handbook</p></div>
-    <p class="directory-total" id="hdr-count" role="status">Loading members...</p>
+    <div><p class="context">JCI Kuala Lumpur · Business network</p><h1 id="directory-title" tabindex="-1">Business Connect</h1><p class="handbook-subtitle">Discover the people, expertise and opportunities in your business community.</p></div>
   </div>
+  <div class="network-dial" aria-hidden="true">
+    <svg viewBox="0 0 260 202" focusable="false">
+      <g class="dial-rings"><circle cx="130" cy="101" r="91"/><circle cx="130" cy="101" r="70"/><circle class="dial-ticks" cx="130" cy="101" r="96"/></g>
+      <g class="dial-links"><path d="M130 101 65 37M130 101 195 37M130 101H222M130 101 195 165M130 101 65 165M130 101H38M130 101V10M130 101V192"/><path class="dial-signal" d="M65 37 130 101 195 37M222 101H130L195 165M65 165 130 101H38M130 10V192"/></g>
+      <g class="dial-nodes"><circle cx="65" cy="37" r="5"/><circle cx="195" cy="37" r="5"/><circle cx="222" cy="101" r="5"/><circle cx="195" cy="165" r="5"/><circle cx="65" cy="165" r="5"/><circle cx="38" cy="101" r="5"/><circle cx="130" cy="10" r="5"/><circle cx="130" cy="192" r="5"/></g>
+    </svg>
+    <div class="dial-core"><strong>JCI KL</strong><span>Connect</span></div>
+  </div>
+  </div>
+   <div id="filter-slot">
+    <aside class="filters" aria-label="Directory filters">
   <div class="search-strip">
     <div class="hdr-search">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4-4"/></svg>
       <input id="search" type="search" placeholder="Search companies, members or services" aria-label="Search companies, members or services" disabled>
     </div>
   </div>
-  <div class="directory-layout">
-    <aside class="filters" aria-label="Directory filters">
       <h2>Refine your search</h2>
       <div class="filter-wrap"><label for="industry">Industry</label><select id="industry" disabled><option value="">All industries</option></select></div>
       <label class="filter-check"><input id="international" type="checkbox" disabled><span>Open to international business</span></label>
       <button class="reset" id="reset-filters" type="button" hidden>Clear filters</button>
       <p class="filter-note">JCI Kuala Lumpur<br>Business &amp; Entrepreneurship</p>
     </aside>
+   </div>
+    <div class="console-stats">
+      <p class="directory-total" id="hdr-count" role="status">Loading members...</p>
+      <span class="console-status">Member profile handbook</span>
+      <div class="results-toolbar"><p id="results-count" role="status">Loading profiles...</p></div>
+    </div>
+ </section>
+  <div class="directory-layout">
     <section aria-label="Member businesses">
-      <div class="results-toolbar"><p id="results-count" role="status">Loading profiles...</p><p>Member profiles</p></div>
       <div id="pages" aria-busy="true">
         <div class="card" aria-hidden="true"><div class="card-identity"><div class="avatar-wrap skel"></div><div class="id-info"><div class="skel" style="width:65%;margin-bottom:12px"></div><div class="skel" style="width:40%"></div></div></div></div>
         <div class="card" aria-hidden="true"><div class="card-identity"><div class="avatar-wrap skel"></div><div class="id-info"><div class="skel" style="width:55%;margin-bottom:12px"></div><div class="skel" style="width:45%"></div></div></div></div>
@@ -302,6 +345,7 @@ function renderPage(p, idx, total) {
   ${offerSection}
   <div class="card-footer">
     <div class="footer-left">
+      <div class="contact-details" data-contact-id="${esc(p.listingId)}" aria-live="polite"></div>
       ${webDisplay && webHref ? `
       <span class="footer-web-lbl">Website</span>
       <a class="footer-web" href="${esc(webHref)}" target="_blank" rel="noopener noreferrer">
@@ -320,6 +364,31 @@ function renderPage(p, idx, total) {
 let _profiles = [];
 let _currentList  = [];
 let _headerObserver;
+let _contactObserver;
+
+function renderContactDetails(data) {
+  const phone = typeof data.phone === 'string' ? data.phone : '';
+  const phoneHref = /^\+[1-9]\d{7,14}$/.test(data.phoneHref) ? data.phoneHref : '';
+  const email = typeof data.email === 'string' && /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(data.email) ? data.email : '';
+  return (phone ? `<p><span class="footer-web-lbl">Phone</span>${phoneHref ? `<a href="tel:${phoneHref}">${esc(phone)}</a>` : esc(phone)}</p>` : '')
+    + (email ? `<p><span class="footer-web-lbl">Email</span><a href="mailto:${esc(encodeURIComponent(email))}">${esc(email)}</a></p>` : '');
+}
+
+async function loadContactDetails(node) {
+  const id = node.getAttribute('data-contact-id');
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(id || '')) return;
+  try {
+    const response = await fetch(`/.netlify/functions/public-directory-photo?mode=contact&id=${encodeURIComponent(id)}`, {
+      cache: 'no-store', signal: AbortSignal.timeout(10000),
+    });
+    if (response.status === 404) return;
+    if (!response.ok) throw new Error('Contact unavailable');
+    const data = await response.json();
+    if (node.isConnected) node.innerHTML = renderContactDetails(data);
+  } catch {
+    if (node.isConnected) node.innerHTML = '<p class="contact-status">Contact details unavailable</p>';
+  }
+}
 
 function groupProfiles(profiles) {
   const groups = new Map();
@@ -353,6 +422,16 @@ function renderAll(list) {
     countEl.textContent = `${total} members`;
   }
   updateResultsCount();
+  if (typeof IntersectionObserver !== 'undefined') {
+    _contactObserver?.disconnect();
+    _contactObserver = new IntersectionObserver(entries => {
+      for (const entry of entries) if (entry.isIntersecting) {
+        _contactObserver.unobserve(entry.target);
+        loadContactDetails(entry.target.querySelector('[data-contact-id]'));
+      }
+    }, { rootMargin: '300px' });
+    pagesEl.querySelectorAll('[data-contact-id]').forEach(node => _contactObserver.observe(node.parentElement));
+  }
 }
 
 function updateResultsCount() {
@@ -384,6 +463,7 @@ function applyFilters() {
 
 
 async function loadDirectory() {
+  syncFilterDock();
   const pagesEl = document.getElementById('pages');
   const countEl = document.getElementById('hdr-count');
   const searchEl = document.getElementById('search');
@@ -461,6 +541,27 @@ backToTop.addEventListener('click', () => {
   window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
 });
 updateBackToTop();
+// Reuse the same controls in the header so filtering and keyboard state stay in sync.
+let filtersDocked = false;
+let filterSlotHeight = 0;
+function syncFilterDock() {
+  const filterSlot = document.getElementById('filter-slot');
+  const filterDock = document.getElementById('header-filter-dock');
+  const directoryFilters = document.querySelector('.filters');
+  const headerRow = document.querySelector('#page-header .hdr-inner');
+  if (!filtersDocked) filterSlotHeight = filterSlot.getBoundingClientRect().height;
+  const shouldDock = filterSlot.getBoundingClientRect().top < headerRow.getBoundingClientRect().height;
+  if (shouldDock === filtersDocked) return;
+  const focused = directoryFilters.contains(document.activeElement) ? document.activeElement : null;
+  filtersDocked = shouldDock;
+  filterSlot.style.height = shouldDock ? `${filterSlotHeight}px` : '';
+  filterDock.hidden = !shouldDock;
+  (shouldDock ? filterDock : filterSlot).appendChild(directoryFilters);
+  focused?.focus({ preventScroll: true });
+  document.documentElement.style.setProperty('--header-height', `${document.getElementById('page-header').getBoundingClientRect().height}px`);
+}
+window.addEventListener('scroll', syncFilterDock, { passive: true });
+window.addEventListener('resize', syncFilterDock);
 loadDirectory();
 </script>
 </body>

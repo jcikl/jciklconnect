@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { useFirestoreCollection } from './useFirestoreCollection';
 import { KnowledgeService } from '../services/knowledgeService';
+import { DocumentsService, DocumentWithVersions } from '../services/documentsService';
 import { TrainingModule, Document } from '../types';
 import { useToast } from '../components/ui/Common';
 
@@ -12,7 +13,7 @@ export const useKnowledge = () => {
     useFirestoreCollection<TrainingModule>({ loader: () => KnowledgeService.getAllTrainingModules() });
 
   const { data: documents, loading: docsLoading, error: docsError, reload: reloadDocs } =
-    useFirestoreCollection<Document>({ loader: () => KnowledgeService.getAllDocuments() });
+    useFirestoreCollection<DocumentWithVersions>({ loader: () => DocumentsService.getAllDocuments() });
 
   const loading = modulesLoading || docsLoading;
   const error = modulesError || docsError;

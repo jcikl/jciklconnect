@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { BookOpen, FileText, Download, Award, PlayCircle, Plus, Edit, Trash2, GraduationCap, CheckCircle, Clock, GitBranch, Eye, Search, Filter, X, Share2 } from 'lucide-react';
-import { Card, Button, ProgressBar, Badge, Tabs, Modal, Drawer, useToast, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
+import { BookOpen, FileText, Download, Award, PlayCircle, Plus, Edit, Trash2, GraduationCap, CheckCircle, Clock, GitBranch, Eye, Search, Filter, X, Share2, ArrowUpRight, MoreHorizontal, ArrowLeft, Folder, ChevronRight } from 'lucide-react';
+import { Card, Button, ProgressBar, Badge, Tabs, Modal, Drawer, Skeleton, useToast, ConfirmDialog, CONFIRM_CLOSED } from '../ui/Common';
 import type { ConfirmState } from '../ui/Common';
 import { Input, Select, Textarea } from '../ui/Form';
 import { LoadingState } from '../ui/Loading';
@@ -12,6 +12,7 @@ import { LearningPathsService, LearningPath, LearningProgress } from '../../serv
 import { DocumentsService, DocumentWithVersions, DocumentVersion } from '../../services/documentsService';
 import { formatDate } from '../../utils/dateUtils';
 import { formatFileSize } from '../../utils/formatUtils';
+import './KnowledgeDocuments.css';
 
 export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery }) => {
     const [activeTab, setActiveTab] = useState<'learning' | 'documents'>('learning');
@@ -40,18 +41,6 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
     const { member } = useAuth();
     const { isBoard, isAdmin } = usePermissions();
     const { showToast } = useToast();
-
-    // Filter documents based on search term
-    const filteredDocuments = useMemo(() => {
-        let filtered = documents || [];
-        const term = (searchQuery || searchTerm).toLowerCase();
-
-        if (term.trim()) {
-            filtered = filtered.filter(doc => doc.name.toLowerCase().includes(term));
-        }
-
-        return filtered;
-    }, [documents, searchTerm, searchQuery]);
 
     const filteredPaths = useMemo(() => {
         let filtered = paths || [];
@@ -102,7 +91,8 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                     )}
                     {activeTab === 'documents' && (
                         <DocumentsTab
-                            documents={filteredDocuments}
+                            documents={documents}
+                            searchQuery={searchQuery}
                             loading={loading}
                             error={error}
                             canManage={isBoard || isAdmin}
@@ -240,7 +230,7 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
             <Modal
                 isOpen={isDocUploadOpen}
                 onClose={() => { setIsDocUploadOpen(false); setEditingDoc(null); setDocForm({ name: '', purpose: '', fileUrl: '' }); }}
-                title={editingDoc ? 'Edit Document' : 'Upload Document'}
+                title={editingDoc ? 'Edit Document' : 'Add file link'}
                 size="md"
             >
                 <div className="space-y-4">
@@ -249,8 +239,9 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                         <Input value={docForm.name} onChange={e => setDocForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Meeting Minutes – Aug 2026" />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Purpose</label>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
                         <Input value={docForm.purpose} onChange={e => setDocForm(f => ({ ...f, purpose: e.target.value }))} placeholder="e.g. New Member Onboarding, Board Reference, Event Planning" />
+                        <div className="flex flex-wrap gap-2 mt-2">{[...new Set(documents.map(doc => doc.purpose?.trim()).filter(Boolean))].sort().map(purpose => <button key={purpose} type="button" className="text-xs text-jci-blue hover:underline" onClick={() => setDocForm(f => ({ ...f, purpose: purpose! }))}>{purpose}</button>)}</div>
                         <p className="text-xs text-slate-400 mt-1">Members will use this to find the right document quickly.</p>
                     </div>
                     <div>
@@ -261,6 +252,10 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                         <Button variant="outline" onClick={() => { setIsDocUploadOpen(false); setEditingDoc(null); setDocForm({ name: '', purpose: '', fileUrl: '' }); }}>Cancel</Button>
                         <Button variant="primary" disabled={!docForm.name.trim() || !docForm.fileUrl.trim() || isSubmittingDoc}
                             onClick={async () => {
+                                try {
+                                    const url = new URL(docForm.fileUrl.trim());
+                                    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new Error();
+                                } catch { showToast('Enter a valid HTTP or HTTPS file link', 'error'); return; }
                                 setIsSubmittingDoc(true);
                                 try {
                                     if (editingDoc) {
@@ -273,20 +268,20 @@ export const KnowledgeView: React.FC<{ searchQuery?: string }> = ({ searchQuery 
                                             { name: docForm.name.trim(), purpose: docForm.purpose.trim() || undefined, loId: (member as any)?.loId ?? 'default', uploadedBy: member?.id ?? '', uploadedDate: new Date(), tags: [] },
                                             url, guessedName, 0, 'application/octet-stream', member?.id ?? ''
                                         );
-                                        showToast('Document uploaded successfully', 'success');
+                                        showToast('File link added successfully', 'success');
                                     }
                                     setIsDocUploadOpen(false);
                                     setEditingDoc(null);
                                     setDocForm({ name: '', purpose: '', fileUrl: '' });
                                     reloadDocs();
                                 } catch {
-                                    showToast(editingDoc ? 'Failed to update document' : 'Failed to upload document', 'error');
+                                    showToast(editingDoc ? 'Failed to update document' : 'Failed to add file link', 'error');
                                 } finally {
                                     setIsSubmittingDoc(false);
                                 }
                             }}
                         >
-                            {isSubmittingDoc ? (editingDoc ? 'Saving...' : 'Uploading...') : (editingDoc ? 'Save' : 'Upload')}
+                            {isSubmittingDoc ? 'Saving...' : (editingDoc ? 'Save' : 'Add link')}
                         </Button>
                     </div>
                 </div>
@@ -447,6 +442,7 @@ const LearningPathsTab: React.FC<LearningPathsTabProps> = ({
 
 interface DocumentsTabProps {
     documents: any[];
+    searchQuery?: string;
     loading: boolean;
     error?: string | null;
     canManage: boolean;
@@ -454,30 +450,39 @@ interface DocumentsTabProps {
     onRefresh?: () => Promise<void>;
 }
 
-const PURPOSE_GRADIENT: Record<string, string> = {
-    'General': 'from-slate-400 to-slate-600',
-};
-const PURPOSE_GRADIENTS = [
-    'from-blue-400 to-blue-600',
-    'from-violet-400 to-violet-600',
-    'from-emerald-400 to-emerald-600',
-    'from-amber-400 to-amber-500',
-    'from-rose-400 to-rose-600',
-    'from-pink-400 to-pink-600',
-    'from-cyan-400 to-cyan-600',
-    'from-indigo-400 to-indigo-600',
-];
-
-const DocumentsTab: React.FC<DocumentsTabProps> = ({ documents, loading, error, canManage, onAdd, onRefresh }) => {
+export const DocumentsTab: React.FC<DocumentsTabProps> = ({ documents, searchQuery, loading, error, canManage, onAdd, onRefresh }) => {
     const { member } = useAuth();
     const { showToast } = useToast();
     const [selectedPurpose, setSelectedPurpose] = useState<string | null>(null);
+    const [query, setQuery] = useState('');
+    const [category, setCategory] = useState('');
+    const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
+    const documentLink = (doc: any): string | null => {
+        try {
+            const url = new URL(doc.currentVersion?.fileUrl || '');
+            return ['https:', 'http:'].includes(url.protocol) && !url.username && !url.password ? url.href : null;
+        } catch { return null; }
+    };
+    const visibleDocuments = documents.filter(doc => {
+        const name = (doc.name || '').toLowerCase();
+        return [category ? query : '', searchQuery || ''].every(term => name.includes(term.trim().toLowerCase()))
+            && (!category || (doc.purpose?.trim() || 'General') === category);
+    }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    const selectedDocument = category ? visibleDocuments.find(doc => doc.id === selectedDocumentId) : undefined;
     // inline add within drawer
     const [inlineAdd, setInlineAdd] = useState({ name: '', fileUrl: '' });
     const [isAddingDoc, setIsAddingDoc] = useState(false);
-    // inline row edit
+    const [showCategoryAdd, setShowCategoryAdd] = useState(false);
+    const [mobileDrawer, setMobileDrawer] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches);
+    useEffect(() => {
+        const media = window.matchMedia('(max-width: 767px)');
+        const update = () => setMobileDrawer(media.matches);
+        update();
+        media.addEventListener('change', update);
+        return () => media.removeEventListener('change', update);
+    }, []);
+    // A file editor is separate from the category manager.
     const [editingDocId, setEditingDocId] = useState<string | null>(null);
-    const [editStep, setEditStep] = useState<1 | 2>(1);
     const [editForm, setEditForm] = useState({ name: '', purpose: '', fileUrl: '' });
     const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
     // edit purpose name (rename)
@@ -501,25 +506,29 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ documents, loading, error, 
         });
     }, [documents]);
 
-    const getGradient = (purpose: string, idx: number) =>
-        PURPOSE_GRADIENT[purpose] ?? PURPOSE_GRADIENTS[idx % PURPOSE_GRADIENTS.length];
-
     const drawerDocs = selectedPurpose ? (grouped.find(([p]) => p === selectedPurpose)?.[1] ?? []) : [];
 
     const openEdit = (doc: any) => {
+        if (!canManage) return;
+        setSelectedPurpose(null);
+        setSelectedDocumentId(null);
         setEditingDocId(doc.id);
-        setEditStep(1);
         setEditForm({ name: doc.name ?? '', purpose: doc.purpose ?? '', fileUrl: doc.currentVersion?.fileUrl ?? '' });
     };
 
     const handleSaveEdit = async (doc: any) => {
+        if (!canManage || !editForm.name.trim() || isSubmittingEdit) return;
+        const newUrl = editForm.fileUrl.trim();
+        if (doc.currentVersion?.id && !documentLink({ currentVersion: { fileUrl: newUrl } })) {
+            showToast('Enter a valid HTTP or HTTPS file link', 'error');
+            return;
+        }
         setIsSubmittingEdit(true);
         try {
             await DocumentsService.updateDocument(doc.id, {
                 name: editForm.name.trim(),
                 purpose: editForm.purpose.trim() || undefined,
             });
-            const newUrl = editForm.fileUrl.trim();
             if (doc.currentVersion?.id && newUrl && newUrl !== doc.currentVersion.fileUrl) {
                 await DocumentsService.updateVersionUrl(doc.currentVersion.id, doc.id, newUrl);
             }
@@ -553,7 +562,11 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ documents, loading, error, 
     };
 
     const handleAddToDrawer = async () => {
-        if (!inlineAdd.name.trim() || !inlineAdd.fileUrl.trim()) return;
+        if (!canManage || !inlineAdd.name.trim() || !inlineAdd.fileUrl.trim() || isAddingDoc) return;
+        if (!documentLink({ currentVersion: { fileUrl: inlineAdd.fileUrl.trim() } })) {
+            showToast('Enter a valid HTTP or HTTPS file link', 'error');
+            return;
+        }
         setIsAddingDoc(true);
         try {
             const url = inlineAdd.fileUrl.trim();
@@ -564,6 +577,7 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ documents, loading, error, 
             );
             showToast('Document added', 'success');
             setInlineAdd({ name: '', fileUrl: '' });
+            setShowCategoryAdd(false);
             onRefresh?.();
         } catch {
             showToast('Failed to add document', 'error');
@@ -574,7 +588,7 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ documents, loading, error, 
 
     const handleDownloadAll = () => {
         drawerDocs.forEach((doc: any) => {
-            const url = doc.currentVersion?.fileUrl;
+            const url = documentLink(doc);
             if (url) window.open(url, '_blank', 'noopener,noreferrer');
         });
     };
@@ -588,7 +602,8 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ documents, loading, error, 
                     DocumentsService.updateDocument(doc.id, { purpose: newPurposeName.trim() } as any)
                 )
             );
-            showToast('Purpose renamed', 'success');
+            showToast('Category renamed', 'success');
+            setCategory(value => value === selectedPurpose ? newPurposeName.trim() : value);
             setSelectedPurpose(newPurposeName.trim());
             setIsEditingPurpose(false);
             onRefresh?.();
@@ -602,8 +617,8 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ documents, loading, error, 
     const handleDeletePurpose = () => {
         setConfirmState({
             open: true,
-            title: 'Delete Purpose Group',
-            message: `Delete all ${drawerDocs.length} document(s) in "${selectedPurpose}"? This cannot be undone.`,
+            title: 'Delete category and files?',
+            message: `Permanently delete all ${drawerDocs.length} file record(s) and their versions in "${selectedPurpose}"? Linked Firebase Storage files may also be removed. This cannot be undone.`,
             variant: 'danger',
             onConfirm: async () => {
                 setConfirmState(CONFIRM_CLOSED);
@@ -611,6 +626,7 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ documents, loading, error, 
                     await Promise.all(drawerDocs.map((doc: any) => DocumentsService.deleteDocument(doc.id)));
                     showToast('Purpose group deleted', 'success');
                     setSelectedPurpose(null);
+                    setCategory(value => value === selectedPurpose ? '' : value);
                     onRefresh?.();
                 } catch {
                     showToast('Failed to delete group', 'error');
@@ -619,147 +635,178 @@ const DocumentsTab: React.FC<DocumentsTabProps> = ({ documents, loading, error, 
         });
     };
 
+    const documentDetails = selectedDocument ? (
+        <div className="document-pos-detail-content">
+            <div className="document-pos-file-symbol"><FileText size={36} strokeWidth={1.4} aria-hidden="true" /></div>
+            <p className="document-pos-caption">Selected file</p>
+            <h4 className="document-pos-detail-name">{selectedDocument.name}</h4>
+            <dl className="document-pos-metadata"><div><dt>Category</dt><dd>{selectedDocument.purpose?.trim() || 'General'}</dd></div><div><dt>File link</dt><dd>{documentLink(selectedDocument) ? 'Available' : 'Not available'}</dd></div></dl>
+            {documentLink(selectedDocument) ? <a href={documentLink(selectedDocument)!} target="_blank" rel="noopener noreferrer" className="document-pos-open">Open file<ArrowUpRight size={17} /></a> : <p className="text-sm text-slate-500">No valid file link is available.</p>}
+            <p className="text-xs text-slate-500 leading-relaxed">Access follows the original file’s sharing settings.</p>
+            {canManage && <div className="document-pos-detail-actions"><Button variant="outline" onClick={() => openEdit(selectedDocument)}><Edit size={15} className="mr-2" />Edit file</Button><button type="button" className="text-sm text-red-600 py-2 text-left" onClick={() => handleDeleteDoc(selectedDocument)}>Delete file…</button></div>}
+        </div>
+    ) : <div className="document-pos-selection-empty"><FileText size={30} strokeWidth={1.3} aria-hidden="true" /><h4>Select a file</h4><p>Choose a tile to see its details and available actions.</p></div>;
+
+    if (loading) return <section aria-label="Loading documents" role="status" aria-live="polite" className="document-pos"><span className="sr-only">Loading documents</span><div aria-hidden="true" className="p-5 space-y-5"><Skeleton className="h-6 w-36" /><Skeleton className="h-10 w-full" /><div className="grid grid-cols-2 md:grid-cols-3 gap-3">{[0, 1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-36 w-full" />)}</div></div></section>;
     return (
         <>
-        <LoadingState loading={loading} error={error ?? null} empty={false} emptyMessage="No documents found">
-            {/* Purpose cards grid — 1 col mobile, 2 col sm+, 3 col lg+ */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                {onAdd && (
-                    <div onClick={onAdd} className="border-2 border-dashed border-slate-200 rounded-2xl p-4 flex items-center gap-3 text-slate-400 hover:border-jci-blue hover:text-jci-blue hover:bg-sky-50 transition-colors cursor-pointer min-h-[72px]">
-                        <div className="w-10 h-10 rounded-lg border-2 border-dashed border-current flex items-center justify-center shrink-0"><Plus size={16} /></div>
-                        <div>
-                            <p className="text-sm font-semibold">Upload Document</p>
-                            <p className="text-xs opacity-70">share a file with the team</p>
+        <LoadingState loading={false} error={error ?? null} onRetry={onRefresh} empty={false} emptyMessage="No documents found">
+            <section aria-label="Document library" className="document-pos">
+                {!category ? (
+                    <div className="document-pos-catalogue">
+                        <div className="document-pos-catalogue-heading">
+                            <h4>Categories</h4>
                         </div>
-                    </div>
-                )}
-                {documents.length === 0 && !loading && (
-                    <p className="col-span-full text-sm text-slate-400 text-center py-10">No documents available</p>
-                )}
-                {grouped.map(([purpose, docs], idx) => {
-                    const gradient = getGradient(purpose, idx);
-                    return (
-                        <div key={purpose}
-                            className="bg-white border border-slate-100 rounded-2xl overflow-hidden hover:border-slate-200 hover:shadow-sm transition-all cursor-pointer active:scale-[0.98]"
-                            onClick={() => { setSelectedPurpose(purpose); setIsEditingPurpose(false); setInlineAdd({ name: '', fileUrl: '' }); }}>
-                            {/* Single row: icon + purpose name + doc count */}
-                            <div className="flex items-center gap-3 px-3 py-3">
-                                <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center shrink-0`}>
-                                    <FileText size={16} className="text-white" strokeWidth={2} />
-                                </div>
-                                <p className="flex-1 min-w-0 font-semibold text-slate-900 text-sm leading-tight line-clamp-1">{purpose}</p>
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-600 shrink-0">{docs.length} doc{docs.length !== 1 ? 's' : ''}</span>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-
-            {/* Document list drawer */}
-            <Drawer isOpen={!!selectedPurpose} onClose={() => { setSelectedPurpose(null); setIsEditingPurpose(false); }} title={selectedPurpose ?? ''} position="bottom">
-                <div className="space-y-3">
-
-                    {/* Doc list */}
-                    <div className="space-y-1.5">
-                        {drawerDocs.length === 0 && (
-                            <p className="text-sm text-slate-400 text-center py-6">No documents in this group</p>
-                        )}
-                        {drawerDocs.map((doc: any) => (
-                            editingDocId === doc.id ? (
-                                <div key={doc.id} className="border border-jci-blue/40 bg-sky-50 rounded-xl px-3 py-2.5">
-                                    {editStep === 1 ? (
-                                        <div className="flex gap-2 items-center">
-                                            <Input value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} placeholder="Document Name *" />
-                                            <Button size="sm" variant="primary" className="shrink-0 px-3" disabled={!editForm.name.trim()} onClick={() => setEditStep(2)}><span className="text-base leading-none">›</span></Button>
-                                        </div>
-                                    ) : (
-                                        <div className="flex gap-2 items-center">
-                                            <Button size="sm" variant="outline" className="shrink-0 px-3" onClick={() => setEditStep(1)}><span className="text-base leading-none">‹</span></Button>
-                                            <Input value={editForm.fileUrl} onChange={e => setEditForm(f => ({ ...f, fileUrl: e.target.value }))} placeholder="File URL *" autoFocus />
-                                            <Button size="sm" variant="primary" className="shrink-0" disabled={!editForm.name.trim() || isSubmittingEdit} onClick={() => handleSaveEdit(doc)}>
-                                                {isSubmittingEdit ? '…' : 'Save'}
-                                            </Button>
-                                        </div>
-                                    )}
-                                </div>
-                            ) : (
-                                <div key={doc.id}
-                                    className="flex items-center gap-3 px-3 py-2.5 bg-white border border-slate-100 rounded-xl hover:border-slate-200 hover:shadow-sm transition-all">
-                                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center shrink-0">
-                                        <FileText size={15} className="text-white" strokeWidth={2} />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="font-semibold text-slate-900 text-sm line-clamp-1">{doc.name}</p>
-                                    </div>
-                                    {canManage && (
-                                        <div className="flex items-center gap-0.5 shrink-0" onClick={e => e.stopPropagation()}>
-                                            <button className="p-1.5 rounded-lg text-slate-400 hover:text-jci-blue hover:bg-sky-50 transition-colors"
-                                                onClick={() => openEdit(doc)} aria-label="Edit">
-                                                <Edit size={14} />
-                                            </button>
-                                            <button className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                                                onClick={() => handleDeleteDoc(doc)} aria-label="Delete">
-                                                <Trash2 size={14} />
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            )
-                        ))}
-                    </div>
-
-                    {/* Rename purpose */}
-                    {canManage && isEditingPurpose && (
-                        <div className="flex gap-2 items-center border border-jci-blue/30 bg-sky-50 rounded-xl px-3 py-2.5">
-                            <Input value={newPurposeName} onChange={e => setNewPurposeName(e.target.value)} placeholder="New purpose name" />
-                            <Button size="sm" variant="outline" className="shrink-0" onClick={() => setIsEditingPurpose(false)}>✕</Button>
-                            <Button size="sm" variant="primary" className="shrink-0" disabled={!newPurposeName.trim() || isSavingPurpose} onClick={handleSavePurpose}>
-                                {isSavingPurpose ? '…' : 'Save'}
-                            </Button>
-                        </div>
-                    )}
-
-                    {/* Add document */}
-                    {canManage && (
-                        <div className="border border-dashed border-slate-200 rounded-xl p-3 space-y-2">
-                            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Add Document</p>
-                            <div className="flex flex-col sm:flex-row gap-2">
-                                <Input value={inlineAdd.name} onChange={e => setInlineAdd(f => ({ ...f, name: e.target.value }))} placeholder="Document Name *" />
-                                <Input value={inlineAdd.fileUrl} onChange={e => setInlineAdd(f => ({ ...f, fileUrl: e.target.value }))} placeholder="File URL *" />
-                                <Button size="sm" variant="primary" disabled={!inlineAdd.name.trim() || !inlineAdd.fileUrl.trim() || isAddingDoc} onClick={handleAddToDrawer} className="sm:shrink-0">
-                                    {isAddingDoc ? 'Adding…' : 'Add'}
+                        <div className="document-pos-grid" aria-label="Document categories">
+                            {canManage && onAdd && (
+                                <Button className="document-pos-create-tile" onClick={onAdd}>
+                                    <Plus size={28} strokeWidth={1.6} aria-hidden="true" />
+                                    Add file link
                                 </Button>
-                            </div>
+                            )}
+                            {grouped.map(([purpose, docs]) => {
+                                const matches = docs.filter(doc => doc.name.toLowerCase().includes((searchQuery || '').trim().toLowerCase()));
+                                if (!matches.length) return null;
+                                return (
+                                    <button key={purpose} type="button" className="document-pos-category-tile" onClick={() => setCategory(purpose)}>
+                                        <span className="document-pos-tile-top"><Folder size={28} strokeWidth={1.4} aria-hidden="true" /><ChevronRight size={16} aria-hidden="true" /></span>
+                                        <span className="document-pos-tile-name">{purpose}</span>
+                                        <span className="document-pos-tile-category">{matches.length} {matches.length === 1 ? 'file' : 'files'}</span>
+                                    </button>
+                                );
+                            })}
                         </div>
-                    )}
+                        {!visibleDocuments.length && (
+                            <div className="document-pos-empty">
+                                <h4>{documents.length ? 'No matching files' : 'No files yet'}</h4>
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                <div className="document-pos-layout">
+                    <div className="document-pos-catalogue">
+                        <div className="document-pos-category-actions">
+                            <button type="button" className="document-pos-back" onClick={() => {
+                                setSelectedDocumentId(null);
+                                setQuery('');
+                                setCategory('');
+                            }}>
+                                <ArrowLeft size={16} aria-hidden="true" />Back to categories
+                            </button>
+                            <button type="button" className="document-pos-manage" onClick={() => {
+                                setSelectedPurpose(category);
+                                setIsEditingPurpose(false);
+                            }}>
+                                {canManage ? 'Manage category' : 'View category files'}
+                                <ArrowUpRight size={14} aria-hidden="true" />
+                            </button>
+                        </div>
+                        <div className="document-pos-catalogue-heading">
+                            <h4>{category}</h4>
+                            <p role="status">{visibleDocuments.length} {visibleDocuments.length === 1 ? 'file' : 'files'}</p>
+                        </div>
+                        <Input label="Search this category" placeholder="Search file names…" value={query} onChange={e => setQuery(e.target.value)} />
+                        <div className="document-pos-file-list" role="list" aria-label="Files in category">
+                            {visibleDocuments.map(doc => {
+                                const link = documentLink(doc);
+                                const selected = selectedDocument?.id === doc.id;
+                                return <article key={doc.id} role="listitem" className={`document-pos-tile${selected ? ' is-selected' : ''}`}>
+                                    <button type="button" aria-label={`Select ${doc.name}`} aria-pressed={selected} className="document-pos-tile-select" onClick={() => setSelectedDocumentId(doc.id)}>
+                                        <FileText size={22} strokeWidth={1.6} aria-hidden="true" />
+                                        <span className="document-pos-tile-name">{doc.name}</span>
+                                        {selected && <CheckCircle size={17} aria-hidden="true" />}
+                                    </button>
+                                    <div className="document-pos-tile-footer">
+                                        {link ? <a href={link} target="_blank" rel="noopener noreferrer" aria-label={`Open ${doc.name}`}>Open<ArrowUpRight size={14} /></a> : <span>No link</span>}
+                                        {canManage && <details className="relative"><summary aria-label={`Actions for ${doc.name}`} className="list-none cursor-pointer p-2 rounded hover:bg-slate-100 [&::-webkit-details-marker]:hidden"><MoreHorizontal size={18} /></summary><div className="absolute right-0 top-full z-10 w-40 bg-white border border-slate-200 rounded-lg shadow-lg p-1"><button type="button" className="flex items-center gap-2 w-full p-2 text-sm hover:bg-slate-50" onClick={() => openEdit(doc)}><Edit size={14} />Edit</button><button type="button" className="flex items-center gap-2 w-full p-2 text-sm text-red-600 hover:bg-red-50" onClick={() => handleDeleteDoc(doc)}><Trash2 size={14} />Delete</button></div></details>}
+                                    </div>
+                                </article>;
+                            })}
+                        </div>
+                        {!visibleDocuments.length && <div className="document-pos-empty"><FileText size={28} aria-hidden="true" /><h4>{documents.length ? 'No matching files' : 'No files yet'}</h4><p>{documents.length ? 'Try a different name or category.' : 'Shared file links will appear here.'}</p>{query && <button type="button" onClick={() => setQuery('')}>Clear search</button>}</div>}
+                    </div>
+                    {!mobileDrawer && <aside className="document-pos-inspector" aria-label="Selected file details">{documentDetails}</aside>}
+                </div>
+                )}
+            </section>
+            <Drawer isOpen={!!selectedDocument && mobileDrawer && !editingDocId && !selectedPurpose} onClose={() => setSelectedDocumentId(null)} title="File details" position="bottom" size="xl">
+                {documentDetails}
+            </Drawer>
 
-                    {/* Footer actions */}
-                    <div className="flex gap-2 pt-1 border-t border-slate-100">
-                        <Button size="sm" variant="outline" className="flex-1" onClick={handleDownloadAll} disabled={drawerDocs.length === 0}>
-                            <Download size={14} className="mr-1.5" />All
-                        </Button>
-                        <Button size="sm" variant="outline" className="flex-1" disabled={drawerDocs.length === 0} onClick={() => {
+            <Drawer
+                isOpen={!!editingDocId && canManage}
+                onClose={() => { if (!isSubmittingEdit) setEditingDocId(null); }}
+                title="Edit file"
+                position={mobileDrawer ? 'bottom' : 'right'}
+                size={mobileDrawer ? 'xl' : 'lg'}
+                footer={<div className="flex justify-end gap-3">
+                    <Button variant="outline" disabled={isSubmittingEdit} onClick={() => setEditingDocId(null)}>Cancel</Button>
+                    <Button disabled={!editForm.name.trim() || isSubmittingEdit} onClick={() => {
+                        const doc = documents.find(item => item.id === editingDocId);
+                        if (doc) void handleSaveEdit(doc);
+                    }}>{isSubmittingEdit ? 'Saving…' : 'Save changes'}</Button>
+                </div>}
+            >
+                <div className="space-y-6">
+                    <p className="text-sm text-slate-500">Update the file details and its existing link.</p>
+                    <Input label="File name" required value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
+                    <div>
+                        <Input label="Category" value={editForm.purpose} onChange={e => setEditForm(f => ({ ...f, purpose: e.target.value }))} placeholder="General" />
+                        <div className="flex flex-wrap gap-2 mt-2">{grouped.map(([purpose]) => <button key={purpose} type="button" className="text-xs text-jci-blue hover:underline" onClick={() => setEditForm(f => ({ ...f, purpose }))}>{purpose}</button>)}</div>
+                    </div>
+                    <Input label="File link" type="url" value={editForm.fileUrl} disabled={!documents.find(doc => doc.id === editingDocId)?.currentVersion?.id} onChange={e => setEditForm(f => ({ ...f, fileUrl: e.target.value }))} placeholder="https://…" />
+                    {!documents.find(doc => doc.id === editingDocId)?.currentVersion?.id && <p className="text-sm text-slate-500">This record has no stored file version. You can update its name and category; use Add file link in the library to add a linked file.</p>}
+                    {documentLink({ currentVersion: { fileUrl: editForm.fileUrl } }) && <a href={documentLink({ currentVersion: { fileUrl: editForm.fileUrl } })!} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm text-jci-blue">Open current link<ArrowUpRight size={15} /></a>}
+                </div>
+            </Drawer>
+
+            <Drawer
+                isOpen={!!selectedPurpose && !editingDocId}
+                onClose={() => { setSelectedPurpose(null); setIsEditingPurpose(false); setShowCategoryAdd(false); setInlineAdd({ name: '', fileUrl: '' }); }}
+                title={canManage ? 'Manage category' : 'Category files'}
+                position={mobileDrawer ? 'bottom' : 'right'}
+                size={mobileDrawer ? 'xl' : 'lg'}
+            >
+                <div className="space-y-6">
+                    <div className="border-b border-slate-200 pb-5">
+                        <div className="flex items-start justify-between gap-3">
+                            <div><h4 className="text-xl font-semibold text-slate-900 break-words">{selectedPurpose}</h4><p className="text-sm text-slate-500 mt-1">{drawerDocs.length} {drawerDocs.length === 1 ? 'file' : 'files'}</p></div>
+                            {canManage && <button type="button" className="text-sm text-jci-blue shrink-0 py-1" onClick={() => { setIsEditingPurpose(v => !v); setNewPurposeName(selectedPurpose ?? ''); }}>Edit name</button>}
+                        </div>
+                        {canManage && isEditingPurpose && <div className="space-y-3 mt-4">
+                            <Input label="Category name" value={newPurposeName} onChange={e => setNewPurposeName(e.target.value)} />
+                            <div className="flex justify-end gap-2"><Button size="sm" variant="outline" disabled={isSavingPurpose} onClick={() => setIsEditingPurpose(false)}>Cancel</Button><Button size="sm" disabled={!newPurposeName.trim() || isSavingPurpose} onClick={handleSavePurpose}>{isSavingPurpose ? 'Saving…' : 'Save name'}</Button></div>
+                        </div>}
+                    </div>
+                    <div className="divide-y divide-slate-100">
+                        {!drawerDocs.length && <p className="text-sm text-slate-500 py-4">No files in this category.</p>}
+                        {drawerDocs.map((doc: any) => <div key={doc.id} className="flex items-center justify-between gap-3 py-3">
+                            <span className="flex items-center gap-3 min-w-0"><FileText size={18} className="text-jci-blue shrink-0" /><span className="text-sm font-medium text-slate-900 break-words">{doc.name}</span></span>
+                            <div className="flex items-center gap-2 shrink-0">
+                                {documentLink(doc) ? <a href={documentLink(doc)!} target="_blank" rel="noopener noreferrer" className="text-sm text-jci-blue inline-flex items-center gap-1 py-2">Open<ArrowUpRight size={14} /></a> : <span className="text-xs text-slate-400">No link</span>}
+                                {canManage && <details className="relative"><summary aria-label={`Category actions for ${doc.name}`} className="list-none cursor-pointer p-2 rounded hover:bg-slate-100 [&::-webkit-details-marker]:hidden"><MoreHorizontal size={18} /></summary><div className="absolute right-0 top-full z-10 w-36 p-1 bg-white rounded-lg border border-slate-200 shadow-lg"><button type="button" className="block text-left w-full p-2 text-sm hover:bg-slate-50" onClick={() => openEdit(doc)}>Edit file</button><button type="button" className="block text-left w-full p-2 text-sm text-red-600 hover:bg-red-50" onClick={() => handleDeleteDoc(doc)}>Delete file</button></div></details>}
+                            </div>
+                        </div>)}
+                    </div>
+                    {canManage && <div className="border-t border-slate-200 pt-4">
+                        <button type="button" className="inline-flex items-center gap-2 text-sm font-semibold text-jci-blue py-2" aria-expanded={showCategoryAdd} onClick={() => setShowCategoryAdd(value => !value)}><Plus size={16} />Add file link</button>
+                        {showCategoryAdd && <div className="space-y-3 mt-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                            <Input label="New file name" required value={inlineAdd.name} onChange={e => setInlineAdd(f => ({ ...f, name: e.target.value }))} />
+                            <Input label="New file link" type="url" required placeholder="https://…" value={inlineAdd.fileUrl} onChange={e => setInlineAdd(f => ({ ...f, fileUrl: e.target.value }))} />
+                            <div className="flex justify-end gap-2"><Button size="sm" variant="outline" disabled={isAddingDoc} onClick={() => setShowCategoryAdd(false)}>Cancel</Button><Button size="sm" disabled={!inlineAdd.name.trim() || !inlineAdd.fileUrl.trim() || isAddingDoc} onClick={handleAddToDrawer}>{isAddingDoc ? 'Adding…' : 'Add link'}</Button></div>
+                        </div>}
+                    </div>}
+                    <div className="space-y-3 border-t border-slate-200 pt-5">
+                        <Button variant="outline" className="w-full justify-center" onClick={handleDownloadAll} disabled={!drawerDocs.some(doc => documentLink(doc))}><ArrowUpRight size={15} className="mr-2" />Open all files</Button>
+                        <p className="text-xs text-slate-500">Opens available links in separate tabs. Your browser may block multiple tabs.</p>
+                        <Button variant="outline" className="w-full justify-center" disabled={!drawerDocs.some(doc => documentLink(doc))} onClick={() => {
                             const lines = [selectedPurpose ?? ''];
-                            drawerDocs.forEach((doc: any) => {
-                                lines.push(doc.name ?? '');
-                                const url = doc.currentVersion?.fileUrl;
-                                if (url) lines.push(url);
-                            });
-                            navigator.clipboard.writeText(lines.join('\n')).then(() => showToast('Copied', 'success')).catch(() => showToast('Failed to copy', 'error'));
-                        }}>
-                            <Share2 size={14} className="mr-1.5" />Share
-                        </Button>
-                        {canManage && (
-                            <>
-                                <Button size="sm" variant="outline" onClick={() => { setIsEditingPurpose(v => !v); setNewPurposeName(selectedPurpose ?? ''); }}>
-                                    <Edit size={14} className="mr-1.5" />Rename
-                                </Button>
-                                <Button size="sm" variant="danger" onClick={handleDeletePurpose}>
-                                    <Trash2 size={14} />
-                                </Button>
-                            </>
-                        )}
+                            drawerDocs.forEach((doc: any) => { const link = documentLink(doc); if (link) lines.push(doc.name ?? '', link); });
+                            navigator.clipboard.writeText(lines.join('\n')).then(() => showToast('File links copied', 'success')).catch(() => showToast('Failed to copy links', 'error'));
+                        }}><Share2 size={15} className="mr-2" />Copy category file links</Button>
+                        <p className="text-xs text-slate-500">Copies links only. Original file sharing permissions stay the same.</p>
                     </div>
+                    {canManage && <details className="border-t border-red-100 pt-5"><summary className="text-sm font-semibold text-red-700 cursor-pointer">Danger zone</summary><div className="mt-4 space-y-3"><p className="text-sm text-slate-600">Delete all {drawerDocs.length} file records and their versions in this category. Linked Firebase Storage files may also be removed.</p><Button variant="danger" disabled={!drawerDocs.length} onClick={handleDeletePurpose}>Delete category and {drawerDocs.length} files…</Button></div></details>}
                 </div>
             </Drawer>
         </LoadingState>

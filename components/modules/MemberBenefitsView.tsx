@@ -516,6 +516,7 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
                 </label>
                 {draftOffer.logoUrl && <button type="button" onClick={() => updateDraft({ logoUrl: '' })} className="text-xs text-slate-400 hover:text-red-500">Remove</button>}
               </div>
+              <p className="text-xs text-slate-500">Recommended: 512 × 512 px (1:1).</p>
             </div>
             <div className="flex flex-col gap-1.5">
               <p className="text-xs text-slate-500 font-medium">Ad Banner</p>
@@ -529,6 +530,7 @@ export const MemberBenefitsView: React.FC<{ searchQuery?: string }> = ({ searchQ
                 </label>
                 {draftOffer.imageUrl && <button type="button" onClick={() => updateDraft({ imageUrl: '' })} className="text-xs text-slate-400 hover:text-red-500">Remove</button>}
               </div>
+              <p className="text-xs text-slate-500">Recommended: 1200 × 900 px (4:3). Keep key content centred; some views crop the image.</p>
             </div>
           </div>
           <div className="flex items-center gap-3 pt-1">

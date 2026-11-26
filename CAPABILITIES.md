@@ -731,7 +731,7 @@
 | `automationService.ts` | 894 | 8 | Automation & Workflow Service | AUTOMATION_RULES, WORKFLOWS, WORKFLOW_EXECUTIONS |
 | `boardManagementService.ts` | 1,264 | 11 | Board Management Service - Handles "One Year to Lead" principle | BOARD_MEMBERS, BOARD_TERM_SETTINGS, BOARD_TRANSITIONS, MEMBERS |
 | `contractService.ts` | 344 | 2 | ⚠️ 無說明 | CONTRACTS, FINANCE_ALERTS, POINT_ESCROW |
-| `documentsService.ts` | 431 | 1 | Documents Service with Version Control | DOCUMENTS, DOCUMENT_VERSIONS |
+| `documentsService.ts` | 431 | 2 | Documents Service with Version Control | DOCUMENTS, DOCUMENT_VERSIONS |
 | `hobbyClubsService.ts` | 343 | 3 | Hobby Clubs Service - CRUD Operations | HOBBY_CLUBS |
 | `permissionConfigService.ts` | 151 | 1 | ⚠️ 無說明 | PERMISSION_CATALOG |
 | `sisterChaptersService.ts` | 62 | 3 | ⚠️ 無說明 | SISTER_CHAPTERS |
@@ -1364,7 +1364,7 @@
 | `useInstallPrompt.ts` | 47 | 1 | `useInstallPrompt` | — | ⚠️ 無說明 |
 | `useInventory.ts` | 232 | 2 | `useInventory` | inventoryService | Inventory Data Hook |
 | `useJciMalaysiaSync.ts` | 67 | 1 | `useJciMalaysiaSync` | jciMalaysiaSyncService | JCI Malaysia sync for components: preview, save a conflict pick, apply. The server enforces developer-only. |
-| `useKnowledge.ts` | 68 | 1 | `useKnowledge` | knowledgeService | ⚠️ 無說明 |
+| `useKnowledge.ts` | 69 | 1 | `useKnowledge` | documentsService, knowledgeService | ⚠️ 無說明 |
 | `useLearningPaths.ts` | 83 | 1 | `useLearningPaths` | learningPathsService | Learning Paths Data Hook |
 | `useMemberAuth.ts` | 36 | 2 | `useMemberAuth` | memberAuthService | 会员登录账号：导入后自动建立（ADMIN+），以及 Fix Auth 试跑 / 执行补建（仅 SUPER_ADMIN）。 |
 | `useMemberBenefits.ts` | 102 | 0 | `useMemberBenefits` | memberBenefitsService | Member Benefits Data Hook Wraps MemberBenefitsService with React state (loading / error / data). |

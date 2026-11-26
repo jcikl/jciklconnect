@@ -39,6 +39,7 @@ function fixture(fetchImage) {
           if (path.startsWith('members/')) assert.ok(
             JSON.stringify(fieldMask) === JSON.stringify(['role', 'loId', 'deletedAt', 'privacy.shareCardInternationally']) ||
             JSON.stringify(fieldMask) === JSON.stringify(['role', 'loId', 'deletedAt', 'privacy.shareCardInternationally', 'general.avatarUrl']) ||
+            JSON.stringify(fieldMask) === JSON.stringify(['role', 'loId', 'deletedAt', 'privacy.shareCardInternationally', 'contact.phone', 'contact.email']) ||
             JSON.stringify(fieldMask) === JSON.stringify(['role', 'loId', 'deletedAt', 'privacy.shareCardInternationally', 'contact.phone']));
           else assert.deepEqual(fieldMask, ['key']);
           const data = snap.data();
@@ -47,7 +48,7 @@ function fixture(fetchImage) {
           for (const field of fieldMask) {
             const [outer, nested] = field.split('.');
             if (!Object.hasOwn(data, outer)) continue;
-            if (nested) projected[outer] = { [nested]: data[outer]?.[nested] };
+            if (nested) projected[outer] = { ...projected[outer], [nested]: data[outer]?.[nested] };
             else projected[outer] = data[outer];
           }
           return [{ ...snap, data: () => projected }];
@@ -78,6 +79,28 @@ function fixture(fetchImage) {
   const link = () => '?id=' + owner + '&key=' + (records.get(listing)?.publicDirectoryPhotoKey || '0'.repeat(32));
   return { records, request, link, publish };
 }
+
+test('contact details expose only current phone and email for eligible shared cards', async () => {
+  const f = fixture();
+  const path = '?mode=contact&id=' + owner;
+  f.records.get(member).contact = { phone: '012-345 6789', email: 'person@example.test', alternatePhone: 'private' };
+  const response = await f.request(path);
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get('cache-control'), /no-store/);
+  assert.deepEqual(await response.json(), { phone: '012-345 6789', phoneHref: '+60123456789', email: 'person@example.test' });
+  f.records.get(member).contact = { phone: 'unknown', email: 'bad\r\nemail@example.test' };
+  assert.deepEqual(await (await f.request(path)).json(), { phone: 'unknown', phoneHref: '', email: '' });
+  delete f.records.get(member).contact;
+  assert.deepEqual(await (await f.request(path)).json(), { phone: '', phoneHref: '', email: '' });
+  const saved = { ...f.records.get(member) };
+  for (const change of [{ privacy: { shareCardInternationally: false } }, { role: 'GUEST' }, { deletedAt: true }, { loId: 'other' }]) {
+    f.records.set(member, { ...saved, ...change });
+    assert.equal((await f.request(path)).status, 404);
+  }
+  f.records.set(member, saved);
+  f.records.delete(listing);
+  assert.equal((await f.request(path)).status, 404);
+});
 
 test('WhatsApp QR encodes the shared contact phone and rejects absent consent or invalid phones', async () => {
   const f = fixture();
@@ -241,7 +264,7 @@ test('directory filters combine industry, services, sharing preference and stabl
   const html = await readFile(new URL('../../public/business-connect.html', import.meta.url), 'utf8');
   const script = html.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/\nloadDirectory\(\);\s*$/, '');
   const filter = vm.runInNewContext(script + '\nfilterProfiles', {
-    URL, document: { getElementById() { return { addEventListener() {} }; } },
+    URL, window: { scrollY: 0, addEventListener() {} }, document: { getElementById() { return { addEventListener() {} }; } },
   });
   const profiles = [
     { companyName: 'Northline Systems', ownerName: 'Pat Yu', industry: 'Technology', description: 'Operations software', departmentAndPosition: 'Director', productsAndServices: ['Inventory consulting'], referralTypes: ['Distributors'], openToIntl: 'Yes' },
@@ -273,7 +296,7 @@ test('handbook renders every matching member and full profile without collapsed 
     }}));
     renderAll(_profiles);
     return document.getElementById('pages').innerHTML;
-  }`, { URL, document: { getElementById(id) {
+  }`, { URL, window: { scrollY: 0, addEventListener() {} }, document: { getElementById(id) {
     if (!nodes.has(id)) nodes.set(id, { addEventListener() {}, innerHTML: '', textContent: '' });
     return nodes.get(id);
   } } });
@@ -292,6 +315,33 @@ test('handbook renders every matching member and full profile without collapsed 
   assert.doesNotMatch(html, /id="sort"|id="print-handbook"/);
 });
 
+test('contact renderer escapes text, validates links and loads current details without storage', async () => {
+  const html = await readFile(new URL('../../public/business-connect.html', import.meta.url), 'utf8');
+  const script = html.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/\nloadDirectory\(\);\s*$/, '');
+  const calls = [];
+  const api = vm.runInNewContext(script + '\n({renderContactDetails,loadContactDetails})', {
+    URL, window: { scrollY: 0, addEventListener() {} }, AbortSignal, encodeURIComponent,
+    fetch: async (url, options) => {
+      calls.push({ url, options });
+      return Response.json({ phone: '012-345 6789', phoneHref: '+60123456789', email: 'person@example.test' });
+    },
+    document: { getElementById() { return { addEventListener() {} }; } },
+  });
+  const node = { isConnected: true, innerHTML: '', getAttribute: () => 'member-a' };
+  await api.loadContactDetails(node);
+  assert.match(node.innerHTML, /href="tel:\+60123456789"/);
+  assert.match(node.innerHTML, /href="mailto:person%40example.test"/);
+  assert.equal(calls[0].options.cache, 'no-store');
+  assert.equal(calls[0].url, '/.netlify/functions/public-directory-photo?mode=contact&id=member-a');
+  assert.equal(api.renderContactDetails({}), '');
+  const unsafe = api.renderContactDetails({ phone: '<img onerror=alert(1)>', phoneHref: 'javascript:alert(1)', email: 'person@example.test?subject=bad' });
+  assert.doesNotMatch(unsafe, /<img|href="javascript:|href="mailto:[^"]*\?subject=/);
+  assert.match(unsafe, /&lt;img/);
+  node.innerHTML = 'unchanged'; node.isConnected = false;
+  await api.loadContactDetails(node);
+  assert.equal(node.innerHTML, 'unchanged');
+});
+
 test('guest renderer: automatic profile photo, retry company logo, then initials', async () => {
   const html = await readFile(new URL('../../public/business-connect.html', import.meta.url), 'utf8');
   const script = html.match(/<script>([\s\S]*?)<\/script>/)[1].replace(/\nloadDirectory\(\);\s*$/, '');
@@ -304,9 +354,10 @@ test('guest renderer: automatic profile photo, retry company logo, then initials
     remove() { this.removed = true; }
   }
   const render = vm.runInNewContext(script + '\n(fields)=>renderPage(mapDoc(fields),0,1)', {
-    URL, HTMLImageElement: Img, document: {
+    URL, window: { scrollY: 0, addEventListener() {} }, HTMLImageElement: Img, document: {
       baseURI: 'https://fixture.test/business-connect.html',
-      getElementById() { return { addEventListener(name, fn, capture) {
+      getElementById(id) { return { addEventListener(name, fn, capture) {
+        if (id !== 'pages') return;
         assert.equal(name, 'error'); assert.equal(capture, true); onError = fn;
       } }; },
     },

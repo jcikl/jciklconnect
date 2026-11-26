@@ -112,21 +112,29 @@ export function makePublicDirectoryPhotoHandler({ auth, db, deleteField, fetchIm
   return async req => {
     const params = new URL(req.url).searchParams;
     const operation = params.get('mode');
-    if (req.method === 'GET' && (operation === 'profile' || operation === 'whatsapp')) {
+    if (req.method === 'GET' && ['profile', 'whatsapp', 'contact'].includes(operation)) {
       const id = params.get('id');
       if (!db || !VALID_ID.test(id || '')) return missing();
       try {
         const [member, listing] = refs(id);
         const readSource = () => db.runTransaction(async tx => {
           const [m, l] = await Promise.all([
-            tx.getAll(member, { fieldMask: ['role', 'loId', 'deletedAt', 'privacy.shareCardInternationally', operation === 'whatsapp' ? 'contact.phone' : 'general.avatarUrl'] }).then(rows => rows[0]),
+            tx.getAll(member, { fieldMask: ['role', 'loId', 'deletedAt', 'privacy.shareCardInternationally',
+              ...(operation === 'contact' ? ['contact.phone', 'contact.email'] : [operation === 'whatsapp' ? 'contact.phone' : 'general.avatarUrl'])] }).then(rows => rows[0]),
             tx.get(listing),
           ]);
           return listingEligible(m, l, id)
-            ? (operation === 'whatsapp' ? m.data()?.contact?.phone : m.data()?.general?.avatarUrl)
+            ? (operation === 'contact' ? m.data()?.contact || {} : operation === 'whatsapp' ? m.data()?.contact?.phone : m.data()?.general?.avatarUrl)
             : null;
         }, { readOnly: true });
         const source = await readSource();
+        if (operation === 'contact') {
+          if (!source) return missing();
+          const phone = typeof source.phone === 'string' ? source.phone.trim().slice(0, 64) : '';
+          const email = typeof source.email === 'string' ? source.email.trim().slice(0, 254) : '';
+          return reply({ phone, phoneHref: normalizeMyPhone(phone) || '',
+            email: /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(email) ? email : '' });
+        }
         if (operation === 'whatsapp') {
           const phone = normalizeMyPhone(source);
           if (!phone) return missing();
